@@ -1,0 +1,4 @@
+---
+deployment:
+  tasks:
+    - /home/slepac/bin/deploy_slep_postulaciones.sh
