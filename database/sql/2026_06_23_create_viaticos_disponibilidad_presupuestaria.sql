@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS viaticos_disponibilidad_presupuestaria (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    anio SMALLINT UNSIGNED NOT NULL,
+    origen_tipo VARCHAR(40) NOT NULL,
+    monto_inicial BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    monto_comprometido BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    monto_ejecutado BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    saldo_disponible BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    vigente_desde DATE NOT NULL,
+    vigente_hasta DATE NULL,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    observaciones TEXT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    updated_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    INDEX viaticos_disp_anio_origen_activo_idx (anio, origen_tipo, activo),
+    INDEX viaticos_disponibilidad_presupuestaria_origen_tipo_index (origen_tipo),
+    INDEX viaticos_disponibilidad_presupuestaria_activo_index (activo)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

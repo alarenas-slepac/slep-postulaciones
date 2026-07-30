@@ -1,0 +1,11 @@
+@extends('layouts.app')
+@section('content')
+<div class="container py-4">
+    <h2 class="h4 mb-3">Nueva institución</h2>
+    <div class="card"><div class="card-body">
+        <form method="POST" action="{{ route('admin.instituciones-catalogo.store') }}">
+            @include('admin.instituciones-catalogo._form')
+        </form>
+    </div></div>
+</div>
+@endsection

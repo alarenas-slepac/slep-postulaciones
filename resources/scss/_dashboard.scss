@@ -1,0 +1,164 @@
+/* =========================================================
+   Dashboard (role-based theming) — compatible con Sass
+   ========================================================= */
+@use "sass:color";
+
+/* Wrapper del dashboard:
+   Usa una de estas clases en el contenedor principal:
+   .dashboard--postulante | .dashboard--funcionario | .dashboard--admin
+   Si no hay wrapper específico, usa .dashboard como fallback.
+   Definimos dos CSS vars por rol:
+   --role-accent   -> color sólido
+   --role-accent-06-> el mismo color con 6% de opacidad (precalculado en Sass)
+*/
+.dashboard--postulante {
+    --role-accent: #{$primary};
+    --role-accent-06: #{rgba($primary, .06)};
+}
+
+.dashboard--funcionario {
+    --role-accent: #{$secondary};
+    --role-accent-06: #{rgba($secondary, .06)};
+}
+
+.dashboard--admin {
+    --role-accent: #{$danger};
+    --role-accent-06: #{rgba($danger, .06)};
+}
+
+/* Fallback */
+.dashboard {
+    --role-accent: #{$primary};
+    --role-accent-06: #{rgba($primary, .06)};
+}
+
+/* Hero (gradiente por rol, precomputado con Sass) */
+.dashboard--postulante .dashboard-hero {
+    background: linear-gradient(135deg,
+        #{color.scale($primary, $lightness: 30%)} 0%,
+        #{color.scale($primary, $lightness: 5%)} 100%);
+}
+
+.dashboard--funcionario .dashboard-hero {
+    background: linear-gradient(135deg,
+        #{color.scale($secondary, $lightness: 30%)} 0%,
+        #{color.scale($secondary, $lightness: 5%)} 100%);
+}
+
+.dashboard--admin .dashboard-hero {
+    background: linear-gradient(135deg,
+        #{color.scale($danger, $lightness: 30%)} 0%,
+        #{color.scale($danger, $lightness: 5%)} 100%);
+}
+
+/* Fallback (si solo usas .dashboard) */
+.dashboard .dashboard-hero {
+    background: linear-gradient(135deg,
+        #{color.scale($primary, $lightness: 30%)} 0%,
+        #{color.scale($primary, $lightness: 5%)} 100%);
+}
+
+/* Bloque hero */
+.dashboard-hero {
+    border-radius: 1rem;
+    color: #fff;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    .hero-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: .75rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, .18);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+        font-size: 1.5rem;
+    }
+
+    .hero-title {
+        margin: 0;
+        font-weight: 900;
+        letter-spacing: .2px;
+    }
+
+    .hero-subtitle {
+        margin: 0;
+        opacity: .92;
+    }
+}
+
+/* Grilla de tarjetas */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+/* Tile por rol: usa las CSS vars ya calculadas */
+.tile.tile-role {
+    background: var(--role-accent-06);
+    border-left: .4rem solid var(--role-accent);
+}
+
+.tile .tile-icon {
+    color: var(--role-accent);
+}
+
+/* Estadísticas pequeñas (opcional) */
+.stat-card {
+    border-radius: 1rem;
+    padding: .875rem 1rem;
+    border: 1px solid rgba(0, 0, 0, .06);
+    background: #fff;
+}
+
+.stat-card .stat-label {
+    font-size: .875rem;
+    color: #6b7280;
+    margin-bottom: .125rem;
+}
+
+.stat-card .stat-value {
+    font-weight: 900;
+    font-size: 1.25rem;
+    line-height: 1.1;
+}
+
+/* Quick links */
+.quick-links {
+    --link-color: var(--role-accent);
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.quick-links li+li {
+    margin-top: .4rem;
+}
+
+.quick-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    text-decoration: none;
+    color: var(--link-color);
+    font-weight: 700;
+}
+
+.quick-links a:hover {
+    text-decoration: underline;
+}
+
+/* Lista de pendientes */
+.pending-list {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+.pending-list li {
+    margin-bottom: .25rem;
+}

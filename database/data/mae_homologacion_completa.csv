@@ -1,0 +1,169 @@
+﻿zona,grupo_macro,subgrupo,columna_original,normalizado,campo_canonico,accion_guardado,destino_valor,destino_nombre,es_aporte_patronal,Santa Juana,San Pedro,JUNJI,Coronel,Lota,observaciones
+datos_trabajador,trabajador,datos_personales,(sin encabezado),[[SIN ENCABEZADO]],dv,guardar,dv,,No,,,,,3,
+datos_trabajador,trabajador,datos_personales,DV,DV,dv,guardar,dv,,No,3,3,3,3,,
+datos_trabajador,trabajador,vinculo_laboral,Dias_Trab,DIAS TRAB,dias_trabajados,guardar,dias_trabajados,,No,11,11,11,11,11,
+datos_trabajador,trabajador,vinculo_laboral,Jornada,JORNADA,jornada,guardar,jornada,,No,7,7,7,7,7,
+datos_trabajador,trabajador,vinculo_laboral,Tipo_de_Contrato,TIPO DE CONTRATO,tipo_contrato,guardar,tipo_contrato,,No,8,8,8,8,8,
+datos_trabajador,trabajador,vinculo_laboral,Ubicación,UBICACION,ubicacion,guardar,ubicacion,,No,6,6,6,6,6,
+datos_trabajador,trabajador,vinculo_laboral,comuna,COMUNA,comuna,guardar,comuna,,No,9,9,9,9,9,
+datos_trabajador,trabajador,vinculo_laboral,fechafin,FECHAFIN,fecha_fin,guardar,fecha_fin,,No,10,10,10,10,10,
+datos_trabajador,trabajador,vinculo_laboral,fechaing,FECHAING,fecha_ingreso,guardar,fecha_ingreso,,No,4,4,4,4,4,
+datos_trabajador,trabajador,datos_personales,nombre,NOMBRE,nombre,guardar,nombre,,No,1,1,1,1,1,
+datos_trabajador,trabajador,vinculo_laboral,planta,PLANTA,planta,guardar,planta,,No,5,5,5,5,5,
+datos_trabajador,trabajador,datos_personales,rut,RUT,rut,guardar,rut,,No,2,2,2,2,2,
+haberes_no_guardar,haber_no_guardar,seguro,ACHS,ACHS,achs,ignorar,,,No,39,25,20,27,26,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,patronal_pre_total,APORTE SEG.INV.SOB.,APORTE SEG INV SOB,aporte_seguro_invalidez_sobrevivencia,ignorar,,,Sí,,,16,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,ASIG.FAMILIAR,ASIG FAMILIAR,asignacion_familiar,ignorar,,,No,19,19,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,ASIG.INVALIDEZ,ASIG INVALIDEZ,asignacion_invalidez,ignorar,,,No,,,,,19,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Aguinaldo Navidad,AGUINALDO NAVIDAD,aguinaldo_navidad,ignorar,,,No,,,,36,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,previsional,Aporte Adicional AFP,APORTE ADICIONAL AFP,aporte_adicional_afp,ignorar,,,No,40,41,22,41,37,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,patronal_pre_total,Aporte Seguro Inv. y Sobrevive,APORTE SEGURO INV Y SOBREVIVE,aporte_seguro_invalidez_sobrevivencia,ignorar,,,Sí,25,24,,22,22,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. Adic. Resp. Prioritarios,ASIG ADIC RESP PRIORITARIOS,asignacion_adicional_resp_prioritarios,ignorar,,,No,,39,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. Experiencia,ASIG EXPERIENCIA,asignacion_experiencia,ignorar,,,No,14,14,,14,14,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. Experiencia Asit Educ.,ASIG EXPERIENCIA ASIT EDUC,asignacion_experiencia_asist_educacion,ignorar,,,No,38,31,21,34,29,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. Familiar,ASIG FAMILIAR,asignacion_familiar,ignorar,,,No,,,13,18,18,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. Familiar (Retroactiva),ASIG FAMILIAR RETROACTIVA,asignacion_familiar_retroactiva,ignorar,,,No,,,15,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. Maternal,ASIG MATERNAL,asignacion_maternal,ignorar,,,No,,,,,20,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. Resp. Tec. Pedago.,ASIG RESP TEC PEDAGO,asignacion_resp_tecnica_pedagogica,ignorar,,,No,,28,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. de Invalidez,ASIG DE INVALIDEZ,asignacion_invalidez,ignorar,,,No,,,14,19,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig. de Resp.Tec.Pedagogica,ASIG DE RESP TEC PEDAGOGICA,asig_de_resp_tec_pedagogica,ignorar,,,No,26,,,32,31,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig.Adic.Resp. Prioritarios,ASIG ADIC RESP PRIORITARIOS,asignacion_adicional_resp_prioritarios,ignorar,,,No,,,,17,17,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig.Concen.Prioritarios,ASIG CONCEN PRIORITARIOS,asignacion_concentracion_prioritarios,ignorar,,,No,29,38,,38,36,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig.Mensual 9° Transi,ASIG MENSUAL 9 TRANSI,asignacion_mensual_transitorio_9,ignorar,,,No,35,32,,35,32,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig.Tramo Des. Profes.,ASIG TRAMO DES PROFES,asignacion_tramo_desarrollo_profesional,ignorar,,,No,28,37,,37,35,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Asig.de Respons.,ASIG DE RESPONS,asignacion_responsabilidad,ignorar,,,No,15,15,,15,15,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,BONO ESP. NO IMPONIB,BONO ESP NO IMPONIB,bono_especial_no_imponible,ignorar,,,No,27,,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,BONO ESPECIAL,BONO ESPECIAL,bono_especial,ignorar,,,No,,,18,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,BONO PRIORITARIO AAEE,BONO PRIORITARIO AAEE,bono_prioritario_aaee,ignorar,,,No,34,,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,BRP Mención,BRP MENCION,brp_mencion,ignorar,,,No,32,36,,25,24,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,BRP Titulo,BRP TITULO,brp_titulo,ignorar,,,No,31,35,,24,23,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,BRP título (Retro),BRP TITULO RETRO,brp_titulo_retro,ignorar,,,No,,,,23,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Bonificacion L/19200 Art 3,BONIFICACION L 19200 ART 3,bonificacion_ley_19200_art_3,ignorar,,,No,,20,,20,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Bono Encargado Rural,BONO ENCARGADO RURAL,bono_encargado_rural,ignorar,,,No,21,,,31,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Bono Esp. no imponible,BONO ESP NO IMPONIBLE,bono_especial_no_imponible,ignorar,,,No,,,,29,28,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Bono Mensual Art 13,BONO MENSUAL ART 13,bono_mensual_art_13,ignorar,,,No,36,33,19,,34,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Bono Mensual Art 33,BONO MENSUAL ART 33,bono_mensual_art_33,ignorar,,,No,,29,,33,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Bono Prioritarios AAEE,BONO PRIORITARIOS AAEE,bono_prioritarios_aaee,ignorar,,,No,,30,,26,25,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Bono de Vacaciones,BONO DE VACACIONES,bono_vacaciones,ignorar,,,No,,,,30,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Bono especial no imponible,BONO ESPECIAL NO IMPONIBLE,bono_especial_no_imponible,ignorar,,,No,,34,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,COLACION,COLACION,colacion,ignorar,,,No,18,22,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Compl. de Zona,COMPL DE ZONA,complemento_zona,ignorar,,,No,16,17,,16,16,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,previsional,Cotización Expectativa de Vida,COTIZACION EXPECTATIVA DE VIDA,cotizacion_expectativa_vida,ignorar,,,No,41,42,23,42,38,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,DESG. HERRAMIENTAS,DESG HERRAMIENTAS,desgaste_herramientas,ignorar,,,No,20,,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,DIF.HAB.RETROACTIVOS,DIF HAB RETROACTIVOS,diferencia_haberes_retroactivos,ignorar,,,No,42,43,24,43,39,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,INCENTIVO REF.EDUCAT,INCENTIVO REF EDUCAT,incentivo_reforzamiento_educativo,ignorar,,,No,23,,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,INCREMENTO SUELDO,INCREMENTO SUELDO,incremento_sueldo,ignorar,,,No,24,,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,MOVILIZACION,MOVILIZACION,movilizacion,ignorar,,,No,17,21,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,No Docentes Ley 19464/96,NO DOCENTES LEY 19464 96,no_docentes_ley_19464_96,ignorar,,,No,22,23,,21,21,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Otros Hab.Art 5 Transitorio,OTROS HAB ART 5 TRANSITORIO,otros_haberes_art_5_transitorio,ignorar,,,No,33,,,40,33,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Otros Haberes Art. 5° Transito,OTROS HABERES ART 5 TRANSITO,otros_haberes_art_5_transitorio,ignorar,,,No,,40,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,PLANILLA .SUPLEMENT.,PLANILLA SUPLEMENT,planilla_suplementaria,ignorar,,,No,,16,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Planilla Supl.Ley 20903,PLANILLA SUPL LEY 20903,planilla_supletoria_ley_20903,ignorar,,,No,30,27,,39,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,R.B.M.N.,R B M N,rbmn,ignorar,,,No,13,13,,13,13,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,REM.ADIC.,REM ADIC,remuneracion_adicional,ignorar,,,No,,18,,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Refuerzo Educativo,REFUERZO EDUCATIVO,refuerzo_educativo,ignorar,,,No,,,,,30,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,patronal,SEG.CESANTIA EMP.,SEG CESANTIA EMP,aporte_patronal_seguro_cesantia,ignorar,,,Sí,,,17,,,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Seg. Cesantia Empleador,SEG CESANTIA EMPLEADOR,seg_cesantia_empleador,ignorar,,,Sí,37,26,,28,27,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+haberes_no_guardar,haber_no_guardar,haber,Sueldo Base,SUELDO BASE,sueldo_base,ignorar,,,No,12,12,12,12,12,Regla de negocio: columnas entre Dias_Trab y TOTAL HABERES no se guardan.
+resumen_base,resumen,descuentos_legales,IMPOSICIONES,IMPOSICIONES,imposiciones,guardar,imposiciones,,No,44,45,26,45,41,
+resumen_base,resumen,descuentos_legales,IMPUESTO,IMPUESTO,impuesto,guardar,impuesto,,No,48,49,30,49,45,
+resumen_base,resumen,bases_calculo,MONTO IMP.DESAHUCIO,MONTO IMP DESAHUCIO,monto_imponible_desahucio,guardar,monto_imponible_desahucio,,No,47,48,29,48,44,
+resumen_base,resumen,bases_calculo,MONTO IMPONIBLE,MONTO IMPONIBLE,monto_imponible,guardar,monto_imponible,,No,46,47,28,47,43,
+resumen_base,resumen,bases_calculo,MONTO TRIBUTABLE,MONTO TRIBUTABLE,monto_tributable,guardar,monto_tributable,,No,49,50,31,50,46,
+resumen_base,resumen,descuentos_legales,SALUD,SALUD,salud,guardar,salud,,No,,,27,,,
+resumen_base,resumen,descuentos_legales,Salud,SALUD,salud,guardar,salud,,No,45,46,,46,42,
+resumen_base,resumen,resumen_remuneracional,TOTAL HABERES,TOTAL HABERES,total_haberes,guardar,total_haberes,,No,43,44,25,44,40,
+descuentos,tecnico,redundante,(sin encabezado),[[SIN ENCABEZADO]],rut_duplicado_sin_encabezado,ignorar,,,No,82,85,65,98,79,Penúltima columna sin encabezado: repite rut/run.
+descuentos,tecnico,redundante,0,0,rut_duplicado_columna_0,ignorar,,,No,83,86,66,99,80,Última columna llamada 0: repite rut/run.
+descuentos,descuento,gremial,A.F.E Santa Juana,A F E SANTA JUANA,afe_santa_juana,guardar,afe_santa_juana,,No,53,,,,,
+descuentos,descuento,seguro,ACHS,ACHS,achs,guardar,achs,,No,79,64,41,57,55,
+descuentos,descuento,gremial,AFE SAN PEDRO,AFE SAN PEDRO,afe_san_pedro,guardar,afe_san_pedro,,No,,,,,76,
+descuentos,descuento,gremial,AFE SPP,AFE SPP,afe_spp,guardar,afe_spp,,No,,,42,,,
+descuentos,descuento,gremial,AFPAE San Pedro De la Paz,AFPAE SAN PEDRO DE LA PAZ,afpae_san_pedro_de_la_paz,guardar,afpae_san_pedro_de_la_paz,,No,,65,,,,
+descuentos,descuento,ahorro,AH.VOLUNTARIO,AH VOLUNTARIO,ahorro_voluntario,guardar,ahorro_voluntario,,No,,,32,,47,
+descuentos,descuento,ahorro,AHORRO CCAF LOS ANDES,AHORRO CCAF LOS ANDES,ccaf_los_andes_ahorro,guardar,ccaf_los_andes_ahorro,,No,,,58,,,
+descuentos,descuento,ahorro,AHORRO CCAFF LOS ANDES,AHORRO CCAFF LOS ANDES,ccaf_los_andes_ahorro,guardar,ccaf_los_andes_ahorro,,No,,,,,58,
+descuentos,descuento,ahorro,AHORRO VOLUNTARIO,AHORRO VOLUNTARIO,ahorro_voluntario,guardar,ahorro_voluntario,,No,50,51,,51,,
+descuentos,descuento,apv,APV,APV,apv_generico,guardar,apv_generico,,No,68,,,,,
+descuentos,descuento,apv,APV BANCO ESTADO,APV BANCO ESTADO,apv_banco_estado,guardar,apv_banco_estado,,No,70,72,,,,
+descuentos,descuento,apv,APV CAPITAL,APV CAPITAL,apv_capital,guardar,apv_capital,,No,74,"70, 74",38,"55, 69",53,"San Pedro: [70, 74]; Coronel: [55, 69]"
+descuentos,descuento,apv,APV CUPRUM,APV CUPRUM,apv_cuprum,guardar,apv_cuprum,,No,76,71,,67,59,
+descuentos,descuento,apv,APV HABITAT,APV HABITAT,apv_habitat,guardar,apv_habitat,,No,75,69,44,68,60,
+descuentos,descuento,apv,APV ITAU,APV ITAU,apv_itau,guardar,apv_itau,,No,,,,89,,
+descuentos,descuento,apv,APV PROVIDA,APV PROVIDA,apv_provida,guardar,apv_provida,,No,77,68,,,,
+descuentos,descuento,apv,APV Planvital,APV PLANVITAL,apv_planvital,guardar,apv_planvital,,No,,,,63,,
+descuentos,descuento,apv,APV SECURITY,APV SECURITY,apv_security,guardar,apv_security,,No,,73,,58,,
+descuentos,descuento,apv,APV Uno,APV UNO,apv_uno,guardar,apv_uno,,No,,,,64,,
+descuentos,descuento,apv,APV. BANCO ESTADO,APV BANCO ESTADO,apv_banco_estado,guardar,apv_banco_estado,,No,,,60,,,
+descuentos,descuento,gremial,ASOC. VTF SPP,ASOC VTF SPP,asoc_vtf_spp,guardar,asoc_vtf_spp,,No,,,61,,,
+descuentos,descuento,ahorro,AhorroCoop (Acciones),AHORROCOOP ACCIONES,ahorrocoop_acciones,guardar,ahorrocoop_acciones,,No,61,,,,,
+descuentos,descuento,credito,AhorroCoop (Credito),AHORROCOOP CREDITO,ahorrocoop_credito,guardar,ahorrocoop_credito,,No,66,,,,,
+descuentos,descuento,ahorro,Ahorrocoop (Acciones),AHORROCOOP ACCIONES,ahorrocoop_acciones,guardar,ahorrocoop_acciones,,No,,,48,74,64,
+descuentos,descuento,ahorro,Ahorrocoop (Ahorros),AHORROCOOP AHORROS,ahorrocoop_ahorros,guardar,ahorrocoop_ahorros,,No,,,,75,65,
+descuentos,descuento,credito,Ahorrocoop (Creditos),AHORROCOOP CREDITOS,ahorrocoop_credito,guardar,ahorrocoop_credito,,No,,,,76,66,
+descuentos,descuento,credito,Ahorrocoop Ltda.(Credito),AHORROCOOP LTDA CREDITO,ahorrocoop_credito,guardar,ahorrocoop_credito,,No,,,49,,,
+descuentos,descuento,previsional,Aporte Adicional AFP,APORTE ADICIONAL AFP,aporte_adicional_afp,guardar,aporte_adicional_afp,,No,80,83,63,96,77,
+descuentos,descuento,gremial,Asoc. AAEE (AASISE),ASOC AAEE AASISE,aasise,guardar,aasise,,No,,,,77,,
+descuentos,descuento,gremial,Asoc. Funcionarios (AFEM LOT,ASOC FUNCIONARIOS AFEM LOT,afemu_lota,guardar,afemu_lota,,No,,,,,72,
+descuentos,descuento,gremial,Asoc. Funcionarios AFEMU,ASOC FUNCIONARIOS AFEMU,afemu,guardar,afemu,,No,,,,95,71,
+descuentos,descuento,gremial,Asoc. Funcionarios(AFE CORON,ASOC FUNCIONARIOS AFE CORON,afe_coronel,guardar,afe_coronel,,No,,,,78,,
+descuentos,descuento,gremial,Asoc. Funcionarios(AFE SAN P,ASOC FUNCIONARIOS AFE SAN P,afe_san_pedro,guardar,afe_san_pedro,,No,,54,,,,
+descuentos,descuento,gremial,Asoc. VTF Coronel,ASOC VTF CORONEL,asoc_vtf_coronel,guardar,asoc_vtf_coronel,,No,,,51,,,
+descuentos,descuento,seguro,BICE VIDA CIA DE SEGUROS S.A,BICE VIDA CIA DE SEGUROS S A,bice_vida_cia_seguros,guardar,bice_vida_cia_seguros,,No,,,,84,69,
+descuentos,descuento,seguro,Bice Vida CIA de Seguros,BICE VIDA CIA DE SEGUROS,bice_vida_cia_seguros,guardar,bice_vida_cia_seguros,,No,,,53,,,
+descuentos,descuento,ahorro,CCAF LOS ANDES AHORRO,CCAF LOS ANDES AHORRO,ccaf_los_andes_ahorro,guardar,ccaf_los_andes_ahorro,,No,,,,92,,
+descuentos,descuento,credito,CCAF LOS ANDES CREDITO,CCAF LOS ANDES CREDITO,ccaf_los_andes_credito,guardar,ccaf_los_andes_credito,,No,,,,91,,
+descuentos,descuento,seguro,CCAF LOS ANDES SEG. VIDA,CCAF LOS ANDES SEG VIDA,ccaf_los_andes_seguro_vida,guardar,ccaf_los_andes_seguro_vida,,No,,,,93,,
+descuentos,descuento,credito,CCAF LOS ANDES(INTERCAJA),CCAF LOS ANDES INTERCAJA,ccaf_los_andes_intercaja,guardar,ccaf_los_andes_intercaja,,No,,,,94,,
+descuentos,descuento,ahorro,CCAF Los Andes (Ahorro),CCAF LOS ANDES AHORRO,ccaf_los_andes_ahorro,guardar,ccaf_los_andes_ahorro,,No,55,80,,,,
+descuentos,descuento,credito,CCAF Los Andes (Credito),CCAF LOS ANDES CREDITO,ccaf_los_andes_credito,guardar,ccaf_los_andes_credito,,No,58,,,,,
+descuentos,descuento,credito,CCAF Los Andes (Creditos),CCAF LOS ANDES CREDITOS,ccaf_los_andes_credito,guardar,ccaf_los_andes_credito,,No,,57,,,,
+descuentos,descuento,credito,CCAF Los Andes (Intercaja),CCAF LOS ANDES INTERCAJA,ccaf_los_andes_intercaja,guardar,ccaf_los_andes_intercaja,,No,,81,,,,
+descuentos,descuento,seguro,CCAF Los Andes (Seguros),CCAF LOS ANDES SEGUROS,ccaf_los_andes_seguro_vida,guardar,ccaf_los_andes_seguro_vida,,No,73,59,,,,
+descuentos,descuento,credito,CREDITO CCAF LOS ANDES,CREDITO CCAF LOS ANDES,ccaf_los_andes_credito,guardar,ccaf_los_andes_credito,,No,,,57,,51,
+descuentos,descuento,credito,Caja 18 Sept (Creditos),CAJA 18 SEPT CREDITOS,caja_18_credito,guardar,caja_18_credito,,No,60,,45,70,61,
+descuentos,descuento,gremial,Colegio de Profesores,COLEGIO DE PROFESORES,colegio_profesores,guardar,colegio_profesores,,No,52,56,,80,67,
+descuentos,descuento,ahorro,Coopeuch (Acciones),COOPEUCH ACCIONES,coopeuch_acciones,guardar,coopeuch_acciones,,No,64,75,46,71,,
+descuentos,descuento,ahorro,Coopeuch (Ahorro),COOPEUCH AHORRO,coopeuch_ahorro,guardar,coopeuch_ahorro,,No,65,76,,72,62,
+descuentos,descuento,credito,Coopeuch (Credito),COOPEUCH CREDITO,coopeuch_credito,guardar,coopeuch_credito,,No,,,47,,,
+descuentos,descuento,credito,Coopeuch (Creditos),COOPEUCH CREDITOS,coopeuch_credito,guardar,coopeuch_credito,,No,63,77,,73,63,
+descuentos,descuento,previsional,Cotización Expectativa de Vi,COTIZACION EXPECTATIVA DE VI,cotizacion_expectativa_vida,guardar,cotizacion_expectativa_vida,,No,81,84,64,97,78,
+descuentos,descuento,administrativo,DSCTO. INT. REX E28349,DSCTO INT REX E28349,dscto_interes_rex_e28349,guardar,dscto_interes_rex_e28349,,No,,79,,,,
+descuentos,descuento,administrativo,DSCTO. REX E28349,DSCTO REX E28349,dscto_rex_e28349,guardar,dscto_rex_e28349,,No,,78,,,,
+descuentos,descuento,administrativo,DSCTO. REX. RE2798,DSCTO REX RE2798,dscto_rex_re2798,guardar,dscto_rex_re2798,,No,,,,65,,
+descuentos,descuento,administrativo,DSTO. REX. RE4114/2026,DSTO REX RE4114 2026,dscto_rex_re4114_2026,guardar,dscto_rex_re4114_2026,,No,78,,,,,
+descuentos,descuento,salud_complementaria,Emerg. Medicas URM,EMERG MEDICAS URM,emergencias_medicas_urm,guardar,emergencias_medicas_urm,,No,,58,,,,
+descuentos,descuento,credito,Fonasa (Prestamo),FONASA PRESTAMO,prestamo_fonasa,guardar,prestamo_fonasa,,No,,62,56,87,,
+descuentos,descuento,salud_complementaria,Fund.Arturo Lopez Pe,FUND ARTURO LOPEZ PE,fundacion_arturo_lopez_perez,guardar,fundacion_arturo_lopez_perez,,No,,,,,56,
+descuentos,descuento,salud_complementaria,Fundacion Arturo Lopez Perez,FUNDACION ARTURO LOPEZ PEREZ,fundacion_arturo_lopez_perez,guardar,fundacion_arturo_lopez_perez,,No,,,,82,,
+descuentos,descuento,seguro,Mutual de Seguros de Chile,MUTUAL DE SEGUROS DE CHILE,mutual_seguros_chile,guardar,mutual_seguros_chile,,No,56,55,52,83,68,
+descuentos,descuento,salud_complementaria,Odontologia Coronel,ODONTOLOGIA CORONEL,odontologia_coronel,guardar,odontologia_coronel,,No,,,,88,,
+descuentos,descuento,credito,OrienCoop,ORIENCOOP,oriencoop,guardar,oriencoop,,No,67,,,,,
+descuentos,descuento,credito,Oriencoop,ORIENCOOP,oriencoop,guardar,oriencoop,,No,,82,62,79,75,
+descuentos,descuento,credito,PREST. FONASA,PREST FONASA,prestamo_fonasa,guardar,prestamo_fonasa,,No,,,,,50,
+descuentos,descuento,credito,Prest. Fonasa,PREST FONASA,prestamo_fonasa,guardar,prestamo_fonasa,,No,54,,,,,
+descuentos,descuento,judicial,RET.JUDICIAL,RET JUDICIAL,retencion_judicial,guardar,retencion_judicial,,No,51,52,33,52,48,
+descuentos,descuento,reintegro,Reintegro A. Prioritarios,REINTEGRO A PRIORITARIOS,reintegro_asignacion_prioritarios,guardar,reintegro_asignacion_prioritarios,,No,,,,66,,
+descuentos,descuento,reintegro,Reintegro Asig. Zona,REINTEGRO ASIG ZONA,reintegro_asignacion_zona,guardar,reintegro_asignacion_zona,,No,,,,60,,
+descuentos,descuento,reintegro,Reintegro B.Escolar,REINTEGRO B ESCOLAR,reintegro_bono_escolar,guardar,reintegro_bono_escolar,,No,,,37,,,
+descuentos,descuento,reintegro,Reintegro BRP Mención,REINTEGRO BRP MENCION,reintegro_brp_mencion,guardar,reintegro_brp_mencion,,No,,,,,57,
+descuentos,descuento,reintegro,Reintegro BRP(M),REINTEGRO BRP M,reintegro_brp_mencion,guardar,reintegro_brp_mencion,,No,,,,62,,
+descuentos,descuento,reintegro,Reintegro BRP(T),REINTEGRO BRP T,reintegro_brp_titulo,guardar,reintegro_brp_titulo,,No,,,,61,,
+descuentos,descuento,reintegro,Reintegro Homologacion,REINTEGRO HOMOLOGACION,reintegro_homologacion,guardar,reintegro_homologacion,,No,,,40,,,
+descuentos,descuento,reintegro,Reintegro RBMN,REINTEGRO RBMN,reintegro_rbmn,guardar,reintegro_rbmn,,No,,,,59,,
+descuentos,descuento,reintegro,Reintegro. Asig. Familiar,REINTEGRO ASIG FAMILIAR,reintegro_asignacion_familiar,guardar,reintegro_asignacion_familiar,,No,,,39,,,
+descuentos,descuento,cesantia,SEG. CESANTIA,SEG CESANTIA,seguro_cesantia_trabajador,guardar,seguro_cesantia_trabajador,,No,,,34,,,
+descuentos,descuento,patronal,SEG. CESANTIA EMP.,SEG CESANTIA EMP,aporte_patronal_seguro_cesantia,guardar,aporte_patronal_seguro_cesantia,,Sí,,,36,,,
+descuentos,descuento,seguro,SEGURO DE VIDA CCAF LOS ANDE,SEGURO DE VIDA CCAF LOS ANDE,ccaf_los_andes_seguro_vida,guardar,ccaf_los_andes_seguro_vida,,No,,,,,74,
+descuentos,descuento,seguro,SEGURO VIDA LOS ANDES,SEGURO VIDA LOS ANDES,ccaf_los_andes_seguro_vida,guardar,ccaf_los_andes_seguro_vida,,No,,,59,,,
+descuentos,descuento,salud_complementaria,SERBIMA,SERBIMA,serbima,guardar,serbima,,No,,67,,,,
+descuentos,descuento,gremial,SUTE,SUTE,sute,guardar,sute,,No,,,,90,73,
+descuentos,descuento,patronal,Seg.Cesantia (Emp),SEG CESANTIA EMP,aporte_patronal_seguro_cesantia,guardar,aporte_patronal_seguro_cesantia,,Sí,72,66,,56,54,
+descuentos,descuento,patronal,Seg.Inv.Sob.(Emp),SEG INV SOB EMP,aporte_patronal_seguro_invalidez_sobrevivencia,guardar,aporte_patronal_seguro_invalidez_sobrevivencia,,Sí,62,63,35,54,52,
+descuentos,descuento,cesantia,Seguro de Cesantía,SEGURO DE CESANTIA,seguro_cesantia_trabajador,guardar,seguro_cesantia_trabajador,,No,69,53,,53,49,
+descuentos,descuento,seguro,Seguros Vida Security,SEGUROS VIDA SECURITY,security_seguro_vida,guardar,security_seguro_vida,,No,57,60,,,,
+descuentos,descuento,salud_complementaria,Serbima,SERBIMA,serbima,guardar,serbima,,No,71,,54,85,,
+descuentos,descuento,gremial,Sindicato Sedimc,SINDICATO SEDIMC,sindicato_sedimc,guardar,sindicato_sedimc,,No,,,50,81,,
+descuentos,descuento,gremial,VTF AFJICU,VTF AFJICU,vtf_afjicu,guardar,vtf_afjicu,,No,,,43,,,
+descuentos,descuento,seguro,Zurich Chile Seguros,ZURICH CHILE SEGUROS,zurich_chile_seguros,guardar,zurich_chile_seguros,,No,59,61,,86,70,
+descuentos,descuento,seguro,Zurich Chile Seguros S.A.,ZURICH CHILE SEGUROS S A,zurich_chile_seguros,guardar,zurich_chile_seguros,,No,,,55,,,

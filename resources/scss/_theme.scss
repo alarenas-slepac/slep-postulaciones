@@ -1,0 +1,81 @@
+// =========================================================
+//  Bootstrap Theme Variables — Accesibilidad (WCAG)
+//  Se importa ANTES de Bootstrap en app.scss
+// =========================================================
+
+// Paleta base (de tu ASE ya verificada)
+$primary: #000DF2;
+$secondary: #FF1A26;
+$success: #00FF00;
+$warning: #FFFF00;
+$info: #00FFFF;
+$light: #FFFFFF;
+$dark: #000000;
+
+// Body / texto / links
+$body-bg: #FFFFFF;
+$body-color: #000000;
+$link-color: $primary;
+
+// Enfoque accesible
+$focus-ring-color: rgba($primary, .4);
+
+// Bordes suaves genéricos
+$border-color: rgba(#000000, 0.12);
+$card-bg: #FFFFFF;
+
+// =========================================================
+// Mapas de colores (Bootstrap 5.3):
+// - $theme-colors            → colores principales
+// - $theme-colors-text       → "text-emphasis" (para .text-*-emphasis)
+// - $theme-colors-bg-subtle  → fondos suaves (.bg-*-subtle)
+// - $theme-colors-border-subtle → bordes suaves (.border-*-subtle)
+// =========================================================
+$theme-colors: (
+    "primary": $primary,
+    "secondary": $secondary,
+    "success": $success,
+    "info": $info,
+    "warning": $warning,
+    "danger": #DC3545,
+    // por si lo usas más adelante
+    "light": $light,
+    "dark": $dark
+);
+
+// Texto para "emphasis" (garantizando legibilidad en subtle)
+$theme-colors-text: (
+    "primary": #000000,
+    "secondary": #000000,
+    "success": #000000,
+    "info": #000000,
+    "warning": #000000,
+    "danger": #58151C,
+    // tono oscuro por consistencia Bootstrap
+    "light": #000000,
+    "dark": #FFFFFF
+);
+
+// Fondos sutiles (mezcla 90% blanco + 10% color)
+$theme-colors-bg-subtle: (
+    "primary": #E6E7FE,
+    "secondary": #FFE8E9,
+    "success": #E6FFE6,
+    "info": #E6FFFF,
+    "warning": #FFFFE6,
+    "danger": #F8D7DA,
+    "light": #FFFFFF,
+    "dark": #E6E6E6
+);
+
+// Bordes sutiles (color base mezclado con 70% negro)
+$theme-colors-border-subtle: (
+    "primary": #000449,
+    "secondary": #4D080B,
+    "success": #004D00,
+    "info": #004D4D,
+    "warning": #4D4D00,
+    "danger": #842029,
+    "light": #4D4D4D,
+    "dark": #000000
+);

@@ -1,0 +1,14 @@
+# Fuerza PHP 8.3 en este DocumentRoot (si tu hosting usa handlers)
+AddHandler application/x-httpd-ea-php83 .php .php8 .phtml
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Si existe el archivo o carpeta, NO pasar por Laravel
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Todo lo demás va al front controller
+    RewriteRule ^ index.php [L]
+</IfModule>

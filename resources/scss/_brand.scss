@@ -1,0 +1,38 @@
+/* =========================================================
+   Brand tokens + fonts (SLEP AC Postulaciones)
+   Coloca tus fuentes OTF en public/fonts/
+   ========================================================= */
+
+/* ====== Color tokens (ajustables) ======
+   Basado en tu línea azul institucional (#0B3D91)
+   y acentos compatibles para UI. */
+$brand-primary: #0b3d91;
+$brand-secondary: #d22630;
+/* rojo institucional */
+$brand-accent: #00a3e0;
+/* celeste apoyo */
+$brand-success: #16a34a;
+$brand-warning: #f59e0b;
+$brand-danger: #dc2626;
+$brand-info: #0ea5e9;
+
+$brand-gray-900: #111827;
+$brand-gray-700: #374151;
+$brand-gray-500: #6b7280;
+$brand-gray-100: #f3f4f6;
+$brand-white: #ffffff;
+
+/* Exponer como CSS vars por si quieres usarlas en Blade/JS */
+:root {
+    --brand-primary: #{$brand-primary};
+    --brand-secondary: #{$brand-secondary};
+    --brand-accent: #{$brand-accent};
+    --brand-success: #{$brand-success};
+    --brand-warning: #{$brand-warning};
+    --brand-danger: #{$brand-danger};
+    --brand-info: #{$brand-info};
+    --brand-gray-900: #{$brand-gray-900};
+    --brand-gray-700: #{$brand-gray-700};
+    --brand-gray-500: #{$brand-gray-500};
+    --brand-gray-100: #{$brand-gray-100};
+}

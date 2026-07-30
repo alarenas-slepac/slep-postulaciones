@@ -1,0 +1,88 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Carga masiva de establecimientos</h1>
+            <p class="text-muted mb-0">Importa o actualiza establecimientos usando la plantilla oficial del sistema.</p>
+        </div>
+        <a href="{{ route('admin.establecimientos.index') }}" class="btn btn-outline-secondary">Volver</a>
+    </div>
+
+    @if (session('status'))
+        <div class="alert alert-success">{{ session('status') }}</div>
+    @endif
+
+    @php($importErrors = session('import_errors', []))
+    @if (!empty($importErrors))
+        <div class="alert alert-warning">
+            <div class="fw-semibold mb-2">Filas con observaciones</div>
+            <ul class="mb-0 ps-3">
+                @foreach ($importErrors as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5">Plantilla descargable</h2>
+                    <p class="text-muted">Descarga la plantilla Excel con el mismo formato usado en la carga oficial inicial, ahora con columnas opcionales de latitud y longitud.</p>
+                    <div class="d-grid gap-2 d-sm-flex">
+                        <a href="{{ route('admin.establecimientos.template') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-download"></i> Descargar plantilla
+                        </a>
+                    </div>
+
+                    <hr>
+
+                    <div class="small text-muted">
+                        <div class="fw-semibold text-dark mb-2">Encabezados esperados</div>
+                        <ol class="mb-0 ps-3">
+                            @foreach ($expectedHeaders as $header)
+                                <li>{!! nl2br(e($header)) !!}</li>
+                            @endforeach
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5">Subir archivo</h2>
+                    <form method="POST" action="{{ route('admin.establecimientos.import.store') }}" enctype="multipart/form-data" class="row g-3">
+                        @csrf
+
+                        <div class="col-12">
+                            <label class="form-label">Archivo Excel</label>
+                            <input type="file" name="excel" class="form-control @error('excel') is-invalid @enderror" accept=".xlsx,.xls" required>
+                            @error('excel')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <div class="form-text">Usa la plantilla descargable o un archivo con la misma estructura oficial. Las columnas latitud y longitud son opcionales, pero si se informan deben venir en decimal.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="1" id="truncate" name="truncate" @checked(old('truncate'))>
+                                <label class="form-check-label" for="truncate">
+                                    Vaciar y reemplazar todos los establecimientos existentes antes de importar
+                                </label>
+                            </div>
+                            <div class="form-text text-danger">Usa esta opción solo si deseas reemplazar completamente el padrón actual.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <button class="btn btn-primary"><i class="bi bi-upload"></i> Importar establecimientos</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection

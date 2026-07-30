@@ -1,0 +1,16 @@
+ALTER TABLE cometidos_funcionarios
+  ADD COLUMN IF NOT EXISTS requiere_autorizacion_director_sin_disponibilidad TINYINT(1) NOT NULL DEFAULT 0 AFTER estado_reembolso,
+  ADD COLUMN IF NOT EXISTS estado_autorizacion_director VARCHAR(40) NULL AFTER requiere_autorizacion_director_sin_disponibilidad,
+  ADD COLUMN IF NOT EXISTS monto_viatico_solicitado_director INT UNSIGNED NULL AFTER estado_autorizacion_director,
+  ADD COLUMN IF NOT EXISTS monto_disponible_director INT UNSIGNED NULL AFTER monto_viatico_solicitado_director,
+  ADD COLUMN IF NOT EXISTS diferencia_presupuestaria_director INT UNSIGNED NULL AFTER monto_disponible_director,
+  ADD COLUMN IF NOT EXISTS fundamento_planificacion_director TEXT NULL AFTER diferencia_presupuestaria_director,
+  ADD COLUMN IF NOT EXISTS decision_director VARCHAR(80) NULL AFTER fundamento_planificacion_director,
+  ADD COLUMN IF NOT EXISTS observacion_director TEXT NULL AFTER decision_director,
+  ADD COLUMN IF NOT EXISTS fecha_solicitud_director TIMESTAMP NULL AFTER observacion_director,
+  ADD COLUMN IF NOT EXISTS fecha_decision_director TIMESTAMP NULL AFTER fecha_solicitud_director,
+  ADD COLUMN IF NOT EXISTS director_user_id BIGINT UNSIGNED NULL AFTER fecha_decision_director,
+  ADD COLUMN IF NOT EXISTS viatico_reconvertido_a_reembolso TINYINT(1) NOT NULL DEFAULT 0 AFTER director_user_id,
+  ADD COLUMN IF NOT EXISTS motivo_reconversion_reembolso TEXT NULL AFTER viatico_reconvertido_a_reembolso,
+  ADD COLUMN IF NOT EXISTS tenia_derecho_viatico_original TINYINT(1) NOT NULL DEFAULT 0 AFTER motivo_reconversion_reembolso,
+  ADD COLUMN IF NOT EXISTS monto_viatico_original INT UNSIGNED NULL AFTER tenia_derecho_viatico_original;

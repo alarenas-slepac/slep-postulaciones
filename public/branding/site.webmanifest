@@ -1,0 +1,21 @@
+{
+    "name": "SLEP AC Postulaciones",
+    "short_name": "SLEP AC",
+    "icons": [
+        {
+            "src": "/branding/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/branding/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#0b3d91",
+    "background_color": "#ffffff",
+    "start_url": "/",
+    "display": "standalone",
+    "scope": "/"
+}
