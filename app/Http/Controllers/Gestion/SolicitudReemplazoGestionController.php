@@ -32,6 +32,8 @@ use App\Services\RestrictedRutService;
 
 class SolicitudReemplazoGestionController extends Controller
 {
+    private const MAX_REPLACEMENT_WEEKLY_HOURS = 44.0;
+
         public function index(Request $request)
     {
         $user = $request->user();
@@ -971,24 +973,29 @@ class SolicitudReemplazoGestionController extends Controller
                 return back()->withErrors(['jornadas' => "Debe completar la jornada del reemplazo para {$fin}."])->withInput();
             }
 
-            $basica = (float) $basicaRaw;
-            $media = (float) $mediaRaw;
+            $basica = round((float) $basicaRaw, 2);
+            $media = round((float) $mediaRaw, 2);
 
-            if ($basica > (float) $row->titular_basica) {
-                return back()->withErrors(['jornadas' => "En {$fin}: HRS BÁSICA no puede exceder {$row->titular_basica}."])->withInput();
-            }
-            if ($media > (float) $row->titular_media) {
-                return back()->withErrors(['jornadas' => "En {$fin}: HRS MEDIA no puede exceder {$row->titular_media}."])->withInput();
+            if ($basica < 0 || $media < 0) {
+                return back()->withErrors(['jornadas' => "En {$fin}: las horas del reemplazo no pueden ser negativas."])->withInput();
             }
 
-            $total = $basica + $media;
-            $nuevoTotal += $total;
+            $total = round($basica + $media, 2);
+            $nuevoTotal = round($nuevoTotal + $total, 2);
             $updates[] = [
                 'model' => $row,
                 'reemplazo_basica' => $basica,
                 'reemplazo_media' => $media,
                 'reemplazo_total' => $total,
             ];
+        }
+
+        if ($nuevoTotal > self::MAX_REPLACEMENT_WEEKLY_HOURS) {
+            return back()
+                ->withErrors([
+                    'jornadas' => 'La distribución completa de la jornada del reemplazo no puede superar las 44 horas semanales.',
+                ])
+                ->withInput();
         }
 
         $horasCron = 0.0;
