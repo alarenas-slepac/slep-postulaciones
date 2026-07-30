@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.7.1.339' => [
+        'date' => '2026-07-30',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Redistribución de jornada del reemplazante con máximo global',
+        'files' => [
+            'app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php',
+            'resources/views/gestion/solicitudes-reemplazo/show.blade.php',
+            'tests/Feature/SolicitudReemplazoJornadaAdjustmentTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Permite a Coordinador UATP y Supervisor Planificación redistribuir las horas del reemplazante entre fuentes de financiamiento sin quedar limitados por las horas del titular en cada fila.',
+            'Aplica como único tope de distribución que la suma completa de horas básicas y medias del reemplazante no supere las 44 horas semanales.',
+            'Mantiene los controles de integridad para exigir valores numéricos y no negativos, además de la observación y trazabilidad del ajuste.',
+            'Actualiza el formulario para eliminar los máximos por financiamiento e informar el límite semanal global.',
+            'No incorpora migraciones ni modifica datos históricos.',
+        ],
+        'roles' => ['Admin', 'Coordinador UATP', 'Supervisor Planificación'],
+    ],
     '2026.7.1.338' => [
         'date' => '2026-07-30',
         'module' => 'Trámites - Reconocimiento de Bienios',

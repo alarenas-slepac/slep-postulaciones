@@ -702,7 +702,7 @@
                 <hr class="my-3">
                 <div class="alert alert-warning">
                     <div class="fw-semibold mb-1">Ajuste de jornada del reemplazo</div>
-                    <div class="small mb-0">Puede modificar aquí mismo la distribución de jornada del reemplazo y, si corresponde, sus horas aula. No se alteran las horas del titular.</div>
+                    <div class="small mb-0">Puede redistribuir libremente las horas del reemplazo entre los financiamientos. La suma completa no puede superar las 44 horas semanales y no se alteran las horas del titular.</div>
                 </div>
 
                 <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.ajuste-reemplazo.update', $s) }}">
@@ -734,10 +734,10 @@
                                         <td class="text-end text-muted">{{ $fmt($j->titular_basica) }}</td>
                                         <td class="text-end text-muted">{{ $fmt($j->titular_media) }}</td>
                                         <td>
-                                            <input type="number" step="0.01" min="0" max="{{ $fmt($j->titular_basica) }}" name="jornadas[{{ $finKey }}][basica]" value="{{ $baseVal }}" class="form-control form-control-sm text-end" required>
+                                            <input type="number" step="0.01" min="0" name="jornadas[{{ $finKey }}][basica]" value="{{ $baseVal }}" class="form-control form-control-sm text-end" required>
                                         </td>
                                         <td>
-                                            <input type="number" step="0.01" min="0" max="{{ $fmt($j->titular_media) }}" name="jornadas[{{ $finKey }}][media]" value="{{ $mediaVal }}" class="form-control form-control-sm text-end" required>
+                                            <input type="number" step="0.01" min="0" name="jornadas[{{ $finKey }}][media]" value="{{ $mediaVal }}" class="form-control form-control-sm text-end" required>
                                         </td>
                                         <td class="text-end fw-semibold">{{ $totalVal }}</td>
                                     </tr>
