@@ -215,6 +215,7 @@ class EstablecimientoController extends Controller
             'tipo_estab' => ['nullable', 'string', 'max:80'],
             'comuna' => ['nullable', 'string', 'max:120'],
             'asignacion_zona' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'matricula_total' => ['nullable', 'integer', 'min:0'],
             'latitud' => ['nullable', 'numeric', 'between:-90,90'],
             'longitud' => ['nullable', 'numeric', 'between:-180,180'],
             'sala_cuna' => ['sometimes', 'boolean'],
@@ -235,6 +236,7 @@ class EstablecimientoController extends Controller
             'adultos' => (bool) $request->boolean('adultos'),
             'especial' => (bool) $request->boolean('especial'),
             'asignacion_zona' => (int) $request->input('asignacion_zona', 0),
+            'matricula_total' => $request->filled('matricula_total') ? (int) $request->input('matricula_total') : null,
             'latitud' => $request->filled('latitud') ? (float) $request->input('latitud') : null,
             'longitud' => $request->filled('longitud') ? (float) $request->input('longitud') : null,
         ];

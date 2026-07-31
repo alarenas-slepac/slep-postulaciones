@@ -2167,6 +2167,27 @@
     "file": "assets/zw-U0m7oJ5e.svg",
     "src": "node_modules/flag-icons/flags/4x3/zw.svg"
   },
+  "node_modules/leaflet/dist/images/layers-2x.png": {
+    "file": "assets/layers-2x-Bpkbi35X.png",
+    "src": "node_modules/leaflet/dist/images/layers-2x.png"
+  },
+  "node_modules/leaflet/dist/images/layers.png": {
+    "file": "assets/layers-BWBAp2CZ.png",
+    "src": "node_modules/leaflet/dist/images/layers.png"
+  },
+  "node_modules/leaflet/dist/images/marker-icon.png": {
+    "file": "assets/marker-icon-hN30_KVU.png",
+    "src": "node_modules/leaflet/dist/images/marker-icon.png"
+  },
+  "resources/css/centro-operaciones.css": {
+    "file": "assets/centro-operaciones-CgDroY0V.css",
+    "src": "resources/css/centro-operaciones.css",
+    "isEntry": true,
+    "name": "centro-operaciones",
+    "names": [
+      "centro-operaciones.css"
+    ]
+  },
   "resources/fonts/Gilmer-Bold.otf": {
     "file": "assets/Gilmer-Bold-DZRjtHOG.otf",
     "src": "resources/fonts/Gilmer-Bold.otf"
@@ -2188,6 +2209,20 @@
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
+  },
+  "resources/js/centro-operaciones.js": {
+    "file": "assets/centro-operaciones-B6f-cyhR.js",
+    "name": "centro-operaciones",
+    "src": "resources/js/centro-operaciones.js",
+    "isEntry": true,
+    "css": [
+      "assets/centro-operaciones-hTRphxZi.css"
+    ],
+    "assets": [
+      "assets/layers-BWBAp2CZ.png",
+      "assets/layers-2x-Bpkbi35X.png",
+      "assets/marker-icon-hN30_KVU.png"
+    ]
   },
   "resources/scss/app.scss": {
     "file": "assets/app-B4IeJODj.css",

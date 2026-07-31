@@ -1,6 +1,47 @@
 <?php
 
 return [
+    '2026.7.1.351' => [
+        'date' => '2026-07-31',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Reportes diarios y panel territorial operacional',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/PanelController.php',
+            'app/Http/Controllers/CentroOperaciones/ReporteController.php',
+            'app/Http/Requests/CentroOperaciones/GuardarReporteRequest.php',
+            'app/Models/CentroOperacionesReporte.php',
+            'app/Models/CentroOperacionesIncidencia.php',
+            'app/Services/CentroOperaciones/ConsolidadoService.php',
+            'app/Services/CentroOperaciones/DatosBaseService.php',
+            'app/Services/CentroOperaciones/EstadoService.php',
+            'app/Services/CentroOperaciones/ReporteService.php',
+            'config/centro_operaciones.php',
+            'database/migrations/2026_07_31_120000_add_matricula_total_to_establecimientos.php',
+            'database/migrations/2026_07_31_121000_create_centro_operaciones_tables.php',
+            'database/migrations/2026_07_31_122000_register_centro_operaciones_module.php',
+            'resources/views/centro-operaciones/panel.blade.php',
+            'resources/views/centro-operaciones/reportes/form.blade.php',
+            'resources/css/centro-operaciones.css',
+            'resources/js/centro-operaciones.js',
+            'resources/templates/plantilla-carga-establecimientos.xlsx',
+            'package.json',
+            'package-lock.json',
+            'routes/web.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Incorpora un panel territorial claro y responsivo con métricas, estado por comuna, mapa georreferenciado, servicios, alertas e incidencias activas.',
+            'Permite exclusivamente al rol funcionario_directivo_estab crear varios reportes del día para su establecimiento y editarlos tantas veces como sea necesario.',
+            'Consolida el último estado operacional y mantiene acumuladas las incidencias de distintos reportes hasta que un envío posterior las marque como resueltas.',
+            'Conserva auditoría de cada versión y habilita el historial completo del establecimiento para el rol reportante.',
+            'Obtiene matrícula desde la ficha del establecimiento y usa como respaldo la suma de cursos activos del año; la dotación proviene del último padrón vigente de personal.',
+            'Añade el modo TV con actualización automática cada minuto y conserva la adaptación para computadores, tablets y teléfonos.',
+            'Agrupa en el mapa los establecimientos con coordenadas cercanas y permite ampliarlos para evitar que un marcador oculte a otro.',
+            'Muestra en la cabecera del formulario y del detalle el logo del establecimiento y el nombre de su director o directora registrados en Admisión Escolar.',
+            'Deja preparada la solicitud de apoyo para incorporar áreas responsables y notificaciones en una mejora futura.',
+        ],
+        'roles' => ['Administrador', 'Director Ejecutivo', 'Funcionario SLEP', 'Coordinador GDP', 'Coordinador UATP', 'Directivo de Establecimiento'],
+    ],
     '2026.7.1.350' => [
         'date' => '2026-07-31',
         'module' => 'Admisión Escolar',
@@ -1797,8 +1838,30 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.7.1.340',
+    'current_version' => '2026.7.1.351',
     'entries' => [
+
+        [
+            'version' => '2026.7.1.351',
+            'title' => 'Centro de Operaciones: reportes diarios y panel territorial',
+            'summary' => 'Incorpora reportes diarios por establecimiento, consolidación de incidencias y un panel operacional responsivo con mapa y modo TV.',
+            'roles' => [
+                'admin',
+                'director_ejecutivo',
+                'funcionario_slep',
+                'coordinador_gdp',
+                'coordinador_uatp',
+                'funcionario_directivo_estab',
+            ],
+            'items' => [
+                'El directivo del establecimiento puede enviar varios reportes del día y editar cada uno durante la jornada.',
+                'El panel consolida el último estado y acumula incidencias activas provenientes de distintos reportes.',
+                'Las incidencias resueltas permanecen disponibles para trazabilidad y cada edición genera una nueva versión de auditoría.',
+                'Muestra cobertura de reportes, asistencia, estados por comuna, servicios y establecimientos georreferenciados.',
+                'Incluye diseño claro inspirado en Admisión Escolar, adaptación móvil y modo TV con actualización automática.',
+            ],
+            'published_at' => '2026-07-31 18:00:00',
+        ],
 
         [
             'version' => '2026.7.1.340',

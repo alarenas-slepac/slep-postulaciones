@@ -9,6 +9,7 @@ use App\Models\EstablecimientoAreaDesempeno;
 use App\Models\AlumnoPrioritarioPorcentaje;
 use App\Models\DotacionProporcionExcepcion;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Establecimiento extends Model
 {
@@ -31,6 +32,7 @@ class Establecimiento extends Model
         'especial',
         'comuna',
         'asignacion_zona',
+        'matricula_total',
         'latitud',
         'longitud',
     ];
@@ -47,6 +49,7 @@ class Establecimiento extends Model
         'adultos' => 'boolean',
         'especial' => 'boolean',
         'asignacion_zona' => 'integer',
+        'matricula_total' => 'integer',
         'latitud' => 'decimal:7',
         'longitud' => 'decimal:7',
     ];
@@ -97,6 +100,11 @@ class Establecimiento extends Model
     {
         // ajusta 'establecimiento_id' si tu FK tiene otro nombre
         return $this->hasMany(ReemplazoPersonal::class, 'establecimiento_id');
+    }
+
+    public function reportesCentroOperaciones(): HasMany
+    {
+        return $this->hasMany(CentroOperacionesReporte::class, 'establecimiento_id');
     }
 
     /**

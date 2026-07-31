@@ -31,7 +31,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <h2 class="h5">Plantilla descargable</h2>
-                    <p class="text-muted">Descarga la plantilla Excel con el mismo formato usado en la carga oficial inicial, ahora con columnas opcionales de latitud y longitud.</p>
+                    <p class="text-muted">Descarga la plantilla oficial, que incorpora la matrícula total para el Centro de Operaciones.</p>
                     <div class="d-grid gap-2 d-sm-flex">
                         <a href="{{ route('admin.establecimientos.template') }}" class="btn btn-outline-primary">
                             <i class="bi bi-download"></i> Descargar plantilla
@@ -63,7 +63,7 @@
                             <label class="form-label">Archivo Excel</label>
                             <input type="file" name="excel" class="form-control @error('excel') is-invalid @enderror" accept=".xlsx,.xls" required>
                             @error('excel')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            <div class="form-text">Usa la plantilla descargable o un archivo con la misma estructura oficial. Las columnas latitud y longitud son opcionales, pero si se informan deben venir en decimal.</div>
+                            <div class="form-text">La columna MATRÍCULA_TOTAL es opcional para mantener compatibilidad con archivos históricos. Si queda vacía, el Centro de Operaciones usará la suma de cursos activos del año.</div>
                         </div>
 
                         <div class="col-12">
