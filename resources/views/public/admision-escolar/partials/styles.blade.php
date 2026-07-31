@@ -30,7 +30,7 @@ button{cursor:pointer}
 .ae-sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .ae-skip-link{position:fixed;left:18px;top:-80px;background:#fff;color:var(--ae-navy);padding:12px 18px;border-radius:12px;z-index:9999;box-shadow:var(--ae-shadow);font-weight:800;text-decoration:none}
 .ae-skip-link:focus{top:18px}
-.ae-header{position:sticky;top:0;z-index:1000;background:rgba(17,29,46,.97);border-bottom:1px solid rgba(255,255,255,.08);backdrop-filter:blur(14px)}
+.ae-header{position:sticky;top:0;z-index:1000;background:var(--ae-institutional-blue);border-bottom:1px solid rgba(255,255,255,.08);backdrop-filter:blur(14px)}
 .ae-header__inner{min-height:86px;display:flex;align-items:center;justify-content:space-between;gap:24px}
 .ae-brand{display:flex;align-items:center;gap:13px;color:#fff;text-decoration:none;min-width:260px}
 .ae-brand img{width:170px;height:58px;object-fit:contain;object-position:center;background:#fff;border-radius:13px;padding:6px 10px;box-shadow:0 8px 20px rgba(0,0,0,.16)}
@@ -187,7 +187,7 @@ button{cursor:pointer}
 }
 @media (max-width:820px){
     .ae-header__inner{min-height:74px}.ae-brand img{width:145px;height:50px;padding:5px 8px}
-    .ae-nav-toggle{display:block}.ae-nav{position:fixed;inset:74px 0 auto;background:var(--ae-navy);padding:24px 20px 30px;display:none;flex-direction:column;align-items:stretch;border-top:1px solid rgba(255,255,255,.08);box-shadow:0 25px 45px rgba(0,0,0,.25)}
+    .ae-nav-toggle{display:block}.ae-nav{position:fixed;inset:74px 0 auto;background:var(--ae-institutional-blue);padding:24px 20px 30px;display:none;flex-direction:column;align-items:stretch;border-top:1px solid rgba(255,255,255,.08);box-shadow:0 25px 45px rgba(0,0,0,.25)}
     .ae-nav.is-open{display:flex}.ae-nav>a{text-align:center;padding:8px}.ae-nav>a:not(.ae-button)::after{display:none}
     .ae-hero__grid{grid-template-columns:1fr;padding-block:48px 80px}.ae-hero__visual{height:300px}
     .ae-section{padding:56px 0}.ae-info-band{grid-template-columns:1fr}

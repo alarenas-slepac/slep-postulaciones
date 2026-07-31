@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.7.1.342' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Color institucional en el encabezado público',
+        'files' => [
+            'resources/views/layouts/admision-public.blade.php',
+            'resources/views/public/admision-escolar/partials/styles.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Actualiza el fondo del encabezado de la vitrina pública al mismo color institucional #084682 utilizado en el pie de página.',
+            'Aplica el color institucional al menú móvil y al color de tema del navegador para mantener una presentación coherente.',
+            'No modifica contenidos, rutas, permisos ni información de establecimientos.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.7.1.341' => [
         'date' => '2026-07-31',
         'module' => 'Admisión Escolar',

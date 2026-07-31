@@ -11,7 +11,7 @@
     @endphp
     <title>{{ $admisionPageTitle }} · {{ config('brand.org_name', 'SLEP Andalién Costa') }}</title>
     <meta name="description" content="{{ $admisionDescription }}">
-    <meta name="theme-color" content="#111d2e">
+    <meta name="theme-color" content="#084682">
     @if (! empty($isPreview))
         <meta name="robots" content="noindex,nofollow,noarchive">
     @endif
