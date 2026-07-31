@@ -65,4 +65,17 @@ class AdmisionEscolarPublicRoutesTest extends TestCase
             ->assertSee(asset('fonts/admision-escolar/century-gothic-bold.ttf'), false)
             ->assertSee('font-family:"Century Gothic",Arial,sans-serif', false);
     }
+
+    public function test_long_public_texts_use_the_justified_text_utility(): void
+    {
+        config([
+            'admision.publica_habilitada' => false,
+            'admision.mostrar_proximamente' => true,
+        ]);
+
+        $this->get('/admision-escolar')
+            ->assertOk()
+            ->assertSee('.ae-long-text{text-align:justify;text-justify:inter-word;hyphens:auto}', false)
+            ->assertSee('<p class="ae-long-text">Muy pronto podrás explorar', false);
+    }
 }

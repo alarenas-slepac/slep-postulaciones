@@ -19,7 +19,7 @@
         <div>
             <span class="ae-eyebrow">Admisión Escolar {{ config('admision.anio', 2027) }}</span>
             <h1>Explora y encuentra una comunidad educativa para cada trayectoria.</h1>
-            <p class="ae-hero__lead">Conoce los establecimientos del SLEP Andalién Costa, revisa sus sellos educativos, niveles de enseñanza, equipos directivos y espacios formativos.</p>
+            <p class="ae-hero__lead ae-long-text">Conoce los establecimientos del SLEP Andalién Costa, revisa sus sellos educativos, niveles de enseñanza, equipos directivos y espacios formativos.</p>
             <div class="ae-hero__actions">
                 <a class="ae-button ae-button--primary" href="#establecimientos">Explorar establecimientos <span aria-hidden="true">→</span></a>
                 <a class="ae-button ae-button--outline" href="{{ config('admision.sae_url') }}" target="_blank" rel="noopener noreferrer">¿Cómo postular? <span aria-hidden="true">↗</span></a>
@@ -168,7 +168,7 @@
                                     <span class="ae-tag">{{ $levelLabel }}</span>
                                 @endforeach
                             </div>
-                            <div class="ae-school-card__seal">{{ \Illuminate\Support\Str::limit($description, 190) }}</div>
+                            <div class="ae-school-card__seal ae-long-text">{{ \Illuminate\Support\Str::limit($description, 190) }}</div>
                             <div class="ae-school-card__footer">
                                 <small>{{ $item->tipo_estab ?: 'Establecimiento público' }}</small>
                                 <a class="ae-button ae-button--outline ae-button--small" href="{{ route('public.admision-escolar.show', $perfil->slug) }}">Ver ficha <span aria-hidden="true">→</span></a>
@@ -186,7 +186,7 @@
     <div class="ae-container">
         <div class="ae-info-band">
             <h2>¿Qué es un sello educativo?</h2>
-            <p>Es el rasgo distintivo del Proyecto Educativo Institucional de cada establecimiento. Expresa sus énfasis formativos, su visión de estudiante y su vínculo con la comunidad y el territorio.</p>
+            <p class="ae-long-text">Es el rasgo distintivo del Proyecto Educativo Institucional de cada establecimiento. Expresa sus énfasis formativos, su visión de estudiante y su vínculo con la comunidad y el territorio.</p>
         </div>
     </div>
 </section>

@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.7.1.349' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Justificación de textos extensos en la vitrina',
+        'files' => [
+            'resources/views/public/admision-escolar/index.blade.php',
+            'resources/views/public/admision-escolar/show.blade.php',
+            'resources/views/public/admision-escolar/coming-soon.blade.php',
+            'resources/views/public/admision-escolar/partials/styles.blade.php',
+            'tests/Feature/AdmisionEscolarPublicRoutesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Justifica los bloques extensos de descripción, sello educativo, reseña directiva y presentación pública.',
+            'Aplica separación silábica automática en español para mejorar la distribución del texto en distintos anchos de pantalla.',
+            'Mantiene sin justificar títulos, etiquetas, datos breves, botones y elementos de navegación.',
+            'Incorpora una prueba de regresión para verificar la utilidad de textos justificados en el HTML público.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.7.1.348' => [
         'date' => '2026-07-31',
         'module' => 'Admisión Escolar',

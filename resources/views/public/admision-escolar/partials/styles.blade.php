@@ -37,6 +37,7 @@ body{margin:0;background:var(--ae-bg);color:var(--ae-ink);font-family:"Century G
 body.ae-nav-open{overflow:hidden}
 a{color:inherit}
 img{max-width:100%;display:block}
+.ae-long-text{text-align:justify;text-justify:inter-word;hyphens:auto}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--ae-yellow);outline-offset:3px}

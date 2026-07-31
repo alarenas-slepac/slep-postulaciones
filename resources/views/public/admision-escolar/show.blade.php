@@ -44,7 +44,7 @@
                     </div>
                     <div class="ae-detail-seal">
                         <span class="ae-detail-seal__icon" aria-hidden="true">✦</span>
-                        <div><strong>Sello educativo</strong><br>{{ $perfil->sello_educativo }}</div>
+                        <div class="ae-long-text"><strong>Sello educativo</strong><br>{{ $perfil->sello_educativo }}</div>
                     </div>
                     <div class="ae-detail-actions">
                         @if ($perfil->sitio_web_url)
@@ -97,7 +97,7 @@
             @if ($perfil->descripcion_corta)
                 <article class="ae-panel">
                     <h2>Sobre nuestro establecimiento</h2>
-                    <p style="margin:0;color:var(--ae-muted);font-size:1rem;">{{ $perfil->descripcion_corta }}</p>
+                    <p class="ae-long-text" style="margin:0;color:var(--ae-muted);font-size:1rem;">{{ $perfil->descripcion_corta }}</p>
                 </article>
             @endif
 
@@ -114,7 +114,7 @@
                     <div>
                         <small style="color:var(--ae-blue-dark);font-weight:900;text-transform:uppercase;letter-spacing:.06em;">Director/a</small>
                         <h3>{{ $perfil->director_nombre }}</h3>
-                        @if ($perfil->director_resena)<p>{{ $perfil->director_resena }}</p>@endif
+                        @if ($perfil->director_resena)<p class="ae-long-text">{{ $perfil->director_resena }}</p>@endif
                     </div>
                 </div>
             </article>
