@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.7.1.344' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Corrección del enlace al sitio institucional',
+        'files' => [
+            'config/brand.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Configura https://slepandaliencosta.gob.cl/ como URL institucional predeterminada en lugar de reutilizar la dirección de la plataforma.',
+            'Corrige el enlace Sitio institucional del encabezado, el acceso del pie de página y la pantalla de próxima publicación.',
+            'Mantiene la posibilidad de definir una URL distinta mediante ORG_URL cuando el entorno lo requiera.',
+            'No modifica rutas internas ni información de establecimientos.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.7.1.343' => [
         'date' => '2026-07-31',
         'module' => 'Admisión Escolar',

@@ -10,7 +10,7 @@ return [
     'support_hours' => env('SUPPORT_HOURS', 'Lunes a Viernes 09:00–17:00'),
 
     // Sitio web institucional
-    'org_url' => env('ORG_URL', config('app.url')),
+    'org_url' => env('ORG_URL', 'https://slepandaliencosta.gob.cl/'),
 
     // Dirección física (opcional)
     'org_address' => env('ORG_ADDRESS', ''),
