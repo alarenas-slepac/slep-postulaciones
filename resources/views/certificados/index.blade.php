@@ -102,6 +102,56 @@
                         <form method="POST" action="{{ route('certificados.emitir') }}">
                             @csrf
                             <input type="hidden" name="rut" value="{{ $resultado['rut_normalizado'] }}">
+                            @if ($puedeEmitirTerceros)
+                                <div class="border rounded bg-light p-3 mb-3">
+                                    <h3 class="h6 mb-1">Datos para este certificado</h3>
+                                    <p class="small text-muted mb-3">
+                                        Puedes ajustar estos antecedentes antes de emitir. Los cambios
+                                        se aplicarán únicamente al certificado y no modificarán la base histórica.
+                                    </p>
+                                    <div class="mb-3">
+                                        <label for="fecha_antiguedad" class="form-label">
+                                            Fecha de antigüedad
+                                        </label>
+                                        <input
+                                            id="fecha_antiguedad"
+                                            type="date"
+                                            name="fecha_antiguedad"
+                                            value="{{ old('fecha_antiguedad', $resultado['fecha_antiguedad']->format('Y-m-d')) }}"
+                                            max="{{ now()->format('Y-m-d') }}"
+                                            class="form-control"
+                                            required
+                                        >
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="calidad_juridica" class="form-label">
+                                            Calidad jurídica
+                                        </label>
+                                        <input
+                                            id="calidad_juridica"
+                                            type="text"
+                                            name="calidad_juridica"
+                                            value="{{ old('calidad_juridica', $resultado['calidad_juridica']) }}"
+                                            maxlength="500"
+                                            class="form-control"
+                                            required
+                                        >
+                                    </div>
+                                    <div>
+                                        <label for="regimen_juridico" class="form-label">
+                                            Régimen jurídico
+                                        </label>
+                                        <textarea
+                                            id="regimen_juridico"
+                                            name="regimen_juridico"
+                                            rows="3"
+                                            maxlength="500"
+                                            class="form-control"
+                                            required
+                                        >{{ old('regimen_juridico', $resultado['regimen_juridico']) }}</textarea>
+                                    </div>
+                                </div>
+                            @endif
                             <button class="btn btn-primary w-100" @disabled(! $baseActiva)>
                                 <i class="bi bi-file-earmark-pdf"></i>
                                 Emitir certificado de vigencia

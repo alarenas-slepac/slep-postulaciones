@@ -48,7 +48,13 @@ class CertificadoLaboralControllerTest extends TestCase
                     'comuna' => 'COMUNA DE PRUEBA',
                 ],
             ],
-            'contratos' => [],
+            'contratos' => [
+                [
+                    'fecha_ingreso' => '2023-04-11',
+                    'calidad_juridica' => 'CONTRATA',
+                    'regimen_juridico' => 'ESTATUTO DOCENTE',
+                ],
+            ],
             'importacion' => (object) ['id' => 8],
         ];
 
@@ -75,7 +81,12 @@ class CertificadoLaboralControllerTest extends TestCase
         $request = Request::create(
             '/certificados/emitir',
             'POST',
-            ['rut' => '123456785']
+            [
+                'rut' => '123456785',
+                'fecha_antiguedad' => '2024-01-15',
+                'calidad_juridica' => 'PLAZO FIJO',
+                'regimen_juridico' => 'CÓDIGO DEL TRABAJO',
+            ]
         );
         $request->setUserResolver(fn () => $usuario);
 
@@ -96,9 +107,92 @@ class CertificadoLaboralControllerTest extends TestCase
         );
         self::assertDatabaseHas('certificados_emitidos', [
             'rut_normalizado' => '123456785',
+            'calidad_juridica_snapshot' => 'PLAZO FIJO',
+            'regimen_juridico_snapshot' => 'CÓDIGO DEL TRABAJO',
             'estado' => 'vigente',
             'archivo_pdf_path' => 'certificados/vigencia/prueba.pdf',
         ]);
+
+        $certificado = CertificadoEmitido::query()->firstOrFail();
+        self::assertSame(
+            '2024-01-15',
+            $certificado->fecha_antiguedad->format('Y-m-d')
+        );
+        self::assertSame(
+            'CONTRATA',
+            $certificado->contratos_snapshot[0]['calidad_juridica']
+        );
+        self::assertSame(
+            'ESTATUTO DOCENTE',
+            $certificado->contratos_snapshot[0]['regimen_juridico']
+        );
+    }
+
+    public function test_funcionario_no_puede_ajustar_su_certificado_propio(): void
+    {
+        $usuario = Mockery::mock(User::class)->makePartial();
+        $usuario->id = 16;
+        $usuario->rut = '123456785';
+        $usuario->shouldReceive('activeRoleName')->andReturn('funcionario');
+
+        $resultado = [
+            'rut_normalizado' => '123456785',
+            'nombre' => 'FUNCIONARIA DE PRUEBA',
+            'fecha_antiguedad' => CarbonImmutable::parse('2023-04-11'),
+            'calidad_juridica' => 'CONTRATA',
+            'regimen_juridico' => 'ESTATUTO DOCENTE',
+            'establecimientos' => [
+                [
+                    'establecimiento' => 'ESCUELA DE PRUEBA',
+                    'comuna' => 'COMUNA DE PRUEBA',
+                ],
+            ],
+            'contratos' => [],
+            'importacion' => (object) ['id' => 8],
+        ];
+
+        $vigenciaService = Mockery::mock(CertificadoVigenciaLaboralService::class);
+        $vigenciaService
+            ->shouldReceive('resolver')
+            ->once()
+            ->with('123456785')
+            ->andReturn($resultado);
+
+        $pdfService = Mockery::mock(CertificadoVigenciaPdfService::class);
+        $pdfService
+            ->shouldReceive('generar')
+            ->once()
+            ->andReturnUsing(function (CertificadoEmitido $certificado) {
+                return $certificado->fresh();
+            });
+
+        $request = Request::create(
+            '/certificados/emitir',
+            'POST',
+            [
+                'fecha_antiguedad' => '2024-01-15',
+                'calidad_juridica' => 'PLAZO FIJO',
+                'regimen_juridico' => 'CÓDIGO DEL TRABAJO',
+            ]
+        );
+        $request->setUserResolver(fn () => $usuario);
+
+        $controller = new CertificadoLaboralController(
+            $vigenciaService,
+            $pdfService
+        );
+        $controller->emitir($request);
+
+        $certificado = CertificadoEmitido::query()->firstOrFail();
+        self::assertSame(
+            '2023-04-11',
+            $certificado->fecha_antiguedad->format('Y-m-d')
+        );
+        self::assertSame('CONTRATA', $certificado->calidad_juridica_snapshot);
+        self::assertSame(
+            'ESTATUTO DOCENTE',
+            $certificado->regimen_juridico_snapshot
+        );
     }
 
     private function crearTablas(): void
