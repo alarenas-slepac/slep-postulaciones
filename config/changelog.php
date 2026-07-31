@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.7.1.350' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Fotografía directiva opcional para publicar',
+        'files' => [
+            'app/Services/AdmisionEscolarCompletenessService.php',
+            'resources/views/admin/admision-escolar/edit.blade.php',
+            'tests/Unit/AdmisionEscolarCompletenessServiceTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La fotografía del director o directora deja de aportar al puntaje de completitud y de bloquear la publicación de la ficha.',
+            'Normaliza el porcentaje sobre los criterios restantes para permitir una completitud de 100% sin fotografía directiva.',
+            'Mantiene visible la ausencia del archivo como contenido opcional pendiente junto al campo de carga y en el panel de estado.',
+            'Conserva el nombre del director o directora como requisito obligatorio para publicar.',
+            'Incorpora pruebas para confirmar que la fotografía pendiente se informa sin impedir la publicación.',
+        ],
+        'roles' => ['Admin', 'Coordinador UATP', 'Comunicaciones'],
+    ],
     '2026.7.1.349' => [
         'date' => '2026-07-31',
         'module' => 'Admisión Escolar',

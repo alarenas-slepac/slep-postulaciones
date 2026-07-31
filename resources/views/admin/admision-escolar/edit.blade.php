@@ -101,12 +101,15 @@
                                 @endif
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="form-label" for="director_foto">Fotografía del director/a</label>
+                                <label class="form-label" for="director_foto">Fotografía del director/a <span class="text-muted fw-normal">(opcional)</span></label>
                                 @if ($perfil->directorFotoUrl())
                                     <div class="admision-current-media is-person mb-3"><img src="{{ $perfil->directorFotoUrl() }}" alt="Fotografía actual de {{ $perfil->director_nombre ?: 'la dirección' }}"></div>
                                 @endif
                                 <input id="director_foto" type="file" name="director_foto" class="form-control" accept="image/jpeg,image/png,image/webp">
                                 <div class="form-text">Preferentemente cuadrada. Hasta {{ config('admision.max_imagen_mb', 100) }} MB; se optimiza automáticamente al guardar.</div>
+                                @if (! $perfil->director_foto_path)
+                                    <div class="alert alert-warning py-2 px-3 small mt-2 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Archivo pendiente de carga. La fotografía es opcional y no bloquea la publicación.</div>
+                                @endif
                                 @if ($perfil->director_foto_path)
                                     <div class="form-check mt-2">
                                         <input type="hidden" name="eliminar_director_foto" value="0">
@@ -214,6 +217,18 @@
                                     <li class="mb-1">{{ $missing }}</li>
                                 @endforeach
                             </ul>
+                        </div>
+                    @endif
+
+                    @if ($completitud['optional_missing'] !== [])
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <div class="fw-semibold"><i class="bi bi-info-circle me-1"></i>Contenido opcional pendiente</div>
+                            <ul class="small mb-0 mt-2 ps-3">
+                                @foreach ($completitud['optional_missing'] as $missing)
+                                    <li>{{ $missing }}</li>
+                                @endforeach
+                            </ul>
+                            <div class="small mt-2">No afecta la completitud ni impide publicar.</div>
                         </div>
                     @endif
 

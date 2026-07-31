@@ -42,6 +42,7 @@ class AdmisionEscolarCompletenessServiceTest extends TestCase
         $this->assertSame(100, $result['score']);
         $this->assertTrue($result['publishable']);
         $this->assertSame([], $result['missing']);
+        $this->assertSame([], $result['optional_missing']);
     }
 
     public function test_optional_links_do_not_block_publication(): void
@@ -81,10 +82,39 @@ class AdmisionEscolarCompletenessServiceTest extends TestCase
         $missing = app(AdmisionEscolarCompletenessService::class)
             ->publicationMissing($establecimiento, $perfil);
 
-        $this->assertContains('Fotografía del director o directora', $missing);
+        $this->assertNotContains('Fotografía del director o directora', $missing);
         $this->assertContains('Logo del establecimiento', $missing);
         $this->assertContains('Imagen de portada', $missing);
         $this->assertNotEmpty($missing);
+    }
+
+    public function test_director_photo_is_optional_but_is_reported_as_pending(): void
+    {
+        $establecimiento = $this->establecimientoBase();
+        $perfil = new AdmisionEstablecimiento([
+            'sello_educativo' => 'Aprendizaje, inclusión y participación territorial.',
+            'descripcion_corta' => 'Una comunidad educativa abierta a su entorno.',
+            'director_nombre' => 'María González',
+            'logo_path' => 'admision/logo.webp',
+            'sitio_web_url' => 'https://example.test',
+            'facebook_url' => 'https://facebook.com/example',
+        ]);
+        $perfil->setRelation('imagenes', new EloquentCollection([
+            new AdmisionEstablecimientoImagen([
+                'imagen_path' => 'admision/portada.webp',
+                'texto_alternativo' => 'Fachada del establecimiento',
+                'es_portada' => true,
+            ]),
+        ]));
+
+        $service = app(AdmisionEscolarCompletenessService::class);
+        $result = $service->calculate($establecimiento, $perfil);
+
+        $this->assertSame(100, $result['score']);
+        $this->assertTrue($result['publishable']);
+        $this->assertSame([], $result['missing']);
+        $this->assertSame([], $service->publicationMissing($establecimiento, $perfil));
+        $this->assertSame(['Fotografía del director o directora'], $result['optional_missing']);
     }
 
     private function establecimientoBase(): Establecimiento
