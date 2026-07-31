@@ -55,6 +55,7 @@ class CertificadoLaboralControllerTest extends TestCase
                     'regimen_juridico' => 'ESTATUTO DOCENTE',
                 ],
             ],
+            'es_funcionario_ac' => true,
             'importacion' => (object) ['id' => 8],
         ];
 
@@ -109,6 +110,7 @@ class CertificadoLaboralControllerTest extends TestCase
             'rut_normalizado' => '123456785',
             'calidad_juridica_snapshot' => 'PLAZO FIJO',
             'regimen_juridico_snapshot' => 'CÓDIGO DEL TRABAJO',
+            'es_funcionario_ac_snapshot' => true,
             'estado' => 'vigente',
             'archivo_pdf_path' => 'certificados/vigencia/prueba.pdf',
         ]);
@@ -128,12 +130,12 @@ class CertificadoLaboralControllerTest extends TestCase
         );
     }
 
-    public function test_funcionario_no_puede_ajustar_su_certificado_propio(): void
+    public function test_funcionario_ac_emite_su_certificado_sin_poder_ajustarlo(): void
     {
         $usuario = Mockery::mock(User::class)->makePartial();
         $usuario->id = 16;
         $usuario->rut = '123456785';
-        $usuario->shouldReceive('activeRoleName')->andReturn('funcionario');
+        $usuario->shouldReceive('activeRoleName')->andReturn('funcionario_ac');
 
         $resultado = [
             'rut_normalizado' => '123456785',
@@ -148,6 +150,7 @@ class CertificadoLaboralControllerTest extends TestCase
                 ],
             ],
             'contratos' => [],
+            'es_funcionario_ac' => true,
             'importacion' => (object) ['id' => 8],
         ];
 
@@ -216,6 +219,7 @@ class CertificadoLaboralControllerTest extends TestCase
             $table->string('regimen_juridico_snapshot');
             $table->json('establecimientos_snapshot');
             $table->json('contratos_snapshot');
+            $table->boolean('es_funcionario_ac_snapshot')->default(false);
             $table->unsignedBigInteger('importacion_id')->nullable();
             $table->unsignedBigInteger('usuario_beneficiario_id')->nullable();
             $table->unsignedBigInteger('emitido_por_user_id')->nullable();

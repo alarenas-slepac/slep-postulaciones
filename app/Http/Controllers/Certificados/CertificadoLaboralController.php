@@ -147,6 +147,7 @@ class CertificadoLaboralController extends Controller
                     'regimen_juridico_snapshot' => $datosCertificado['regimen_juridico'],
                     'establecimientos_snapshot' => $datosCertificado['establecimientos'],
                     'contratos_snapshot' => $datosCertificado['contratos'],
+                    'es_funcionario_ac_snapshot' => (bool) ($datosCertificado['es_funcionario_ac'] ?? false),
                     'importacion_id' => $datosCertificado['importacion']->id,
                     'usuario_beneficiario_id' => $beneficiario?->id,
                     'emitido_por_user_id' => $user->id,

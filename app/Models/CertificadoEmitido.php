@@ -20,6 +20,7 @@ class CertificadoEmitido extends Model
         'regimen_juridico_snapshot',
         'establecimientos_snapshot',
         'contratos_snapshot',
+        'es_funcionario_ac_snapshot',
         'importacion_id',
         'usuario_beneficiario_id',
         'emitido_por_user_id',
@@ -39,6 +40,7 @@ class CertificadoEmitido extends Model
             'fecha_antiguedad' => 'date',
             'establecimientos_snapshot' => 'array',
             'contratos_snapshot' => 'array',
+            'es_funcionario_ac_snapshot' => 'boolean',
             'emitido_at' => 'datetime',
             'anulado_at' => 'datetime',
         ];

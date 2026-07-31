@@ -9,6 +9,7 @@ return [
 
     'roles_emision_propia' => [
         'funcionario',
+        'funcionario_ac',
     ],
 
     'institucion' => [

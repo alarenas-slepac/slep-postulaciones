@@ -190,6 +190,49 @@
         </div>
     </div>
 
+    @if ($puedeEmitirTerceros && $resultado)
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-white">
+                <h2 class="h5 mb-1">Historial de contratos</h2>
+                <p class="small text-muted mb-0">
+                    Registros de la base histórica activa, ordenados desde la fecha de ingreso más antigua.
+                </p>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Establecimiento</th>
+                            <th>Fecha de ingreso</th>
+                            <th>Fecha de término</th>
+                            <th>Calidad jurídica</th>
+                            <th>Régimen jurídico</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($resultado['historial_contratos'] as $contrato)
+                            <tr>
+                                <td>{{ $contrato['establecimiento'] }}</td>
+                                <td class="text-nowrap">
+                                    {{ \Carbon\CarbonImmutable::parse($contrato['fecha_ingreso'])->format('d-m-Y') }}
+                                </td>
+                                <td class="text-nowrap">
+                                    @if ($contrato['termino_indefinido'] || ! $contrato['fecha_finiquito'])
+                                        Indefinido
+                                    @else
+                                        {{ \Carbon\CarbonImmutable::parse($contrato['fecha_finiquito'])->format('d-m-Y') }}
+                                    @endif
+                                </td>
+                                <td>{{ $contrato['calidad_juridica'] }}</td>
+                                <td>{{ $contrato['regimen_juridico'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     <div id="certificados-emitidos" class="card shadow-sm mt-4">
         <div class="card-header bg-white">
             <h2 class="h5 mb-0">

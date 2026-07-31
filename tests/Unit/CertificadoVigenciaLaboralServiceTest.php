@@ -118,6 +118,50 @@ class CertificadoVigenciaLaboralServiceTest extends TestCase
         self::assertSame('2024-01-01', $resultado['fecha_antiguedad']->format('Y-m-d'));
     }
 
+    public function test_historial_incluye_todos_los_contratos_en_orden_cronologico(): void
+    {
+        $resultado = $this->resolver([
+            $this->contrato(
+                3,
+                '2025-01-01',
+                '2027-12-31',
+                'CONTRATA',
+                'CÓDIGO DEL TRABAJO'
+            ),
+            $this->contrato(
+                1,
+                '2022-01-01',
+                '2022-12-31',
+                'REEMPLAZO DOCENTE',
+                'ESTATUTO DOCENTE'
+            ),
+            $this->contrato(
+                2,
+                '2023-01-01',
+                '2024-12-31',
+                'CONTRATA',
+                'ESTATUTO DOCENTE'
+            ),
+        ]);
+
+        self::assertCount(3, $resultado['historial_contratos']);
+        self::assertSame(
+            ['2022-01-01', '2023-01-01', '2025-01-01'],
+            array_column($resultado['historial_contratos'], 'fecha_ingreso')
+        );
+        self::assertSame(
+            [
+                'establecimiento',
+                'fecha_ingreso',
+                'fecha_finiquito',
+                'termino_indefinido',
+                'calidad_juridica',
+                'regimen_juridico',
+            ],
+            array_keys($resultado['historial_contratos'][0])
+        );
+    }
+
     /**
      * @param  array<int, array<string, mixed>>  $contratos
      * @return array<string, mixed>

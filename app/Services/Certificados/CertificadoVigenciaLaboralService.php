@@ -4,6 +4,7 @@ namespace App\Services\Certificados;
 
 use App\Models\CertificadoContratoHistorico;
 use App\Models\CertificadoImportacion;
+use App\Models\FuncionarioAcAutorizado;
 use App\Support\RutChile;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -50,6 +51,10 @@ class CertificadoVigenciaLaboralService
             $fechaEmision ?? CarbonImmutable::now()
         );
         $resultado['importacion'] = $importacion;
+        $resultado['es_funcionario_ac'] = FuncionarioAcAutorizado::query()
+            ->where('rut_normalizado', $rutNormalizado)
+            ->where('estado_autorizacion', 'activo')
+            ->exists();
 
         return $resultado;
     }
@@ -133,6 +138,22 @@ class CertificadoVigenciaLaboralService
             ->values()
             ->all();
 
+        $historialContratos = $filas
+            ->sortBy([
+                ['fecha_ingreso', 'asc'],
+                ['orden', 'asc'],
+            ])
+            ->map(fn (array $fila) => [
+                'establecimiento' => $fila['establecimiento'],
+                'fecha_ingreso' => $fila['fecha_ingreso']->format('Y-m-d'),
+                'fecha_finiquito' => $fila['fecha_finiquito']?->format('Y-m-d'),
+                'termino_indefinido' => $fila['termino_indefinido'],
+                'calidad_juridica' => $fila['calidad_juridica'],
+                'regimen_juridico' => $fila['regimen_juridico'],
+            ])
+            ->values()
+            ->all();
+
         return [
             'rut_normalizado' => $ancla['rut_normalizado'],
             'rut_formateado' => $this->formatearRut($ancla['rut_normalizado']),
@@ -143,6 +164,8 @@ class CertificadoVigenciaLaboralService
             'regimen_juridico' => $ancla['regimen_juridico'],
             'establecimientos' => $establecimientos,
             'contratos' => $contratosSnapshot,
+            'historial_contratos' => $historialContratos,
+            'es_funcionario_ac' => false,
         ];
     }
 
