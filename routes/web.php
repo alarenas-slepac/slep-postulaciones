@@ -156,7 +156,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
     Route::prefix('certificados')
         ->name('certificados.')
-        ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep|funcionario')
+        ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep|funcionario|funcionario_ac')
         ->group(function () {
             Route::get('/', [CertificadoLaboralController::class, 'index'])
                 ->name('index');

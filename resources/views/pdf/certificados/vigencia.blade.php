@@ -252,12 +252,18 @@
     </table>
 
     <div class="statement">
-        Mantiene contrato vigente en
-        {{ $establecimientos->count() === 1 ? 'un establecimiento educacional' : 'establecimientos educacionales' }}
-        que a contar del {{ $fechaIncorporacionTexto }}, conforme a ley,
-        {{ $establecimientos->count() === 1 ? 'forma' : 'forman' }} parte del
-        {{ $institucion['nombre'] }}, RUT {{ $institucion['rut'] }}, con domicilio en
-        {{ $institucion['domicilio'] }} como su actual sostenedor, según los siguientes antecedentes:
+        @if ($certificado->es_funcionario_ac_snapshot)
+            Mantiene contrato vigente en el {{ $institucion['nombre'] }},
+            RUT {{ $institucion['rut'] }}, con domicilio en {{ $institucion['domicilio'] }}
+            como su actual empleador, según los siguientes antecedentes:
+        @else
+            Mantiene contrato vigente en
+            {{ $establecimientos->count() === 1 ? 'un establecimiento educacional' : 'establecimientos educacionales' }}
+            que a contar del {{ $fechaIncorporacionTexto }}, conforme a ley,
+            {{ $establecimientos->count() === 1 ? 'forma' : 'forman' }} parte del
+            {{ $institucion['nombre'] }}, RUT {{ $institucion['rut'] }}, con domicilio en
+            {{ $institucion['domicilio'] }} como su actual sostenedor, según los siguientes antecedentes:
+        @endif
     </div>
 
     <table class="details">
