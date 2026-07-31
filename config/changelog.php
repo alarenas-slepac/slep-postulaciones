@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.7.1.341' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Actualización visual de la vitrina pública',
+        'files' => [
+            'resources/views/public/admision-escolar/partials/styles.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Actualiza el fondo del banner principal y del pie de página de la vitrina pública al color institucional #084682.',
+            'Ajusta el contraste de títulos, descripción y estadísticas del banner para conservar su legibilidad sobre el nuevo fondo.',
+            'Amplía la fotografía del director o directora en la ficha pública de cada establecimiento para mejorar su visibilidad.',
+            'No modifica contenidos, rutas, permisos ni información de establecimientos.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.7.1.340' => [
         'date' => '2026-07-30',
         'module' => 'Certificados laborales',
