@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.7.1.343' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Legibilidad de ficha y logo completo en tarjetas',
+        'files' => [
+            'resources/views/public/admision-escolar/index.blade.php',
+            'resources/views/public/admision-escolar/partials/styles.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Restablece un color azul oscuro legible para el rótulo Establecimiento SLEP Andalién Costa dentro de las fichas públicas.',
+            'Mantiene el rótulo claro únicamente sobre el banner azul de la portada de Admisión Escolar.',
+            'Separa la portada de cada tarjeta en un contenedor recortado para permitir que el logo del establecimiento sobresalga completo sobre el contenido.',
+            'Redondea la fotografía del director o directora con una curva concéntrica al marco exterior para mantener la simetría visual.',
+            'No modifica imágenes, contenidos ni información de establecimientos.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.7.1.342' => [
         'date' => '2026-07-31',
         'module' => 'Admisión Escolar',

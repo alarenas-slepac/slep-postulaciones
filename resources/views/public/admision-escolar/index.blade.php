@@ -144,11 +144,13 @@
                     @endphp
                     <article class="ae-school-card">
                         <div class="ae-school-card__media">
-                            @if ($cover)
-                                <img src="{{ $cover->url() }}" alt="{{ $cover->texto_alternativo }}" loading="lazy">
-                            @else
-                                <div class="ae-school-card__placeholder">{{ $item->nombre_establecimiento }}</div>
-                            @endif
+                            <div class="ae-school-card__cover">
+                                @if ($cover)
+                                    <img src="{{ $cover->url() }}" alt="{{ $cover->texto_alternativo }}" loading="lazy">
+                                @else
+                                    <div class="ae-school-card__placeholder">{{ $item->nombre_establecimiento }}</div>
+                                @endif
+                            </div>
                             <span class="ae-school-card__commune">{{ $item->comuna ?: 'SLEP Andalién Costa' }}</span>
                             <div class="ae-school-card__logo">
                                 @if ($perfil->logoUrl())

@@ -56,7 +56,8 @@ button{cursor:pointer}
 .ae-hero::before{content:"";position:absolute;width:340px;height:340px;border:70px solid rgba(145,207,53,.20);border-radius:50%;left:-210px;bottom:-180px}
 .ae-hero::after{content:"";position:absolute;width:300px;height:300px;border:70px solid rgba(44,137,244,.22);border-radius:50%;right:-180px;bottom:-170px}
 .ae-hero__grid{min-height:470px;display:grid;grid-template-columns:1.05fr .95fr;align-items:center;gap:50px;padding-block:58px;position:relative;z-index:1}
-.ae-eyebrow{display:inline-flex;align-items:center;gap:9px;color:#d9edff;font-size:.8rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.ae-eyebrow{display:inline-flex;align-items:center;gap:9px;color:var(--ae-blue-dark);font-size:.8rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.ae-hero .ae-eyebrow{color:#d9edff}
 .ae-eyebrow::before{content:"";width:28px;height:3px;background:var(--ae-coral);border-radius:4px}
 .ae-hero h1{font-size:clamp(2.5rem,5vw,4.6rem);line-height:1.03;letter-spacing:-.045em;margin:18px 0;color:#fff;max-width:760px}
 .ae-hero__lead{font-size:1.12rem;color:#d3e3f1;max-width:650px;margin:0}
@@ -92,12 +93,13 @@ button{cursor:pointer}
 .ae-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
 .ae-school-card{background:#fff;border:1px solid var(--ae-line);border-radius:22px;overflow:hidden;box-shadow:0 12px 36px rgba(15,29,46,.07);display:flex;flex-direction:column;min-width:0;transition:.2s}
 .ae-school-card:hover{transform:translateY(-5px);box-shadow:var(--ae-shadow)}
-.ae-school-card__media{height:205px;position:relative;overflow:hidden;background:linear-gradient(135deg,#dcecff,#e9f7d8)}
-.ae-school-card__media>img{width:100%;height:100%;object-fit:cover;transition:transform .35s}
-.ae-school-card:hover .ae-school-card__media>img{transform:scale(1.035)}
+.ae-school-card__media{height:205px;position:relative;background:linear-gradient(135deg,#dcecff,#e9f7d8)}
+.ae-school-card__cover{position:absolute;inset:0;overflow:hidden}
+.ae-school-card__cover>img{width:100%;height:100%;object-fit:cover;transition:transform .35s}
+.ae-school-card:hover .ae-school-card__cover>img{transform:scale(1.035)}
 .ae-school-card__placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,rgba(44,137,244,.15),rgba(145,207,53,.18));color:#40516a;font-weight:800}
-.ae-school-card__commune{position:absolute;left:14px;top:14px;background:rgba(17,29,46,.88);color:#fff;padding:7px 10px;border-radius:999px;font-size:.73rem;font-weight:800;backdrop-filter:blur(8px)}
-.ae-school-card__logo{position:absolute;right:15px;bottom:-33px;width:76px;height:76px;border-radius:20px;background:#fff;border:1px solid var(--ae-line);box-shadow:0 12px 30px rgba(15,29,46,.14);display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px}
+.ae-school-card__commune{position:absolute;z-index:2;left:14px;top:14px;background:rgba(17,29,46,.88);color:#fff;padding:7px 10px;border-radius:999px;font-size:.73rem;font-weight:800;backdrop-filter:blur(8px)}
+.ae-school-card__logo{position:absolute;z-index:2;right:15px;bottom:-33px;width:76px;height:76px;border-radius:20px;background:#fff;border:1px solid var(--ae-line);box-shadow:0 12px 30px rgba(15,29,46,.14);display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px}
 .ae-school-card__logo img{width:100%;height:100%;object-fit:contain}
 .ae-school-card__logo span{font-size:.7rem;text-align:center;color:#64748b;font-weight:800}
 .ae-school-card__body{padding:25px 22px 20px;display:flex;flex-direction:column;flex:1}
@@ -140,7 +142,7 @@ button{cursor:pointer}
 .ae-panel h2{font-size:1.2rem;margin:0 0 18px;color:var(--ae-navy);letter-spacing:-.02em}
 .ae-director{display:flex;gap:18px;align-items:center}
 .ae-director__photo{width:160px;height:160px;flex:0 0 160px;border-radius:24px;background:linear-gradient(135deg,#fde2e7,#dbeafe);overflow:hidden;display:flex;align-items:center;justify-content:center;color:#5a687d;font-weight:800;text-align:center;padding:8px}
-.ae-director__photo img{width:100%;height:100%;object-fit:cover}
+.ae-director__photo img{width:100%;height:100%;object-fit:cover;border-radius:16px}
 .ae-director h3{margin:4px 0 7px;font-size:1.35rem;color:var(--ae-navy)}
 .ae-director p{color:var(--ae-muted);margin:0;font-size:.9rem}
 .ae-gallery{display:grid;grid-template-columns:1.35fr .85fr .85fr;grid-auto-rows:170px;gap:10px}
