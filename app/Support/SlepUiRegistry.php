@@ -21,6 +21,7 @@ class SlepUiRegistry
             'funcionario_slep' => 'Funcionario SLEP',
             'funcionario_ac' => 'Funcionario Administración Central',
             'funcionario_estab' => 'Funcionario Establecimiento',
+            'funcionario_directivo_estab' => 'Directivo de Establecimiento',
             'funcionario_daf' => 'Funcionario DAF',
             'funcionario_daf_compra' => 'Funcionario DAF Compra',
             'director_ejecutivo' => 'Director Ejecutivo',
@@ -36,7 +37,7 @@ class SlepUiRegistry
 
         return match ($role) {
             'admin' => 'primary',
-            'funcionario_estab' => 'success',
+            'funcionario_estab', 'funcionario_directivo_estab' => 'success',
             'coordinador_uatp' => 'info',
             'comunicaciones' => 'purple',
             'supervisor_plani', 'coordinador_plani' => 'warning',
@@ -63,6 +64,11 @@ class SlepUiRegistry
         $entries = [
             'Inicio' => [
                 self::entry('Dashboard', 'dashboard', 'bi-speedometer2', ['*']),
+            ],
+            'Centro de Operaciones' => [
+                self::entry('Panel territorial', 'centro-operaciones.index', 'bi-broadcast-pin', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp'], 'centro-operaciones'),
+                self::entry('Reporte diario', 'centro-operaciones.reportes.create', 'bi-clipboard2-pulse', ['funcionario_directivo_estab'], 'centro-operaciones'),
+                self::entry('Historial de reportes', 'centro-operaciones.reportes.history', 'bi-clock-history', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_directivo_estab'], 'centro-operaciones'),
             ],
             'Trámites y operación' => [
                 self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario', 'funcionario_ac'], 'certificados'),
@@ -142,6 +148,9 @@ class SlepUiRegistry
     public static function quickModules($user, ?string $activeRole): array
     {
         $items = [
+            self::entry('Centro de Operaciones', 'centro-operaciones.index', 'bi-broadcast-pin', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp'], 'centro-operaciones'),
+            self::entry('Reporte diario', 'centro-operaciones.reportes.create', 'bi-clipboard2-pulse', ['funcionario_directivo_estab'], 'centro-operaciones'),
+            self::entry('Historial operacional', 'centro-operaciones.reportes.history', 'bi-clock-history', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_directivo_estab'], 'centro-operaciones'),
             self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario', 'funcionario_ac'], 'certificados'),
             self::entry('Cometidos funcionarios', 'tramites.cometidos-funcionarios.index', 'bi-briefcase', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_ac', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_daf_compra', 'funcionario_juridica']),
             self::entry('Licencias Médicas', 'tramites.licencias-medicas.index', 'bi-file-medical', ['admin', 'coordinador_gdp', 'funcionario_slep']),

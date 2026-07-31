@@ -13,6 +13,16 @@ class EstablecimientoImportService
      */
     public function expectedHeaders(): array
     {
+        return [...$this->requiredHeaders(), 'MATRICULA_TOTAL'];
+    }
+
+    /**
+     * La estructura histórica sigue siendo válida para no romper cargas antiguas.
+     *
+     * @return array<int, string>
+     */
+    public function requiredHeaders(): array
+    {
         return [
             'COD_ESTAB',
             'RBD',
@@ -61,10 +71,10 @@ class EstablecimientoImportService
         }
 
         $headers = $this->buildHeaders($rows[1] ?? [], $rows[2] ?? []);
-        $expected = $this->expectedHeaders();
-        $got = array_slice($headers, 0, count($expected));
+        $required = $this->requiredHeaders();
+        $got = array_slice($headers, 0, count($required));
 
-        if ($got !== $expected) {
+        if ($got !== $required) {
             throw new InvalidArgumentException(
                 'Encabezados inesperados. Debes usar la plantilla oficial de establecimientos.'
             );
@@ -74,7 +84,8 @@ class EstablecimientoImportService
             Establecimiento::query()->delete();
         }
 
-        $idx = array_flip($expected);
+        $idx = array_flip($headers);
+        $hasMatricula = ($headers[count($required)] ?? null) === 'MATRICULA_TOTAL';
         $processed = 0;
         $created = 0;
         $updated = 0;
@@ -110,6 +121,17 @@ class EstablecimientoImportService
                 continue;
             }
 
+            $matricula = null;
+            if ($hasMatricula) {
+                $matriculaRaw = $vals[$idx['MATRICULA_TOTAL']] ?? null;
+                $matricula = $this->toIntOrNull($matriculaRaw);
+                if (trim((string) ($matriculaRaw ?? '')) !== '' && ($matricula === null || $matricula < 0)) {
+                    $errors[] = "Fila {$displayRow}: MATRÍCULA_TOTAL debe ser un número entero mayor o igual a cero.";
+                    $skipped++;
+                    continue;
+                }
+            }
+
             $processed++;
 
             $payload = [
@@ -131,6 +153,10 @@ class EstablecimientoImportService
                 'latitud' => $latitud,
                 'longitud' => $longitud,
             ];
+
+            if ($hasMatricula) {
+                $payload['matricula_total'] = $matricula;
+            }
 
             $existing = Establecimiento::query()->where('cod_estab', $cod)->first();
             if ($existing) {

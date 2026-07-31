@@ -90,6 +90,7 @@
                                 <th>Establecimiento</th>
                                 <th>RBD</th>
                                 <th>Comuna</th>
+                                <th class="text-end">Matrícula</th>
                                 <th>Latitud</th>
                                 <th>Longitud</th>
                                 <th>Sala cuna</th>
@@ -104,6 +105,7 @@
                                     <td>{{ $e->nombre_establecimiento ?? ($e->nombre ?? '-') }}</td>
                                     <td>{{ $e->rbd ?? '-' }}</td>
                                     <td>{{ $e->comuna ?? '-' }}</td>
+                                    <td class="text-end">{{ $e->matricula_total !== null ? number_format($e->matricula_total, 0, ',', '.') : '-' }}</td>
                                     <td>{{ $e->latitud ?? '-' }}</td>
                                     <td>{{ $e->longitud ?? '-' }}</td>
                                     <td>
@@ -148,7 +150,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
+                                    <td colspan="9" class="text-center text-muted py-4">
                                         No hay establecimientos.
                                     </td>
                                 </tr>

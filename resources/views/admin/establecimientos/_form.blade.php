@@ -45,11 +45,19 @@
             @error('nombre_establecimiento')<div class="invalid-feedback">{{ $message }}</div>@enderror
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-2">
             <label class="form-label">% ASIGNACION ZONA</label>
             <input type="number" name="asignacion_zona" value="{{ old('asignacion_zona', $item->asignacion_zona ?? 0) }}"
                 class="form-control @error('asignacion_zona') is-invalid @enderror" min="0" max="100">
             @error('asignacion_zona')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Matrícula total</label>
+            <input type="number" name="matricula_total" value="{{ old('matricula_total', $item->matricula_total) }}"
+                class="form-control @error('matricula_total') is-invalid @enderror" min="0">
+            @error('matricula_total')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            <div class="form-text">Fuente principal para el Centro de Operaciones.</div>
         </div>
 
         <div class="col-md-6">
