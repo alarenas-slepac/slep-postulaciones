@@ -1,6 +1,53 @@
 <?php
 
 return [
+    '2026.7.1.340' => [
+        'date' => '2026-07-30',
+        'module' => 'Certificados laborales',
+        'title' => 'Emisión verificable del certificado de vigencia laboral',
+        'files' => [
+            'app/Http/Controllers/Certificados/CertificadoImportacionController.php',
+            'app/Http/Controllers/Certificados/CertificadoLaboralController.php',
+            'app/Http/Controllers/Certificados/CertificadoVerificacionController.php',
+            'app/Jobs/ProcesarCertificadoImportacion.php',
+            'app/Models/CertificadoContratoHistorico.php',
+            'app/Models/CertificadoEmitido.php',
+            'app/Models/CertificadoImportacion.php',
+            'app/Services/Certificados/CertificadoVigenciaLaboralService.php',
+            'app/Services/Certificados/CertificadoVigenciaPdfService.php',
+            'app/Services/Certificados/ContratoHistoricoImportService.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/certificados.php',
+            'database/migrations/2026_07_30_220000_create_certificados_vigencia_module.php',
+            'resources/branding/certificados/logo-slep-gob.png',
+            'resources/branding/certificados/timbre-gdp.png',
+            'resources/branding/certificados/firma-subdirectora-gdp.png',
+            'resources/fonts/certificados/century-gothic-regular.ttf',
+            'resources/fonts/certificados/century-gothic-bold.ttf',
+            'resources/views/certificados/index.blade.php',
+            'resources/views/certificados/verificar.blade.php',
+            'resources/views/certificados/importaciones/index.blade.php',
+            'resources/views/certificados/importaciones/create.blade.php',
+            'resources/views/certificados/importaciones/show.blade.php',
+            'resources/views/pdf/certificados/vigencia.blade.php',
+            'resources/views/partials/navbar.blade.php',
+            'routes/web.php',
+            'tests/Feature/CertificadoLaboralControllerTest.php',
+            'tests/Feature/ContratoHistoricoImportServiceTest.php',
+            'tests/Unit/CertificadoVigenciaLaboralServiceTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Incorpora importación versionada y asíncrona del historial de contratos, con lectura XLSX en flujo, validación de RUT, fechas, duplicados y filas observadas.',
+            'Calcula la antigüedad desde la continuidad vigente, corta por cambio de régimen jurídico o por días sin contrato y conserva cambios de establecimiento o calidad jurídica.',
+            'Excluye los períodos anteriores de REEMPLAZO DOCENTE o REEMPLAZO CONTRATA cuando existe una CONTRATA posterior, y de REEMPLAZO cuando existe un PLAZO FIJO posterior.',
+            'Permite emisión propia a funcionarios registrados y emisión general a Administrador, Coordinador GDP y Funcionario SLEP.',
+            'Genera el certificado de vigencia en formato carta con Century Gothic, firma, timbre, código QR, huella SHA-256 y verificación documental pública.',
+            'Conserva en cada emisión una copia de los antecedentes y de la versión histórica utilizada para asegurar trazabilidad.',
+            'Mantiene al usuario en el módulo después de emitir y deja el PDF disponible en el listado para verlo o descargarlo cuando corresponda.',
+        ],
+        'roles' => ['Funcionario', 'Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.7.1.339' => [
         'date' => '2026-07-30',
         'module' => 'Solicitudes de reemplazo',
@@ -1564,8 +1611,28 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.7.1.311',
+    'current_version' => '2026.7.1.340',
     'entries' => [
+
+        [
+            'version' => '2026.7.1.340',
+            'title' => 'Certificados laborales: vigencia verificable',
+            'summary' => 'Incorpora la importación histórica, el cálculo de continuidad y la emisión PDF verificable del certificado de vigencia laboral.',
+            'roles' => [
+                'funcionario',
+                'admin',
+                'coordinador_gdp',
+                'funcionario_slep',
+            ],
+            'items' => [
+                'Permite a cada funcionario emitir su propio certificado y a los operadores GDP/SLEP emitir para terceros.',
+                'Determina la antigüedad respetando interrupciones, cambios de régimen y las reglas especiales de reemplazo.',
+                'Muestra los establecimientos y comunas de los contratos actualmente vigentes.',
+                'Agrega QR, código público de verificación y huella SHA-256 al documento emitido.',
+                'Mantiene versionadas las bases históricas y registra cuál sustentó cada emisión.',
+            ],
+            'published_at' => '2026-07-30 22:00:00',
+        ],
 
         [
             'version' => '2026.7.1.311',
@@ -10857,6 +10924,7 @@ return [
             'published_at' => '2026-05-05 23:00:00',
         ],
     ],
+
 
 
 // 2026.7.1.242 - Solicitudes de reemplazo: fix Error 500 antecedentes por columna users.name

@@ -65,6 +65,7 @@ class SlepUiRegistry
                 self::entry('Dashboard', 'dashboard', 'bi-speedometer2', ['*']),
             ],
             'Trámites y operación' => [
+                self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario'], 'certificados'),
                 self::entry('Cometidos funcionarios', 'tramites.cometidos-funcionarios.index', 'bi-briefcase', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_ac', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_daf_compra', 'funcionario_juridica']),
                 self::entry('Licencias Médicas', 'tramites.licencias-medicas.index', 'bi-file-medical', ['admin', 'coordinador_gdp', 'funcionario_slep']),
                 self::entry('Agendamiento Proyector y Salas', 'gestion.agendamientos-recursos.index', 'bi-calendar-event', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac', 'secretaria_direccion_ejecutiva']),
@@ -141,6 +142,7 @@ class SlepUiRegistry
     public static function quickModules($user, ?string $activeRole): array
     {
         $items = [
+            self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario'], 'certificados'),
             self::entry('Cometidos funcionarios', 'tramites.cometidos-funcionarios.index', 'bi-briefcase', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_ac', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_daf_compra', 'funcionario_juridica']),
             self::entry('Licencias Médicas', 'tramites.licencias-medicas.index', 'bi-file-medical', ['admin', 'coordinador_gdp', 'funcionario_slep']),
                 self::entry('Agendamiento Proyector y Salas', 'gestion.agendamientos-recursos.index', 'bi-calendar-event', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac', 'secretaria_direccion_ejecutiva']),
