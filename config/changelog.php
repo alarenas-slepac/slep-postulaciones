@@ -1,6 +1,43 @@
 <?php
 
 return [
+    '2026.7.1.348' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Tipografía Century Gothic en la vitrina pública',
+        'files' => [
+            'public/fonts/admision-escolar/century-gothic-regular.ttf',
+            'public/fonts/admision-escolar/century-gothic-bold.ttf',
+            'resources/views/public/admision-escolar/partials/styles.blade.php',
+            'tests/Feature/AdmisionEscolarPublicRoutesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Incorpora las fuentes Century Gothic Regular y Bold proporcionadas para la vitrina de Admisión Escolar.',
+            'Aplica Century Gothic como tipografía principal del encabezado, portada, filtros, tarjetas, fichas y pie de página públicos.',
+            'Declara los pesos 400 y 700 mediante font-face con font-display swap y conserva Arial como respaldo.',
+            'Verifica mediante prueba automatizada la presencia, integridad y carga pública de ambos archivos tipográficos.',
+            'No modifica la tipografía del resto de los módulos de la plataforma.',
+        ],
+        'roles' => ['Público'],
+    ],
+    '2026.7.1.347' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Identificación y derechos reservados en el pie de página',
+        'files' => [
+            'resources/views/layouts/admision-public.blade.php',
+            'tests/Feature/AdmisionEscolarPublicRoutesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Reemplaza SLEP AC Postulaciones por SLEP AC Admisión Escolar en el texto inferior de la vitrina.',
+            'Añade la declaración Todos los derechos reservados después del nombre del módulo.',
+            'Mantiene el año de copyright actualizado automáticamente.',
+            'Incorpora una prueba de regresión para evitar que el texto vuelva a depender del nombre interno de la plataforma.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.7.1.346' => [
         'date' => '2026-07-31',
         'module' => 'Admisión Escolar',

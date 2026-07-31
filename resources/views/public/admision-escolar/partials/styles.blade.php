@@ -1,4 +1,18 @@
 <style>
+@font-face {
+    font-family:"Century Gothic";
+    src:url("{{ asset('fonts/admision-escolar/century-gothic-regular.ttf') }}") format("truetype");
+    font-style:normal;
+    font-weight:400;
+    font-display:swap;
+}
+@font-face {
+    font-family:"Century Gothic";
+    src:url("{{ asset('fonts/admision-escolar/century-gothic-bold.ttf') }}") format("truetype");
+    font-style:normal;
+    font-weight:700;
+    font-display:swap;
+}
 :root {
     --ae-navy:#111d2e;
     --ae-navy-2:#172840;
@@ -19,7 +33,7 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--ae-bg);color:var(--ae-ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--ae-bg);color:var(--ae-ink);font-family:"Century Gothic",Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
 body.ae-nav-open{overflow:hidden}
 a{color:inherit}
 img{max-width:100%;display:block}

@@ -40,6 +40,29 @@ class AdmisionEscolarPublicRoutesTest extends TestCase
             ->assertSee('<a href="https://slepandaliencosta.gob.cl/" target="_blank" rel="noopener noreferrer">Sitio institucional</a>', false)
             ->assertSee('<a href="https://slepandaliencosta.gob.cl/" target="_blank" rel="noopener noreferrer">SLEP Andalién Costa</a>', false)
             ->assertDontSee('<small>SLEP AC Postulaciones</small>', false)
-            ->assertSee('<a href="mailto:comunicaciones@slepandaliencosta.gob.cl">comunicaciones@slepandaliencosta.gob.cl</a>', false);
+            ->assertSee('<a href="mailto:comunicaciones@slepandaliencosta.gob.cl">comunicaciones@slepandaliencosta.gob.cl</a>', false)
+            ->assertSee('<span>© '.now()->year.' SLEP AC Admisión Escolar. Todos los derechos reservados.</span>', false);
+    }
+
+    public function test_public_layout_loads_the_provided_century_gothic_fonts(): void
+    {
+        config([
+            'admision.publica_habilitada' => false,
+            'admision.mostrar_proximamente' => true,
+        ]);
+
+        $regularFont = public_path('fonts/admision-escolar/century-gothic-regular.ttf');
+        $boldFont = public_path('fonts/admision-escolar/century-gothic-bold.ttf');
+
+        $this->assertFileExists($regularFont);
+        $this->assertFileExists($boldFont);
+        $this->assertSame('3a9cbb5d75b2a2b0d22dc94571608e4e9dc7b88e825374985880c5722c1c9e5f', hash_file('sha256', $regularFont));
+        $this->assertSame('90cb613b492874a560c0ff18a3402b1d24fb7e846dff11295d5c4644d6c75e83', hash_file('sha256', $boldFont));
+
+        $this->get('/admision-escolar')
+            ->assertOk()
+            ->assertSee(asset('fonts/admision-escolar/century-gothic-regular.ttf'), false)
+            ->assertSee(asset('fonts/admision-escolar/century-gothic-bold.ttf'), false)
+            ->assertSee('font-family:"Century Gothic",Arial,sans-serif', false);
     }
 }

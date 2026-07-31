@@ -95,7 +95,7 @@
         </div>
     </div>
     <div class="ae-container ae-footer__bottom">
-        <span>© {{ now()->year }} {{ config('brand.org_name', 'SLEP Andalién Costa') }}</span>
+        <span>© {{ now()->year }} SLEP AC Admisión Escolar. Todos los derechos reservados.</span>
         <span>Vitrina informativa de establecimientos</span>
     </div>
 </footer>
