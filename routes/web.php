@@ -82,6 +82,9 @@ use App\Http\Controllers\Tramites\CometidoFuncionarioInformeController;
 use App\Http\Controllers\Tramites\LicenciaMedicaController;
 use App\Http\Controllers\Tramites\LicenciaFeriadoController;
 use App\Http\Controllers\System\GlobalSearchController;
+use App\Http\Controllers\Certificados\CertificadoImportacionController;
+use App\Http\Controllers\Certificados\CertificadoLaboralController;
+use App\Http\Controllers\Certificados\CertificadoVerificacionController;
 
 
 Route::get('/', function () {
@@ -141,10 +144,53 @@ Route::get('/validar-documento/{codigo}', [CometidoFuncionarioController::class,
     ->middleware('throttle:60,1')
     ->name('documentos.validar');
 
+Route::get('/certificados/verificar/{codigo}', CertificadoVerificacionController::class)
+    ->middleware('throttle:60,1')
+    ->where('codigo', '[A-Fa-f0-9]{32}')
+    ->name('certificados.verificar');
+
 // =========================
 //  RUTAS PROTEGIDAS POR MÓDULO
 // =========================
 Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
+
+    Route::prefix('certificados')
+        ->name('certificados.')
+        ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep|funcionario')
+        ->group(function () {
+            Route::get('/', [CertificadoLaboralController::class, 'index'])
+                ->name('index');
+            Route::post('/emitir', [CertificadoLaboralController::class, 'emitir'])
+                ->name('emitir');
+
+            Route::prefix('importaciones')
+                ->name('importaciones.')
+                ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
+                ->group(function () {
+                    Route::get('/', [CertificadoImportacionController::class, 'index'])
+                        ->name('index');
+                    Route::get('/crear', [CertificadoImportacionController::class, 'create'])
+                        ->name('create');
+                    Route::post('/', [CertificadoImportacionController::class, 'store'])
+                        ->name('store');
+                    Route::get('/{importacion}', [CertificadoImportacionController::class, 'show'])
+                        ->whereNumber('importacion')
+                        ->name('show');
+                    Route::post('/{importacion}/activar', [CertificadoImportacionController::class, 'activar'])
+                        ->whereNumber('importacion')
+                        ->name('activar');
+                });
+
+            Route::get('/{certificado}', [CertificadoLaboralController::class, 'ver'])
+                ->whereNumber('certificado')
+                ->name('ver');
+            Route::get('/{certificado}/descargar', [CertificadoLaboralController::class, 'descargar'])
+                ->whereNumber('certificado')
+                ->name('descargar');
+            Route::patch('/{certificado}/anular', [CertificadoLaboralController::class, 'anular'])
+                ->whereNumber('certificado')
+                ->name('anular');
+        });
 
     // -------------------------
     // Declaración de Sostenedores

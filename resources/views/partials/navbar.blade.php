@@ -148,6 +148,18 @@
                         </li>
                     @endif
 
+                    @if (
+                        in_array($activeRole, ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario'], true)
+                        && $u->canModule('certificados', $activeRole)
+                        && Route::has('certificados.index')
+                    )
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('certificados.*') ? 'active' : '' }}" href="{{ route('certificados.index') }}">
+                                <i class="bi bi-file-earmark-check"></i> Certificados
+                            </a>
+                        </li>
+                    @endif
+
                     @if (($isAdmin || $isGdp || $isUatp || $isSlep || $isPlani || $isFuncionarioAc || $isSecretariaDe) &&
                             ($u->canAnyModule(['gestion.solicitudes-reemplazo', 'gestion.estadisticas', 'gestion.informes', 'gestion.bolsa-trabajo'], $activeRole) || $canGestionBolsa || $canAgendamientoRecursos))
                         <li class="nav-item dropdown">
