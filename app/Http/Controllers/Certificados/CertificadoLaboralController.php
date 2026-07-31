@@ -8,6 +8,7 @@ use App\Models\CertificadoImportacion;
 use App\Models\User;
 use App\Services\Certificados\CertificadoVigenciaLaboralService;
 use App\Services\Certificados\CertificadoVigenciaPdfService;
+use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -84,9 +85,23 @@ class CertificadoLaboralController extends Controller
             abort(403);
         }
 
-        $datos = $request->validate([
+        $reglas = [
             'rut' => [$puedeEmitirTerceros ? 'required' : 'nullable', 'string', 'max:20'],
-        ]);
+        ];
+
+        if ($puedeEmitirTerceros) {
+            $reglas += [
+                'fecha_antiguedad' => [
+                    'required',
+                    'date_format:Y-m-d',
+                    'before_or_equal:today',
+                ],
+                'calidad_juridica' => ['required', 'string', 'max:500'],
+                'regimen_juridico' => ['required', 'string', 'max:500'],
+            ];
+        }
+
+        $datos = $request->validate($reglas);
         $rut = $puedeEmitirTerceros
             ? (string) ($datos['rut'] ?? '')
             : (string) $user->rut_normalized;
@@ -97,13 +112,27 @@ class CertificadoLaboralController extends Controller
             throw ValidationException::withMessages(['rut' => $e->getMessage()]);
         }
 
+        $datosCertificado = $resultado;
+        if ($puedeEmitirTerceros) {
+            $datosCertificado['fecha_antiguedad'] = CarbonImmutable::createFromFormat(
+                'Y-m-d',
+                (string) $datos['fecha_antiguedad']
+            )->startOfDay();
+            $datosCertificado['calidad_juridica'] = trim(
+                (string) $datos['calidad_juridica']
+            );
+            $datosCertificado['regimen_juridico'] = trim(
+                (string) $datos['regimen_juridico']
+            );
+        }
+
         $beneficiario = User::query()
             ->where('rut', $resultado['rut_normalizado'])
             ->first();
 
         try {
             $certificado = DB::transaction(function () use (
-                $resultado,
+                $datosCertificado,
                 $beneficiario,
                 $user,
                 $rolActivo
@@ -111,14 +140,14 @@ class CertificadoLaboralController extends Controller
                 $certificado = CertificadoEmitido::query()->create([
                     'tipo' => 'vigencia_laboral',
                     'codigo_validacion' => Str::upper(bin2hex(random_bytes(16))),
-                    'rut_normalizado' => $resultado['rut_normalizado'],
-                    'nombre_snapshot' => $resultado['nombre'],
-                    'fecha_antiguedad' => $resultado['fecha_antiguedad']->format('Y-m-d'),
-                    'calidad_juridica_snapshot' => $resultado['calidad_juridica'],
-                    'regimen_juridico_snapshot' => $resultado['regimen_juridico'],
-                    'establecimientos_snapshot' => $resultado['establecimientos'],
-                    'contratos_snapshot' => $resultado['contratos'],
-                    'importacion_id' => $resultado['importacion']->id,
+                    'rut_normalizado' => $datosCertificado['rut_normalizado'],
+                    'nombre_snapshot' => $datosCertificado['nombre'],
+                    'fecha_antiguedad' => $datosCertificado['fecha_antiguedad']->format('Y-m-d'),
+                    'calidad_juridica_snapshot' => $datosCertificado['calidad_juridica'],
+                    'regimen_juridico_snapshot' => $datosCertificado['regimen_juridico'],
+                    'establecimientos_snapshot' => $datosCertificado['establecimientos'],
+                    'contratos_snapshot' => $datosCertificado['contratos'],
+                    'importacion_id' => $datosCertificado['importacion']->id,
                     'usuario_beneficiario_id' => $beneficiario?->id,
                     'emitido_por_user_id' => $user->id,
                     'rol_emisor' => $rolActivo,
