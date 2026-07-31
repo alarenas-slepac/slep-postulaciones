@@ -47,10 +47,36 @@
                         <div><strong>Sello educativo</strong><br>{{ $perfil->sello_educativo }}</div>
                     </div>
                     <div class="ae-detail-actions">
-                        @if ($perfil->sitio_web_url)<a class="ae-button ae-button--outline ae-button--small" href="{{ $perfil->sitio_web_url }}" target="_blank" rel="noopener noreferrer">Sitio web ↗</a>@endif
-                        @if ($perfil->facebook_url)<a class="ae-button ae-button--outline ae-button--small" href="{{ $perfil->facebook_url }}" target="_blank" rel="noopener noreferrer">Facebook ↗</a>@endif
-                        @if ($perfil->instagram_url)<a class="ae-button ae-button--outline ae-button--small" href="{{ $perfil->instagram_url }}" target="_blank" rel="noopener noreferrer">Instagram ↗</a>@endif
-                        <a class="ae-button ae-button--primary ae-button--small" href="{{ config('admision.sae_url') }}" target="_blank" rel="noopener noreferrer">Ir al SAE ↗</a>
+                        @if ($perfil->sitio_web_url)
+                            <a class="ae-button ae-button--outline ae-button--small" href="{{ $perfil->sitio_web_url }}" target="_blank" rel="noopener noreferrer">
+                                <svg class="ae-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>
+                                </svg>
+                                <span>Sitio web</span><span aria-hidden="true">↗</span>
+                            </a>
+                        @endif
+                        @if ($perfil->facebook_url)
+                            <a class="ae-button ae-button--outline ae-button--small" href="{{ $perfil->facebook_url }}" target="_blank" rel="noopener noreferrer">
+                                <svg class="ae-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor">
+                                    <path d="M14 8h3V4h-3c-3.3 0-5 1.8-5 5v3H6v4h3v8h4v-8h3.5l.5-4h-4V9c0-.7.3-1 1-1Z"/>
+                                </svg>
+                                <span>Facebook</span><span aria-hidden="true">↗</span>
+                            </a>
+                        @endif
+                        @if ($perfil->instagram_url)
+                            <a class="ae-button ae-button--outline ae-button--small" href="{{ $perfil->instagram_url }}" target="_blank" rel="noopener noreferrer">
+                                <svg class="ae-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+                                </svg>
+                                <span>Instagram</span><span aria-hidden="true">↗</span>
+                            </a>
+                        @endif
+                        <a class="ae-button ae-button--primary ae-button--small" href="{{ config('admision.sae_url') }}" target="_blank" rel="noopener noreferrer">
+                            <svg class="ae-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m3 9.5 9-4.5 9 4.5-9 4.5-9-4.5Z"/><path d="M7 12v4c3 2 7 2 10 0v-4M21 10v6"/>
+                            </svg>
+                            <span>Ir al SAE</span><span aria-hidden="true">↗</span>
+                        </a>
                     </div>
                 </div>
             </div>

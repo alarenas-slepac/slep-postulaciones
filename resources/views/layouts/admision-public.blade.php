@@ -8,6 +8,8 @@
         $admisionDescription = $metaDescription ?? config('admision.descripcion');
         $admisionLogo = asset(config('brand.logo_slep', config('brand.logo_principal', 'branding/01_logo_principal.png')));
         $admisionLogoFallback = asset(config('brand.logo_principal', 'branding/01_logo_principal.png'));
+        $admisionInstitutionalUrl = 'https://slepandaliencosta.gob.cl/';
+        $admisionCommunicationsEmail = 'comunicaciones@slepandaliencosta.gob.cl';
     @endphp
     <title>{{ $admisionPageTitle }} · {{ config('brand.org_name', 'SLEP Andalién Costa') }}</title>
     <meta name="description" content="{{ $admisionDescription }}">
@@ -35,7 +37,6 @@
             <img src="{{ $admisionLogo }}" alt="SLEP Andalién Costa" onerror="this.onerror=null;this.src='{{ $admisionLogoFallback }}'">
             <span>
                 <strong>Admisión Escolar</strong>
-                <small>{{ config('brand.org_name', 'SLEP Andalién Costa') }}</small>
             </span>
         </a>
 
@@ -47,7 +48,7 @@
         <nav class="ae-nav" id="ae-main-nav" aria-label="Navegación principal" data-ae-nav>
             <a href="{{ route('public.admision-escolar.index') }}">Establecimientos</a>
             <a href="{{ route('public.admision-escolar.index') }}#como-explorar">Cómo explorar</a>
-            <a href="{{ config('brand.org_url', 'https://slepandaliencosta.gob.cl/') }}" target="_blank" rel="noopener noreferrer">Sitio institucional</a>
+            <a href="{{ $admisionInstitutionalUrl }}" target="_blank" rel="noopener noreferrer">Sitio institucional</a>
             <a class="ae-button ae-button--primary ae-button--small" href="{{ config('admision.sae_url') }}" target="_blank" rel="noopener noreferrer">Ir al SAE <span aria-hidden="true">↗</span></a>
         </nav>
     </div>
@@ -80,11 +81,12 @@
         <div>
             <h2>Enlaces útiles</h2>
             <a href="https://www.mineduc.cl/" target="_blank" rel="noopener noreferrer">Ministerio de Educación</a>
-            <a href="{{ config('brand.org_url') }}" target="_blank" rel="noopener noreferrer">SLEP Andalién Costa</a>
+            <a href="{{ $admisionInstitutionalUrl }}" target="_blank" rel="noopener noreferrer">SLEP Andalién Costa</a>
         </div>
         <div>
             <h2>Contacto</h2>
-            @if (config('admision.contacto_email'))
+            <a href="mailto:{{ $admisionCommunicationsEmail }}">{{ $admisionCommunicationsEmail }}</a>
+            @if (config('admision.contacto_email') && strcasecmp(config('admision.contacto_email'), $admisionCommunicationsEmail) !== 0)
                 <a href="mailto:{{ config('admision.contacto_email') }}">{{ config('admision.contacto_email') }}</a>
             @endif
             @if (config('admision.contacto_telefono'))

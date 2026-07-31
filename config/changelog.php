@@ -1,6 +1,43 @@
 <?php
 
 return [
+    '2026.7.1.346' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Iconos identificadores en enlaces externos',
+        'files' => [
+            'resources/views/public/admision-escolar/show.blade.php',
+            'resources/views/public/admision-escolar/partials/styles.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Añade un icono de globo al botón Sitio web de la ficha pública de cada establecimiento.',
+            'Incorpora iconos reconocibles de Facebook e Instagram en sus respectivos enlaces externos.',
+            'Identifica el acceso al Sistema de Admisión Escolar con un símbolo educativo.',
+            'Los iconos se integran como SVG accesibles, heredan el color de cada botón y no requieren librerías externas.',
+        ],
+        'roles' => ['Público'],
+    ],
+    '2026.7.1.345' => [
+        'date' => '2026-07-31',
+        'module' => 'Admisión Escolar',
+        'title' => 'Enlaces y contacto institucionales en la vitrina',
+        'files' => [
+            'resources/views/layouts/admision-public.blade.php',
+            'tests/Feature/AdmisionEscolarPublicRoutesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Fija explícitamente https://slepandaliencosta.gob.cl/ en el enlace Sitio institucional del encabezado público.',
+            'Aplica la misma URL al enlace SLEP Andalién Costa del pie de página.',
+            'Evita que ambos accesos sean reemplazados por APP_URL u ORG_URL del entorno de ejecución.',
+            'Incorpora una prueba de regresión que valida ambos destinos aun cuando la configuración del entorno contenga otra dirección.',
+            'Elimina del encabezado la segunda línea dinámica que mostraba el nombre interno SLEP AC Postulaciones.',
+            'Añade comunicaciones@slepandaliencosta.gob.cl como contacto permanente del pie de página y evita duplicarlo si coincide con el correo configurable.',
+            'No modifica otros enlaces ni rutas internas de la vitrina.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.7.1.344' => [
         'date' => '2026-07-31',
         'module' => 'Admisión Escolar',

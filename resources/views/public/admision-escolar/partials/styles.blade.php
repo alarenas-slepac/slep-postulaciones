@@ -45,6 +45,7 @@ button{cursor:pointer}
 .ae-nav-toggle span:not(.ae-sr-only){display:block;height:2px;background:#fff;margin:5px 0;border-radius:10px}
 .ae-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:14px;padding:13px 18px;font-weight:800;text-decoration:none;transition:transform .18s,box-shadow .18s,background .18s}
 .ae-button:hover{transform:translateY(-2px)}
+.ae-button__icon{width:18px;height:18px;flex:0 0 18px;display:block}
 .ae-button--primary{background:linear-gradient(135deg,var(--ae-blue),#1674dd);color:#fff;box-shadow:0 10px 24px rgba(44,137,244,.28)}
 .ae-button--outline{background:#fff;color:var(--ae-blue-dark);border:1px solid #bcd7f8}
 .ae-button--dark{background:var(--ae-navy);color:#fff}
