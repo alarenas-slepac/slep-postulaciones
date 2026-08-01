@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.7.1.353' => [
+        'date' => '2026-07-31',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Encuadre completo de logos institucionales',
+        'files' => [
+            'resources/css/centro-operaciones.css',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Conserva la proporción natural de los logos y agrega un margen interno real para evitar que sus bordes se perciban recortados.',
+            'Aplica el encuadre corregido en la cabecera de reportes, su detalle, dispositivos móviles y fichas emergentes del mapa.',
+        ],
+        'roles' => ['Administrador', 'Director Ejecutivo', 'Funcionario SLEP', 'Coordinador GDP', 'Coordinador UATP', 'Directivo de Establecimiento'],
+    ],
     '2026.7.1.352' => [
         'date' => '2026-07-31',
         'module' => 'Centro de Operaciones',
