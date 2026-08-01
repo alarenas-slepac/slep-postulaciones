@@ -55,7 +55,7 @@
             <div class="co-section-title"><span>1</span><div><h2>Estado operacional</h2><p>Selecciona el estado actual de cada servicio.</p></div></div>
             <div class="co-service-cards">
             @foreach(config('centro_operaciones.servicios') as $codigo => $servicio)
-                <fieldset class="co-service-card">
+                <fieldset class="co-service-card co-service--{{ $codigo }}">
                     <legend><i class="bi {{ $servicio['icon'] }}"></i>{{ $servicio['label'] }}</legend>
                     <div class="co-segmented co-segmented--service">
                     @foreach(config('centro_operaciones.estados_servicio') as $estado => $label)
