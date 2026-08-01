@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.7.1.352' => [
+        'date' => '2026-07-31',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Identidad visual de establecimientos y servicios',
+        'files' => [
+            'app/Services/CentroOperaciones/ConsolidadoService.php',
+            'resources/css/centro-operaciones.css',
+            'resources/js/centro-operaciones.js',
+            'resources/views/centro-operaciones/panel.blade.php',
+            'resources/views/centro-operaciones/reportes/form.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Amplía el logo institucional en la cabecera del formulario y del detalle sin deformarlo ni recortarlo.',
+            'Incorpora el logo de cada establecimiento en la ficha emergente de su marcador dentro del mapa operacional.',
+            'Mantiene un ícono institucional de respaldo cuando la ficha de Admisión Escolar no posee logo.',
+            'Precarga los perfiles de Admisión Escolar para evitar consultas adicionales al construir los marcadores.',
+            'Diferencia cada servicio mediante una paleta propia aplicada a sus íconos y barras de continuidad, manteniendo la misma identidad visual en el panel y el formulario.',
+        ],
+        'roles' => ['Administrador', 'Director Ejecutivo', 'Funcionario SLEP', 'Coordinador GDP', 'Coordinador UATP', 'Directivo de Establecimiento'],
+    ],
     '2026.7.1.351' => [
         'date' => '2026-07-31',
         'module' => 'Centro de Operaciones',

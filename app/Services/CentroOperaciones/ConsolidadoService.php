@@ -23,6 +23,7 @@ class ConsolidadoService
         $hoy = CarbonImmutable::now($zona);
         $puntoCorte = $fecha->isSameDay($hoy) ? $hoy : $fecha->endOfDay();
         $establecimientos = Establecimiento::query()
+            ->with('admisionPerfil:id,establecimiento_id,logo_path')
             ->orderBy('comuna')
             ->orderBy('nombre_establecimiento')
             ->get();
@@ -65,6 +66,7 @@ class ConsolidadoService
                 'rbd' => $establecimiento->rbd,
                 'nombre' => $establecimiento->nombre_establecimiento,
                 'comuna' => $establecimiento->comuna ?: 'Sin comuna',
+                'logo_url' => $establecimiento->admisionPerfil?->logoUrl(),
                 'latitud' => $establecimiento->latitud !== null ? (float) $establecimiento->latitud : null,
                 'longitud' => $establecimiento->longitud !== null ? (float) $establecimiento->longitud : null,
                 'estado' => $estado,

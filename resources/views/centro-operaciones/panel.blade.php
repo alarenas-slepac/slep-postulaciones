@@ -108,7 +108,7 @@
             <div class="co-card-head"><div><span class="co-eyebrow">Continuidad operacional</span><h2>Estado de servicios</h2></div></div>
             <div class="co-services" data-co-services>
             @foreach($datos['servicios'] as $servicio)
-                <div class="co-service-row">
+                <div class="co-service-row co-service--{{ $servicio['codigo'] }}">
                     <div class="co-service-label"><i class="bi {{ $servicio['icon'] }}"></i><span>{{ $servicio['label'] }}</span></div>
                     <div class="co-progress"><span style="width: {{ $servicio['porcentaje_operativo'] }}%"></span></div>
                     <strong>{{ number_format($servicio['porcentaje_operativo'], 1, ',', '.') }}%</strong>

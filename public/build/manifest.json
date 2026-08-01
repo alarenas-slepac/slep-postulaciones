@@ -2180,7 +2180,7 @@
     "src": "node_modules/leaflet/dist/images/marker-icon.png"
   },
   "resources/css/centro-operaciones.css": {
-    "file": "assets/centro-operaciones-CgDroY0V.css",
+    "file": "assets/centro-operaciones-B5gvTQul.css",
     "src": "resources/css/centro-operaciones.css",
     "isEntry": true,
     "name": "centro-operaciones",
@@ -2211,7 +2211,7 @@
     "isEntry": true
   },
   "resources/js/centro-operaciones.js": {
-    "file": "assets/centro-operaciones-B6f-cyhR.js",
+    "file": "assets/centro-operaciones-DhuvoZjM.js",
     "name": "centro-operaciones",
     "src": "resources/js/centro-operaciones.js",
     "isEntry": true,

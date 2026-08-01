@@ -83,11 +83,14 @@ function initPanel(root) {
             bounds.push(point);
             const reportUrl = item.reporte_id ? root.dataset.reportUrl.replace('__ID__', item.reporte_id) : '';
             const reportLink = reportUrl ? `<a href="${escapeHtml(reportUrl)}">Ver reporte</a>` : '';
+            const logo = item.logo_url
+                ? `<div class="co-leaflet-popup-logo"><img src="${escapeHtml(item.logo_url)}" alt="Logo de ${escapeHtml(item.nombre)}"></div>`
+                : '<div class="co-leaflet-popup-logo co-leaflet-popup-logo--fallback"><i class="bi bi-building" aria-hidden="true"></i></div>';
             L.marker(point, {
                 icon: markerIcon(item.estado),
                 coState: item.estado,
                 title: `${item.nombre} · ${stateLabel[item.estado]}`,
-            }).bindPopup(`<div class="co-leaflet-popup"><strong>${escapeHtml(item.nombre)}</strong><span>${escapeHtml(item.comuna)} · ${stateLabel[item.estado]}</span>${reportLink}</div>`).addTo(markerLayer);
+            }).bindPopup(`<div class="co-leaflet-popup"><div class="co-leaflet-popup-header">${logo}<div class="co-leaflet-popup-copy"><strong>${escapeHtml(item.nombre)}</strong><span>${escapeHtml(item.comuna)} · ${escapeHtml(stateLabel[item.estado] ?? item.estado)}</span></div></div>${reportLink}</div>`).addTo(markerLayer);
         });
         if (bounds.length) map.fitBounds(bounds, { padding: [25, 25], maxZoom: 12 });
     };
@@ -111,7 +114,7 @@ function initPanel(root) {
     const renderServices = (payload) => {
         const target = document.querySelector('[data-co-services]');
         if (!target) return;
-        target.innerHTML = payload.servicios.map((item) => `<div class="co-service-row"><div class="co-service-label"><i class="bi ${escapeHtml(item.icon)}"></i><span>${escapeHtml(item.label)}</span></div><div class="co-progress"><span style="width:${Number(item.porcentaje_operativo)}%"></span></div><strong>${formatPercent(item.porcentaje_operativo)}%</strong></div>`).join('');
+        target.innerHTML = payload.servicios.map((item) => `<div class="co-service-row co-service--${escapeHtml(item.codigo)}"><div class="co-service-label"><i class="bi ${escapeHtml(item.icon)}"></i><span>${escapeHtml(item.label)}</span></div><div class="co-progress"><span style="width:${Number(item.porcentaje_operativo)}%"></span></div><strong>${formatPercent(item.porcentaje_operativo)}%</strong></div>`).join('');
     };
 
     const renderAlerts = (payload) => {
