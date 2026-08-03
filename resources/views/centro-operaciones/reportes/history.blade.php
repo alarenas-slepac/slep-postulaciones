@@ -10,7 +10,7 @@
         <div><div class="co-eyebrow">Centro de Operaciones</div><h1>Historial de reportes</h1><p>Consulta todos los envíos y sus versiones registradas.</p></div>
         <div class="co-hero-actions">
             @role('funcionario_directivo_estab')<a class="btn btn-primary" href="{{ route('centro-operaciones.reportes.create') }}"><i class="bi bi-plus-circle"></i> Reportar hoy</a>@endrole
-            @hasanyrole('admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp')<a class="btn btn-outline-primary" href="{{ route('centro-operaciones.index') }}"><i class="bi bi-speedometer2"></i> Panel</a>@endhasanyrole
+            @hasanyrole('admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep')<a class="btn btn-outline-primary" href="{{ route('centro-operaciones.index') }}"><i class="bi bi-speedometer2"></i> Panel</a>@endhasanyrole
         </div>
     </header>
     <section class="co-card">

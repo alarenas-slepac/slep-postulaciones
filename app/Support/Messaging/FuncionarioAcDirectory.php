@@ -25,6 +25,7 @@ class FuncionarioAcDirectory
         'coordinador_gdp',
         'coordinador_uatp',
         'comunicaciones',
+        'gabinete_slep',
         'supervisor_plani',
         'coordinador_plani',
         'funcionario_daf',
