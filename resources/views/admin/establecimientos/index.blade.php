@@ -50,7 +50,7 @@
                     <div class="col-12 col-md-4">
                         <label class="form-label mb-1">Buscar</label>
                         <input type="text" name="q" value="{{ $q ?? '' }}" class="form-control form-control-sm"
-                            placeholder="Nombre, RBD, código, tipo, comuna...">
+                            placeholder="Nombre, RBD, director, contacto, comuna...">
                     </div>
 
                     <div class="col-12 col-md-4">
@@ -90,6 +90,8 @@
                                 <th>Establecimiento</th>
                                 <th>RBD</th>
                                 <th>Comuna</th>
+                                <th>Director/a</th>
+                                <th>Contacto</th>
                                 <th class="text-end">Matrícula</th>
                                 <th>Latitud</th>
                                 <th>Longitud</th>
@@ -105,6 +107,8 @@
                                     <td>{{ $e->nombre_establecimiento ?? ($e->nombre ?? '-') }}</td>
                                     <td>{{ $e->rbd ?? '-' }}</td>
                                     <td>{{ $e->comuna ?? '-' }}</td>
+                                    <td>{{ $e->director_nombre ?: '-' }}</td>
+                                    <td>{{ $e->director_contacto ?: '-' }}</td>
                                     <td class="text-end">{{ $e->matricula_total !== null ? number_format($e->matricula_total, 0, ',', '.') : '-' }}</td>
                                     <td>{{ $e->latitud ?? '-' }}</td>
                                     <td>{{ $e->longitud ?? '-' }}</td>
@@ -150,7 +154,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
+                                    <td colspan="11" class="text-center text-muted py-4">
                                         No hay establecimientos.
                                     </td>
                                 </tr>

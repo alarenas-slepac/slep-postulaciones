@@ -6,6 +6,8 @@
     $subdireccionActual = request('subdireccion');
     $unidadActual = request('unidad');
     $recentOnlyActual = request()->boolean('recent_only');
+    $establecimientoQActual = request('establecimiento_q');
+    $establecimientoComunaActual = request('establecimiento_comuna');
 @endphp
 
 <div class="container-fluid py-4 messages-institutional-view">
@@ -19,12 +21,12 @@
         .messages-institutional-view .module-help { max-width: 850px; color: #475569; line-height: 1.45; margin-bottom: 0; }
         .messages-institutional-view .module-badge { display: inline-flex; align-items: center; gap: .4rem; padding: .48rem .75rem; border-radius: 999px; background: #eef6ff; border: 1px solid #b9d9ff; color: #0d47a1; font-size: .8rem; font-weight: 800; }
 
-        .messages-institutional-view .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .9rem; padding: 1rem 1.45rem 1.25rem; background: #fff; }
+        .messages-institutional-view .metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; padding: 1rem 1.45rem 1.25rem; background: #fff; }
         .messages-institutional-view .metric-card { border: 1px solid #dbe4f0; border-radius: 1rem; background: #fff; padding: .95rem 1rem; min-height: 6.2rem; box-shadow: 0 .25rem .8rem rgba(15,23,42,.035); }
         .messages-institutional-view .metric-label { display: flex; align-items: center; gap: .45rem; color: #64748b; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .025em; margin-bottom: .35rem; }
         .messages-institutional-view .metric-number { color: #0f172a; font-size: 1.55rem; line-height: 1; font-weight: 900; margin-bottom: .45rem; }
         .messages-institutional-view .metric-help { color: #64748b; font-size: .78rem; line-height: 1.35; margin-bottom: 0; }
-        .messages-institutional-view .quick-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
+        .messages-institutional-view .quick-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
         .messages-institutional-view .quick-nav-card { display: flex; align-items: flex-start; gap: .75rem; padding: .95rem 1rem; border: 1px solid #dbe4f0; border-radius: 1rem; background: #fff; color: #0f172a; text-decoration: none; box-shadow: 0 .25rem .8rem rgba(15,23,42,.035); transition: all .18s ease; }
         .messages-institutional-view .quick-nav-card:hover { border-color: #b9d9ff; background: #f8fbff; transform: translateY(-1px); color: #0f172a; }
         .messages-institutional-view .quick-nav-icon { width: 2.35rem; height: 2.35rem; border-radius: .85rem; display: inline-flex; align-items: center; justify-content: center; background: #eef6ff; color: #0d47a1; flex: 0 0 auto; }
@@ -36,6 +38,7 @@
         .messages-institutional-view .stage-panel-title-wrap { display: flex; align-items: flex-start; gap: .8rem; min-width: 0; }
         .messages-institutional-view .stage-panel-icon { width: 2.55rem; height: 2.55rem; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 1.1rem; box-shadow: 0 .35rem .8rem rgba(15,23,42,.12); flex: 0 0 auto; }
         .messages-institutional-view .stage-panel-icon.is-directory { background: #0d6efd; }
+        .messages-institutional-view .stage-panel-icon.is-establishment { background: #475569; }
         .messages-institutional-view .stage-panel-icon.is-filter { background: #475569; }
         .messages-institutional-view .stage-panel-icon.is-chat { background: #0f8f4d; }
         .messages-institutional-view .stage-panel-icon.is-search { background: #7c3aed; }
@@ -111,10 +114,10 @@
                 <div>
                     <div class="module-kicker">Mensajería institucional</div>
                     <h1 class="module-title">Mensajes SLEP</h1>
-                    <p class="module-help">Bandeja de conversaciones y libreta institucional para contactar personal autorizado de Administración Central, ordenado por subdirección y unidad.</p>
+                    <p class="module-help">Bandeja de conversaciones, libreta institucional de Administración Central y nómina territorial de establecimientos con sus directores y datos de contacto.</p>
                 </div>
             </div>
-            <span class="module-badge"><i class="bi bi-person-lines-fill"></i> Libreta SLEP</span>
+            <span class="module-badge"><i class="bi bi-person-lines-fill"></i> Directorios SLEP</span>
         </div>
 
         <div class="metric-grid">
@@ -132,6 +135,11 @@
                 <div class="metric-label"><i class="bi bi-person-check"></i> Contactos AC</div>
                 <div class="metric-number">{{ number_format($metrics['directory'] ?? 0, 0, ',', '.') }}</div>
                 <p class="metric-help">Funcionarios AC registrados con cuenta activa.</p>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label"><i class="bi bi-buildings"></i> Establecimientos</div>
+                <div class="metric-number">{{ number_format($metrics['establishments'] ?? 0, 0, ',', '.') }}</div>
+                <p class="metric-help">Nómina territorial con director/a y contacto registrado.</p>
             </div>
             <div class="metric-card">
                 <div class="metric-label"><i class="bi bi-diagram-3"></i> Subdirecciones</div>
@@ -159,6 +167,13 @@
             <span>
                 <span class="quick-nav-title">Mis conversaciones</span>
                 <span class="quick-nav-help d-block">Acceder rápidamente a los chats activos o recientes.</span>
+            </span>
+        </a>
+        <a href="#establishmentPanel" class="quick-nav-card">
+            <span class="quick-nav-icon"><i class="bi bi-buildings"></i></span>
+            <span>
+                <span class="quick-nav-title">Establecimientos</span>
+                <span class="quick-nav-help d-block">Consultar director o directora y su contacto institucional.</span>
             </span>
         </a>
         <a href="#directoryFilters" class="quick-nav-card">
@@ -197,6 +212,99 @@
 
     <div class="main-layout">
         <div>
+            <div class="stage-panel-card mb-4" id="establishmentPanel">
+                <div class="stage-panel-header">
+                    <div class="stage-panel-title-wrap">
+                        <span class="stage-panel-icon is-establishment"><i class="bi bi-buildings"></i></span>
+                        <div>
+                            <div class="stage-panel-kicker">Nómina territorial</div>
+                            <h2 class="h5 mb-0">Establecimientos y contactos directivos</h2>
+                            <div class="stage-panel-help">Consulta el nombre del director o directora y el contacto registrado para cada establecimiento.</div>
+                        </div>
+                    </div>
+                    <span class="info-chip"><i class="bi bi-building-check"></i> {{ $establishmentItems->count() }} establecimiento(s)</span>
+                </div>
+                <div class="stage-panel-body">
+                    <form method="GET" action="{{ route('messages.index') }}" class="row g-3 align-items-end mb-4">
+                        @if(filled($qActual))
+                            <input type="hidden" name="q" value="{{ $qActual }}">
+                        @endif
+                        @if(filled($subdireccionActual))
+                            <input type="hidden" name="subdireccion" value="{{ $subdireccionActual }}">
+                        @endif
+                        @if(filled($unidadActual))
+                            <input type="hidden" name="unidad" value="{{ $unidadActual }}">
+                        @endif
+                        @if($recentOnlyActual)
+                            <input type="hidden" name="recent_only" value="1">
+                        @endif
+
+                        <div class="col-lg-7">
+                            <label class="form-label">Buscar establecimiento o director/a</label>
+                            <input type="text" name="establecimiento_q" value="{{ $establecimientoQActual }}" class="form-control" placeholder="Nombre, RBD, director/a o contacto">
+                        </div>
+                        <div class="col-lg-3">
+                            <label class="form-label">Comuna</label>
+                            <select name="establecimiento_comuna" class="form-select">
+                                <option value="">Todas</option>
+                                @foreach($establishmentComunas as $comuna)
+                                    <option value="{{ $comuna }}" @selected($establecimientoComunaActual === $comuna)>{{ $comuna }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-lg-2 d-flex gap-2">
+                            <button type="submit" class="cometido-btn is-primary flex-fill" title="Filtrar establecimientos"><i class="bi bi-search"></i></button>
+                            <a href="{{ route('messages.index', array_filter([
+                                'q' => $qActual,
+                                'subdireccion' => $subdireccionActual,
+                                'unidad' => $unidadActual,
+                                'recent_only' => $recentOnlyActual ? 1 : null,
+                            ], fn ($value) => $value !== null && $value !== '')) }}" class="cometido-btn is-danger" title="Limpiar filtro de establecimientos"><i class="bi bi-x-circle"></i></a>
+                        </div>
+                    </form>
+
+                    @if($establishmentGrouped->isEmpty())
+                        <div class="empty-state">
+                            <div class="empty-icon"><i class="bi bi-search"></i></div>
+                            <div class="fw-semibold">No se encontraron establecimientos</div>
+                            <div class="small">Ajusta los filtros o completa los datos directivos desde la administración de establecimientos.</div>
+                        </div>
+                    @else
+                        <div class="directory-tree">
+                            @foreach($establishmentGrouped as $comuna => $establecimientos)
+                                <div class="subdir-card">
+                                    <div class="subdir-header">
+                                        <div>
+                                            <div class="subdir-title"><i class="bi bi-geo-alt me-1"></i> {{ $comuna }}</div>
+                                            <div class="small text-muted">{{ $establecimientos->count() }} establecimiento(s)</div>
+                                        </div>
+                                    </div>
+                                    <div class="unit-list">
+                                        <div class="contact-grid">
+                                            @foreach($establecimientos as $establecimiento)
+                                                <div class="contact-card">
+                                                    <div class="contact-head">
+                                                        <span class="avatar-pill role-estab">{{ $establecimiento['initials'] }}</span>
+                                                        <div class="min-w-0">
+                                                            <div class="contact-name">{{ $establecimiento['name'] }}</div>
+                                                            <div class="contact-role">RBD {{ $establecimiento['rbd'] ?: 'sin registro' }}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="contact-meta">
+                                                        <span><i class="bi bi-person-badge"></i> {{ $establecimiento['director_nombre'] ?: 'Director/a sin registrar' }}</span>
+                                                        <span><i class="bi bi-telephone"></i> {{ $establecimiento['director_contacto'] ?: 'Contacto sin registrar' }}</span>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </div>
+
             <div class="stage-panel-card mb-4" id="directoryFilters">
                 <div class="stage-panel-header">
                     <div class="stage-panel-title-wrap">
@@ -210,6 +318,12 @@
                 </div>
                 <div class="stage-panel-body">
                     <form method="GET" action="{{ route('messages.index') }}" class="row g-3 align-items-end">
+                        @if(filled($establecimientoQActual))
+                            <input type="hidden" name="establecimiento_q" value="{{ $establecimientoQActual }}">
+                        @endif
+                        @if(filled($establecimientoComunaActual))
+                            <input type="hidden" name="establecimiento_comuna" value="{{ $establecimientoComunaActual }}">
+                        @endif
                         <div class="col-lg-4">
                             <label class="form-label">Buscar</label>
                             <input type="text" name="q" value="{{ $qActual }}" class="form-control" placeholder="Nombre, correo, cargo o unidad">
@@ -239,7 +353,10 @@
                             </div>
                             <div class="d-flex gap-2">
                                 <button type="submit" class="cometido-btn is-primary flex-fill"><i class="bi bi-search"></i></button>
-                                <a href="{{ route('messages.index') }}" class="cometido-btn is-danger"><i class="bi bi-x-circle"></i></a>
+                                <a href="{{ route('messages.index', array_filter([
+                                    'establecimiento_q' => $establecimientoQActual,
+                                    'establecimiento_comuna' => $establecimientoComunaActual,
+                                ], fn ($value) => $value !== null && $value !== '')) }}" class="cometido-btn is-danger"><i class="bi bi-x-circle"></i></a>
                             </div>
                         </div>
                     </form>

@@ -1,6 +1,36 @@
 <?php
 
 return [
+    '2026.8.3.356' => [
+        'date' => '2026-08-03',
+        'module' => 'Establecimientos y Mensajes',
+        'title' => 'Directorio de establecimientos y contactos directivos',
+        'files' => [
+            'app/Http/Controllers/Admin/EstablecimientoController.php',
+            'app/Http/Controllers/MessagingController.php',
+            'app/Models/Establecimiento.php',
+            'app/Services/EstablecimientoImportService.php',
+            'app/Support/Messaging/EstablecimientoDirectory.php',
+            'database/migrations/2026_08_03_120000_add_director_contact_to_establecimientos.php',
+            'resources/templates/plantilla-carga-establecimientos.xlsx',
+            'resources/views/admin/establecimientos/_form.blade.php',
+            'resources/views/admin/establecimientos/index.blade.php',
+            'resources/views/admin/establecimientos/show.blade.php',
+            'resources/views/messages/index.blade.php',
+            'tests/Feature/EstablecimientoDirectorFieldsMigrationTest.php',
+            'tests/Unit/EstablecimientoDirectoryTest.php',
+            'tests/Unit/EstablecimientoImportHeadersTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Agrega nombre y contacto del director o directora al catálogo principal de establecimientos y a sus formularios de administración.',
+            'Precarga los nuevos campos desde la información histórica de Admisión Escolar sin reemplazar datos ya registrados.',
+            'Incorpora en Mensajes una nómina territorial filtrable por establecimiento, RBD, director, contacto y comuna.',
+            'Amplía la plantilla y el importador masivo de establecimientos manteniendo compatibles las plantillas históricas.',
+            'Añade pruebas para la migración, la consulta del nuevo directorio y la estructura de importación.',
+        ],
+        'roles' => ['Usuarios con acceso a Mensajes', 'Administrador', 'Coordinador GDP'],
+    ],
     '2026.8.3.355' => [
         'date' => '2026-08-03',
         'module' => 'Mensajes',

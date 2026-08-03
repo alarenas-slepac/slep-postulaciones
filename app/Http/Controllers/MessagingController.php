@@ -8,6 +8,7 @@ use App\Models\Message;
 use App\Models\MessageAttachment;
 use App\Models\MessageRead;
 use App\Models\User;
+use App\Support\Messaging\EstablecimientoDirectory;
 use App\Support\Messaging\FuncionarioAcDirectory;
 use App\Support\Messaging\MessageContentSanitizer;
 use App\Support\SlepUiRegistry;
@@ -50,6 +51,16 @@ class MessagingController extends Controller
 
         $directoryCatalog = $canUseDirectory ? FuncionarioAcDirectory::items() : collect();
         $directoryFilterOptions = $canUseDirectory ? FuncionarioAcDirectory::filters() : ['subdirecciones' => collect(), 'unidades' => collect()];
+
+        $establishmentFilters = [
+            'q' => $request->query('establecimiento_q'),
+            'comuna' => $request->query('establecimiento_comuna'),
+        ];
+        $establishmentItems = EstablecimientoDirectory::items($establishmentFilters);
+        $establishmentGrouped = $establishmentItems
+            ->groupBy(fn ($item) => $item['comuna'] ?: 'Sin comuna registrada');
+        $establishmentCatalog = EstablecimientoDirectory::items();
+        $establishmentComunas = EstablecimientoDirectory::comunas();
 
         $readStates = $this->messageReadsAvailable()
             ? MessageRead::query()
@@ -108,6 +119,7 @@ class MessagingController extends Controller
             'unread' => $unreadTotal,
             'unread_conversations' => $conversations->where('has_unread', true)->count(),
             'directory' => $directoryCatalog->count(),
+            'establishments' => $establishmentCatalog->count(),
             'subdirecciones' => $directoryCatalog->pluck('subdireccion')->filter()->unique()->count(),
             'unidades' => $directoryCatalog->pluck('unidad')->filter()->unique()->count(),
         ];
@@ -122,6 +134,10 @@ class MessagingController extends Controller
             'directoryItems',
             'directoryFilterOptions',
             'directoryFilters',
+            'establishmentGrouped',
+            'establishmentItems',
+            'establishmentComunas',
+            'establishmentFilters',
             'metrics'
         ));
     }
