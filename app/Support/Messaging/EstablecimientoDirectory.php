@@ -20,6 +20,7 @@ class EstablecimientoDirectory
 
         $search = trim((string) ($filters['q'] ?? ''));
         $comuna = trim((string) ($filters['comuna'] ?? ''));
+        $logosAvailable = self::logoColumnsAvailable();
 
         return Establecimiento::query()
             ->select([
@@ -30,6 +31,9 @@ class EstablecimientoDirectory
                 'director_nombre',
                 'director_contacto',
             ])
+            ->when($logosAvailable, fn ($query) => $query->with([
+                'admisionPerfil:id,establecimiento_id,logo_path',
+            ]))
             ->when($search !== '', function ($query) use ($search) {
                 $like = '%' . str_replace(' ', '%', $search) . '%';
 
@@ -44,7 +48,7 @@ class EstablecimientoDirectory
             ->orderBy('comuna')
             ->orderBy('nombre_establecimiento')
             ->get()
-            ->map(function (Establecimiento $establecimiento) {
+            ->map(function (Establecimiento $establecimiento) use ($logosAvailable) {
                 $name = trim((string) $establecimiento->nombre_establecimiento);
 
                 return [
@@ -54,6 +58,7 @@ class EstablecimientoDirectory
                     'comuna' => trim((string) $establecimiento->comuna),
                     'director_nombre' => trim((string) $establecimiento->director_nombre),
                     'director_contacto' => trim((string) $establecimiento->director_contacto),
+                    'logo_url' => $logosAvailable ? $establecimiento->admisionPerfil?->logoUrl() : null,
                     'initials' => self::initials($name),
                 ];
             })
@@ -87,6 +92,19 @@ class EstablecimientoDirectory
                     'comuna',
                     'director_nombre',
                     'director_contacto',
+                ]);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private static function logoColumnsAvailable(): bool
+    {
+        try {
+            return Schema::hasTable('admision_establecimientos')
+                && Schema::hasColumns('admision_establecimientos', [
+                    'establecimiento_id',
+                    'logo_path',
                 ]);
         } catch (\Throwable) {
             return false;

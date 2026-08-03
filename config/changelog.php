@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.3.357' => [
+        'date' => '2026-08-03',
+        'module' => 'Mensajes',
+        'title' => 'Logos y sección plegable para contactos de establecimientos',
+        'files' => [
+            'app/Support/Messaging/EstablecimientoDirectory.php',
+            'resources/views/messages/index.blade.php',
+            'tests/Unit/EstablecimientoDirectoryTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Reutiliza en la nómina de Mensajes el logo de cada establecimiento cargado previamente en Admisión Escolar.',
+            'Mantiene las iniciales del establecimiento como respaldo cuando no existe un logo disponible.',
+            'Convierte la sección de contactos de establecimientos en un bloque plegable, cerrado inicialmente y abierto automáticamente cuando se aplican filtros.',
+            'Conserva la proporción de los logos y la adaptación de las tarjetas en pantallas de distinto tamaño.',
+        ],
+        'roles' => ['Usuarios con acceso a Mensajes'],
+    ],
     '2026.8.3.356' => [
         'date' => '2026-08-03',
         'module' => 'Establecimientos y Mensajes',
