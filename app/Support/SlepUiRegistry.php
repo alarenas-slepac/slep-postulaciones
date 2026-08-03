@@ -130,7 +130,7 @@ class SlepUiRegistry
                 self::entry('Historial notificaciones', 'admin.notification-logs.index', 'bi-bell', ['admin'], 'admin.notification-logs'),
             ],
             'Comunicación' => [
-                self::entry('Mensajes', 'messages.index', 'bi-chat-square-dots', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_establecimiento', 'funcionario_directivo_estab', 'funcionario_directivo_establecimiento', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_juridica', 'funcionario_daf_compra', 'funcionario_ac', 'funcionario', 'postulante'], 'messages'),
+                self::entry('Mensajes', 'messages.index', 'bi-chat-square-dots', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_establecimiento', 'funcionario_directivo_estab', 'funcionario_directivo_establecimiento', 'coordinador_uatp', 'comunicaciones', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_juridica', 'funcionario_daf_compra', 'funcionario_ac', 'funcionario', 'postulante'], 'messages'),
             ],
         ];
 
@@ -177,7 +177,7 @@ class SlepUiRegistry
             self::entry('Roles', 'admin.roles.index', 'bi-person-gear', ['admin'], 'admin.roles'),
             self::entry('Reportes', 'gestion.informes.index', 'bi-file-earmark-spreadsheet', ['admin', 'coordinador_gdp', 'funcionario_slep', 'supervisor_plani'], 'gestion.informes'),
             self::entry('Revisión documentos', 'admin.documents.index', 'bi-file-earmark-check', ['admin', 'funcionario_slep', 'coordinador_gdp'], 'admin.documents'),
-            self::entry('Mensajes', 'messages.index', 'bi-chat-square-dots', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_establecimiento', 'funcionario_directivo_estab', 'funcionario_directivo_establecimiento', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_juridica', 'funcionario_daf_compra', 'funcionario_ac', 'funcionario', 'postulante'], 'messages'),
+            self::entry('Mensajes', 'messages.index', 'bi-chat-square-dots', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_establecimiento', 'funcionario_directivo_estab', 'funcionario_directivo_establecimiento', 'coordinador_uatp', 'comunicaciones', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_juridica', 'funcionario_daf_compra', 'funcionario_ac', 'funcionario', 'postulante'], 'messages'),
         ];
 
         return array_values(array_filter($items, fn ($item) => self::entryVisible($item, $user, $activeRole)));
