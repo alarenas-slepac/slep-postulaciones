@@ -223,6 +223,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'coordinador_uatp' => 'Coordinador UATP',
             'comunicaciones' => 'Comunicaciones',
             'gabinete_slep' => 'Gabinete SLEP',
+            'secretaria_direccion_ejecutiva' => 'Secretaría Dirección Ejecutiva',
             'supervisor_plani' => 'Supervisor Planificación',
             'funcionario_slep' => 'Funcionario SLEP',
             'funcionario_ac' => 'Funcionario Administracion Central',

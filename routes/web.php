@@ -157,7 +157,7 @@ Route::get('/certificados/verificar/{codigo}', CertificadoVerificacionController
 Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
     Route::prefix('centro-operaciones')->name('centro-operaciones.')->group(function () {
-        Route::middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep')
+        Route::middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|secretaria_direccion_ejecutiva')
             ->group(function () {
                 Route::get('/', [CentroOperacionesPanelController::class, 'index'])->name('index');
                 Route::get('/datos', [CentroOperacionesPanelController::class, 'datos'])->name('datos');
@@ -171,10 +171,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:funcionario_directivo_estab')
             ->name('reportes.store');
         Route::get('/historial', [CentroOperacionesReporteController::class, 'history'])
-            ->middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|funcionario_directivo_estab')
+            ->middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|secretaria_direccion_ejecutiva|funcionario_directivo_estab')
             ->name('reportes.history');
         Route::get('/reportes/{reporte}', [CentroOperacionesReporteController::class, 'show'])
-            ->middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|funcionario_directivo_estab')
+            ->middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|secretaria_direccion_ejecutiva|funcionario_directivo_estab')
             ->whereNumber('reporte')
             ->name('reportes.show');
         Route::get('/reportes/{reporte}/editar', [CentroOperacionesReporteController::class, 'edit'])
