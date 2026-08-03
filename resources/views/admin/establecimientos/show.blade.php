@@ -67,6 +67,14 @@
                         <div class="fw-semibold">Coordenadas</div>
                         <div class="fs-6">{{ ($establecimiento->latitud !== null && $establecimiento->longitud !== null) ? $establecimiento->latitud . ', ' . $establecimiento->longitud : 'Sin coordenadas' }}</div>
                     </div>
+                    <div class="col-md-4">
+                        <div class="fw-semibold">Director o directora</div>
+                        <div class="fs-6">{{ $establecimiento->director_nombre ?: 'Sin información registrada' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fw-semibold">Contacto directivo</div>
+                        <div class="fs-6">{{ $establecimiento->director_contacto ?: 'Sin información registrada' }}</div>
+                    </div>
                 </div>
             </div>
         </div>

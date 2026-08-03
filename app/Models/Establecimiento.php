@@ -20,6 +20,8 @@ class Establecimiento extends Model
         'rbd',
         'dv',
         'nombre_establecimiento',
+        'director_nombre',
+        'director_contacto',
         'clasificacion',
         'tipo_estab',
         'sala_cuna',

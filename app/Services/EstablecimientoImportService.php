@@ -13,7 +13,12 @@ class EstablecimientoImportService
      */
     public function expectedHeaders(): array
     {
-        return [...$this->requiredHeaders(), 'MATRICULA_TOTAL'];
+        return [
+            ...$this->requiredHeaders(),
+            'MATRICULA_TOTAL',
+            'DIRECTOR_NOMBRE',
+            'DIRECTOR_CONTACTO',
+        ];
     }
 
     /**
@@ -86,6 +91,8 @@ class EstablecimientoImportService
 
         $idx = array_flip($headers);
         $hasMatricula = ($headers[count($required)] ?? null) === 'MATRICULA_TOTAL';
+        $hasDirectorNombre = ($headers[count($required) + 1] ?? null) === 'DIRECTOR_NOMBRE';
+        $hasDirectorContacto = ($headers[count($required) + 2] ?? null) === 'DIRECTOR_CONTACTO';
         $processed = 0;
         $created = 0;
         $updated = 0;
@@ -132,6 +139,24 @@ class EstablecimientoImportService
                 }
             }
 
+            $directorNombre = $hasDirectorNombre
+                ? $this->toNullableString($vals[$idx['DIRECTOR_NOMBRE']] ?? null)
+                : null;
+            $directorContacto = $hasDirectorContacto
+                ? $this->toNullableString($vals[$idx['DIRECTOR_CONTACTO']] ?? null)
+                : null;
+
+            if ($directorNombre !== null && mb_strlen($directorNombre) > 180) {
+                $errors[] = "Fila {$displayRow}: DIRECTOR_NOMBRE no puede superar 180 caracteres.";
+                $skipped++;
+                continue;
+            }
+            if ($directorContacto !== null && mb_strlen($directorContacto) > 255) {
+                $errors[] = "Fila {$displayRow}: DIRECTOR_CONTACTO no puede superar 255 caracteres.";
+                $skipped++;
+                continue;
+            }
+
             $processed++;
 
             $payload = [
@@ -156,6 +181,12 @@ class EstablecimientoImportService
 
             if ($hasMatricula) {
                 $payload['matricula_total'] = $matricula;
+            }
+            if ($hasDirectorNombre) {
+                $payload['director_nombre'] = $directorNombre;
+            }
+            if ($hasDirectorContacto) {
+                $payload['director_contacto'] = $directorContacto;
             }
 
             $existing = Establecimiento::query()->where('cod_estab', $cod)->first();

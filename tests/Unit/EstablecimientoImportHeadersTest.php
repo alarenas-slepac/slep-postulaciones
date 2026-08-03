@@ -7,7 +7,7 @@ use Tests\TestCase;
 
 class EstablecimientoImportHeadersTest extends TestCase
 {
-    public function test_matricula_total_se_agrega_sin_alterar_los_encabezados_historicos(): void
+    public function test_campos_opcionales_se_agregan_sin_alterar_los_encabezados_historicos(): void
     {
         $servicio = new EstablecimientoImportService();
 
@@ -17,5 +17,7 @@ class EstablecimientoImportHeadersTest extends TestCase
             count($servicio->requiredHeaders())
         ));
         $this->assertSame('MATRICULA_TOTAL', $servicio->expectedHeaders()[count($servicio->requiredHeaders())]);
+        $this->assertSame('DIRECTOR_NOMBRE', $servicio->expectedHeaders()[count($servicio->requiredHeaders()) + 1]);
+        $this->assertSame('DIRECTOR_CONTACTO', $servicio->expectedHeaders()[count($servicio->requiredHeaders()) + 2]);
     }
 }

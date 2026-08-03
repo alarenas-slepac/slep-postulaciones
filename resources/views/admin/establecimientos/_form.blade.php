@@ -61,6 +61,23 @@
         </div>
 
         <div class="col-md-6">
+            <label class="form-label">Director o directora</label>
+            <input type="text" name="director_nombre" value="{{ old('director_nombre', $item->director_nombre) }}"
+                class="form-control @error('director_nombre') is-invalid @enderror" maxlength="180"
+                placeholder="Nombre completo">
+            @error('director_nombre')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Contacto del director o directora</label>
+            <input type="text" name="director_contacto" value="{{ old('director_contacto', $item->director_contacto) }}"
+                class="form-control @error('director_contacto') is-invalid @enderror" maxlength="255"
+                placeholder="Correo, teléfono o ambos">
+            @error('director_contacto')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            <div class="form-text">Este dato se mostrará en la nómina de establecimientos del módulo Mensajes.</div>
+        </div>
+
+        <div class="col-md-6">
             <label class="form-label">CLASIFICACIÓN</label>
             <input type="text" name="clasificacion" value="{{ old('clasificacion', $item->clasificacion) }}"
                 class="form-control @error('clasificacion') is-invalid @enderror" maxlength="255">

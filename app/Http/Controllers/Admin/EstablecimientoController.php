@@ -36,6 +36,8 @@ class EstablecimientoController extends Controller
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('nombre_establecimiento', 'like', "%{$q}%")
+                        ->orWhere('director_nombre', 'like', "%{$q}%")
+                        ->orWhere('director_contacto', 'like', "%{$q}%")
                         ->orWhere('comuna', 'like', "%{$q}%")
                         ->orWhere('tipo_estab', 'like', "%{$q}%")
                         ->orWhere('rbd', 'like', "%{$q}%")
@@ -211,6 +213,8 @@ class EstablecimientoController extends Controller
             'rbd' => ['required', 'integer', 'min:0', 'unique:establecimientos,rbd' . ($ignoreId ? ",{$ignoreId}" : '')],
             'dv' => ['nullable', 'string', 'max:2'],
             'nombre_establecimiento' => ['required', 'string', 'max:255'],
+            'director_nombre' => ['nullable', 'string', 'max:180'],
+            'director_contacto' => ['nullable', 'string', 'max:255'],
             'clasificacion' => ['nullable', 'string', 'max:255'],
             'tipo_estab' => ['nullable', 'string', 'max:80'],
             'comuna' => ['nullable', 'string', 'max:120'],
