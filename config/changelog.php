@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.8.2.354' => [
+        'date' => '2026-08-02',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Logo institucional en el panel operacional',
+        'files' => [
+            'resources/views/centro-operaciones/panel.blade.php',
+            'resources/css/centro-operaciones.css',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Incorpora el logo configurado del SLEP Andalién Costa en la cabecera principal del Centro de Operaciones.',
+            'Mantiene la marca institucional visible y correctamente proporcionada en escritorio, dispositivos móviles y modo TV.',
+        ],
+        'roles' => ['Administrador', 'Director Ejecutivo', 'Funcionario SLEP', 'Coordinador GDP', 'Coordinador UATP'],
+    ],
     '2026.7.1.353' => [
         'date' => '2026-07-31',
         'module' => 'Centro de Operaciones',

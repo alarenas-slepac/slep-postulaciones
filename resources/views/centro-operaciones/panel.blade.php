@@ -9,13 +9,19 @@
     $metricas = $datos['metricas'];
     $fechaLocal = \Carbon\CarbonImmutable::parse($datos['fecha'], config('centro_operaciones.timezone'));
     $estadoLabels = ['operativo' => 'Operativo', 'alerta' => 'Alerta', 'critico' => 'Crítico', 'sin_reporte' => 'Sin reporte'];
+    $slepLogoUrl = asset(config('brand.logo_slep', 'branding/logo-andaliencosta.png'));
 @endphp
 <div class="co-shell" data-co-panel data-url="{{ route('centro-operaciones.datos', ['fecha' => $datos['fecha']]) }}" data-report-url="{{ route('centro-operaciones.reportes.show', ['reporte' => '__ID__']) }}" data-tv="{{ $modoTv ? '1' : '0' }}">
     <header class="co-hero">
-        <div>
-            <div class="co-eyebrow">SLEP Andalién Costa</div>
-            <h1>Centro de Operaciones</h1>
-            <p>Monitoreo diario de establecimientos y continuidad de servicios.</p>
+        <div class="co-hero-brand">
+            <div class="co-slep-logo">
+                <img src="{{ $slepLogoUrl }}" alt="Servicio Local de Educación Pública Andalién Costa">
+            </div>
+            <div class="co-hero-copy">
+                <div class="co-eyebrow">SLEP Andalién Costa</div>
+                <h1>Centro de Operaciones</h1>
+                <p>Monitoreo diario de establecimientos y continuidad de servicios.</p>
+            </div>
         </div>
         <div class="co-hero-actions">
             <div class="co-update"><i class="bi bi-arrow-repeat"></i> Actualizado <span data-co-updated>{{ now(config('centro_operaciones.timezone'))->format('H:i') }}</span></div>
