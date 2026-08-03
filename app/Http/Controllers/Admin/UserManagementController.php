@@ -473,6 +473,7 @@ class UserManagementController extends Controller
             'funcionario_slep' => 'Funcionario SLEP',
             'coordinador_uatp' => 'Coordinador UATP',
             'comunicaciones' => 'Comunicaciones',
+            'gabinete_slep' => 'Gabinete SLEP',
             'coordinador_gdp' => 'Coordinador GDP',
             'supervisor_plani' => 'Supervisor Planificación',
             'funcionario_estab' => 'Funcionario establecimiento',
@@ -506,6 +507,7 @@ class UserManagementController extends Controller
             'funcionario_slep',
             'coordinador_uatp',
             'comunicaciones',
+            'gabinete_slep',
             'coordinador_gdp',
             'supervisor_plani',
             'funcionario_estab',
@@ -526,6 +528,6 @@ class UserManagementController extends Controller
 
     private function internalRoles(): array
     {
-        return ['admin', 'funcionario_slep', 'coordinador_uatp', 'comunicaciones', 'coordinador_gdp', 'supervisor_plani', 'coordinador_plani', 'funcionario_estab', 'funcionario_directivo_estab', 'funcionario_daf', 'funcionario_juridica', 'funcionario'];
+        return ['admin', 'funcionario_slep', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'coordinador_gdp', 'supervisor_plani', 'coordinador_plani', 'funcionario_estab', 'funcionario_directivo_estab', 'funcionario_daf', 'funcionario_juridica', 'funcionario'];
     }
 }

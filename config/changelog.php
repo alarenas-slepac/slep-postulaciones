@@ -1,6 +1,51 @@
 <?php
 
 return [
+    '2026.8.3.359' => [
+        'date' => '2026-08-03',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Corrección al registrar incidencias en reportes',
+        'files' => [
+            'app/Services/CentroOperaciones/ReporteService.php',
+            'tests/Feature/CentroOperacionesReporteServiceTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Corrige el error 500 que impedía guardar un reporte diario cuando incluía una nueva incidencia.',
+            'Persiste el tipo seleccionado junto con la severidad, descripción, establecimiento, fecha y estado de la incidencia.',
+            'Agrega una prueba de integración que crea un reporte y verifica el registro completo de la incidencia en la base de datos.',
+        ],
+        'roles' => ['Directivo de Establecimiento'],
+    ],
+    '2026.8.3.358' => [
+        'date' => '2026-08-03',
+        'module' => 'Centro de Operaciones y Mensajes',
+        'title' => 'Acceso para Comunicaciones y Gabinete SLEP',
+        'files' => [
+            'app/Http/Controllers/Admin/UserManagementController.php',
+            'app/Models/User.php',
+            'app/Support/Messaging/FuncionarioAcDirectory.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/centro_operaciones.php',
+            'database/migrations/2026_08_03_140000_grant_operations_center_and_messages_to_gabinete.php',
+            'database/seeders/RolesAndAdminSeeder.php',
+            'resources/views/centro-operaciones/reportes/history.blade.php',
+            'routes/web.php',
+            'tests/Feature/CentroOperacionesRoleAccessTest.php',
+            'tests/Feature/GabineteSlepModuleAccessMigrationTest.php',
+            'tests/Unit/FuncionarioAcDirectoryRolesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Habilita al rol Comunicaciones para consultar el panel territorial, modo TV, datos consolidados, historial y detalle de reportes del Centro de Operaciones.',
+            'Crea el rol Gabinete SLEP y le asigna acceso de lectura al Centro de Operaciones y acceso completo al módulo Mensajes.',
+            'Incorpora Gabinete SLEP a la libreta institucional para iniciar conversaciones generales y responder mensajes.',
+            'Mantiene la creación y edición de reportes diarios reservada exclusivamente a los directivos de establecimientos.',
+            'Integra el nuevo rol en la administración de usuarios, el selector de rol activo, los menús y los accesos rápidos.',
+            'Elimina credenciales y datos administrativos predeterminados del seeder y exige su configuración segura mediante variables de entorno.',
+        ],
+        'roles' => ['Comunicaciones', 'Gabinete SLEP'],
+    ],
     '2026.8.3.357' => [
         'date' => '2026-08-03',
         'module' => 'Mensajes',
@@ -1955,8 +2000,40 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.7.1.351',
+    'current_version' => '2026.8.3.359',
     'entries' => [
+
+        [
+            'version' => '2026.8.3.359',
+            'title' => 'Centro de Operaciones: corrección al registrar incidencias',
+            'summary' => 'Corrige el error 500 al guardar reportes diarios que incluyen una nueva incidencia.',
+            'roles' => [
+                'funcionario_directivo_estab',
+            ],
+            'items' => [
+                'Guarda el tipo obligatorio de cada incidencia junto con su severidad, descripción, fecha y estado.',
+                'Permite completar correctamente reportes diarios que informan cortes, emergencias u otras incidencias.',
+                'Incorpora una prueba de integración para prevenir que el error vuelva a ocurrir.',
+            ],
+            'published_at' => '2026-08-03 12:25:00',
+        ],
+
+        [
+            'version' => '2026.8.3.358',
+            'title' => 'Acceso para Comunicaciones y Gabinete SLEP',
+            'summary' => 'Amplía la consulta del Centro de Operaciones y crea el rol Gabinete SLEP con acceso a Mensajes.',
+            'roles' => [
+                'comunicaciones',
+                'gabinete_slep',
+            ],
+            'items' => [
+                'Comunicaciones puede consultar el panel territorial, modo TV, datos consolidados, historial y detalle de reportes.',
+                'Gabinete SLEP dispone del mismo acceso territorial de lectura y puede utilizar el módulo Mensajes.',
+                'Gabinete SLEP puede iniciar conversaciones generales, revisar contactos institucionales y responder mensajes.',
+                'La creación y edición de reportes diarios permanece reservada a directivos de establecimientos.',
+            ],
+            'published_at' => '2026-08-03 23:00:00',
+        ],
 
         [
             'version' => '2026.7.1.351',

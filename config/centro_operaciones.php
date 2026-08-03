@@ -9,6 +9,8 @@ return [
         'funcionario_slep',
         'coordinador_gdp',
         'coordinador_uatp',
+        'comunicaciones',
+        'gabinete_slep',
     ],
 
     'rol_reporte' => 'funcionario_directivo_estab',

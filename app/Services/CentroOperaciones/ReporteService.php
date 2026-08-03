@@ -134,6 +134,7 @@ class ReporteService
         foreach ($tiposIncidencia as $tipo) {
             $incidencia = $reporte->incidencias()->where('tipo', $tipo)->first();
             $atributos = [
+                'tipo' => $tipo,
                 'severidad' => config("centro_operaciones.incidencias.{$tipo}.severity", 'alerta'),
                 'descripcion' => Arr::get($datos, "incidencia_detalles.{$tipo}"),
             ];
