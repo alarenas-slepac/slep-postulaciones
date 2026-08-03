@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.3.355' => [
+        'date' => '2026-08-03',
+        'module' => 'Mensajes',
+        'title' => 'Acceso para Administración Central y Comunicaciones',
+        'files' => [
+            'app/Support/Messaging/FuncionarioAcDirectory.php',
+            'app/Support/SlepUiRegistry.php',
+            'database/migrations/2026_08_03_080000_grant_messages_access_to_funcionario_ac_and_comunicaciones.php',
+            'tests/Feature/MessagesModuleAccessMigrationTest.php',
+            'tests/Unit/FuncionarioAcDirectoryRolesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Corrige el error 403 asignando el módulo Mensajes al rol funcionario_ac mediante una migración compatible con instalaciones históricas.',
+            'Incorpora el rol comunicaciones al acceso del módulo, la libreta institucional, el inicio de conversaciones generales y la navegación.',
+            'Agrega pruebas para verificar las asignaciones de módulo y los roles internos autorizados.',
+        ],
+        'roles' => ['Funcionario Administración Central', 'Comunicaciones'],
+    ],
     '2026.8.2.354' => [
         'date' => '2026-08-02',
         'module' => 'Centro de Operaciones',
