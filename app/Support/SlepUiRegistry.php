@@ -17,6 +17,7 @@ class SlepUiRegistry
             'coordinador_uatp' => 'Coordinador UATP',
             'comunicaciones' => 'Comunicaciones',
             'gabinete_slep' => 'Gabinete SLEP',
+            'secretaria_direccion_ejecutiva' => 'Secretaría Dirección Ejecutiva',
             'supervisor_plani' => 'Supervisor Planificación',
             'coordinador_plani' => 'Coordinador Planificación',
             'funcionario_slep' => 'Funcionario SLEP',
@@ -40,7 +41,7 @@ class SlepUiRegistry
             'admin' => 'primary',
             'funcionario_estab', 'funcionario_directivo_estab' => 'success',
             'coordinador_uatp' => 'info',
-            'comunicaciones', 'gabinete_slep' => 'purple',
+            'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva' => 'purple',
             'supervisor_plani', 'coordinador_plani' => 'warning',
             'coordinador_gdp', 'funcionario_slep' => 'purple',
             'funcionario_daf', 'funcionario_daf_compra' => 'teal',
@@ -67,9 +68,9 @@ class SlepUiRegistry
                 self::entry('Dashboard', 'dashboard', 'bi-speedometer2', ['*']),
             ],
             'Centro de Operaciones' => [
-                self::entry('Panel territorial', 'centro-operaciones.index', 'bi-broadcast-pin', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep'], 'centro-operaciones'),
+                self::entry('Panel territorial', 'centro-operaciones.index', 'bi-broadcast-pin', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva'], 'centro-operaciones'),
                 self::entry('Reporte diario', 'centro-operaciones.reportes.create', 'bi-clipboard2-pulse', ['funcionario_directivo_estab'], 'centro-operaciones'),
-                self::entry('Historial de reportes', 'centro-operaciones.reportes.history', 'bi-clock-history', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'funcionario_directivo_estab'], 'centro-operaciones'),
+                self::entry('Historial de reportes', 'centro-operaciones.reportes.history', 'bi-clock-history', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva', 'funcionario_directivo_estab'], 'centro-operaciones'),
             ],
             'Trámites y operación' => [
                 self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario', 'funcionario_ac'], 'certificados'),
@@ -149,9 +150,9 @@ class SlepUiRegistry
     public static function quickModules($user, ?string $activeRole): array
     {
         $items = [
-            self::entry('Centro de Operaciones', 'centro-operaciones.index', 'bi-broadcast-pin', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep'], 'centro-operaciones'),
+            self::entry('Centro de Operaciones', 'centro-operaciones.index', 'bi-broadcast-pin', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva'], 'centro-operaciones'),
             self::entry('Reporte diario', 'centro-operaciones.reportes.create', 'bi-clipboard2-pulse', ['funcionario_directivo_estab'], 'centro-operaciones'),
-            self::entry('Historial operacional', 'centro-operaciones.reportes.history', 'bi-clock-history', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'funcionario_directivo_estab'], 'centro-operaciones'),
+            self::entry('Historial operacional', 'centro-operaciones.reportes.history', 'bi-clock-history', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva', 'funcionario_directivo_estab'], 'centro-operaciones'),
             self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario', 'funcionario_ac'], 'certificados'),
             self::entry('Cometidos funcionarios', 'tramites.cometidos-funcionarios.index', 'bi-briefcase', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_ac', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_daf_compra', 'funcionario_juridica']),
             self::entry('Licencias Médicas', 'tramites.licencias-medicas.index', 'bi-file-medical', ['admin', 'coordinador_gdp', 'funcionario_slep']),
@@ -192,6 +193,7 @@ class SlepUiRegistry
             'coordinador_uatp' => ['title' => 'Panel UATP', 'subtitle' => 'Revisión de pertinencia pedagógica y derivaciones.'],
             'comunicaciones' => ['title' => 'Panel de Comunicaciones', 'subtitle' => 'Gestión editorial y publicación de la vitrina de Admisión Escolar.'],
             'gabinete_slep' => ['title' => 'Panel Gabinete SLEP', 'subtitle' => 'Seguimiento territorial, coordinación institucional y comunicación interna.'],
+            'secretaria_direccion_ejecutiva' => ['title' => 'Panel Secretaría Dirección Ejecutiva', 'subtitle' => 'Seguimiento territorial y coordinación de la Dirección Ejecutiva.'],
             'supervisor_plani', 'coordinador_plani' => ['title' => 'Panel Planificación', 'subtitle' => 'Revisión CDP, montos diarios y disponibilidad presupuestaria.'],
             'coordinador_gdp', 'funcionario_slep' => ['title' => 'Panel GDP / SLEP', 'subtitle' => 'Resoluciones, autorizaciones y gestión administrativa.'],
             'funcionario_daf' => ['title' => 'Panel DAF', 'subtitle' => 'Pagos, rendiciones y control financiero.'],

@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.8.3.360' => [
+        'date' => '2026-08-03',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Acceso para Secretaría Dirección Ejecutiva',
+        'files' => [
+            'app/Models/User.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/centro_operaciones.php',
+            'database/migrations/2026_08_03_150000_grant_operations_center_to_secretaria_direccion_ejecutiva.php',
+            'routes/web.php',
+            'tests/Feature/SecretariaDireccionEjecutivaCentroOperacionesAccessTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Habilita al rol Secretaría Dirección Ejecutiva para consultar el panel territorial, modo TV y datos consolidados del Centro de Operaciones.',
+            'Permite consultar el historial y el detalle de los reportes de todos los establecimientos.',
+            'Incorpora el módulo al menú, los accesos rápidos y el selector de contexto del rol.',
+            'Mantiene la creación y edición de reportes diarios reservada exclusivamente a los directivos de establecimientos.',
+            'Agrega una migración idempotente y pruebas de autorización, navegación y asignación del módulo.',
+        ],
+        'roles' => ['Secretaría Dirección Ejecutiva'],
+    ],
     '2026.8.3.359' => [
         'date' => '2026-08-03',
         'module' => 'Centro de Operaciones',
@@ -2000,8 +2022,24 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.8.3.359',
+    'current_version' => '2026.8.3.360',
     'entries' => [
+
+        [
+            'version' => '2026.8.3.360',
+            'title' => 'Centro de Operaciones: acceso para Secretaría Dirección Ejecutiva',
+            'summary' => 'Habilita la consulta territorial y el historial operacional para Secretaría Dirección Ejecutiva.',
+            'roles' => [
+                'secretaria_direccion_ejecutiva',
+            ],
+            'items' => [
+                'Permite consultar el panel territorial, modo TV y datos consolidados del Centro de Operaciones.',
+                'Habilita el historial y el detalle de reportes de todos los establecimientos.',
+                'Muestra los accesos correspondientes en el menú principal y en los accesos rápidos.',
+                'No habilita la creación ni edición de reportes diarios, que permanece reservada a directivos de establecimientos.',
+            ],
+            'published_at' => '2026-08-03 13:00:00',
+        ],
 
         [
             'version' => '2026.8.3.359',

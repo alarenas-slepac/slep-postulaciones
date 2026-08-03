@@ -11,6 +11,7 @@ return [
         'coordinador_uatp',
         'comunicaciones',
         'gabinete_slep',
+        'secretaria_direccion_ejecutiva',
     ],
 
     'rol_reporte' => 'funcionario_directivo_estab',
