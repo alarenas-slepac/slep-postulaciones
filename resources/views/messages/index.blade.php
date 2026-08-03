@@ -8,6 +8,7 @@
     $recentOnlyActual = request()->boolean('recent_only');
     $establecimientoQActual = request('establecimiento_q');
     $establecimientoComunaActual = request('establecimiento_comuna');
+    $establishmentDirectoryOpen = filled($establecimientoQActual) || filled($establecimientoComunaActual);
 @endphp
 
 <div class="container-fluid py-4 messages-institutional-view">
@@ -72,6 +73,15 @@
         .messages-institutional-view .contact-meta span { display: flex; align-items: flex-start; gap: .42rem; min-width: 0; word-break: break-word; }
         .messages-institutional-view .contact-actions { margin-top: auto; display: flex; justify-content: flex-end; }
         .messages-institutional-view .contact-actions .cometido-btn { padding: .55rem .78rem; font-size: .84rem; }
+        .messages-institutional-view .establishment-logo { width: 3.15rem; height: 3.15rem; border-radius: .9rem; border: 1px solid #dbe4f0; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; overflow: hidden; background: #fff; box-shadow: 0 .3rem .8rem rgba(15,23,42,.08); }
+        .messages-institutional-view .establishment-logo img { display: block; width: 100%; height: 100%; padding: .25rem; object-fit: contain; object-position: center; }
+        .messages-institutional-view .establishment-collapse-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .55rem; }
+        .messages-institutional-view .establishment-collapse-toggle { padding: .5rem .75rem; font-size: .82rem; }
+        .messages-institutional-view .establishment-collapse-toggle .toggle-icon { transition: transform .18s ease; }
+        .messages-institutional-view .establishment-collapse-toggle[aria-expanded="true"] .toggle-icon { transform: rotate(180deg); }
+        .messages-institutional-view .establishment-collapse-toggle .when-expanded { display: none; }
+        .messages-institutional-view .establishment-collapse-toggle[aria-expanded="true"] .when-collapsed { display: none; }
+        .messages-institutional-view .establishment-collapse-toggle[aria-expanded="true"] .when-expanded { display: inline; }
         .messages-institutional-view .avatar-pill { width: 2.45rem; height: 2.45rem; border-radius: .9rem; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; flex: 0 0 auto; color: #fff; box-shadow: 0 .3rem .8rem rgba(15,23,42,.1); }
         .messages-institutional-view .avatar-pill.role-admin { background: #0d6efd; }
         .messages-institutional-view .avatar-pill.role-director { background: #1d4ed8; }
@@ -222,10 +232,25 @@
                             <div class="stage-panel-help">Consulta el nombre del director o directora y el contacto registrado para cada establecimiento.</div>
                         </div>
                     </div>
-                    <span class="info-chip"><i class="bi bi-building-check"></i> {{ $establishmentItems->count() }} establecimiento(s)</span>
+                    <div class="establishment-collapse-actions">
+                        <span class="info-chip"><i class="bi bi-building-check"></i> {{ $establishmentItems->count() }} establecimiento(s)</span>
+                        <button
+                            type="button"
+                            class="cometido-btn is-secondary establishment-collapse-toggle"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#establishmentDirectoryCollapse"
+                            aria-expanded="{{ $establishmentDirectoryOpen ? 'true' : 'false' }}"
+                            aria-controls="establishmentDirectoryCollapse"
+                        >
+                            <i class="bi bi-chevron-down toggle-icon"></i>
+                            <span class="when-collapsed">Mostrar contactos</span>
+                            <span class="when-expanded">Ocultar contactos</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="stage-panel-body">
-                    <form method="GET" action="{{ route('messages.index') }}" class="row g-3 align-items-end mb-4">
+                <div class="collapse {{ $establishmentDirectoryOpen ? 'show' : '' }}" id="establishmentDirectoryCollapse">
+                    <div class="stage-panel-body">
+                        <form method="GET" action="{{ route('messages.index') }}" class="row g-3 align-items-end mb-4">
                         @if(filled($qActual))
                             <input type="hidden" name="q" value="{{ $qActual }}">
                         @endif
@@ -261,47 +286,54 @@
                                 'recent_only' => $recentOnlyActual ? 1 : null,
                             ], fn ($value) => $value !== null && $value !== '')) }}" class="cometido-btn is-danger" title="Limpiar filtro de establecimientos"><i class="bi bi-x-circle"></i></a>
                         </div>
-                    </form>
+                        </form>
 
-                    @if($establishmentGrouped->isEmpty())
-                        <div class="empty-state">
-                            <div class="empty-icon"><i class="bi bi-search"></i></div>
-                            <div class="fw-semibold">No se encontraron establecimientos</div>
-                            <div class="small">Ajusta los filtros o completa los datos directivos desde la administración de establecimientos.</div>
-                        </div>
-                    @else
-                        <div class="directory-tree">
-                            @foreach($establishmentGrouped as $comuna => $establecimientos)
-                                <div class="subdir-card">
-                                    <div class="subdir-header">
-                                        <div>
-                                            <div class="subdir-title"><i class="bi bi-geo-alt me-1"></i> {{ $comuna }}</div>
-                                            <div class="small text-muted">{{ $establecimientos->count() }} establecimiento(s)</div>
+                        @if($establishmentGrouped->isEmpty())
+                            <div class="empty-state">
+                                <div class="empty-icon"><i class="bi bi-search"></i></div>
+                                <div class="fw-semibold">No se encontraron establecimientos</div>
+                                <div class="small">Ajusta los filtros o completa los datos directivos desde la administración de establecimientos.</div>
+                            </div>
+                        @else
+                            <div class="directory-tree">
+                                @foreach($establishmentGrouped as $comuna => $establecimientos)
+                                    <div class="subdir-card">
+                                        <div class="subdir-header">
+                                            <div>
+                                                <div class="subdir-title"><i class="bi bi-geo-alt me-1"></i> {{ $comuna }}</div>
+                                                <div class="small text-muted">{{ $establecimientos->count() }} establecimiento(s)</div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="unit-list">
-                                        <div class="contact-grid">
-                                            @foreach($establecimientos as $establecimiento)
-                                                <div class="contact-card">
-                                                    <div class="contact-head">
-                                                        <span class="avatar-pill role-estab">{{ $establecimiento['initials'] }}</span>
-                                                        <div class="min-w-0">
-                                                            <div class="contact-name">{{ $establecimiento['name'] }}</div>
-                                                            <div class="contact-role">RBD {{ $establecimiento['rbd'] ?: 'sin registro' }}</div>
+                                        <div class="unit-list">
+                                            <div class="contact-grid">
+                                                @foreach($establecimientos as $establecimiento)
+                                                    <div class="contact-card">
+                                                        <div class="contact-head">
+                                                            @if($establecimiento['logo_url'])
+                                                                <span class="establishment-logo">
+                                                                    <img src="{{ $establecimiento['logo_url'] }}" alt="Logo de {{ $establecimiento['name'] }}" loading="lazy">
+                                                                </span>
+                                                            @else
+                                                                <span class="avatar-pill role-estab">{{ $establecimiento['initials'] }}</span>
+                                                            @endif
+                                                            <div class="min-w-0">
+                                                                <div class="contact-name">{{ $establecimiento['name'] }}</div>
+                                                                <div class="contact-role">RBD {{ $establecimiento['rbd'] ?: 'sin registro' }}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="contact-meta">
+                                                            <span><i class="bi bi-person-badge"></i> {{ $establecimiento['director_nombre'] ?: 'Director/a sin registrar' }}</span>
+                                                            <span><i class="bi bi-telephone"></i> {{ $establecimiento['director_contacto'] ?: 'Contacto sin registrar' }}</span>
                                                         </div>
                                                     </div>
-                                                    <div class="contact-meta">
-                                                        <span><i class="bi bi-person-badge"></i> {{ $establecimiento['director_nombre'] ?: 'Director/a sin registrar' }}</span>
-                                                        <span><i class="bi bi-telephone"></i> {{ $establecimiento['director_contacto'] ?: 'Contacto sin registrar' }}</span>
-                                                    </div>
-                                                </div>
-                                            @endforeach
+                                                @endforeach
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
                 </div>
             </div>
 
