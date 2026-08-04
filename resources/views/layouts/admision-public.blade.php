@@ -10,6 +10,8 @@
         $admisionLogoFallback = asset(config('brand.logo_principal', 'branding/01_logo_principal.png'));
         $admisionInstitutionalUrl = 'https://slepandaliencosta.gob.cl/';
         $admisionCommunicationsEmail = 'comunicaciones@slepandaliencosta.gob.cl';
+        $admisionWhatsAppNumber = '+56 9 2615 9707';
+        $admisionWhatsAppUrl = 'https://wa.me/56926159707';
     @endphp
     <title>{{ $admisionPageTitle }} · {{ config('brand.org_name', 'SLEP Andalién Costa') }}</title>
     <meta name="description" content="{{ $admisionDescription }}">
@@ -89,6 +91,15 @@
             @if (config('admision.contacto_email') && strcasecmp(config('admision.contacto_email'), $admisionCommunicationsEmail) !== 0)
                 <a href="mailto:{{ config('admision.contacto_email') }}">{{ config('admision.contacto_email') }}</a>
             @endif
+            <div class="ae-footer__whatsapp-contact">
+                <a class="ae-footer__whatsapp" href="{{ $admisionWhatsAppUrl }}" target="_blank" rel="noopener noreferrer" aria-label="Contactar por WhatsApp al {{ $admisionWhatsAppNumber }}">
+                    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                        <path fill="currentColor" d="M16.03 3.2A12.73 12.73 0 0 0 5.06 22.36L3.25 29l6.79-1.78A12.73 12.73 0 1 0 16.03 3.2Zm0 2.55a10.18 10.18 0 1 1-5.19 18.93l-.48-.29-4.03 1.06 1.08-3.93-.31-.5a10.18 10.18 0 0 1 8.93-15.27Zm-3.39 4.94c-.2-.46-.41-.47-.61-.48h-.52c-.18 0-.47.07-.72.34-.25.27-.95.93-.95 2.27s.98 2.63 1.11 2.81c.14.18 1.92 2.93 4.65 4.11.65.28 1.16.45 1.56.57.65.21 1.24.18 1.71.11.52-.08 1.61-.66 1.84-1.3.23-.64.23-1.19.16-1.3-.07-.11-.25-.18-.52-.32-.27-.14-1.61-.79-1.86-.88-.25-.09-.43-.14-.61.14-.18.27-.7.88-.86 1.06-.16.18-.32.2-.59.07-.27-.14-1.15-.42-2.19-1.35-.81-.72-1.35-1.61-1.51-1.88-.16-.27-.02-.42.12-.55.12-.12.27-.32.41-.47.14-.16.18-.27.27-.45.09-.18.05-.34-.02-.47-.07-.14-.6-1.48-.83-2.02Z"/>
+                    </svg>
+                    <span>WhatsApp {{ $admisionWhatsAppNumber }}</span>
+                </a>
+                <span class="ae-footer__contact-hours">Atención de lunes a viernes, de 08:00 a 17:00.<br><strong>Solo mensajes, no llamadas.</strong></span>
+            </div>
             @if (config('admision.contacto_telefono'))
                 <span>{{ config('admision.contacto_telefono') }}</span>
             @endif

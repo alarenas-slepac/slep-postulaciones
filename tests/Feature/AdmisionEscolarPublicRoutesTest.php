@@ -66,6 +66,26 @@ class AdmisionEscolarPublicRoutesTest extends TestCase
             ->assertSee('font-family:"Century Gothic",Arial,sans-serif', false);
     }
 
+    public function test_footer_shows_whatsapp_contact_below_the_email(): void
+    {
+        config([
+            'admision.publica_habilitada' => false,
+            'admision.mostrar_proximamente' => true,
+        ]);
+
+        $this->get('/admision-escolar')
+            ->assertOk()
+            ->assertSeeInOrder([
+                '<a href="mailto:comunicaciones@slepandaliencosta.gob.cl">comunicaciones@slepandaliencosta.gob.cl</a>',
+                'href="https://wa.me/56926159707"',
+                'WhatsApp +56 9 2615 9707',
+                'Atención de lunes a viernes, de 08:00 a 17:00.',
+                '<strong>Solo mensajes, no llamadas.</strong>',
+            ], false)
+            ->assertSee('aria-label="Contactar por WhatsApp al +56 9 2615 9707"', false)
+            ->assertSee('<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">', false);
+    }
+
     public function test_long_public_texts_use_the_justified_text_utility(): void
     {
         config([
