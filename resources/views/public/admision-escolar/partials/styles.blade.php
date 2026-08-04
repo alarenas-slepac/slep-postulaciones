@@ -191,6 +191,12 @@ button{cursor:pointer}
 .ae-footer h2{font-size:.9rem;color:#fff;margin:0 0 13px}
 .ae-footer a,.ae-footer span{display:block;color:#b8c6d8;text-decoration:none;font-size:.85rem;margin:7px 0}
 .ae-footer a:hover{color:#fff}
+.ae-footer__whatsapp-contact{margin-top:13px}
+.ae-footer a.ae-footer__whatsapp{display:inline-flex;align-items:center;gap:8px;color:#d9fddf;font-weight:700;margin:0}
+.ae-footer__whatsapp svg{width:20px;height:20px;flex:0 0 20px;color:#25d366}
+.ae-footer__whatsapp span{margin:0;color:inherit;font-size:inherit}
+.ae-footer span.ae-footer__contact-hours{margin:5px 0 0;padding-left:28px;font-size:.76rem;line-height:1.45;color:#b8c6d8}
+.ae-footer__contact-hours strong{color:#fff;font-weight:700}
 .ae-footer__brand img{width:210px;height:82px;object-fit:contain;object-position:center;margin-bottom:12px;background:#fff;border-radius:14px;padding:8px 12px}
 .ae-footer__brand p{max-width:300px;font-size:.85rem;color:#aebdd0}
 .ae-footer__bottom{border-top:1px solid rgba(255,255,255,.1);margin-top:36px;padding-top:17px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}

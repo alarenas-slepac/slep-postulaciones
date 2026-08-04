@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.3.361' => [
+        'date' => '2026-08-03',
+        'module' => 'Admisión Escolar',
+        'title' => 'Contacto de WhatsApp en la vitrina pública',
+        'files' => [
+            'resources/views/layouts/admision-public.blade.php',
+            'resources/views/public/admision-escolar/partials/styles.blade.php',
+            'tests/Feature/AdmisionEscolarPublicRoutesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Añade bajo el correo de contacto un enlace directo de WhatsApp al número +56 9 2615 9707.',
+            'Incorpora el icono de WhatsApp y conserva una presentación accesible y adaptable a dispositivos móviles.',
+            'Informa atención de lunes a viernes, de 08:00 a 17:00, exclusivamente por mensajes y sin llamadas.',
+            'Agrega una prueba de regresión para verificar el enlace, número, horario y advertencia publicados.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.8.3.360' => [
         'date' => '2026-08-03',
         'module' => 'Centro de Operaciones',
@@ -2022,8 +2040,23 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.8.3.360',
+    'current_version' => '2026.8.3.361',
     'entries' => [
+
+        [
+            'version' => '2026.8.3.361',
+            'title' => 'Admisión Escolar: contacto de WhatsApp en la vitrina',
+            'summary' => 'Incorpora un canal de WhatsApp visible bajo el correo de contacto del pie de página público.',
+            'roles' => [
+                'publico',
+            ],
+            'items' => [
+                'Abre un chat de WhatsApp con el número +56 9 2615 9707 mediante un enlace directo e icono identificador.',
+                'Informa atención de lunes a viernes, de 08:00 a 17:00.',
+                'Aclara que el canal recibe únicamente mensajes y no llamadas.',
+            ],
+            'published_at' => '2026-08-03 20:55:00',
+        ],
 
         [
             'version' => '2026.8.3.360',
