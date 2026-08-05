@@ -16,21 +16,29 @@ class ReporteService
     public function __construct(
         private readonly DatosBaseService $datosBase,
         private readonly EstadoService $estadoService,
+        private readonly UnidadOperacionalService $unidades,
     ) {
     }
 
     public function crear(Establecimiento $establecimiento, User $usuario, array $datos): CentroOperacionesReporte
     {
         $ahora = CarbonImmutable::now(config('centro_operaciones.timezone'));
-        $base = $this->datosBase->paraEstablecimiento($establecimiento, $ahora->year);
+        $unidadCodigo = Arr::get($datos, 'unidad_codigo') ?: null;
+        if (! $this->unidades->codigoPermitido($establecimiento, $unidadCodigo)) {
+            throw ValidationException::withMessages([
+                'unidad_codigo' => 'La unidad seleccionada no pertenece a este establecimiento.',
+            ]);
+        }
+        $base = $this->datosBase->paraContexto($establecimiento, $ahora->year, $unidadCodigo);
 
-        return DB::transaction(function () use ($establecimiento, $usuario, $datos, $ahora, $base) {
+        return DB::transaction(function () use ($establecimiento, $usuario, $datos, $ahora, $base, $unidadCodigo) {
             $reporte = new CentroOperacionesReporte([
                 'establecimiento_id' => $establecimiento->id,
+                'unidad_codigo' => $unidadCodigo,
                 'reportado_por_id' => $usuario->id,
                 'fecha_reporte' => $ahora->toDateString(),
                 'reportado_en' => $ahora,
-                'establecimiento_nombre' => $establecimiento->nombre_establecimiento,
+                'establecimiento_nombre' => $this->unidades->nombreReporte($establecimiento, $unidadCodigo),
                 'establecimiento_rbd' => $establecimiento->rbd,
                 'establecimiento_comuna' => $establecimiento->comuna,
                 'matricula_total' => $base['matricula']['total'],
@@ -38,7 +46,7 @@ class ReporteService
                 'docentes_total' => $base['dotacion']['docentes'],
                 'asistentes_total' => $base['dotacion']['asistentes'],
                 'padron_periodo' => $base['dotacion']['periodo'],
-                'regla_version' => '1.0',
+                'regla_version' => '1.1',
                 'version' => 1,
             ]);
 
@@ -93,6 +101,7 @@ class ReporteService
 
         $reporte->fill([
             'funcionamiento' => $datos['funcionamiento'],
+            'fecha_control_plagas' => $this->fechaControlPlagas($reporte, $datos),
             'estudiantes_presentes' => $estudiantesPresentes,
             'docentes_presentes' => $docentesPresentes,
             'asistentes_presentes' => $asistentesPresentes,
@@ -126,16 +135,25 @@ class ReporteService
         $reporte->afectaciones()->delete();
         $reporte->afectaciones()->createMany($afectaciones);
 
-        $tiposIncidencia = collect(Arr::get($datos, 'incidencias', []))->unique()->values();
+        $tiposIncidencia = collect(Arr::get($datos, 'incidencias', []))
+            ->reject(fn ($tipo) => (bool) config("centro_operaciones.incidencias.{$tipo}.automatic", false))
+            ->unique()
+            ->values();
         $reporte->incidencias()
             ->where('estado', 'activa')
+            ->where('tipo', '!=', 'control_plagas_vencido')
             ->whereNotIn('tipo', $tiposIncidencia)
             ->delete();
         foreach ($tiposIncidencia as $tipo) {
             $incidencia = $reporte->incidencias()->where('tipo', $tipo)->first();
+            $modalidad = Arr::get($datos, "incidencia_modalidades.{$tipo}");
             $atributos = [
                 'tipo' => $tipo,
-                'severidad' => config("centro_operaciones.incidencias.{$tipo}.severity", 'alerta'),
+                'modalidad' => $modalidad,
+                'severidad' => config(
+                    "centro_operaciones.severidades_modalidad_incidencia.{$tipo}.{$modalidad}",
+                    config("centro_operaciones.incidencias.{$tipo}.severity", 'alerta')
+                ),
                 'descripcion' => Arr::get($datos, "incidencia_detalles.{$tipo}"),
             ];
 
@@ -144,6 +162,7 @@ class ReporteService
             } else {
                 $reporte->incidencias()->create($atributos + [
                     'establecimiento_id' => $reporte->establecimiento_id,
+                    'unidad_codigo' => $reporte->unidad_codigo,
                     'fecha_incidencia' => $reporte->fecha_reporte,
                     'estado' => 'activa',
                 ]);
@@ -158,6 +177,7 @@ class ReporteService
         CentroOperacionesIncidencia::query()
             ->whereIn('id', $idsResolucion)
             ->where('establecimiento_id', $reporte->establecimiento_id)
+            ->where('unidad_codigo', $reporte->unidad_codigo)
             ->where('estado', 'activa')
             ->update([
                 'estado' => 'resuelta',
@@ -166,6 +186,8 @@ class ReporteService
                 'resuelta_en_reporte_id' => $reporte->id,
                 'updated_at' => $ahora,
             ]);
+
+        $this->sincronizarControlPlagas($reporte, $usuario, $ahora);
     }
 
     private function actualizarEstado(CentroOperacionesReporte $reporte): void
@@ -173,6 +195,7 @@ class ReporteService
         $reporte->load(['servicios', 'afectaciones']);
         $activas = CentroOperacionesIncidencia::query()
             ->where('establecimiento_id', $reporte->establecimiento_id)
+            ->where('unidad_codigo', $reporte->unidad_codigo)
             ->where('estado', 'activa')
             ->get();
 
@@ -187,6 +210,74 @@ class ReporteService
             'version' => $reporte->version,
             'editado_por_id' => $usuario->id,
             'datos' => $reporte->toArray(),
+        ]);
+    }
+
+    private function fechaControlPlagas(CentroOperacionesReporte $reporte, array $datos): ?string
+    {
+        $fechaIngresada = Arr::get($datos, 'fecha_control_plagas');
+        if ($fechaIngresada) {
+            return (string) $fechaIngresada;
+        }
+
+        if ($reporte->fecha_control_plagas) {
+            return $reporte->fecha_control_plagas->toDateString();
+        }
+
+        $fechaAnterior = CentroOperacionesReporte::query()
+            ->where('establecimiento_id', $reporte->establecimiento_id)
+            ->where('unidad_codigo', $reporte->unidad_codigo)
+            ->whereNotNull('fecha_control_plagas')
+            ->latest('reportado_en')
+            ->latest('id')
+            ->value('fecha_control_plagas');
+
+        return $fechaAnterior
+            ? CarbonImmutable::parse((string) $fechaAnterior)->toDateString()
+            : null;
+    }
+
+    private function sincronizarControlPlagas(
+        CentroOperacionesReporte $reporte,
+        User $usuario,
+        CarbonImmutable $ahora
+    ): void {
+        if (! $reporte->fecha_control_plagas) {
+            return;
+        }
+
+        $consulta = CentroOperacionesIncidencia::query()
+            ->where('establecimiento_id', $reporte->establecimiento_id)
+            ->where('unidad_codigo', $reporte->unidad_codigo)
+            ->where('tipo', 'control_plagas_vencido')
+            ->where('estado', 'activa');
+        $fechaReporte = CarbonImmutable::parse(
+            $reporte->fecha_reporte->toDateString(),
+            config('centro_operaciones.timezone')
+        )->startOfDay();
+
+        if ($reporte->fecha_control_plagas->startOfDay()->isBefore($fechaReporte)) {
+            if (! $consulta->exists()) {
+                $reporte->incidencias()->create([
+                    'establecimiento_id' => $reporte->establecimiento_id,
+                    'unidad_codigo' => $reporte->unidad_codigo,
+                    'fecha_incidencia' => $reporte->fecha_reporte,
+                    'tipo' => 'control_plagas_vencido',
+                    'severidad' => config('centro_operaciones.incidencias.control_plagas_vencido.severity', 'critico'),
+                    'descripcion' => 'La vigencia informada terminó el '.$reporte->fecha_control_plagas->format('d-m-Y').'.',
+                    'estado' => 'activa',
+                ]);
+            }
+
+            return;
+        }
+
+        $consulta->update([
+            'estado' => 'resuelta',
+            'resuelta_en' => $ahora,
+            'resuelta_por_id' => $usuario->id,
+            'resuelta_en_reporte_id' => $reporte->id,
+            'updated_at' => $ahora,
         ]);
     }
 

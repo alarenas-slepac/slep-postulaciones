@@ -13,6 +13,7 @@ class ConsolidadoService
     public function __construct(
         private readonly DatosBaseService $datosBase,
         private readonly EstadoService $estadoService,
+        private readonly UnidadOperacionalService $unidades,
     ) {
     }
 
@@ -27,6 +28,25 @@ class ConsolidadoService
             ->orderBy('comuna')
             ->orderBy('nombre_establecimiento')
             ->get();
+        $contextos = $establecimientos->flatMap(function (Establecimiento $establecimiento) {
+            $principal = [[
+                'clave' => $this->unidades->clave((int) $establecimiento->id, null),
+                'establecimiento' => $establecimiento,
+                'unidad_codigo' => null,
+                'unidad' => null,
+            ]];
+            $anexos = $this->unidades->paraEstablecimiento($establecimiento)
+                ->map(fn (array $unidad, string $codigo) => [
+                    'clave' => $this->unidades->clave((int) $establecimiento->id, $codigo),
+                    'establecimiento' => $establecimiento,
+                    'unidad_codigo' => $codigo,
+                    'unidad' => $unidad,
+                ])
+                ->values()
+                ->all();
+
+            return [...$principal, ...$anexos];
+        });
 
         $reportes = CentroOperacionesReporte::query()
             ->whereDate('fecha_reporte', $fecha->toDateString())
@@ -35,7 +55,15 @@ class ConsolidadoService
             ->orderByDesc('reportado_en')
             ->orderByDesc('id')
             ->get();
-        $ultimos = $reportes->unique('establecimiento_id')->keyBy('establecimiento_id');
+        $ultimos = $reportes
+            ->unique(fn (CentroOperacionesReporte $reporte) => $this->unidades->clave(
+                (int) $reporte->establecimiento_id,
+                $reporte->unidad_codigo
+            ))
+            ->keyBy(fn (CentroOperacionesReporte $reporte) => $this->unidades->clave(
+                (int) $reporte->establecimiento_id,
+                $reporte->unidad_codigo
+            ));
 
         $incidenciasActivas = CentroOperacionesIncidencia::query()
             ->where('created_at', '<=', $puntoCorte)
@@ -45,26 +73,41 @@ class ConsolidadoService
             ->with(['establecimiento', 'reporte'])
             ->orderByDesc('created_at')
             ->get();
-        $incidenciasPorEstablecimiento = $incidenciasActivas->groupBy('establecimiento_id');
+        $incidenciasPorContexto = $incidenciasActivas->groupBy(fn (CentroOperacionesIncidencia $incidencia) =>
+            $this->unidades->clave((int) $incidencia->establecimiento_id, $incidencia->unidad_codigo)
+        );
 
         $matriculas = $this->datosBase->matriculasPara($establecimientos, $fecha->year);
         $dotaciones = $this->datosBase->dotacionesPara($establecimientos);
 
-        $filas = $establecimientos->map(function (Establecimiento $establecimiento) use (
+        $filas = $contextos->map(function (array $contexto) use (
             $ultimos,
-            $incidenciasPorEstablecimiento,
+            $incidenciasPorContexto,
             $matriculas,
             $dotaciones
         ) {
+            /** @var Establecimiento $establecimiento */
+            $establecimiento = $contexto['establecimiento'];
+            $unidadCodigo = $contexto['unidad_codigo'];
+            $unidad = $contexto['unidad'];
             /** @var CentroOperacionesReporte|null $reporte */
-            $reporte = $ultimos->get($establecimiento->id);
-            $activas = $incidenciasPorEstablecimiento->get($establecimiento->id, collect());
+            $reporte = $ultimos->get($contexto['clave']);
+            $activas = $incidenciasPorContexto->get($contexto['clave'], collect());
             $estado = $reporte ? $this->estadoService->paraReporte($reporte, $activas) : 'sin_reporte';
+            $matriculaBase = $unidadCodigo
+                ? (int) ($unidad['matricula_total'] ?? 0)
+                : (int) $matriculas[$establecimiento->id]['total'];
+            $docentesBase = $unidadCodigo
+                ? (int) ($unidad['docentes_total'] ?? 0)
+                : (int) $dotaciones[$establecimiento->id]['docentes'];
+            $asistentesBase = $unidadCodigo
+                ? (int) ($unidad['asistentes_total'] ?? 0)
+                : (int) $dotaciones[$establecimiento->id]['asistentes'];
 
             return [
-                'id' => $establecimiento->id,
+                'id' => $contexto['clave'],
                 'rbd' => $establecimiento->rbd,
-                'nombre' => $establecimiento->nombre_establecimiento,
+                'nombre' => $unidad['nombre_reporte'] ?? $establecimiento->nombre_establecimiento,
                 'comuna' => $establecimiento->comuna ?: 'Sin comuna',
                 'logo_url' => $establecimiento->admisionPerfil?->logoUrl(),
                 'latitud' => $establecimiento->latitud !== null ? (float) $establecimiento->latitud : null,
@@ -72,13 +115,14 @@ class ConsolidadoService
                 'estado' => $estado,
                 'reporte_id' => $reporte?->id,
                 'reportado_en' => $reporte?->reportado_en?->toIso8601String(),
-                'matricula_total' => $reporte?->matricula_total ?? $matriculas[$establecimiento->id]['total'],
+                'matricula_total' => $reporte?->matricula_total ?? $matriculaBase,
                 'estudiantes_presentes' => $reporte?->estudiantes_presentes,
-                'docentes_total' => $reporte?->docentes_total ?? $dotaciones[$establecimiento->id]['docentes'],
+                'docentes_total' => $reporte?->docentes_total ?? $docentesBase,
                 'docentes_presentes' => $reporte?->docentes_presentes,
-                'asistentes_total' => $reporte?->asistentes_total ?? $dotaciones[$establecimiento->id]['asistentes'],
+                'asistentes_total' => $reporte?->asistentes_total ?? $asistentesBase,
                 'asistentes_presentes' => $reporte?->asistentes_presentes,
                 'incidencias_activas' => $activas->count(),
+                'unidad_codigo' => $unidadCodigo,
                 'servicios' => $reporte?->servicios->mapWithKeys(fn ($servicio) => [
                     $servicio->servicio => $servicio->estado,
                 ])->all() ?? [],
@@ -86,6 +130,14 @@ class ConsolidadoService
         });
 
         $reportados = $filas->whereNotNull('reporte_id');
+        $unidadesConfiguradas = $contextos->whereNotNull('unidad_codigo');
+        $matriculaUnidades = (int) $unidadesConfiguradas->sum(fn (array $contexto) =>
+            (int) ($contexto['unidad']['matricula_total'] ?? 0)
+        );
+        $dotacionUnidades = (int) $unidadesConfiguradas->sum(fn (array $contexto) =>
+            (int) ($contexto['unidad']['docentes_total'] ?? 0)
+                + (int) ($contexto['unidad']['asistentes_total'] ?? 0)
+        );
         $metricas = [
             'establecimientos_total' => $filas->count(),
             'reportados' => $reportados->count(),
@@ -96,7 +148,7 @@ class ConsolidadoService
             'cobertura_reportes' => $this->porcentaje($reportados->count(), $filas->count()),
             'estudiantes_presentes' => (int) $reportados->sum('estudiantes_presentes'),
             'matricula_reportada' => (int) $reportados->sum('matricula_total'),
-            'matricula_territorial' => (int) collect($matriculas)->sum('total'),
+            'matricula_territorial' => (int) collect($matriculas)->sum('total') + $matriculaUnidades,
             'asistencia_estudiantes' => $this->porcentaje(
                 (int) $reportados->sum('estudiantes_presentes'),
                 (int) $reportados->sum('matricula_total')
@@ -109,7 +161,7 @@ class ConsolidadoService
             ),
             'dotacion_territorial' => (int) collect($dotaciones)->sum(fn ($fila) =>
                 (int) $fila['docentes'] + (int) $fila['asistentes']
-            ),
+            ) + $dotacionUnidades,
             'asistencia_funcionarios' => $this->porcentaje(
                 (int) $reportados->sum(fn ($fila) =>
                     (int) $fila['docentes_presentes'] + (int) $fila['asistentes_presentes']
@@ -171,8 +223,11 @@ class ConsolidadoService
             'alertas' => $alertas->all(),
             'incidencias_activas' => $incidenciasActivas->map(fn (CentroOperacionesIncidencia $incidencia) => [
                 'id' => $incidencia->id,
-                'establecimiento' => $incidencia->establecimiento?->nombre_establecimiento
-                    ?? $incidencia->reporte?->establecimiento_nombre,
+                'establecimiento' => $incidencia->unidad_codigo
+                    ? ($incidencia->reporte?->establecimiento_nombre
+                        ?? $this->unidades->nombreReporte($incidencia->establecimiento, $incidencia->unidad_codigo))
+                    : ($incidencia->establecimiento?->nombre_establecimiento
+                        ?? $incidencia->reporte?->establecimiento_nombre),
                 'comuna' => $incidencia->establecimiento?->comuna
                     ?? $incidencia->reporte?->establecimiento_comuna,
                 'tipo' => $incidencia->tipo,

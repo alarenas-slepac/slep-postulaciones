@@ -15,20 +15,26 @@ class CentroOperacionesMigrationsTest extends TestCase
 
         $matricula = require database_path('migrations/2026_07_31_120000_add_matricula_total_to_establecimientos.php');
         $operaciones = require database_path('migrations/2026_07_31_121000_create_centro_operaciones_tables.php');
+        $extension = require database_path('migrations/2026_08_05_120000_extend_centro_operaciones_daily_reports.php');
         $modulo = require database_path('migrations/2026_07_31_122000_register_centro_operaciones_module.php');
 
         try {
             $matricula->up();
             $operaciones->up();
+            $extension->up();
             $modulo->up();
 
             $this->assertTrue(Schema::hasColumn('establecimientos', 'matricula_total'));
             $this->assertTrue(Schema::hasTable('centro_operaciones_reportes'));
             $this->assertTrue(Schema::hasTable('centro_operaciones_incidencias'));
+            $this->assertTrue(Schema::hasColumn('centro_operaciones_reportes', 'unidad_codigo'));
+            $this->assertTrue(Schema::hasColumn('centro_operaciones_reportes', 'fecha_control_plagas'));
+            $this->assertTrue(Schema::hasColumn('centro_operaciones_incidencias', 'modalidad'));
             $this->assertDatabaseHas('modules', ['key' => 'centro-operaciones']);
             $this->assertSame(6, DB::table('module_role')->count());
         } finally {
             $modulo->down();
+            $extension->down();
             $operaciones->down();
             $matricula->down();
             Schema::dropIfExists('module_role');

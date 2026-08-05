@@ -12,6 +12,7 @@ class CentroOperacionesReporte extends Model
 
     protected $fillable = [
         'establecimiento_id',
+        'unidad_codigo',
         'reportado_por_id',
         'fecha_reporte',
         'reportado_en',
@@ -19,6 +20,7 @@ class CentroOperacionesReporte extends Model
         'establecimiento_rbd',
         'establecimiento_comuna',
         'funcionamiento',
+        'fecha_control_plagas',
         'matricula_total',
         'matricula_fuente',
         'estudiantes_presentes',
@@ -39,6 +41,7 @@ class CentroOperacionesReporte extends Model
     protected $casts = [
         'fecha_reporte' => 'date',
         'reportado_en' => 'datetime',
+        'fecha_control_plagas' => 'date',
         'matricula_total' => 'integer',
         'estudiantes_presentes' => 'integer',
         'docentes_total' => 'integer',

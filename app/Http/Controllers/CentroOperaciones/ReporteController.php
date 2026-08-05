@@ -9,6 +9,7 @@ use App\Models\CentroOperacionesReporte;
 use App\Models\Establecimiento;
 use App\Services\CentroOperaciones\DatosBaseService;
 use App\Services\CentroOperaciones\ReporteService;
+use App\Services\CentroOperaciones\UnidadOperacionalService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,14 +20,17 @@ class ReporteController extends Controller
     public function __construct(
         private readonly DatosBaseService $datosBase,
         private readonly ReporteService $reportes,
+        private readonly UnidadOperacionalService $unidades,
     ) {
     }
 
     public function create(Request $request): View
     {
         $establecimiento = $this->establecimientoDelUsuario($request);
+        $unidadCodigo = $request->filled('unidad') ? (string) $request->string('unidad') : null;
+        abort_unless($this->unidades->codigoPermitido($establecimiento, $unidadCodigo), 404);
 
-        return $this->formulario($establecimiento);
+        return $this->formulario($establecimiento, null, $unidadCodigo);
     }
 
     public function store(GuardarReporteRequest $request): RedirectResponse
@@ -84,7 +88,11 @@ class ReporteController extends Controller
         $establecimiento = $reporte->establecimiento;
         abort_unless($establecimiento, 422, 'El establecimiento asociado ya no está disponible.');
 
-        return $this->formulario($establecimiento, $reporte->load(['servicios', 'afectaciones', 'incidencias']));
+        return $this->formulario(
+            $establecimiento,
+            $reporte->load(['servicios', 'afectaciones', 'incidencias']),
+            $reporte->unidad_codigo
+        );
     }
 
     public function update(
@@ -101,7 +109,8 @@ class ReporteController extends Controller
 
     private function formulario(
         Establecimiento $establecimiento,
-        ?CentroOperacionesReporte $reporte = null
+        ?CentroOperacionesReporte $reporte = null,
+        ?string $unidadCodigo = null
     ): View {
         $hoy = CarbonImmutable::now(config('centro_operaciones.timezone'));
         $establecimiento->loadMissing('admisionPerfil');
@@ -115,14 +124,27 @@ class ReporteController extends Controller
                     'periodo' => $reporte->padron_periodo,
                 ],
             ]
-            : $this->datosBase->paraEstablecimiento($establecimiento, $hoy->year);
+            : $this->datosBase->paraContexto($establecimiento, $hoy->year, $unidadCodigo);
 
         $incidenciasActivas = CentroOperacionesIncidencia::query()
             ->where('establecimiento_id', $establecimiento->id)
+            ->where('unidad_codigo', $unidadCodigo)
             ->where('estado', 'activa')
+            ->where('tipo', '!=', 'control_plagas_vencido')
             ->when($reporte, fn ($query) => $query->where('reporte_id', '!=', $reporte->id))
             ->oldest('created_at')
             ->get();
+
+        $fechaControlPlagas = $reporte?->fecha_control_plagas
+            ?? CentroOperacionesReporte::query()
+                ->where('establecimiento_id', $establecimiento->id)
+                ->where('unidad_codigo', $unidadCodigo)
+                ->whereNotNull('fecha_control_plagas')
+                ->latest('reportado_en')
+                ->latest('id')
+                ->value('fecha_control_plagas');
+        $opcionesUnidades = $this->unidades->opciones($establecimiento);
+        $nombreContexto = $this->unidades->nombreReporte($establecimiento, $unidadCodigo);
 
         return view('centro-operaciones.reportes.form', compact(
             'establecimiento',
@@ -130,7 +152,11 @@ class ReporteController extends Controller
             'datosBase',
             'incidenciasActivas',
             'hoy',
-            'perfilAdmision'
+            'perfilAdmision',
+            'unidadCodigo',
+            'opcionesUnidades',
+            'nombreContexto',
+            'fechaControlPlagas'
         ));
     }
 

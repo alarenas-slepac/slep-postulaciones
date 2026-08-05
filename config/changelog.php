@@ -1,6 +1,39 @@
 <?php
 
 return [
+    '2026.8.5.362' => [
+        'date' => '2026-08-05',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Nuevas incidencias, control de plagas e Internado Nueva Zelandia',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/ReporteController.php',
+            'app/Http/Requests/CentroOperaciones/GuardarReporteRequest.php',
+            'app/Models/CentroOperacionesIncidencia.php',
+            'app/Models/CentroOperacionesReporte.php',
+            'app/Services/CentroOperaciones/ConsolidadoService.php',
+            'app/Services/CentroOperaciones/DatosBaseService.php',
+            'app/Services/CentroOperaciones/ReporteService.php',
+            'app/Services/CentroOperaciones/UnidadOperacionalService.php',
+            'config/centro_operaciones.php',
+            'database/migrations/2026_08_05_120000_extend_centro_operaciones_daily_reports.php',
+            'resources/js/centro-operaciones.js',
+            'resources/views/centro-operaciones/reportes/form.blade.php',
+            'resources/views/centro-operaciones/reportes/show.blade.php',
+            'tests/Feature/CentroOperacionesMigrationsTest.php',
+            'tests/Feature/CentroOperacionesReporteServiceTest.php',
+            'tests/Unit/CentroOperacionesUnidadOperacionalServiceTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Añade Toma de establecimiento, Amago de incendio, Sismo y Evacuación, exigiendo indicar si esta última corresponde a simulacro o emergencia declarada.',
+            'Incorpora el botón de establecimiento utilizado como albergue en la sección de funcionamiento.',
+            'Agrega Control de plagas al estado operacional y conserva su fecha de vigencia para los reportes posteriores del mismo establecimiento o unidad.',
+            'Genera automáticamente una incidencia crítica cuando la fecha de control de plagas ha vencido y la resuelve al informar una nueva fecha vigente.',
+            'Habilita el Internado del Liceo Nueva Zelandia como unidad reportante independiente y vinculada, visible exclusivamente en el Centro de Operaciones.',
+            'Mantiene separados los reportes e incidencias del Liceo y del Internado sin crear un registro en el catálogo general de establecimientos.',
+        ],
+        'roles' => ['Directivo de Establecimiento', 'Usuarios con acceso al Centro de Operaciones'],
+    ],
     '2026.8.3.361' => [
         'date' => '2026-08-03',
         'module' => 'Admisión Escolar',

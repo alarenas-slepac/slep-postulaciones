@@ -12,8 +12,10 @@ class CentroOperacionesIncidencia extends Model
     protected $fillable = [
         'reporte_id',
         'establecimiento_id',
+        'unidad_codigo',
         'fecha_incidencia',
         'tipo',
+        'modalidad',
         'severidad',
         'descripcion',
         'estado',
