@@ -50,19 +50,30 @@
     @endif
 
     @if(count($opcionesUnidades) > 1)
-        <nav class="co-card mb-4" aria-label="Unidad que reporta">
-            <div class="co-card-head mb-3"><div><span class="co-eyebrow">Liceo Nueva Zelandia</span><h2>Unidad que genera el reporte</h2></div></div>
-            <div class="d-flex flex-wrap gap-2">
-                @foreach($opcionesUnidades as $opcion)
-                    @php($activa = ($unidadCodigo ?: null) === ($opcion['codigo'] ?: null))
-                    @if($editando)
-                        <span class="btn {{ $activa ? 'btn-primary' : 'btn-outline-secondary disabled' }}">{{ $opcion['label'] }}</span>
-                    @else
-                        <a class="btn {{ $activa ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ route('centro-operaciones.reportes.create', array_filter(['unidad' => $opcion['codigo']])) }}">{{ $opcion['label'] }}</a>
-                    @endif
-                @endforeach
+        <nav class="co-card co-unit-selector mb-4" aria-label="Unidad que reporta">
+            <div class="co-card-head"><div><span class="co-eyebrow">Liceo Nueva Zelandia</span><h2>Unidad que genera el reporte</h2></div></div>
+            <div class="co-unit-selector-body">
+                <div class="co-unit-options">
+                    @foreach($opcionesUnidades as $opcion)
+                        @php($activa = ($unidadCodigo ?: null) === ($opcion['codigo'] ?: null))
+                        @if($editando)
+                            <span class="btn co-unit-option {{ $activa ? 'btn-primary is-active' : 'btn-outline-secondary disabled' }}" @if($activa) aria-current="page" @endif>
+                                <i class="bi {{ $activa ? 'bi-check-circle-fill' : 'bi-building' }}" aria-hidden="true"></i>
+                                {{ $opcion['label'] }}
+                            </span>
+                        @else
+                            <a class="btn co-unit-option {{ $activa ? 'btn-primary is-active' : 'btn-outline-primary' }}" href="{{ route('centro-operaciones.reportes.create', array_filter(['unidad' => $opcion['codigo']])) }}" @if($activa) aria-current="page" @endif>
+                                <i class="bi {{ $activa ? 'bi-check-circle-fill' : 'bi-building' }}" aria-hidden="true"></i>
+                                {{ $opcion['label'] }}
+                            </a>
+                        @endif
+                    @endforeach
+                </div>
+                <div class="co-unit-note">
+                    <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
+                    <p><strong>Reportes independientes.</strong> El Internado continúa vinculado al establecimiento principal únicamente dentro del Centro de Operaciones.</p>
+                </div>
             </div>
-            <p class="text-muted small mb-0 mt-3">El Internado posee un reporte independiente, pero continúa vinculado al establecimiento principal sólo dentro del Centro de Operaciones.</p>
         </nav>
     @endif
 
