@@ -47,6 +47,18 @@ function initReportForm() {
         input.addEventListener('input', refresh);
         refresh();
     });
+
+    document.querySelectorAll('[data-incident-toggle]').forEach((checkbox) => {
+        const code = checkbox.dataset.incidentToggle;
+        const detail = document.querySelector(`[data-incident-detail="${code}"]`);
+        const refresh = () => {
+            if (!detail) return;
+            detail.disabled = !checkbox.checked;
+            detail.required = checkbox.checked;
+        };
+        checkbox.addEventListener('change', refresh);
+        refresh();
+    });
 }
 
 function initPanel(root) {

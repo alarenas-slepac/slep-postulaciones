@@ -121,4 +121,35 @@ class DatosBaseService
             'dotacion' => $this->dotacionesPara($coleccion)[$establecimiento->id],
         ];
     }
+
+    /**
+     * Las unidades anexas del Centro de Operaciones no heredan matrícula ni
+     * dotación del establecimiento principal, para evitar duplicarlas en el
+     * consolidado. Sus totales pueden definirse en la configuración del módulo.
+     *
+     * @return array{matricula:array{total:int,fuente:string},dotacion:array{docentes:int,asistentes:int,periodo:?string}}
+     */
+    public function paraContexto(
+        Establecimiento $establecimiento,
+        int $anio,
+        ?string $unidadCodigo = null
+    ): array {
+        if ($unidadCodigo === null || $unidadCodigo === '') {
+            return $this->paraEstablecimiento($establecimiento, $anio);
+        }
+
+        $unidad = app(UnidadOperacionalService::class)->obtener($establecimiento, $unidadCodigo);
+
+        return [
+            'matricula' => [
+                'total' => (int) ($unidad['matricula_total'] ?? 0),
+                'fuente' => 'unidad_operacional',
+            ],
+            'dotacion' => [
+                'docentes' => (int) ($unidad['docentes_total'] ?? 0),
+                'asistentes' => (int) ($unidad['asistentes_total'] ?? 0),
+                'periodo' => null,
+            ],
+        ];
+    }
 }

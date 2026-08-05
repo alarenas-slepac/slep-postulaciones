@@ -10,9 +10,11 @@
     $servicioValores = old('servicios', $editando ? $reporte->servicios->pluck('estado', 'servicio')->all() : array_fill_keys(array_keys(config('centro_operaciones.servicios')), 'operativo'));
     $afectacionValores = old('afectaciones', $editando ? $reporte->afectaciones->pluck('tipo')->all() : []);
     $incidenciaValores = old('incidencias', $editando ? $reporte->incidencias->pluck('tipo')->all() : []);
+    $incidenciaModalidadValores = old('incidencia_modalidades', $editando ? $reporte->incidencias->pluck('modalidad', 'tipo')->filter()->all() : []);
     $funcionamiento = old('funcionamiento', $editando ? $reporte->funcionamiento : 'si');
     $prioridad = old('prioridad', $editando ? $reporte->prioridad : 'sin_novedad');
     $estadoClases = ['operativo' => 'success', 'alerta' => 'warning', 'critico' => 'danger'];
+    $fechaControlPlagasValor = old('fecha_control_plagas', $fechaControlPlagas ? \Carbon\Carbon::parse($fechaControlPlagas)->toDateString() : '');
 @endphp
 <div class="co-shell co-report-shell" data-co-report-form>
     <header class="co-hero co-hero--report">
@@ -37,7 +39,7 @@
         </div>
         <div class="co-report-context">
             <span><i class="bi bi-calendar3"></i>{{ $hoy->translatedFormat('d \d\e F \d\e Y') }}</span>
-            <span><i class="bi bi-building"></i>{{ $establecimiento->nombre_establecimiento }}</span>
+            <span><i class="bi bi-building"></i>{{ $nombreContexto }}</span>
             <span><i class="bi bi-geo-alt"></i>{{ $establecimiento->comuna ?: 'Sin comuna' }}</span>
             <span><i class="bi bi-person-badge"></i>{{ auth()->user()->nombre_completo ?? auth()->user()->name }}</span>
         </div>
@@ -47,9 +49,27 @@
         <div class="alert alert-danger"><strong>Revisa la información antes de enviar.</strong><ul class="mb-0 mt-2">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
     @endif
 
+    @if(count($opcionesUnidades) > 1)
+        <nav class="co-card mb-4" aria-label="Unidad que reporta">
+            <div class="co-card-head mb-3"><div><span class="co-eyebrow">Liceo Nueva Zelandia</span><h2>Unidad que genera el reporte</h2></div></div>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach($opcionesUnidades as $opcion)
+                    @php($activa = ($unidadCodigo ?: null) === ($opcion['codigo'] ?: null))
+                    @if($editando)
+                        <span class="btn {{ $activa ? 'btn-primary' : 'btn-outline-secondary disabled' }}">{{ $opcion['label'] }}</span>
+                    @else
+                        <a class="btn {{ $activa ? 'btn-primary' : 'btn-outline-primary' }}" href="{{ route('centro-operaciones.reportes.create', array_filter(['unidad' => $opcion['codigo']])) }}">{{ $opcion['label'] }}</a>
+                    @endif
+                @endforeach
+            </div>
+            <p class="text-muted small mb-0 mt-3">El Internado posee un reporte independiente, pero continúa vinculado al establecimiento principal sólo dentro del Centro de Operaciones.</p>
+        </nav>
+    @endif
+
     <form method="POST" action="{{ $editando ? route('centro-operaciones.reportes.update', $reporte) : route('centro-operaciones.reportes.store') }}">
         @csrf
         @if($editando) @method('PUT') @endif
+        <input type="hidden" name="unidad_codigo" value="{{ $unidadCodigo }}">
 
         <section class="co-card co-form-section">
             <div class="co-section-title"><span>1</span><div><h2>Estado operacional</h2><p>Selecciona el estado actual de cada servicio.</p></div></div>
@@ -66,6 +86,11 @@
                     @endforeach
                     </div>
                     <input class="form-control form-control-sm mt-2" name="servicio_observaciones[{{ $codigo }}]" value="{{ old("servicio_observaciones.$codigo", $editando ? optional($reporte->servicios->firstWhere('servicio', $codigo))->observacion : '') }}" placeholder="Observación opcional">
+                    @if($codigo === 'control_plagas')
+                        <label class="form-label small fw-semibold mt-3" for="fecha-control-plagas">Fecha de vigencia del último control</label>
+                        <input id="fecha-control-plagas" class="form-control" type="date" name="fecha_control_plagas" value="{{ $fechaControlPlagasValor }}">
+                        <small class="text-muted d-block mt-2">La fecha se conserva en los reportes siguientes. Desde el día posterior a su vencimiento se genera una incidencia hasta informar una nueva.</small>
+                    @endif
                 </fieldset>
             @endforeach
             </div>
@@ -87,11 +112,15 @@
                 <div class="col-lg-5">
                     <label class="form-label fw-semibold">Afectaciones (selecciona las que correspondan)</label>
                     <div class="co-check-grid">
-                    @foreach(config('centro_operaciones.afectaciones') as $codigo => $opcion)
+                    @foreach(collect(config('centro_operaciones.afectaciones'))->except('albergue') as $codigo => $opcion)
                         <label class="form-check"><input class="form-check-input" type="checkbox" name="afectaciones[]" value="{{ $codigo }}" @checked(in_array($codigo, $afectacionValores, true))><span class="form-check-label">{{ $opcion['label'] }}</span></label>
                     @endforeach
                     </div>
                     <input class="form-control mt-2" name="afectacion_otro" value="{{ old('afectacion_otro', $editando ? optional($reporte->afectaciones->firstWhere('tipo', 'otro'))->detalle : '') }}" placeholder="Describe otra afectación">
+                    <label class="co-support-toggle mt-3">
+                        <input type="checkbox" name="afectaciones[]" value="albergue" @checked(in_array('albergue', $afectacionValores, true))>
+                        <span><i class="bi bi-house-heart"></i> Establecimiento utilizado como albergue</span>
+                    </label>
                 </div>
             </div>
         </section>
@@ -102,31 +131,46 @@
                 <div class="co-attendance-card">
                     <i class="bi bi-mortarboard"></i><h3>Estudiantes</h3>
                     <div class="co-total"><span>Matrícula total</span><strong>{{ number_format($datosBase['matricula']['total'], 0, ',', '.') }}</strong></div>
-                    <label>Presentes<input type="number" name="estudiantes_presentes" min="0" max="{{ $datosBase['matricula']['total'] }}" value="{{ old('estudiantes_presentes', $editando ? $reporte->estudiantes_presentes : '') }}" required data-attendance data-total="{{ $datosBase['matricula']['total'] }}"></label>
+                    <label>Presentes<input type="number" name="estudiantes_presentes" min="0" max="{{ $datosBase['matricula']['total'] }}" value="{{ old('estudiantes_presentes', $editando ? $reporte->estudiantes_presentes : ($datosBase['matricula']['fuente'] === 'unidad_operacional' ? 0 : '')) }}" required data-attendance data-total="{{ $datosBase['matricula']['total'] }}"></label>
                     <small>Asistencia: <b data-attendance-result>—</b></small>
                 </div>
                 <div class="co-attendance-card">
                     <i class="bi bi-person-video3"></i><h3>Docentes</h3>
                     <div class="co-total"><span>Dotación total</span><strong>{{ number_format($datosBase['dotacion']['docentes'], 0, ',', '.') }}</strong></div>
-                    <label>Presentes<input type="number" name="docentes_presentes" min="0" max="{{ $datosBase['dotacion']['docentes'] }}" value="{{ old('docentes_presentes', $editando ? $reporte->docentes_presentes : '') }}" required data-attendance data-total="{{ $datosBase['dotacion']['docentes'] }}"></label>
+                    <label>Presentes<input type="number" name="docentes_presentes" min="0" max="{{ $datosBase['dotacion']['docentes'] }}" value="{{ old('docentes_presentes', $editando ? $reporte->docentes_presentes : ($datosBase['matricula']['fuente'] === 'unidad_operacional' ? 0 : '')) }}" required data-attendance data-total="{{ $datosBase['dotacion']['docentes'] }}"></label>
                     <small>Asistencia: <b data-attendance-result>—</b></small>
                 </div>
                 <div class="co-attendance-card">
                     <i class="bi bi-people"></i><h3>Asistentes de la educación</h3>
                     <div class="co-total"><span>Dotación total</span><strong>{{ number_format($datosBase['dotacion']['asistentes'], 0, ',', '.') }}</strong></div>
-                    <label>Presentes<input type="number" name="asistentes_presentes" min="0" max="{{ $datosBase['dotacion']['asistentes'] }}" value="{{ old('asistentes_presentes', $editando ? $reporte->asistentes_presentes : '') }}" required data-attendance data-total="{{ $datosBase['dotacion']['asistentes'] }}"></label>
+                    <label>Presentes<input type="number" name="asistentes_presentes" min="0" max="{{ $datosBase['dotacion']['asistentes'] }}" value="{{ old('asistentes_presentes', $editando ? $reporte->asistentes_presentes : ($datosBase['matricula']['fuente'] === 'unidad_operacional' ? 0 : '')) }}" required data-attendance data-total="{{ $datosBase['dotacion']['asistentes'] }}"></label>
                     <small>Asistencia: <b data-attendance-result>—</b></small>
                 </div>
             </div>
-            <div class="co-source-note"><i class="bi bi-info-circle"></i>Matrícula: {{ $datosBase['matricula']['fuente'] === 'establecimientos.matricula_total' ? 'ficha del establecimiento' : 'suma de cursos activos del año' }}. Dotación: padrón {{ $datosBase['dotacion']['periodo'] ?: 'sin período disponible' }}.</div>
+            <div class="co-source-note"><i class="bi bi-info-circle"></i>
+                @if($datosBase['matricula']['fuente'] === 'unidad_operacional')
+                    El Internado no hereda matrícula ni dotación del Liceo, evitando duplicar los totales territoriales. Sus valores independientes pueden configurarse en el módulo.
+                @else
+                    Matrícula: {{ $datosBase['matricula']['fuente'] === 'establecimientos.matricula_total' ? 'ficha del establecimiento' : 'suma de cursos activos del año' }}. Dotación: padrón {{ $datosBase['dotacion']['periodo'] ?: 'sin período disponible' }}.
+                @endif
+            </div>
         </section>
 
         <section class="co-card co-form-section">
             <div class="co-section-title"><span>4</span><div><h2>Incidentes del día</h2><p>Cada reporte agrega nuevas incidencias al consolidado.</p></div></div>
             <div class="co-incident-grid">
             @foreach(config('centro_operaciones.incidencias') as $codigo => $incidencia)
-                <div class="co-incident-option">
-                    <label class="form-check"><input class="form-check-input" type="checkbox" name="incidencias[]" value="{{ $codigo }}" @checked(in_array($codigo, $incidenciaValores, true))><span class="form-check-label">{{ $incidencia['label'] }}</span></label>
+                @continue($incidencia['automatic'] ?? false)
+                <div class="co-incident-option" @if($codigo === 'evacuacion') data-incident-option="evacuacion" @endif>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" name="incidencias[]" value="{{ $codigo }}" @checked(in_array($codigo, $incidenciaValores, true)) @if($codigo === 'evacuacion') data-incident-toggle="evacuacion" @endif><span class="form-check-label">{{ $incidencia['label'] }}</span></label>
+                    @if($codigo === 'evacuacion')
+                        <select class="form-select form-select-sm mb-2" name="incidencia_modalidades[evacuacion]" data-incident-detail="evacuacion">
+                            <option value="">Selecciona el motivo</option>
+                            @foreach(config('centro_operaciones.modalidades_incidencia.evacuacion') as $modalidad => $label)
+                                <option value="{{ $modalidad }}" @selected(($incidenciaModalidadValores['evacuacion'] ?? null) === $modalidad)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                     <input class="form-control form-control-sm" name="incidencia_detalles[{{ $codigo }}]" value="{{ old("incidencia_detalles.$codigo", $editando ? optional($reporte->incidencias->firstWhere('tipo', $codigo))->descripcion : '') }}" placeholder="Detalle opcional">
                 </div>
             @endforeach
