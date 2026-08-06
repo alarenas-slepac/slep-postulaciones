@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.8.6.364' => [
+        'date' => '2026-08-06',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Compatibilidad MySQL de la migración de tickets',
+        'files' => [
+            'database/migrations/2026_08_06_120000_create_centro_operaciones_tickets_tables.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Asigna un nombre corto y explícito a la clave foránea del responsable en la configuración de incidencias.',
+            'Evita el error 1059 de MySQL al ejecutar la migración de tickets por superar el límite de 64 caracteres en identificadores.',
+            'Agrega una prueba de regresión que verifica el nombre compatible de la restricción.',
+        ],
+        'roles' => ['Administrador'],
+    ],
     '2026.8.6.363' => [
         'date' => '2026-08-06',
         'module' => 'Centro de Operaciones',
