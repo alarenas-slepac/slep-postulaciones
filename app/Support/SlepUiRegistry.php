@@ -71,6 +71,8 @@ class SlepUiRegistry
                 self::entry('Panel territorial', 'centro-operaciones.index', 'bi-broadcast-pin', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva'], 'centro-operaciones'),
                 self::entry('Reporte diario', 'centro-operaciones.reportes.create', 'bi-clipboard2-pulse', ['funcionario_directivo_estab'], 'centro-operaciones'),
                 self::entry('Historial de reportes', 'centro-operaciones.reportes.history', 'bi-clock-history', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva', 'funcionario_directivo_estab'], 'centro-operaciones'),
+                self::entry('Tickets de incidencias', 'centro-operaciones.tickets.index', 'bi-ticket-detailed', ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab']),
+                self::entry('Mantenedor de incidencias', 'centro-operaciones.configuraciones.index', 'bi-sliders', ['admin']),
             ],
             'Trámites y operación' => [
                 self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario', 'funcionario_ac'], 'certificados'),

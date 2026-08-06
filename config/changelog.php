@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.8.6.366' => [
+        'date' => '2026-08-06',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Tickets visibles en la barra lateral',
+        'files' => [
+            'app/Support/SlepUiRegistry.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Incorpora el acceso a Tickets de incidencias en la barra lateral moderna para todos los roles autorizados.',
+            'Muestra el Mantenedor de incidencias en la barra lateral únicamente a usuarios administradores.',
+            'Agrega una prueba de regresión para validar ambos accesos en el registro central de navegación.',
+        ],
+        'roles' => ['Administrador', 'Funcionario AC', 'Directivo de Establecimiento', 'Dirección Ejecutiva', 'Comunicaciones'],
+    ],
     '2026.8.6.365' => [
         'date' => '2026-08-06',
         'module' => 'Centro de Operaciones',

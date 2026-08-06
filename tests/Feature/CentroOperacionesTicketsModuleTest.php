@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\SlepUiRegistry;
 use Tests\TestCase;
 
 class CentroOperacionesTicketsModuleTest extends TestCase
@@ -57,6 +58,21 @@ class CentroOperacionesTicketsModuleTest extends TestCase
             "in_array(\$activeRole, ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab'], true) && Route::has('centro-operaciones.tickets.index')",
             $navbar
         );
+    }
+
+    public function test_barra_lateral_moderna_incluye_los_accesos_de_tickets(): void
+    {
+        $menuDirector = collect(SlepUiRegistry::menuGroups(null, 'director_ejecutivo'))
+            ->flatten(1)
+            ->pluck('label');
+        $menuAdmin = collect(SlepUiRegistry::menuGroups(null, 'admin'))
+            ->flatten(1)
+            ->pluck('label');
+
+        $this->assertContains('Tickets de incidencias', $menuDirector);
+        $this->assertNotContains('Mantenedor de incidencias', $menuDirector);
+        $this->assertContains('Tickets de incidencias', $menuAdmin);
+        $this->assertContains('Mantenedor de incidencias', $menuAdmin);
     }
 
     public function test_reporte_resuelve_el_ticket_y_conserva_la_incidencia(): void
