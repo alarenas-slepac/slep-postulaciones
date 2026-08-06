@@ -231,7 +231,7 @@ class ConsolidadoService
                 'comuna' => $incidencia->establecimiento?->comuna
                     ?? $incidencia->reporte?->establecimiento_comuna,
                 'tipo' => $incidencia->tipo,
-                'label' => config("centro_operaciones.incidencias.{$incidencia->tipo}.label", $incidencia->tipo),
+                'label' => $incidencia->tipo_label,
                 'severidad' => $incidencia->severidad,
                 'descripcion' => $incidencia->descripcion,
                 'creada_en' => $incidencia->created_at?->toIso8601String(),

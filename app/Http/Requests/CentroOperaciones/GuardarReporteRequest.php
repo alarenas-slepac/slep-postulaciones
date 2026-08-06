@@ -3,6 +3,7 @@
 namespace App\Http\Requests\CentroOperaciones;
 
 use App\Models\Establecimiento;
+use App\Services\CentroOperaciones\IncidenciaCatalogo;
 use App\Services\CentroOperaciones\UnidadOperacionalService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,8 +21,8 @@ class GuardarReporteRequest extends FormRequest
         $servicios = array_keys(config('centro_operaciones.servicios', []));
         $estados = array_keys(config('centro_operaciones.estados_servicio', []));
         $afectaciones = array_keys(config('centro_operaciones.afectaciones', []));
-        $incidencias = collect(config('centro_operaciones.incidencias', []))
-            ->reject(fn (array $incidencia) => (bool) ($incidencia['automatic'] ?? false))
+        $incidencias = app(IncidenciaCatalogo::class)
+            ->activos()
             ->keys()
             ->all();
         $modalidadesEvacuacion = array_keys(config('centro_operaciones.modalidades_incidencia.evacuacion', []));

@@ -171,7 +171,7 @@
         <section class="co-card co-form-section">
             <div class="co-section-title"><span>4</span><div><h2>Incidentes del día</h2><p>Cada reporte agrega nuevas incidencias al consolidado.</p></div></div>
             <div class="co-incident-grid">
-            @foreach(config('centro_operaciones.incidencias') as $codigo => $incidencia)
+            @foreach($incidenciasCatalogo as $codigo => $incidencia)
                 @continue($incidencia['automatic'] ?? false)
                 <div class="co-incident-option" @if($codigo === 'evacuacion') data-incident-option="evacuacion" @endif>
                     <label class="form-check"><input class="form-check-input" type="checkbox" name="incidencias[]" value="{{ $codigo }}" @checked(in_array($codigo, $incidenciaValores, true)) @if($codigo === 'evacuacion') data-incident-toggle="evacuacion" @endif><span class="form-check-label">{{ $incidencia['label'] }}</span></label>
@@ -195,7 +195,7 @@
                     @foreach($incidenciasActivas as $incidencia)
                         <label class="form-check">
                             <input class="form-check-input" type="checkbox" name="incidencias_resueltas[]" value="{{ $incidencia->id }}" @checked(in_array($incidencia->id, old('incidencias_resueltas', [])))>
-                            <span class="form-check-label"><strong>{{ config("centro_operaciones.incidencias.{$incidencia->tipo}.label", $incidencia->tipo) }}</strong> · reportada {{ $incidencia->created_at?->diffForHumans() }}</span>
+                            <span class="form-check-label"><strong>{{ $incidencia->tipo_label }}</strong> · reportada {{ $incidencia->created_at?->diffForHumans() }}</span>
                         </label>
                     @endforeach
                 </div>

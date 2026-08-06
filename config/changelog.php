@@ -1,6 +1,44 @@
 <?php
 
 return [
+    '2026.8.6.368' => [
+        'date' => '2026-08-06',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Línea visual unificada para mantenedor y tickets',
+        'files' => [
+            'resources/css/centro-operaciones.css',
+            'resources/views/centro-operaciones/configuraciones/index.blade.php',
+            'resources/views/centro-operaciones/tickets/index.blade.php',
+            'resources/views/centro-operaciones/tickets/show.blade.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+        ],
+        'changes' => [
+            'Alinea encabezados, tarjetas, tipografía, colores, espaciados y acciones del mantenedor y tickets con el Centro de Operaciones.',
+            'Mejora la lectura de estados, vencimientos, responsables y rutas institucionales de atención.',
+            'Rediseña el detalle del ticket con bloques de antecedentes, asignación y resolución, adaptables a dispositivos móviles.',
+            'Agrega una prueba de regresión para conservar el sistema visual compartido en las tres vistas.',
+        ],
+        'roles' => ['Administrador', 'Funcionario AC', 'Directivo de Establecimiento', 'Dirección Ejecutiva', 'Comunicaciones'],
+    ],
+    '2026.8.6.367' => [
+        'date' => '2026-08-06',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Incidencias dinámicas y responsables por subdirección',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/IncidenteConfiguracionController.php',
+            'app/Services/CentroOperaciones/IncidenciaCatalogo.php',
+            'database/migrations/2026_08_06_150000_add_catalog_fields_to_centro_operaciones_incidente_configuraciones.php',
+            'resources/views/centro-operaciones/configuraciones/index.blade.php',
+            'resources/views/centro-operaciones/reportes/form.blade.php',
+        ],
+        'changes' => [
+            'Permite crear nuevos tipos de incidencia desde el mantenedor, con nombre, severidad, plazo y estado activo.',
+            'Solicita primero la subdirección y luego limita los responsables a funcionarios activos de esa dependencia.',
+            'Identifica expresamente al Subdirector(a) (Jefatura) dentro del selector de responsables.',
+            'Incorpora las incidencias creadas al reporte diario y conserva sus nombres en tickets, correos, PDF e historial.',
+        ],
+        'roles' => ['Administrador', 'Directivo de Establecimiento', 'Usuarios con acceso al Centro de Operaciones'],
+    ],
     '2026.8.6.366' => [
         'date' => '2026-08-06',
         'module' => 'Centro de Operaciones',

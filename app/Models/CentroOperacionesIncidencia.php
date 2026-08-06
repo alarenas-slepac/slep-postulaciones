@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CentroOperaciones\IncidenciaCatalogo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -53,5 +54,10 @@ class CentroOperacionesIncidencia extends Model
     public function ticket(): HasOne
     {
         return $this->hasOne(CentroOperacionesTicket::class, 'incidencia_id');
+    }
+
+    public function getTipoLabelAttribute(): string
+    {
+        return app(IncidenciaCatalogo::class)->nombre($this->tipo);
     }
 }
