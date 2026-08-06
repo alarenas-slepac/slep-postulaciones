@@ -6,6 +6,7 @@ use App\Models\Establecimiento;
 use App\Models\User;
 use App\Services\CentroOperaciones\DatosBaseService;
 use App\Services\CentroOperaciones\EstadoService;
+use App\Services\CentroOperaciones\IncidenciaCatalogo;
 use App\Services\CentroOperaciones\ReporteService;
 use App\Services\CentroOperaciones\UnidadOperacionalService;
 use Carbon\CarbonImmutable;
@@ -46,7 +47,12 @@ class CentroOperacionesReporteServiceTest extends TestCase
                 }
             };
 
-            $service = new ReporteService($datosBase, new EstadoService(), new UnidadOperacionalService());
+            $service = new ReporteService(
+                $datosBase,
+                new EstadoService(),
+                app(IncidenciaCatalogo::class),
+                new UnidadOperacionalService()
+            );
             $reporte = $service->crear(
                 Establecimiento::query()->findOrFail(1),
                 User::query()->findOrFail(1),
@@ -111,7 +117,12 @@ class CentroOperacionesReporteServiceTest extends TestCase
                     ];
                 }
             };
-            $service = new ReporteService($datosBase, new EstadoService(), new UnidadOperacionalService());
+            $service = new ReporteService(
+                $datosBase,
+                new EstadoService(),
+                app(IncidenciaCatalogo::class),
+                new UnidadOperacionalService()
+            );
             $establecimiento = Establecimiento::query()->findOrFail(1);
             $usuario = User::query()->findOrFail(1);
             $datos = [

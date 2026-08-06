@@ -1,8 +1,130 @@
 @extends('layouts.app')
+
+@push('styles')
+    @vite('resources/css/centro-operaciones.css')
+@endpush
+
 @section('content')
-<div class="container py-4"><div class="d-flex justify-content-between align-items-center mb-4"><div><h1 class="h3 mb-1">Tickets de incidencia</h1><p class="text-muted mb-0">Tickets visibles según su rol, unidad o establecimiento.</p></div>@if(auth()->user()->hasRole('admin'))<a class="btn btn-outline-primary" href="{{ route('centro-operaciones.configuraciones.index') }}">Mantenedor</a>@endif</div>
-@if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
-<div class="card shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Ticket</th><th>Incidencia</th><th>Establecimiento</th><th>Responsable / unidad</th><th>Vencimiento</th><th>Estado</th><th></th></tr></thead><tbody>
-@forelse($tickets as $ticket)<tr><td class="fw-semibold">{{ $ticket->numero }}</td><td>{{ config("centro_operaciones.incidencias.{$ticket->incidencia->tipo}.label", $ticket->incidencia->tipo) }}</td><td>{{ $ticket->incidencia->establecimiento?->nombre_establecimiento ?? '—' }}</td><td>{{ $ticket->responsable?->nombre_completo }}<br><small class="text-muted">{{ $ticket->unidad_departamento }}</small></td><td>{{ $ticket->vence_en->format('d/m/Y H:i') }}</td><td><span class="badge {{ $ticket->estado === 'resuelto' ? 'text-bg-success' : ($ticket->estado === 'vencido' ? 'text-bg-danger' : 'text-bg-warning') }}">{{ ucfirst($ticket->estado) }}</span></td><td><a href="{{ route('centro-operaciones.tickets.show', $ticket) }}" class="btn btn-sm btn-outline-primary">Ver</a></td></tr>@empty<tr><td colspan="7" class="text-center text-muted py-5">No hay tickets en este ámbito.</td></tr>@endforelse
-</tbody></table></div></div><div class="mt-3">{{ $tickets->links() }}</div></div>
+<div class="co-shell co-tickets-shell">
+    <header class="co-hero">
+        <div class="co-module-identity">
+            <div class="co-module-icon co-module-icon--tickets">
+                <i class="bi bi-ticket-detailed" aria-hidden="true"></i>
+            </div>
+            <div>
+                <div class="co-eyebrow">Centro de Operaciones</div>
+                <h1>Tickets de incidencias</h1>
+                <p>Seguimiento y resolución de incidencias según su rol, unidad o establecimiento.</p>
+            </div>
+        </div>
+        <div class="co-hero-actions">
+            <span class="co-hero-counter">
+                <i class="bi bi-inbox" aria-hidden="true"></i>
+                <span><strong>{{ number_format($tickets->total(), 0, ',', '.') }}</strong> visibles</span>
+            </span>
+            @if(auth()->user()->hasRole('admin'))
+                <a class="btn btn-outline-primary" href="{{ route('centro-operaciones.configuraciones.index') }}">
+                    <i class="bi bi-sliders"></i> Mantenedor
+                </a>
+            @endif
+        </div>
+    </header>
+
+    @if(session('success'))
+        <div class="alert alert-success co-flash-message">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>{{ session('success') }}</span>
+        </div>
+    @endif
+
+    <section class="co-card">
+        <div class="co-card-head">
+            <div>
+                <span class="co-eyebrow">Bandeja de seguimiento</span>
+                <h2>Tickets asignados</h2>
+            </div>
+            <span class="co-date-chip">
+                <i class="bi bi-calendar3" aria-hidden="true"></i>
+                {{ now(config('centro_operaciones.timezone'))->translatedFormat('d M Y') }}
+            </span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table co-table co-ticket-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Ticket</th>
+                        <th>Incidencia</th>
+                        <th>Establecimiento</th>
+                        <th>Responsable / unidad</th>
+                        <th>Vencimiento</th>
+                        <th>Estado</th>
+                        <th><span class="visually-hidden">Acciones</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @forelse($tickets as $ticket)
+                    @php
+                        $estadoTicket = strtolower($ticket->estado);
+                        $estadoLabel = match ($estadoTicket) {
+                            'asignado' => 'Asignado',
+                            'vencido' => 'Vencido',
+                            'escalado' => 'Escalado',
+                            'resuelto' => 'Resuelto',
+                            default => ucfirst(str_replace('_', ' ', $estadoTicket)),
+                        };
+                    @endphp
+                    <tr>
+                        <td>
+                            <a class="co-ticket-number" href="{{ route('centro-operaciones.tickets.show', $ticket) }}">
+                                <i class="bi bi-ticket-perforated" aria-hidden="true"></i>
+                                {{ $ticket->numero }}
+                            </a>
+                        </td>
+                        <td>
+                            <div class="co-table-primary">{{ $ticket->incidencia->tipo_label }}</div>
+                            <small class="co-table-secondary">{{ ucfirst($ticket->incidencia->severidad ?? 'alerta') }}</small>
+                        </td>
+                        <td>
+                            <div class="co-table-primary">{{ $ticket->incidencia->establecimiento?->nombre_establecimiento ?? 'Sin establecimiento' }}</div>
+                        </td>
+                        <td>
+                            <div class="co-table-primary">{{ $ticket->responsable?->nombre_completo ?? 'Sin responsable' }}</div>
+                            <small class="co-table-secondary">{{ $ticket->unidad_departamento }}</small>
+                        </td>
+                        <td>
+                            <div class="co-deadline {{ in_array($estadoTicket, ['vencido', 'escalado'], true) ? 'co-deadline--late' : '' }}">
+                                <i class="bi bi-clock" aria-hidden="true"></i>
+                                <span>
+                                    <strong>{{ $ticket->vence_en->format('d/m/Y') }}</strong>
+                                    <small>{{ $ticket->vence_en->format('H:i') }} hrs.</small>
+                                </span>
+                            </div>
+                        </td>
+                        <td><span class="co-ticket-status co-ticket-status--{{ $estadoTicket }}"><i></i>{{ $estadoLabel }}</span></td>
+                        <td class="text-end">
+                            <a href="{{ route('centro-operaciones.tickets.show', $ticket) }}" class="btn btn-sm btn-outline-primary co-action-button" aria-label="Ver ticket {{ $ticket->numero }}">
+                                Ver detalle <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                            </a>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7">
+                            <div class="co-empty co-empty--large">
+                                <i class="bi bi-inbox" aria-hidden="true"></i>
+                                <div><strong>No hay tickets en este ámbito</strong><span>Los nuevos tickets asignados aparecerán en esta bandeja.</span></div>
+                            </div>
+                        </td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        @if($tickets->hasPages())
+            <div class="co-card-footer">{{ $tickets->links() }}</div>
+        @endif
+    </section>
+</div>
 @endsection

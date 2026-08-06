@@ -18,6 +18,7 @@ class ReporteService
     public function __construct(
         private readonly DatosBaseService $datosBase,
         private readonly EstadoService $estadoService,
+        private readonly IncidenciaCatalogo $incidencias,
         private readonly UnidadOperacionalService $unidades,
     ) {
     }
@@ -172,7 +173,7 @@ class ReporteService
                 'modalidad' => $modalidad,
                 'severidad' => config(
                     "centro_operaciones.severidades_modalidad_incidencia.{$tipo}.{$modalidad}",
-                    config("centro_operaciones.incidencias.{$tipo}.severity", 'alerta')
+                    $this->incidencias->severidad($tipo)
                 ),
                 'descripcion' => Arr::get($datos, "incidencia_detalles.{$tipo}"),
             ];

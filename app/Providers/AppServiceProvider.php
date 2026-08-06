@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\View;
 use App\Support\ChangeLog;
 use App\Models\Conversation;
 use App\Policies\ConversationPolicy;
+use App\Services\CentroOperaciones\IncidenciaCatalogo;
 use Vonage\Client;
 use Vonage\Client\Credentials\Basic;
 
@@ -17,6 +18,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         require_once app_path('Support/helpers.php');
+
+        $this->app->singleton(IncidenciaCatalogo::class);
 
         // No bindear manualmente 'request' aquí.
         $this->app->singleton(Client::class, function () {

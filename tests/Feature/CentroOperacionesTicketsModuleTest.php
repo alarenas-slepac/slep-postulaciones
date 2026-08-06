@@ -31,7 +31,55 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $routes = file_get_contents(base_path('routes/web.php'));
         $this->assertStringContainsString("name('tickets.index')", $routes);
         $this->assertStringContainsString("name('configuraciones.index')", $routes);
+        $this->assertStringContainsString("name('configuraciones.store')", $routes);
         $this->assertStringContainsString("name('tickets.resolver')", $routes);
+    }
+
+    public function test_mantenedor_permite_crear_y_asignar_por_subdireccion(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/CentroOperaciones/IncidenteConfiguracionController.php'));
+        $view = file_get_contents(resource_path('views/centro-operaciones/configuraciones/index.blade.php'));
+
+        $this->assertStringContainsString('public function store(Request $request)', $controller);
+        $this->assertStringContainsString("->where('subdireccion_dependencia', \$datos['subdireccion_dependencia'])", $controller);
+        $this->assertStringContainsString('48 - strlen($terminacion)', $controller);
+        $this->assertStringContainsString('Nueva incidencia', $view);
+        $this->assertStringContainsString('1. Subdirección', $view);
+        $this->assertStringContainsString('2. Responsable de subdirección', $view);
+        $this->assertStringContainsString('Subdirector(a) (Jefatura)', $view);
+        $this->assertStringContainsString('data-subdireccion', $view);
+    }
+
+    public function test_mantenedor_y_tickets_comparten_la_linea_visual_del_centro_de_operaciones(): void
+    {
+        $mantenedor = file_get_contents(resource_path('views/centro-operaciones/configuraciones/index.blade.php'));
+        $tickets = file_get_contents(resource_path('views/centro-operaciones/tickets/index.blade.php'));
+        $detalle = file_get_contents(resource_path('views/centro-operaciones/tickets/show.blade.php'));
+        $estilos = file_get_contents(resource_path('css/centro-operaciones.css'));
+
+        foreach ([$mantenedor, $tickets, $detalle] as $vista) {
+            $this->assertStringContainsString("@vite('resources/css/centro-operaciones.css')", $vista);
+            $this->assertStringContainsString('class="co-shell', $vista);
+            $this->assertStringContainsString('class="co-hero', $vista);
+            $this->assertStringContainsString('class="co-card', $vista);
+        }
+
+        $this->assertStringContainsString('co-config-grid', $mantenedor);
+        $this->assertStringContainsString('co-ticket-status', $tickets);
+        $this->assertStringContainsString('co-resolution-card', $detalle);
+        $this->assertStringContainsString('.co-config-grid', $estilos);
+        $this->assertStringContainsString('.co-ticket-status', $estilos);
+    }
+
+    public function test_catalogo_dinamico_conserva_nombre_severidad_y_estado(): void
+    {
+        $migration = file_get_contents(database_path('migrations/2026_08_06_150000_add_catalog_fields_to_centro_operaciones_incidente_configuraciones.php'));
+        $catalogo = file_get_contents(app_path('Services/CentroOperaciones/IncidenciaCatalogo.php'));
+
+        $this->assertStringContainsString("->string('nombre', 120)", $migration);
+        $this->assertStringContainsString("->string('severidad', 20)", $migration);
+        $this->assertStringContainsString("'active' => \$configuracion->activo", $catalogo);
+        $this->assertStringContainsString('public function activos(): Collection', $catalogo);
     }
 
     public function test_menu_de_tickets_considera_los_roles_asignados_al_usuario(): void

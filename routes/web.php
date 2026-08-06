@@ -166,6 +166,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         });
         Route::middleware('ensure.role:admin')->group(function () {
             Route::get('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'index'])->name('configuraciones.index');
+            Route::post('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'store'])->name('configuraciones.store');
             Route::put('/mantenedor-incidencias/{configuracion}', [CentroOperacionesIncidenteConfiguracionController::class, 'update'])->whereNumber('configuracion')->name('configuraciones.update');
         });
         Route::middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|secretaria_direccion_ejecutiva')

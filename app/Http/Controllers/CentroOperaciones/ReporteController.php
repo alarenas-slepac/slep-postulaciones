@@ -8,6 +8,7 @@ use App\Models\CentroOperacionesIncidencia;
 use App\Models\CentroOperacionesReporte;
 use App\Models\Establecimiento;
 use App\Services\CentroOperaciones\DatosBaseService;
+use App\Services\CentroOperaciones\IncidenciaCatalogo;
 use App\Services\CentroOperaciones\ReporteService;
 use App\Services\CentroOperaciones\UnidadOperacionalService;
 use Carbon\CarbonImmutable;
@@ -19,6 +20,7 @@ class ReporteController extends Controller
 {
     public function __construct(
         private readonly DatosBaseService $datosBase,
+        private readonly IncidenciaCatalogo $incidencias,
         private readonly ReporteService $reportes,
         private readonly UnidadOperacionalService $unidades,
     ) {
@@ -145,12 +147,14 @@ class ReporteController extends Controller
                 ->value('fecha_control_plagas');
         $opcionesUnidades = $this->unidades->opciones($establecimiento);
         $nombreContexto = $this->unidades->nombreReporte($establecimiento, $unidadCodigo);
+        $incidenciasCatalogo = $this->incidencias->activos();
 
         return view('centro-operaciones.reportes.form', compact(
             'establecimiento',
             'reporte',
             'datosBase',
             'incidenciasActivas',
+            'incidenciasCatalogo',
             'hoy',
             'perfilAdmision',
             'unidadCodigo',
