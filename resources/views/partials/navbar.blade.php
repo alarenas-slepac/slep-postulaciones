@@ -43,6 +43,20 @@
                         </a>
                     </li>
 
+                    @if (in_array($activeRole, ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab'], true) && Route::has('centro-operaciones.tickets.index'))
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle {{ request()->routeIs('centro-operaciones.tickets.*', 'centro-operaciones.configuraciones.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-ticket-detailed"></i> Incidencias
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ route('centro-operaciones.tickets.index') }}"><i class="bi bi-inbox"></i> Tickets</a></li>
+                                @if ($isAdmin && Route::has('centro-operaciones.configuraciones.index'))
+                                    <li><a class="dropdown-item" href="{{ route('centro-operaciones.configuraciones.index') }}"><i class="bi bi-sliders"></i> Mantenedor</a></li>
+                                @endif
+                            </ul>
+                        </li>
+                    @endif
+
                     @if ($isPostulante && ($u->canAnyModule(['postulant.profile', 'postulant.documents', 'postulant.reemplazos', 'postulant.ofertas-laborales', 'liquidaciones'], $activeRole) || Route::has('liquidaciones.mis.index')))
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle {{ (request()->routeIs('postulant.*') || request()->routeIs('liquidaciones.mis.*')) ? 'active' : '' }}"

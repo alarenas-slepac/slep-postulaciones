@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class CentroOperacionesIncidencia extends Model
 {
@@ -47,5 +48,10 @@ class CentroOperacionesIncidencia extends Model
     public function reporteResolucion(): BelongsTo
     {
         return $this->belongsTo(CentroOperacionesReporte::class, 'resuelta_en_reporte_id');
+    }
+
+    public function ticket(): HasOne
+    {
+        return $this->hasOne(CentroOperacionesTicket::class, 'incidencia_id');
     }
 }

@@ -9,8 +9,9 @@
     $editando = isset($reporte) && $reporte;
     $servicioValores = old('servicios', $editando ? $reporte->servicios->pluck('estado', 'servicio')->all() : array_fill_keys(array_keys(config('centro_operaciones.servicios')), 'operativo'));
     $afectacionValores = old('afectaciones', $editando ? $reporte->afectaciones->pluck('tipo')->all() : []);
-    $incidenciaValores = old('incidencias', $editando ? $reporte->incidencias->pluck('tipo')->all() : []);
-    $incidenciaModalidadValores = old('incidencia_modalidades', $editando ? $reporte->incidencias->pluck('modalidad', 'tipo')->filter()->all() : []);
+    $incidenciasActivasReporte = $editando ? $reporte->incidencias->where('estado', 'activa') : collect();
+    $incidenciaValores = old('incidencias', $incidenciasActivasReporte->pluck('tipo')->all());
+    $incidenciaModalidadValores = old('incidencia_modalidades', $incidenciasActivasReporte->pluck('modalidad', 'tipo')->filter()->all());
     $funcionamiento = old('funcionamiento', $editando ? $reporte->funcionamiento : 'si');
     $prioridad = old('prioridad', $editando ? $reporte->prioridad : 'sin_novedad');
     $estadoClases = ['operativo' => 'success', 'alerta' => 'warning', 'critico' => 'danger'];
@@ -182,7 +183,7 @@
                             @endforeach
                         </select>
                     @endif
-                    <input class="form-control form-control-sm" name="incidencia_detalles[{{ $codigo }}]" value="{{ old("incidencia_detalles.$codigo", $editando ? optional($reporte->incidencias->firstWhere('tipo', $codigo))->descripcion : '') }}" placeholder="Detalle opcional">
+                    <input class="form-control form-control-sm" name="incidencia_detalles[{{ $codigo }}]" value="{{ old("incidencia_detalles.$codigo", $editando ? optional($incidenciasActivasReporte->firstWhere('tipo', $codigo))->descripcion : '') }}" placeholder="Detalle opcional">
                 </div>
             @endforeach
             </div>
