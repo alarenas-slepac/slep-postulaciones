@@ -33,6 +33,32 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("name('tickets.resolver')", $routes);
     }
 
+    public function test_menu_de_tickets_considera_los_roles_asignados_al_usuario(): void
+    {
+        $navbar = file_get_contents(resource_path('views/partials/navbar.blade.php'));
+
+        $this->assertStringContainsString(
+            '$canAccessCentroOperacionesTickets = $u->hasAnyRole($ticketsRoles);',
+            $navbar
+        );
+        $this->assertStringContainsString(
+            '@if ($canAccessCentroOperacionesTickets && Route::has(\'centro-operaciones.tickets.index\'))',
+            $navbar
+        );
+        $this->assertStringContainsString(
+            '$canManageCentroOperacionesTickets = $u->hasRole(\'admin\');',
+            $navbar
+        );
+        $this->assertStringContainsString(
+            '@if ($canManageCentroOperacionesTickets && Route::has(\'centro-operaciones.configuraciones.index\'))',
+            $navbar
+        );
+        $this->assertStringNotContainsString(
+            "in_array(\$activeRole, ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab'], true) && Route::has('centro-operaciones.tickets.index')",
+            $navbar
+        );
+    }
+
     public function test_reporte_resuelve_el_ticket_y_conserva_la_incidencia(): void
     {
         $servicio = file_get_contents(app_path('Services/CentroOperaciones/ReporteService.php'));

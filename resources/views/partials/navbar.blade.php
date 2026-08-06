@@ -35,6 +35,9 @@
                         $canAgendamientoRecursos = in_array($activeRole, ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac', 'secretaria_direccion_ejecutiva'], true) && Route::has('gestion.agendamientos-recursos.index');
                         $cargasSolicitanteRoles = (array) config('cargas_familiares.acceso_solicitantes.roles_habilitados', ['funcionario_ac']);
                         $isCargasApplicant = in_array($activeRole, $cargasSolicitanteRoles, true);
+                        $ticketsRoles = ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab'];
+                        $canAccessCentroOperacionesTickets = $u->hasAnyRole($ticketsRoles);
+                        $canManageCentroOperacionesTickets = $u->hasRole('admin');
                     @endphp
 
                     <li class="nav-item">
@@ -43,14 +46,14 @@
                         </a>
                     </li>
 
-                    @if (in_array($activeRole, ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab'], true) && Route::has('centro-operaciones.tickets.index'))
+                    @if ($canAccessCentroOperacionesTickets && Route::has('centro-operaciones.tickets.index'))
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle {{ request()->routeIs('centro-operaciones.tickets.*', 'centro-operaciones.configuraciones.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-ticket-detailed"></i> Incidencias
                             </a>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{{ route('centro-operaciones.tickets.index') }}"><i class="bi bi-inbox"></i> Tickets</a></li>
-                                @if ($isAdmin && Route::has('centro-operaciones.configuraciones.index'))
+                                @if ($canManageCentroOperacionesTickets && Route::has('centro-operaciones.configuraciones.index'))
                                     <li><a class="dropdown-item" href="{{ route('centro-operaciones.configuraciones.index') }}"><i class="bi bi-sliders"></i> Mantenedor</a></li>
                                 @endif
                             </ul>
