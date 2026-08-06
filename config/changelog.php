@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.8.6.365' => [
+        'date' => '2026-08-06',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Acceso visible al menú de tickets',
+        'files' => [
+            'resources/views/partials/navbar.blade.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Muestra el menú Incidencias cuando el usuario posee cualquiera de los roles autorizados para ingresar a tickets, aunque tenga otro rol activo.',
+            'Alinea la visibilidad del mantenedor con el permiso de administrador realmente asignado al usuario.',
+            'Agrega una prueba de regresión para mantener sincronizadas la navegación y la autorización de las rutas.',
+        ],
+        'roles' => ['Administrador', 'Funcionario AC', 'Directivo de Establecimiento', 'Dirección Ejecutiva', 'Comunicaciones'],
+    ],
     '2026.8.6.364' => [
         'date' => '2026-08-06',
         'module' => 'Centro de Operaciones',
