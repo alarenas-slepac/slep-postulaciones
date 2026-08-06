@@ -14,7 +14,11 @@ return new class extends Migration
             $table->string('tipo', 80)->unique();
             $table->string('unidad_departamento', 190)->nullable();
             $table->string('subdireccion_dependencia', 255)->nullable();
-            $table->foreignId('responsable_funcionario_ac_id')->nullable()->constrained('funcionarios_ac_autorizados')->nullOnDelete();
+            $table->foreignId('responsable_funcionario_ac_id')->nullable();
+            $table->foreign('responsable_funcionario_ac_id', 'co_inc_cfg_responsable_fk')
+                ->references('id')
+                ->on('funcionarios_ac_autorizados')
+                ->nullOnDelete();
             $table->unsignedSmallInteger('plazo_dias')->default(4);
             $table->boolean('activo')->default(true);
             $table->timestamps();
