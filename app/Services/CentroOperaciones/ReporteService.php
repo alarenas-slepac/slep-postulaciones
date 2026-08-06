@@ -31,7 +31,7 @@ class ReporteService
         }
         $base = $this->datosBase->paraContexto($establecimiento, $ahora->year, $unidadCodigo);
 
-        return DB::transaction(function () use ($establecimiento, $usuario, $datos, $ahora, $base, $unidadCodigo) {
+        $reporte = DB::transaction(function () use ($establecimiento, $usuario, $datos, $ahora, $base, $unidadCodigo) {
             $reporte = new CentroOperacionesReporte([
                 'establecimiento_id' => $establecimiento->id,
                 'unidad_codigo' => $unidadCodigo,
@@ -58,13 +58,17 @@ class ReporteService
 
             return $reporte->fresh($this->relaciones());
         });
+
+        $this->generarTickets($reporte, $usuario);
+
+        return $reporte;
     }
 
     public function actualizar(CentroOperacionesReporte $reporte, User $usuario, array $datos): CentroOperacionesReporte
     {
         $ahora = CarbonImmutable::now(config('centro_operaciones.timezone'));
 
-        return DB::transaction(function () use ($reporte, $usuario, $datos, $ahora) {
+        $reporte = DB::transaction(function () use ($reporte, $usuario, $datos, $ahora) {
             $reporte = CentroOperacionesReporte::query()->lockForUpdate()->findOrFail($reporte->id);
             $reporte->version++;
             $reporte->reportado_por_id = $usuario->id;
@@ -77,6 +81,10 @@ class ReporteService
 
             return $reporte->fresh($this->relaciones());
         });
+
+        $this->generarTickets($reporte, $usuario);
+
+        return $reporte;
     }
 
     private function aplicarDatos(CentroOperacionesReporte $reporte, array $datos): void
@@ -285,5 +293,13 @@ class ReporteService
     private function relaciones(): array
     {
         return ['establecimiento', 'reportadoPor', 'servicios', 'afectaciones', 'incidencias', 'incidenciasResueltas'];
+    }
+
+    private function generarTickets(CentroOperacionesReporte $reporte, User $usuario): void
+    {
+        $tickets = app(TicketService::class);
+        $reporte->incidencias()->where('estado', 'activa')->where('tipo', '!=', 'otro')
+            ->whereDoesntHave('ticket')->get()
+            ->each(fn (CentroOperacionesIncidencia $incidencia) => $tickets->crearParaIncidencia($incidencia, $usuario));
     }
 }

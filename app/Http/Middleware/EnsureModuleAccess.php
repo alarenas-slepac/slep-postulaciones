@@ -41,6 +41,16 @@ class EnsureModuleAccess
             return $next($request);
         }
 
+        // Los tickets de incidencia aplican un alcance propio por responsable,
+        // subdirección o establecimiento en TicketController.
+        if (
+            str_starts_with($routeName, 'centro-operaciones.tickets.')
+            && method_exists($user, 'hasAnyRole')
+            && $user->hasAnyRole(['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab'])
+        ) {
+            return $next($request);
+        }
+
         // Mis Cargas Familiares tiene control fino en sus propias rutas y controlador.
         // El módulo padre se resuelve como "tramites"; por eso se permite pasar a los
         // roles autorizados para este submódulo aunque no tengan habilitado todo Tramites.

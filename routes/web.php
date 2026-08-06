@@ -8,6 +8,8 @@ use App\Http\Controllers\RoleContextController;
 use App\Http\Controllers\PostulanteProvisorioLookupController;
 use App\Http\Controllers\CentroOperaciones\PanelController as CentroOperacionesPanelController;
 use App\Http\Controllers\CentroOperaciones\ReporteController as CentroOperacionesReporteController;
+use App\Http\Controllers\CentroOperaciones\TicketController as CentroOperacionesTicketController;
+use App\Http\Controllers\CentroOperaciones\IncidenteConfiguracionController as CentroOperacionesIncidenteConfiguracionController;
 
 use App\Http\Controllers\ReemplazosController;
 use App\Http\Controllers\Reemplazos\PersonalImportController;
@@ -157,6 +159,15 @@ Route::get('/certificados/verificar/{codigo}', CertificadoVerificacionController
 Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
     Route::prefix('centro-operaciones')->name('centro-operaciones.')->group(function () {
+        Route::middleware('ensure.role:admin|director_ejecutivo|secretaria_direccion_ejecutiva|comunicaciones|funcionario_ac|funcionario_directivo_estab')->group(function () {
+            Route::get('/tickets', [CentroOperacionesTicketController::class, 'index'])->name('tickets.index');
+            Route::get('/tickets/{ticket}', [CentroOperacionesTicketController::class, 'show'])->whereNumber('ticket')->name('tickets.show');
+            Route::patch('/tickets/{ticket}/resolver', [CentroOperacionesTicketController::class, 'resolver'])->whereNumber('ticket')->name('tickets.resolver');
+        });
+        Route::middleware('ensure.role:admin')->group(function () {
+            Route::get('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'index'])->name('configuraciones.index');
+            Route::put('/mantenedor-incidencias/{configuracion}', [CentroOperacionesIncidenteConfiguracionController::class, 'update'])->whereNumber('configuracion')->name('configuraciones.update');
+        });
         Route::middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|secretaria_direccion_ejecutiva')
             ->group(function () {
                 Route::get('/', [CentroOperacionesPanelController::class, 'index'])->name('index');

@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.8.6.363' => [
+        'date' => '2026-08-06',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Tickets y escalamiento de incidencias',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/TicketController.php',
+            'app/Http/Controllers/CentroOperaciones/IncidenteConfiguracionController.php',
+            'app/Http/Middleware/EnsureModuleAccess.php',
+            'app/Services/CentroOperaciones/TicketService.php',
+            'database/migrations/2026_08_06_120000_create_centro_operaciones_tickets_tables.php',
+            'resources/views/centro-operaciones/tickets/index.blade.php',
+            'resources/views/centro-operaciones/configuraciones/index.blade.php',
+        ],
+        'changes' => [
+            'Crea un mantenedor para asignar cada incidencia del reporte diario, excepto Otro incidente, a una unidad, responsable y subdirección de Administración Central.',
+            'Genera tickets con un plazo predeterminado de cuatro días, configurable por tipo, y notifica al responsable con el detalle adjunto en PDF.',
+            'Escala por correo los tickets vencidos a la jefatura o subrogancia vigente de la matriz de autorización.',
+            'Aplica visibilidad por responsable, subdirección, establecimiento y roles institucionales, y permite registrar la resolución del ticket.',
+        ],
+        'roles' => ['Administrador', 'Funcionario AC', 'Directivo de Establecimiento', 'Dirección Ejecutiva', 'Comunicaciones'],
+    ],
     '2026.8.5.362' => [
         'date' => '2026-08-05',
         'module' => 'Centro de Operaciones',
