@@ -21,6 +21,18 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("name('tickets.resolver')", $routes);
     }
 
+    public function test_reporte_resuelve_el_ticket_y_conserva_la_incidencia(): void
+    {
+        $servicio = file_get_contents(app_path('Services/CentroOperaciones/ReporteService.php'));
+        $formulario = file_get_contents(resource_path('views/centro-operaciones/reportes/form.blade.php'));
+
+        $this->assertStringContainsString('private function resolverIncidencias(', $servicio);
+        $this->assertStringContainsString('CentroOperacionesTicket::query()', $servicio);
+        $this->assertStringContainsString("'resolucion' => \$resolucion", $servicio);
+        $this->assertStringNotContainsString("->whereNotIn('tipo', \$tiposIncidencia)\n            ->delete();", $servicio);
+        $this->assertStringContainsString("->where('estado', 'activa')", $formulario);
+    }
+
     public function test_escalamiento_esta_programado(): void
     {
         $console = file_get_contents(base_path('routes/console.php'));

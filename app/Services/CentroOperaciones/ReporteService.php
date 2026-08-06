@@ -4,9 +4,11 @@ namespace App\Services\CentroOperaciones;
 
 use App\Models\CentroOperacionesIncidencia;
 use App\Models\CentroOperacionesReporte;
+use App\Models\CentroOperacionesTicket;
 use App\Models\Establecimiento;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -147,13 +149,23 @@ class ReporteService
             ->reject(fn ($tipo) => (bool) config("centro_operaciones.incidencias.{$tipo}.automatic", false))
             ->unique()
             ->values();
-        $reporte->incidencias()
+        $incidenciasRetiradas = CentroOperacionesIncidencia::query()
+            ->where('reporte_id', $reporte->id)
             ->where('estado', 'activa')
             ->where('tipo', '!=', 'control_plagas_vencido')
-            ->whereNotIn('tipo', $tiposIncidencia)
-            ->delete();
+            ->whereNotIn('tipo', $tiposIncidencia);
+        $this->resolverIncidencias(
+            $incidenciasRetiradas,
+            $reporte,
+            $usuario,
+            $ahora,
+            'Incidencia retirada durante la actualización del reporte diario.'
+        );
         foreach ($tiposIncidencia as $tipo) {
-            $incidencia = $reporte->incidencias()->where('tipo', $tipo)->first();
+            $incidencia = $reporte->incidencias()
+                ->where('tipo', $tipo)
+                ->where('estado', 'activa')
+                ->first();
             $modalidad = Arr::get($datos, "incidencia_modalidades.{$tipo}");
             $atributos = [
                 'tipo' => $tipo,
@@ -182,18 +194,18 @@ class ReporteService
             ->filter()
             ->all();
 
-        CentroOperacionesIncidencia::query()
+        $incidenciasResueltas = CentroOperacionesIncidencia::query()
             ->whereIn('id', $idsResolucion)
             ->where('establecimiento_id', $reporte->establecimiento_id)
             ->where('unidad_codigo', $reporte->unidad_codigo)
-            ->where('estado', 'activa')
-            ->update([
-                'estado' => 'resuelta',
-                'resuelta_en' => $ahora,
-                'resuelta_por_id' => $usuario->id,
-                'resuelta_en_reporte_id' => $reporte->id,
-                'updated_at' => $ahora,
-            ]);
+            ->where('estado', 'activa');
+        $this->resolverIncidencias(
+            $incidenciasResueltas,
+            $reporte,
+            $usuario,
+            $ahora,
+            'Incidencia resuelta desde el reporte diario.'
+        );
 
         $this->sincronizarControlPlagas($reporte, $usuario, $ahora);
     }
@@ -280,13 +292,47 @@ class ReporteService
             return;
         }
 
-        $consulta->update([
-            'estado' => 'resuelta',
-            'resuelta_en' => $ahora,
-            'resuelta_por_id' => $usuario->id,
-            'resuelta_en_reporte_id' => $reporte->id,
-            'updated_at' => $ahora,
-        ]);
+        $this->resolverIncidencias(
+            $consulta,
+            $reporte,
+            $usuario,
+            $ahora,
+            'Control de plagas actualizado con una fecha vigente.'
+        );
+    }
+
+    private function resolverIncidencias(
+        Builder $consulta,
+        CentroOperacionesReporte $reporte,
+        User $usuario,
+        CarbonImmutable $ahora,
+        string $resolucion
+    ): void {
+        $ids = (clone $consulta)->pluck('id');
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        CentroOperacionesIncidencia::query()
+            ->whereIn('id', $ids)
+            ->update([
+                'estado' => 'resuelta',
+                'resuelta_en' => $ahora,
+                'resuelta_por_id' => $usuario->id,
+                'resuelta_en_reporte_id' => $reporte->id,
+                'updated_at' => $ahora,
+            ]);
+
+        CentroOperacionesTicket::query()
+            ->whereIn('incidencia_id', $ids)
+            ->where('estado', '!=', 'resuelto')
+            ->update([
+                'estado' => 'resuelto',
+                'resuelto_en' => $ahora,
+                'resuelto_por_id' => $usuario->id,
+                'resolucion' => $resolucion,
+                'updated_at' => $ahora,
+            ]);
     }
 
     /** @return array<int, string> */
