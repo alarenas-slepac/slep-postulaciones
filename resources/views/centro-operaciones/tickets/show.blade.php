@@ -80,9 +80,73 @@
                 <div><span><i class="bi bi-people"></i> Unidad</span><strong>{{ $ticket->unidad_departamento ?: 'Sin unidad registrada' }}</strong></div>
                 <div><span><i class="bi bi-building-gear"></i> Subdirección</span><strong>{{ $ticket->subdireccion_dependencia ?: 'Sin subdirección registrada' }}</strong></div>
                 <div><span><i class="bi bi-hourglass-split"></i> Plazo límite</span><strong>{{ $ticket->vence_en->translatedFormat('d \d\e F \d\e Y, H:i') }} hrs.</strong></div>
+
+                <!-- Segundo responsable -->
+                @if($ticket->segunda_subdireccion_responsable)
+                    <div class="co-second-responsible">
+                        <span><i class="bi bi-person-plus"></i> Segundo responsable (subdirección)</span>
+                        <strong>{{ $ticket->segunda_subdireccion_responsable }}</strong>
+                    </div>
+                @endif
+
+                @if($ticket->segunda_responsable_subdireccion)
+                    <div class="co-second-responsible">
+                        <span><i class="bi bi-person-plus"></i> Segundo responsable (subdirección)</span>
+                        <strong>{{ $ticket->segunda_responsable_subdireccion }}</strong>
+                    </div>
+                @endif
             </div>
         </section>
     </div>
+
+    <!-- Formulario para editar segundo responsable -->
+    <section class="co-card co-resolution-card">
+        <div class="co-card-head">
+            <div><span class="co-eyebrow">Asignación</span><h2>Segundo responsable (opcional)</h2></div>
+            <i class="bi bi-person-plus co-card-head-icon" aria-hidden="true"></i>
+        </div>
+
+        <form method="POST" action="{{ route('centro-operaciones.tickets.update-second-responsible', $ticket) }}" class="co-resolution-form">
+            @csrf
+            @method('PUT')
+
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="segunda_subdireccion_responsable">
+                        <strong>Segunda subdirección responsable</strong>
+                        <span>Seleccione la subdirección (opcional)</span>
+                    </label>
+                    <select id="segunda_subdireccion_responsable" name="segunda_subdireccion_responsable" class="form-select">
+                        <option value="">— Ninguno —</option>
+                        @foreach($subdirecciones as $subdir)
+                            <option value="{{ $subdir->id }}" {{ $ticket->segunda_subdireccion_responsable == $subdir->id ? 'selected' : '' }}>
+                                {{ $subdir->nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label for="segunda_responsable_subdireccion">
+                        <strong>Segundo responsable de subdirección</strong>
+                        <span>Seleccione el responsable (opcional)</span>
+                    </label>
+                    <select id="segunda_responsable_subdireccion" name="segunda_responsable_subdireccion" class="form-select">
+                        <option value="">— Ninguno —</option>
+                        @foreach($responsables as $resp)
+                            <option value="{{ $resp->id }}" {{ $ticket->segunda_responsable_subdireccion == $resp->id ? 'selected' : '' }}>
+                                {{ $resp->nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div class="co-resolution-actions mt-3">
+                <button class="btn btn-primary"><i class="bi bi-save"></i> Guardar cambios</button>
+            </div>
+        </form>
+    </section>
 
     <section class="co-card co-resolution-card">
         <div class="co-card-head">
@@ -111,4 +175,51 @@
         @endif
     </section>
 </div>
+
+@section('scripts')
+    <script>
+        // Cargar subdirecciones dinámicas
+        function loadSubdirecciones() {
+            fetch('/api/subdirecciones')
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('segunda_subdireccion_responsable');
+                    if (select) {
+                        select.innerHTML = '<option value="">— Ninguno —</option>' +
+                            data.map(s => `<option value="${s.id}" ${select.value === s.id ? 'selected' : ''}>${s.nombre}</option>`).join('');
+                    }
+                })
+                .catch(console.error);
+        }
+
+        // Cargar responsables dinámicos
+        function loadResponsables() {
+            fetch('/api/responsables')
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('segunda_responsable_subdireccion');
+                    if (select) {
+                        select.innerHTML = '<option value="">— Ninguno —</option>' +
+                            data.map(s => `<option value="${s.id}" ${select.value === s.id ? 'selected' : ''}>${s.nombre}</option>`).join('');
+                    }
+                })
+                .catch(console.error);
+        }
+
+        // Cargar al cargar la página
+        document.addEventListener('DOMContentLoaded', function () {
+            loadSubdirecciones();
+            loadResponsables();
+        });
+
+        // Recargar al cambio en el primer selector
+        document.getElementById('segunda_subdireccion_responsable')?.addEventListener('change', function () {
+            loadResponsables();
+        });
+
+        // Recargar al cambio en el segundo selector
+        document.getElementById('segunda_responsable_subdireccion')?.addEventListener('change', function () {
+            loadResponsables();
+        });
+    </script>
 @endsection
