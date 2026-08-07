@@ -28,7 +28,26 @@ class TicketController extends Controller
         $this->aplicarAlcance($query, $request);
         abort_unless($query->exists(), 403);
 
-        return view('centro-operaciones.tickets.show', ['ticket' => $ticket->load(['incidencia.establecimiento', 'incidencia.reporte.reportadoPor', 'responsable'])]);
+        // Cargar segunda subdirección y responsable de la configuración del ticket
+        $ticket->loadMissing(['configuracion', 'configuracion.segundaSubdireccionResponsable', 'configuracion.segundaResponsableSubdireccion']);
+
+        return view('centro-operaciones.tickets.show', [
+            'ticket' => $ticket,
+            'subdirecciones' => $this->getSubdirecciones(),
+            'responsables' => $this->getResponsables(),
+        ]);
+    }
+
+    private function getSubdirecciones()
+    {
+        // Método para cargar subdirecciones dinámicas para el formulario (opcional)
+        return []; // Esto podría ser dinámico, como una lista de subdirecciones desde la base de datos
+    }
+
+    private function getResponsables()
+    {
+        // Método para cargar responsables dinámicos para el formulario
+        return FuncionarioAcAutorizado::all();
     }
 
     public function resolver(Request $request, CentroOperacionesTicket $ticket): RedirectResponse

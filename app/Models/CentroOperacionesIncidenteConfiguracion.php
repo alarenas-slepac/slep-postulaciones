@@ -9,11 +9,11 @@ class CentroOperacionesIncidenteConfiguracion extends Model
 {
     protected $table = 'centro_operaciones_incidente_configuraciones';
 
-    protected $fillable = ['tipo', 'nombre', 'severidad', 'unidad_departamento', 'subdireccion_dependencia', 'responsable_funcionario_ac_id', 'plazo_dias', 'activo'];
+    protected $fillable = ['tipo', 'nombre', 'severidad', 'unidad_departamento', 'subdireccion_dependencia', 'responsable_funcionario_ac_id', 'plazo_dias', 'activo', 'segunda_subdireccion_responsable', 'segunda_responsable_subdireccion'];
 
     protected function casts(): array
     {
-        return ['activo' => 'boolean', 'plazo_dias' => 'integer'];
+        return ['activo' => 'boolean', 'plazo_dias' => 'integer', 'segunda_subdireccion_responsable' => 'string', 'segunda_responsable_subdireccion' => 'string'];
     }
 
     public function responsable(): BelongsTo

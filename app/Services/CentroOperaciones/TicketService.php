@@ -36,6 +36,8 @@ class TicketService
                 'responsable_funcionario_ac_id' => $configuracion->responsable_funcionario_ac_id,
                 'creado_por_id' => $creador->id,
                 'vence_en' => now(config('centro_operaciones.timezone'))->addDays($configuracion->plazo_dias),
+                'segunda_subdireccion_responsable' => $configuracion->segunda_subdireccion_responsable ?? null,
+                'segunda_responsable_subdireccion' => $configuracion->segunda_responsable_subdireccion ?? null,
             ]);
             $ticket->update(['numero' => 'INC-'.now()->format('Y').'-'.str_pad((string) $ticket->id, 6, '0', STR_PAD_LEFT)]);
 
