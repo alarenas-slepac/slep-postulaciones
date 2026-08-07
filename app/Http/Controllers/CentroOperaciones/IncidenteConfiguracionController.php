@@ -20,15 +20,19 @@ class IncidenteConfiguracionController extends Controller
         $funcionarios = FuncionarioAcAutorizado::query()->where('estado_autorizacion', 'activo')
             ->whereNotNull('unidad_departamento')->whereNotNull('subdireccion_dependencia')
             ->orderBy('subdireccion_dependencia')->orderByDesc('jefatura')
-            ->orderBy('apellido_paterno')->get()
+            ->orderBy('apellido_paterno')
+            ->get()
             ->filter(fn (FuncionarioAcAutorizado $funcionario) => $funcionario->estaActivo())
             ->values();
+
         $subdirecciones = $funcionarios->pluck('subdireccion_dependencia')->unique()->sort()->values();
+        $responsables = $funcionarios->pluck('nombre')->unique()->sort()->values();
 
         return view('centro-operaciones.configuraciones.index', compact(
             'configuraciones',
             'funcionarios',
-            'subdirecciones'
+            'subdirecciones',
+            'responsables'
         ));
     }
 
@@ -83,6 +87,13 @@ class IncidenteConfiguracionController extends Controller
         $configuracion->update($datos + [
             'unidad_departamento' => $responsable->unidad_departamento,
             'activo' => $request->boolean('activo'),
+            // Incluir los nuevos campos de segundo responsable
+            'segunda_subdireccion_responsable' => $request->filled('segunda_subdireccion_responsable')
+                ? $request->input('segunda_subdireccion_responsable')
+                : null,
+            'segunda_responsable_subdireccion' => $request->filled('segunda_responsable_subdireccion')
+                ? $request->input('segunda_responsable_subdireccion')
+                : null,
         ]);
 
         return back()->with('success', 'Configuración actualizada.');
@@ -101,6 +112,18 @@ class IncidenteConfiguracionController extends Controller
             ],
             'responsable_funcionario_ac_id' => [
                 'required',
+                Rule::exists('funcionarios_ac_autorizados', 'id')
+                    ->where('estado_autorizacion', 'activo'),
+            ],
+            'segunda_subdireccion_responsable' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::exists('funcionarios_ac_autorizados', 'subdireccion_dependencia')
+                    ->where('estado_autorizacion', 'activo'),
+            ],
+            'segunda_responsable_subdireccion' => [
+                'nullable',
                 Rule::exists('funcionarios_ac_autorizados', 'id')
                     ->where('estado_autorizacion', 'activo'),
             ],
@@ -123,6 +146,8 @@ class IncidenteConfiguracionController extends Controller
         return $request->validate($reglas, [], [
             'subdireccion_dependencia' => 'subdirección',
             'responsable_funcionario_ac_id' => 'responsable de subdirección',
+            'segunda_subdireccion_responsable' => 'segunda subdirección responsable',
+            'segunda_responsable_subdireccion' => 'segundo responsable de subdirección',
             'plazo_dias' => 'plazo',
         ]);
     }
