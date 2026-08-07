@@ -1,5 +1,4 @@
 <?php
-
 return [
     'timezone' => 'America/Santiago',
 
@@ -29,6 +28,7 @@ return [
         'cocina_junaeb' => ['label' => 'Cocina / JUNAEB', 'icon' => 'bi-fork-knife'],
         'transporte_escolar' => ['label' => 'Transporte escolar', 'icon' => 'bi-bus-front-fill'],
         'control_plagas' => ['label' => 'Control de plagas', 'icon' => 'bi-bug-fill'],
+        'extintores' => ['label' => 'Extintores', 'icon' => 'bi-fire-extinguisher'],
     ],
 
     'estados_servicio' => [
@@ -67,14 +67,16 @@ return [
         'problemas_calefaccion' => ['label' => 'Problemas de calefacción', 'severity' => 'alerta'],
         'toma_establecimiento' => ['label' => 'Toma de establecimiento', 'severity' => 'critico'],
         'amago_incendio' => ['label' => 'Amago de incendio', 'severity' => 'critico'],
-        'sismo' => ['label' => 'Sismo', 'severity' => 'alerta'],
-        'evacuacion' => ['label' => 'Evacuación', 'severity' => 'critico'],
         'control_plagas_vencido' => [
             'label' => 'Control de plagas vencido',
             'severity' => 'critico',
             'automatic' => true,
         ],
-        'otro' => ['label' => 'Otro incidente', 'severity' => 'alerta'],
+        'extintor_no_operativo' => [
+            'label' => 'Extintor no operativo',
+            'severity' => 'critico',
+            'automatic' => true,
+        ],
     ],
 
     'modalidades_incidencia' => [

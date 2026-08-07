@@ -302,6 +302,53 @@ class ReporteService
         );
     }
 
+    private function sincronizarExtintores(
+        CentroOperacionesReporte $reporte,
+        User $usuario,
+        CarbonImmutable $ahora
+    ): void {
+        // Buscar el servicio de extintores
+        $extintoresServicio = $reporte->servicios->firstWhere('servicio', 'extintores');
+
+        if (! $extintoresServicio) {
+            return;
+        }
+
+        // Verificar si el extintor está en estado no operacional
+        $esNoOperativo = $extintoresServicio->estado !== 'operativo';
+
+        // Busca incidencias activas de extintor no operativo
+        $consultaIncidencia = CentroOperacionesIncidencia::query()
+            ->where('establecimiento_id', $reporte->establecimiento_id)
+            ->where('unidad_codigo', $reporte->unidad_codigo)
+            ->where('tipo', 'extintor_no_operativo')
+            ->where('estado', 'activa');
+
+        if ($esNoOperativo) {
+            // Crear incidencia si no existe
+            if (! $consultaIncidencia->exists()) {
+                $reporte->incidencias()->create([
+                    'establecimiento_id' => $reporte->establecimiento_id,
+                    'unidad_codigo' => $reporte->unidad_codigo,
+                    'fecha_incidencia' => $reporte->fecha_reporte,
+                    'tipo' => 'extintor_no_operativo',
+                    'severidad' => config('centro_operaciones.incidencias.extintor_no_operativo.severity', 'critico'),
+                    'descripcion' => 'El servicio de extintores se encuentra en estado: '.$extintoresServicio->estado.'.',
+                    'estado' => 'activa',
+                ]);
+            }
+        } else {
+            // Resolver incidencia si existe y ahora está operativo
+            $this->resolverIncidencias(
+                $consultaIncidencia,
+                $reporte,
+                $usuario,
+                $ahora,
+                'Servicio de extintores restaurado a estado operativo.'
+            );
+        }
+    }
+
     private function resolverIncidencias(
         Builder $consulta,
         CentroOperacionesReporte $reporte,

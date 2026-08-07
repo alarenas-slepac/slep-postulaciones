@@ -19,6 +19,10 @@ class EstadoService
 
         foreach ($reporte->servicios as $servicio) {
             $severidades[] = (string) $servicio->estado;
+            // Extintores no operativos deben ser considerados para el estado general
+            if ($servicio->servicio === 'extintores' && $servicio->estado === 'critico') {
+                $severidades[] = 'critico';
+            }
         }
 
         foreach ($reporte->afectaciones as $afectacion) {
