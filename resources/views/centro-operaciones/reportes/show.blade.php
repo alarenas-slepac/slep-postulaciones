@@ -32,7 +32,7 @@
     @if(session('success'))<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>{{ session('success') }}</div>@endif
 
     <div class="co-detail-meta">
-        <div><span>Enviado por</span><strong>{{ $reporte->reportadoPor?->name ?? 'Usuario no disponible' }}</strong></div>
+        <div><span>Enviado por</span><strong>{{ $reporte->reportado_por_nombre_visible }}</strong></div>
         <div><span>Última actualización</span><strong>{{ $reporte->reportado_en->format('d-m-Y H:i') }} hrs.</strong></div>
         <div><span>Funcionamiento</span><strong>{{ config("centro_operaciones.funcionamientos.{$reporte->funcionamiento}.label", ucfirst($reporte->funcionamiento)) }}</strong></div>
         <div><span>Prioridad</span><strong>{{ config("centro_operaciones.prioridades.{$reporte->prioridad}.label", ucfirst($reporte->prioridad)) }}</strong></div>
@@ -50,6 +50,6 @@
     </div>
 
     <section class="co-card mb-4"><div class="co-card-head"><h2>Observaciones</h2></div><p class="mb-0">{{ $reporte->observaciones ?: 'Sin observaciones.' }}</p></section>
-    <section class="co-card"><div class="co-card-head"><h2>Auditoría de versiones</h2><span class="co-count">{{ $reporte->revisiones->count() }}</span></div><div class="co-timeline">@foreach($reporte->revisiones->sortByDesc('version') as $revision)<div><i></i><span><strong>Versión {{ $revision->version }}</strong><small>{{ $revision->created_at->format('d-m-Y H:i') }} · {{ $revision->editadoPor?->name ?? 'Usuario no disponible' }}</small></span></div>@endforeach</div></section>
+    <section class="co-card"><div class="co-card-head"><h2>Auditoría de versiones</h2><span class="co-count">{{ $reporte->revisiones->count() }}</span></div><div class="co-timeline">@foreach($reporte->revisiones->sortByDesc('version') as $revision)<div><i></i><span><strong>Versión {{ $revision->version }}</strong><small>{{ $revision->created_at->format('d-m-Y H:i') }} · {{ $revision->editadoPor?->display_name ?: data_get($revision->datos, 'reportado_por_nombre', 'Usuario registrado sin nombre disponible') }}</small></span></div>@endforeach</div></section>
 </div>
 @endsection

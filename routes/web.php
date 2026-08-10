@@ -153,6 +153,11 @@ Route::get('/certificados/verificar/{codigo}', CertificadoVerificacionController
     ->where('codigo', '[A-Fa-f0-9]{32}')
     ->name('certificados.verificar');
 
+Route::get('/verificar-ticket/{codigo}', [CentroOperacionesTicketController::class, 'verificar'])
+    ->middleware('throttle:60,1')
+    ->where('codigo', '[A-Za-z0-9-]{16,40}')
+    ->name('centro-operaciones.tickets.verificar');
+
 // =========================
 //  RUTAS PROTEGIDAS POR MÓDULO
 // =========================
@@ -162,6 +167,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::middleware('ensure.role:admin|director_ejecutivo|secretaria_direccion_ejecutiva|comunicaciones|funcionario_ac|funcionario_directivo_estab')->group(function () {
             Route::get('/tickets', [CentroOperacionesTicketController::class, 'index'])->name('tickets.index');
             Route::get('/tickets/{ticket}', [CentroOperacionesTicketController::class, 'show'])->whereNumber('ticket')->name('tickets.show');
+            Route::get('/tickets/{ticket}/informe', [CentroOperacionesTicketController::class, 'pdf'])->whereNumber('ticket')->name('tickets.pdf');
             Route::patch('/tickets/{ticket}/resolver', [CentroOperacionesTicketController::class, 'resolver'])->whereNumber('ticket')->name('tickets.resolver');
         });
         Route::middleware('ensure.role:admin')->group(function () {

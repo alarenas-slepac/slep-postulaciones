@@ -20,7 +20,7 @@
                 <thead><tr><th>Fecha y hora</th><th>Establecimiento</th><th>Comuna</th><th>Responsable</th><th>Estado</th><th>Versión</th><th></th></tr></thead>
                 <tbody>
                 @forelse($reportes as $reporte)
-                    <tr><td><strong>{{ $reporte->fecha_reporte->format('d-m-Y') }}</strong><small class="d-block text-muted">{{ $reporte->reportado_en->format('H:i') }} hrs.</small></td><td>{{ $reporte->establecimiento_nombre }}</td><td>{{ $reporte->establecimiento_comuna ?: '-' }}</td><td>{{ $reporte->reportadoPor?->name ?? 'Usuario no disponible' }}</td><td><span class="co-badge co-badge--{{ $reporte->estado_general }}">{{ ucfirst($reporte->estado_general) }}</span></td><td>v{{ $reporte->version }}</td><td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ route('centro-operaciones.reportes.show', $reporte) }}">Ver detalle</a></td></tr>
+                    <tr><td><strong>{{ $reporte->fecha_reporte->format('d-m-Y') }}</strong><small class="d-block text-muted">{{ $reporte->reportado_en->format('H:i') }} hrs.</small></td><td>{{ $reporte->establecimiento_nombre }}</td><td>{{ $reporte->establecimiento_comuna ?: '-' }}</td><td>{{ $reporte->reportado_por_nombre_visible }}</td><td><span class="co-badge co-badge--{{ $reporte->estado_general }}">{{ ucfirst($reporte->estado_general) }}</span></td><td>v{{ $reporte->version }}</td><td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ route('centro-operaciones.reportes.show', $reporte) }}">Ver detalle</a></td></tr>
                 @empty<tr><td colspan="7"><div class="co-empty py-5"><i class="bi bi-inbox"></i> No hay reportes para los filtros seleccionados.</div></td></tr>@endforelse
                 </tbody>
             </table>

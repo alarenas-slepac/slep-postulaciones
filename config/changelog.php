@@ -1,6 +1,42 @@
 <?php
 
 return [
+    '2026.8.10.370' => [
+        'date' => '2026-08-10',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Informe de tickets con firma y verificación documental',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/TicketController.php',
+            'app/Mail/CentroOperacionesTicketMail.php',
+            'app/Models/CentroOperacionesReporte.php',
+            'app/Models/CentroOperacionesReporteRevision.php',
+            'app/Models/CentroOperacionesTicket.php',
+            'app/Models/CentroOperacionesTicketFirma.php',
+            'app/Services/CentroOperaciones/ReporteService.php',
+            'app/Services/CentroOperaciones/TicketDocumentoService.php',
+            'app/Services/CentroOperaciones/TicketService.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_10_160000_add_verification_and_signatures_to_centro_operaciones_tickets.php',
+            'resources/views/centro-operaciones/reportes/history.blade.php',
+            'resources/views/centro-operaciones/reportes/show.blade.php',
+            'resources/views/centro-operaciones/tickets/pdf.blade.php',
+            'resources/views/centro-operaciones/tickets/show.blade.php',
+            'resources/views/centro-operaciones/tickets/verificar.blade.php',
+            'routes/web.php',
+            'tests/Feature/CentroOperacionesTicketServiceTest.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+        ],
+        'changes' => [
+            'Rediseña el informe PDF del ticket con encabezado institucional, estado, origen, responsables, plazo, resolución y trazabilidad.',
+            'Incorpora código único, QR, URL pública y huella SHA-256 para verificar documentalmente cada ticket.',
+            'Registra al resolver una firma electrónica simple con funcionario, rol, fecha, IP, navegador y huella de firma.',
+            'Muestra la firma del funcionario resolutor en el informe PDF, el detalle del ticket y la validación pública.',
+            'Agrega acceso al informe PDF actualizado desde el detalle del ticket y reutiliza el mismo formato en los correos.',
+            'Corrige Enviado por usando el nombre real del usuario y conserva una copia histórica para evitar pérdidas de trazabilidad.',
+            'Regulariza códigos, nombres de emisores y firmas disponibles para tickets y reportes históricos.',
+        ],
+        'roles' => ['Administrador', 'Funcionario AC', 'Directivo de Establecimiento', 'Dirección Ejecutiva', 'Comunicaciones'],
+    ],
     '2026.8.10.369' => [
         'date' => '2026-08-10',
         'module' => 'Centro de Operaciones',

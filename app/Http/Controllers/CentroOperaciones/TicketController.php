@@ -5,14 +5,20 @@ namespace App\Http\Controllers\CentroOperaciones;
 use App\Http\Controllers\Controller;
 use App\Models\CentroOperacionesTicket;
 use App\Models\FuncionarioAcAutorizado;
+use App\Services\CentroOperaciones\TicketDocumentoService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class TicketController extends Controller
 {
     private const ROLES_TODOS = ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones'];
+
+    public function __construct(private readonly TicketDocumentoService $documentos)
+    {
+    }
 
     public function index(Request $request): View
     {
@@ -26,9 +32,7 @@ class TicketController extends Controller
 
     public function show(Request $request, CentroOperacionesTicket $ticket): View
     {
-        $query = CentroOperacionesTicket::query()->whereKey($ticket->id);
-        $this->aplicarAlcance($query, $request);
-        abort_unless($query->exists(), 403);
+        $this->autorizarTicket($request, $ticket);
 
         $ticket->loadMissing([
             'incidencia.establecimiento',
@@ -36,6 +40,8 @@ class TicketController extends Controller
             'responsable',
             'segundoResponsable',
             'configuracion',
+            'resueltoPor',
+            'firmaResolucion',
         ]);
 
         return view('centro-operaciones.tickets.show', [
@@ -53,9 +59,48 @@ class TicketController extends Controller
         DB::transaction(function () use ($ticket, $request) {
             $ticket->update(['estado' => 'resuelto', 'resuelto_en' => now(), 'resuelto_por_id' => $request->user()->id, 'resolucion' => $request->string('resolucion')->trim()]);
             $ticket->incidencia()->update(['estado' => 'resuelta', 'resuelta_en' => now(), 'resuelta_por_id' => $request->user()->id]);
+            $this->documentos->registrarFirmaResolucion($ticket->fresh(), $request->user(), $request);
         });
 
         return back()->with('success', 'Ticket resuelto correctamente.');
+    }
+
+    public function pdf(Request $request, CentroOperacionesTicket $ticket): Response
+    {
+        $this->autorizarTicket($request, $ticket);
+        $contenido = $this->documentos->generarPdf($ticket);
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$ticket->numero.'.pdf"',
+            'Cache-Control' => 'private, no-store, max-age=0',
+        ]);
+    }
+
+    public function verificar(string $codigo): View
+    {
+        $ticket = CentroOperacionesTicket::query()
+            ->with([
+                'incidencia.establecimiento',
+                'incidencia.reporte.reportadoPor',
+                'firmaResolucion',
+                'responsable',
+                'segundoResponsable',
+            ])
+            ->where('codigo_validacion', strtoupper($codigo))
+            ->first();
+        $integridad = $ticket
+            ? $this->documentos->verificarIntegridad($ticket)
+            : ['hash_actual' => '', 'integro' => false];
+
+        return view('centro-operaciones.tickets.verificar', compact('ticket', 'integridad'));
+    }
+
+    private function autorizarTicket(Request $request, CentroOperacionesTicket $ticket): void
+    {
+        $query = CentroOperacionesTicket::query()->whereKey($ticket->id);
+        $this->aplicarAlcance($query, $request);
+        abort_unless($query->exists(), 403);
     }
 
     private function aplicarAlcance($query, Request $request): void
@@ -103,7 +148,15 @@ class TicketController extends Controller
 
     private function funcionario($usuario): ?FuncionarioAcAutorizado
     {
-        return FuncionarioAcAutorizado::query()->where('registered_user_id', $usuario->id)
-            ->orWhere('rut_normalizado', $usuario->rut_normalized)->first();
+        $rutNormalizado = $usuario->rut_normalized;
+
+        return FuncionarioAcAutorizado::query()
+            ->where(function ($query) use ($usuario, $rutNormalizado) {
+                $query->where('registered_user_id', $usuario->id);
+                if ($rutNormalizado !== '') {
+                    $query->orWhere('rut_normalizado', $rutNormalizado);
+                }
+            })
+            ->first();
     }
 }
