@@ -7,6 +7,7 @@ use App\Models\CentroOperacionesIncidencia;
 use App\Models\CentroOperacionesIncidenteConfiguracion;
 use App\Models\FuncionarioAcAutorizado;
 use App\Models\User;
+use App\Services\CentroOperaciones\TicketDocumentoService;
 use App\Services\CentroOperaciones\TicketService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class CentroOperacionesTicketServiceTest extends TestCase
     protected function tearDown(): void
     {
         foreach ([
+            'centro_operaciones_ticket_firmas',
             'centro_operaciones_tickets',
             'centro_operaciones_incidente_configuraciones',
             'centro_operaciones_incidencias',
@@ -113,15 +115,47 @@ class CentroOperacionesTicketServiceTest extends TestCase
         Mail::assertQueued(CentroOperacionesTicketMail::class, 1);
     }
 
+    public function test_resolucion_registra_firma_electronica_y_huella_documental(): void
+    {
+        Mail::fake();
+        [$usuario, $incidencia] = $this->crearContexto('sismo');
+        $ticket = app(TicketService::class)->crearParaIncidencia($incidencia, $usuario);
+        $ticket->update([
+            'estado' => 'resuelto',
+            'resuelto_en' => now(),
+            'resuelto_por_id' => $usuario->id,
+            'resolucion' => 'Se aplicó el protocolo institucional y se normalizó la operación.',
+        ]);
+
+        $documentos = app(TicketDocumentoService::class);
+        $firma = $documentos->registrarFirmaResolucion($ticket->fresh(), $usuario);
+        $ticket = $ticket->fresh(['firmaResolucion']);
+        $integridad = $documentos->verificarIntegridad($ticket);
+
+        $this->assertSame($usuario->id, $firma->user_id);
+        $this->assertSame('resolucion', $firma->tipo_firma);
+        $this->assertNotNull($ticket->codigo_validacion);
+        $this->assertNotNull($ticket->documento_hash);
+        $this->assertTrue($integridad['integro']);
+        $this->assertDatabaseCount('centro_operaciones_ticket_firmas', 1);
+    }
+
     /** @return array{User, CentroOperacionesIncidencia} */
     private function crearContexto(string $tipo): array
     {
-        DB::table('users')->insert(['id' => 1]);
+        DB::table('users')->insert([
+            'id' => 1,
+            'rut' => '12345678K',
+            'nombres' => 'Directora',
+            'apellido_paterno' => 'Prueba',
+            'email' => 'directora@slep.test',
+        ]);
         DB::table('establecimientos')->insert(['id' => 1, 'nombre_establecimiento' => 'Escuela de prueba']);
         DB::table('centro_operaciones_reportes')->insert([
             'id' => 1,
             'establecimiento_id' => 1,
             'reportado_por_id' => 1,
+            'reportado_por_nombre' => 'Directora Prueba',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -154,7 +188,15 @@ class CentroOperacionesTicketServiceTest extends TestCase
 
     private function crearEsquema(): void
     {
-        Schema::create('users', fn (Blueprint $table) => $table->id());
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('rut')->nullable();
+            $table->string('nombres')->nullable();
+            $table->string('apellido_paterno')->nullable();
+            $table->string('apellido_materno')->nullable();
+            $table->string('email')->nullable();
+            $table->softDeletes();
+        });
         Schema::create('establecimientos', function (Blueprint $table) {
             $table->id();
             $table->string('nombre_establecimiento');
@@ -165,7 +207,11 @@ class CentroOperacionesTicketServiceTest extends TestCase
             $table->string('apellido_paterno')->nullable();
             $table->string('apellido_materno')->nullable();
             $table->string('email')->nullable();
+            $table->string('run')->nullable();
+            $table->string('dv', 1)->nullable();
+            $table->string('rut_normalizado')->nullable();
             $table->string('unidad_departamento')->nullable();
+            $table->string('cargo_funcion')->nullable();
             $table->string('subdireccion_dependencia')->nullable();
             $table->string('estado_autorizacion')->nullable();
             $table->date('fecha_inicio_autorizacion')->nullable();
@@ -177,6 +223,7 @@ class CentroOperacionesTicketServiceTest extends TestCase
             $table->id();
             $table->foreignId('establecimiento_id');
             $table->foreignId('reportado_por_id')->nullable();
+            $table->string('reportado_por_nombre')->nullable();
             $table->timestamps();
         });
         Schema::create('centro_operaciones_incidencias', function (Blueprint $table) {
@@ -207,6 +254,9 @@ class CentroOperacionesTicketServiceTest extends TestCase
         Schema::create('centro_operaciones_tickets', function (Blueprint $table) {
             $table->id();
             $table->string('numero')->nullable()->unique();
+            $table->string('codigo_validacion')->nullable()->unique();
+            $table->char('documento_hash', 64)->nullable();
+            $table->timestamp('documento_emitido_en')->nullable();
             $table->foreignId('incidencia_id')->unique();
             $table->foreignId('configuracion_id')->nullable();
             $table->string('unidad_departamento')->nullable();
@@ -222,6 +272,24 @@ class CentroOperacionesTicketServiceTest extends TestCase
             $table->timestamp('resuelto_en')->nullable();
             $table->foreignId('resuelto_por_id')->nullable();
             $table->text('resolucion')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('centro_operaciones_ticket_firmas', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('ticket_id')->unique();
+            $table->foreignId('user_id')->nullable();
+            $table->foreignId('funcionario_ac_autorizado_id')->nullable();
+            $table->string('tipo_firma');
+            $table->string('rol_firmante')->nullable();
+            $table->string('nombre_firmante');
+            $table->string('rut_firmante')->nullable();
+            $table->string('cargo_firmante')->nullable();
+            $table->string('dependencia_firmante')->nullable();
+            $table->string('ip_firma')->nullable();
+            $table->text('user_agent')->nullable();
+            $table->timestamp('fecha_firma');
+            $table->string('token_firma')->unique();
+            $table->char('hash_firma', 64);
             $table->timestamps();
         });
     }

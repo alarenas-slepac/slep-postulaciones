@@ -75,8 +75,8 @@ class TicketService
             ->whereNull('escalado_en')->where('vence_en', '<=', now())->get();
 
         foreach ($tickets as $ticket) {
-            $this->notificar($ticket, 'escalamiento');
             $ticket->update(['estado' => 'vencido', 'escalado_en' => now()]);
+            $this->notificar($ticket->fresh(), 'escalamiento');
         }
 
         return $tickets->count();

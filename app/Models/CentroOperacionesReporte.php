@@ -14,6 +14,7 @@ class CentroOperacionesReporte extends Model
         'establecimiento_id',
         'unidad_codigo',
         'reportado_por_id',
+        'reportado_por_nombre',
         'fecha_reporte',
         'reportado_en',
         'establecimiento_nombre',
@@ -59,7 +60,13 @@ class CentroOperacionesReporte extends Model
 
     public function reportadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'reportado_por_id');
+        return $this->belongsTo(User::class, 'reportado_por_id')->withTrashed();
+    }
+
+    public function getReportadoPorNombreVisibleAttribute(): string
+    {
+        return $this->reportado_por_nombre
+            ?: ($this->reportadoPor?->display_name ?: 'Usuario registrado sin nombre disponible');
     }
 
     public function servicios(): HasMany

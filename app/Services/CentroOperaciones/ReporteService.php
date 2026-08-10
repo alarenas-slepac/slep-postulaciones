@@ -53,6 +53,9 @@ class ReporteService
                 'regla_version' => '1.1',
                 'version' => 1,
             ]);
+            if (Schema::hasColumn($reporte->getTable(), 'reportado_por_nombre')) {
+                $reporte->reportado_por_nombre = $usuario->display_name;
+            }
 
             $this->aplicarDatos($reporte, $datos);
             $reporte->save();
@@ -76,6 +79,9 @@ class ReporteService
             $reporte = CentroOperacionesReporte::query()->lockForUpdate()->findOrFail($reporte->id);
             $reporte->version++;
             $reporte->reportado_por_id = $usuario->id;
+            if (Schema::hasColumn($reporte->getTable(), 'reportado_por_nombre')) {
+                $reporte->reportado_por_nombre = $usuario->display_name;
+            }
             $reporte->reportado_en = $ahora;
             $this->aplicarDatos($reporte, $datos);
             $reporte->save();
@@ -377,16 +383,23 @@ class ReporteService
             ]);
 
         if (Schema::hasTable('centro_operaciones_tickets')) {
-            CentroOperacionesTicket::query()
+            $tickets = CentroOperacionesTicket::query()
                 ->whereIn('incidencia_id', $ids)
                 ->where('estado', '!=', 'resuelto')
-                ->update([
+                ->get();
+
+            foreach ($tickets as $ticket) {
+                $ticket->update([
                     'estado' => 'resuelto',
                     'resuelto_en' => $ahora,
                     'resuelto_por_id' => $usuario->id,
                     'resolucion' => $resolucion,
                     'updated_at' => $ahora,
                 ]);
+                if (Schema::hasTable('centro_operaciones_ticket_firmas')) {
+                    app(TicketDocumentoService::class)->registrarFirmaResolucion($ticket->fresh(), $usuario);
+                }
+            }
         }
     }
 

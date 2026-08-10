@@ -38,6 +38,8 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("name('configuraciones.index')", $routes);
         $this->assertStringContainsString("name('configuraciones.store')", $routes);
         $this->assertStringContainsString("name('tickets.resolver')", $routes);
+        $this->assertStringContainsString("name('tickets.pdf')", $routes);
+        $this->assertStringContainsString("name('centro-operaciones.tickets.verificar')", $routes);
     }
 
     public function test_mantenedor_permite_crear_y_asignar_por_subdireccion(): void
@@ -163,5 +165,22 @@ class CentroOperacionesTicketsModuleTest extends TestCase
     {
         $console = file_get_contents(base_path('routes/console.php'));
         $this->assertStringContainsString("Schedule::command('incidencias:escalar-tickets')->hourly()", $console);
+    }
+
+    public function test_informe_incluye_firma_y_verificacion_documental(): void
+    {
+        $migration = file_get_contents(database_path('migrations/2026_08_10_160000_add_verification_and_signatures_to_centro_operaciones_tickets.php'));
+        $servicio = file_get_contents(app_path('Services/CentroOperaciones/TicketDocumentoService.php'));
+        $pdf = file_get_contents(resource_path('views/centro-operaciones/tickets/pdf.blade.php'));
+        $detalleReporte = file_get_contents(resource_path('views/centro-operaciones/reportes/show.blade.php'));
+
+        $this->assertStringContainsString('centro_operaciones_ticket_firmas', $migration);
+        $this->assertStringContainsString('reportado_por_nombre', $migration);
+        $this->assertStringContainsString('registrarFirmaResolucion', $servicio);
+        $this->assertStringContainsString('verificarIntegridad', $servicio);
+        $this->assertStringContainsString('Firma electrónica y verificación documental', $pdf);
+        $this->assertStringContainsString('Huella de datos SHA-256', $pdf);
+        $this->assertStringContainsString('$reporte->reportado_por_nombre_visible', $detalleReporte);
+        $this->assertStringNotContainsString('Usuario no disponible', $detalleReporte);
     }
 }

@@ -23,6 +23,6 @@ class CentroOperacionesReporteRevision extends Model
 
     public function editadoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'editado_por_id');
+        return $this->belongsTo(User::class, 'editado_por_id')->withTrashed();
     }
 }

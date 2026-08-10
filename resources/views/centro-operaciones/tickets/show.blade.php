@@ -30,6 +30,9 @@
         </div>
         <div class="co-hero-actions">
             <span class="co-ticket-status co-ticket-status--{{ $estadoTicket }} co-ticket-status--large"><i></i>{{ $estadoLabel }}</span>
+            <a class="btn btn-primary" href="{{ route('centro-operaciones.tickets.pdf', $ticket) }}" target="_blank" rel="noopener">
+                <i class="bi bi-file-earmark-pdf"></i> Ver informe PDF
+            </a>
             <a class="btn btn-outline-secondary" href="{{ route('centro-operaciones.tickets.index') }}">
                 <i class="bi bi-arrow-left"></i> Volver a tickets
             </a>
@@ -67,7 +70,7 @@
                 <div><span><i class="bi bi-exclamation-triangle"></i> Incidencia</span><strong>{{ $ticket->incidencia->tipo_label }}</strong></div>
                 <div><span><i class="bi bi-card-text"></i> Detalle</span><p>{{ $ticket->incidencia->descripcion ?: 'Sin detalle informado.' }}</p></div>
                 <div><span><i class="bi bi-building"></i> Establecimiento</span><strong>{{ $ticket->incidencia->establecimiento?->nombre_establecimiento ?? 'Sin establecimiento' }}</strong></div>
-                <div><span><i class="bi bi-person-check"></i> Reportado por</span><strong>{{ $ticket->incidencia->reporte?->reportadoPor?->name ?? 'Usuario no disponible' }}</strong></div>
+                <div><span><i class="bi bi-person-check"></i> Reportado por</span><strong>{{ $ticket->incidencia->reporte?->reportado_por_nombre_visible ?? 'Usuario registrado sin nombre disponible' }}</strong></div>
             </div>
         </section>
 
@@ -109,7 +112,18 @@
         @elseif($estadoTicket === 'resuelto')
             <div class="co-resolution-result">
                 <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-                <div><strong>Ticket resuelto</strong><p>{{ $ticket->resolucion ?: 'Sin detalle de resolución.' }}</p>@if($ticket->resuelto_en)<small>Registrado el {{ $ticket->resuelto_en->format('d/m/Y H:i') }} hrs.</small>@endif</div>
+                <div>
+                    <strong>Ticket resuelto</strong>
+                    <p>{{ $ticket->resolucion ?: 'Sin detalle de resolución.' }}</p>
+                    @if($ticket->firmaResolucion)
+                        <small>
+                            Firmado electrónicamente por {{ $ticket->firmaResolucion->nombre_firmante }}
+                            el {{ $ticket->firmaResolucion->fecha_firma?->format('d/m/Y H:i') }} hrs.
+                        </small>
+                    @elseif($ticket->resuelto_en)
+                        <small>Registrado el {{ $ticket->resuelto_en->format('d/m/Y H:i') }} hrs.</small>
+                    @endif
+                </div>
             </div>
         @else
             <div class="alert alert-info mb-0">
