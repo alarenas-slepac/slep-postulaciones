@@ -13,39 +13,58 @@ use Illuminate\Support\Facades\Mail;
 
 class TicketService
 {
-    public function crearParaIncidencia(CentroOperacionesIncidencia $incidencia, User $creador): ?CentroOperacionesTicket
+    public function crearParaIncidencia(CentroOperacionesIncidencia $incidencia, User $creador): CentroOperacionesTicket
     {
-        if ($incidencia->tipo === 'otro' || $incidencia->ticket()->exists()) {
-            return null;
-        }
+        $creado = false;
+        $ticket = DB::transaction(function () use ($incidencia, $creador, &$creado) {
+            $incidenciaBloqueada = CentroOperacionesIncidencia::query()
+                ->lockForUpdate()
+                ->findOrFail($incidencia->id);
+            $existente = CentroOperacionesTicket::query()
+                ->where('incidencia_id', $incidenciaBloqueada->id)
+                ->first();
 
-        $configuracion = CentroOperacionesIncidenteConfiguracion::query()
-            ->where('tipo', $incidencia->tipo)->where('activo', true)
-            ->whereNotNull('responsable_funcionario_ac_id')->first();
+            if ($existente) {
+                return $existente;
+            }
 
-        if (! $configuracion || ! $configuracion->unidad_departamento || ! $configuracion->subdireccion_dependencia) {
-            return null;
-        }
+            $configuracion = CentroOperacionesIncidenteConfiguracion::query()
+                ->with(['responsable', 'segundoResponsable'])
+                ->where('tipo', $incidenciaBloqueada->tipo)
+                ->first();
+            $asignada = $this->configuracionAsignable($configuracion);
+            $segundoResponsable = $asignada
+                ? $this->segundoResponsableAsignable($configuracion)
+                : null;
 
-        $ticket = DB::transaction(function () use ($incidencia, $creador, $configuracion) {
             $ticket = CentroOperacionesTicket::query()->create([
-                'incidencia_id' => $incidencia->id,
-                'configuracion_id' => $configuracion->id,
-                'unidad_departamento' => $configuracion->unidad_departamento,
-                'subdireccion_dependencia' => $configuracion->subdireccion_dependencia,
-                'responsable_funcionario_ac_id' => $configuracion->responsable_funcionario_ac_id,
+                'incidencia_id' => $incidenciaBloqueada->id,
+                'configuracion_id' => $configuracion?->id,
+                'unidad_departamento' => $asignada ? $configuracion->unidad_departamento : null,
+                'subdireccion_dependencia' => $asignada ? $configuracion->subdireccion_dependencia : null,
+                'responsable_funcionario_ac_id' => $asignada ? $configuracion->responsable_funcionario_ac_id : null,
+                'segunda_subdireccion_responsable' => $segundoResponsable
+                    ? $configuracion->segunda_subdireccion_responsable
+                    : null,
+                'segundo_responsable_funcionario_ac_id' => $segundoResponsable?->id,
                 'creado_por_id' => $creador->id,
-                'vence_en' => now(config('centro_operaciones.timezone'))->addDays($configuracion->plazo_dias),
-                'segunda_subdireccion_responsable' => $configuracion->segunda_subdireccion_responsable ?? null,
-                'segunda_responsable_subdireccion' => $configuracion->segunda_responsable_subdireccion ?? null,
+                'vence_en' => $asignada
+                    ? now(config('centro_operaciones.timezone'))->addDays($configuracion->plazo_dias)
+                    : null,
+                'estado' => $asignada ? 'asignado' : 'pendiente_asignacion',
             ]);
-            $ticket->update(['numero' => 'INC-'.now()->format('Y').'-'.str_pad((string) $ticket->id, 6, '0', STR_PAD_LEFT)]);
+            $ticket->update([
+                'numero' => 'INC-'.now(config('centro_operaciones.timezone'))->format('Y').'-'
+                    .str_pad((string) $ticket->id, 6, '0', STR_PAD_LEFT),
+            ]);
+            $creado = true;
 
             return $ticket;
         });
 
-        $this->notificar($ticket, 'asignacion');
-        $ticket->update(['notificado_responsable_en' => now()]);
+        if ($creado && $ticket->estado === 'asignado' && $this->notificar($ticket, 'asignacion')) {
+            $ticket->update(['notificado_responsable_en' => now()]);
+        }
 
         return $ticket;
     }
@@ -63,16 +82,98 @@ class TicketService
         return $tickets->count();
     }
 
-    private function notificar(CentroOperacionesTicket $ticket, string $evento): void
-    {
-        $ticket->loadMissing(['incidencia.establecimiento', 'responsable']);
-        $destinatario = $evento === 'asignacion'
-            ? $ticket->responsable
-            : $this->jefaturaActiva($ticket->subdireccion_dependencia);
-
-        if ($destinatario?->email) {
-            Mail::to($destinatario->email)->queue(new CentroOperacionesTicketMail($ticket, $evento));
+    public function sincronizarAsignaciones(
+        CentroOperacionesIncidenteConfiguracion $configuracion
+    ): int {
+        $configuracion->loadMissing(['responsable', 'segundoResponsable']);
+        if (! $this->configuracionAsignable($configuracion)) {
+            return 0;
         }
+
+        $segundoResponsable = $this->segundoResponsableAsignable($configuracion);
+        $tickets = CentroOperacionesTicket::query()
+            ->whereHas('incidencia', fn ($query) => $query->where('tipo', $configuracion->tipo))
+            ->where('estado', '!=', 'resuelto')
+            ->get();
+
+        foreach ($tickets as $ticket) {
+            $estabaPendiente = $ticket->estado === 'pendiente_asignacion';
+            $asignacion = [
+                'configuracion_id' => $configuracion->id,
+                'unidad_departamento' => $configuracion->unidad_departamento,
+                'subdireccion_dependencia' => $configuracion->subdireccion_dependencia,
+                'responsable_funcionario_ac_id' => $configuracion->responsable_funcionario_ac_id,
+                'segunda_subdireccion_responsable' => $segundoResponsable
+                    ? $configuracion->segunda_subdireccion_responsable
+                    : null,
+                'segundo_responsable_funcionario_ac_id' => $segundoResponsable?->id,
+                'vence_en' => $ticket->vence_en
+                    ?: now(config('centro_operaciones.timezone'))->addDays($configuracion->plazo_dias),
+                'estado' => $estabaPendiente ? 'asignado' : $ticket->estado,
+            ];
+            $cambioAsignacion = $estabaPendiente
+                || collect($asignacion)
+                    ->except(['vence_en', 'estado'])
+                    ->contains(fn ($valor, $campo) => $ticket->getAttribute($campo) != $valor);
+            $ticket->update($asignacion);
+
+            if ($cambioAsignacion && $this->notificar($ticket->fresh(), 'asignacion')) {
+                $ticket->update(['notificado_responsable_en' => now()]);
+            }
+        }
+
+        return $tickets->count();
+    }
+
+    private function configuracionAsignable(?CentroOperacionesIncidenteConfiguracion $configuracion): bool
+    {
+        return $configuracion?->activo === true
+            && (bool) $configuracion->unidad_departamento
+            && (bool) $configuracion->subdireccion_dependencia
+            && $configuracion->responsable?->estaActivo() === true
+            && $configuracion->responsable->subdireccion_dependencia === $configuracion->subdireccion_dependencia;
+    }
+
+    private function segundoResponsableAsignable(
+        CentroOperacionesIncidenteConfiguracion $configuracion
+    ): ?FuncionarioAcAutorizado {
+        $responsable = $configuracion->segundoResponsable;
+
+        if (! $configuracion->segunda_subdireccion_responsable
+            || ! $responsable?->estaActivo()
+            || $responsable->subdireccion_dependencia !== $configuracion->segunda_subdireccion_responsable
+            || (int) $responsable->id === (int) $configuracion->responsable_funcionario_ac_id) {
+            return null;
+        }
+
+        return $responsable;
+    }
+
+    private function notificar(CentroOperacionesTicket $ticket, string $evento): bool
+    {
+        $ticket->loadMissing(['incidencia.establecimiento', 'responsable', 'segundoResponsable']);
+        $destinatarios = $evento === 'asignacion'
+            ? collect([$ticket->responsable, $ticket->segundoResponsable])
+            : collect([
+                $ticket->subdireccion_dependencia
+                    ? $this->jefaturaActiva($ticket->subdireccion_dependencia)
+                    : null,
+                $ticket->segunda_subdireccion_responsable
+                    ? $this->jefaturaActiva($ticket->segunda_subdireccion_responsable)
+                    : null,
+            ]);
+
+        $correos = $destinatarios
+            ->filter(fn (?FuncionarioAcAutorizado $destinatario) => (bool) $destinatario?->email)
+            ->pluck('email')
+            ->unique()
+            ->values();
+
+        foreach ($correos as $correo) {
+            Mail::to($correo)->queue(new CentroOperacionesTicketMail($ticket, $evento));
+        }
+
+        return $correos->isNotEmpty();
     }
 
     private function jefaturaActiva(string $subdireccion): ?FuncionarioAcAutorizado

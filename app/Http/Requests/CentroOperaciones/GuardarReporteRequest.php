@@ -26,6 +26,10 @@ class GuardarReporteRequest extends FormRequest
             ->keys()
             ->all();
         $modalidadesEvacuacion = array_keys(config('centro_operaciones.modalidades_incidencia.evacuacion', []));
+        $incidenciasAutomaticas = collect(config('centro_operaciones.incidencias', []))
+            ->filter(fn (array $incidencia) => (bool) ($incidencia['automatic'] ?? false))
+            ->keys()
+            ->all();
         $establecimiento = $this->user()?->establecimiento_id
             ? Establecimiento::query()->find($this->user()->establecimiento_id)
             : null;
@@ -58,7 +62,7 @@ class GuardarReporteRequest extends FormRequest
                 Rule::exists('centro_operaciones_incidencias', 'id')->where(fn ($query) => $query
                     ->where('establecimiento_id', $this->user()?->establecimiento_id)
                     ->where('unidad_codigo', $this->input('unidad_codigo') ?: null)
-                    ->where('tipo', '!=', 'control_plagas_vencido')
+                    ->whereNotIn('tipo', $incidenciasAutomaticas)
                     ->where('estado', 'activa')),
             ],
             'observaciones' => ['nullable', 'string', 'max:5000'],

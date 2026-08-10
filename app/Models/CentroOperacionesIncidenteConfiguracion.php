@@ -9,15 +9,31 @@ class CentroOperacionesIncidenteConfiguracion extends Model
 {
     protected $table = 'centro_operaciones_incidente_configuraciones';
 
-    protected $fillable = ['tipo', 'nombre', 'severidad', 'unidad_departamento', 'subdireccion_dependencia', 'responsable_funcionario_ac_id', 'plazo_dias', 'activo', 'segunda_subdireccion_responsable', 'segunda_responsable_subdireccion'];
+    protected $fillable = [
+        'tipo',
+        'nombre',
+        'severidad',
+        'unidad_departamento',
+        'subdireccion_dependencia',
+        'responsable_funcionario_ac_id',
+        'segunda_subdireccion_responsable',
+        'segundo_responsable_funcionario_ac_id',
+        'plazo_dias',
+        'activo',
+    ];
 
     protected function casts(): array
     {
-        return ['activo' => 'boolean', 'plazo_dias' => 'integer', 'segunda_subdireccion_responsable' => 'string', 'segunda_responsable_subdireccion' => 'string'];
+        return ['activo' => 'boolean', 'plazo_dias' => 'integer'];
     }
 
     public function responsable(): BelongsTo
     {
         return $this->belongsTo(FuncionarioAcAutorizado::class, 'responsable_funcionario_ac_id');
+    }
+
+    public function segundoResponsable(): BelongsTo
+    {
+        return $this->belongsTo(FuncionarioAcAutorizado::class, 'segundo_responsable_funcionario_ac_id');
     }
 }

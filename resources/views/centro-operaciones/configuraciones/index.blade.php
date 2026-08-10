@@ -134,6 +134,34 @@
                         </button>
                     </div>
                 </div>
+                <div class="border rounded-4 bg-light p-3 mt-3" data-segunda-asignacion>
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-person-plus text-primary" aria-hidden="true"></i>
+                        <div><strong>Segundo responsable (opcional)</strong><div class="small text-muted">Si selecciona una segunda subdirección, debe indicar también la persona responsable.</div></div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-lg-5">
+                            <label class="form-label fw-semibold" for="nueva-incidencia-segunda-subdireccion">Segunda subdirección</label>
+                            <select id="nueva-incidencia-segunda-subdireccion" name="segunda_subdireccion_responsable" class="form-select" data-segunda-subdireccion>
+                                <option value="">Sin segunda subdirección</option>
+                                @foreach($subdirecciones as $subdireccion)
+                                    <option value="{{ $subdireccion }}" @selected(old('form_context') === 'create' && old('segunda_subdireccion_responsable') === $subdireccion)>{{ $subdireccion }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-lg-7">
+                            <label class="form-label fw-semibold" for="nueva-incidencia-segundo-responsable">Segundo responsable</label>
+                            <select id="nueva-incidencia-segundo-responsable" name="segundo_responsable_funcionario_ac_id" class="form-select" data-segundo-responsable>
+                                <option value="">Seleccione primero una subdirección…</option>
+                                @foreach($funcionarios as $persona)
+                                    <option value="{{ $persona->id }}" data-subdireccion="{{ $persona->subdireccion_dependencia }}" @selected(old('form_context') === 'create' && (int) old('segundo_responsable_funcionario_ac_id') === $persona->id)>
+                                        {{ $persona->nombre_completo }} — {{ $persona->jefatura ? 'Subdirector(a) (Jefatura)' : ($persona->cargo_funcion ?: $persona->unidad_departamento) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
         </form>
     </div>
@@ -158,6 +186,12 @@
                 $responsableSeleccionado = $reintentando
                     ? (int) old('responsable_funcionario_ac_id')
                     : $configuracion->responsable_funcionario_ac_id;
+                $segundaSubdireccionSeleccionada = $reintentando
+                    ? old('segunda_subdireccion_responsable')
+                    : $configuracion->segunda_subdireccion_responsable;
+                $segundoResponsableSeleccionado = $reintentando
+                    ? (int) old('segundo_responsable_funcionario_ac_id')
+                    : $configuracion->segundo_responsable_funcionario_ac_id;
                 $nombreIncidencia = $configuracion->nombre
                     ?: config("centro_operaciones.incidencias.{$configuracion->tipo}.label", $configuracion->tipo);
                 $severidad = $configuracion->severidad
@@ -230,6 +264,34 @@
                                 </button>
                             </div>
                         </div>
+                        <div class="border rounded-4 bg-light p-3 mt-3" data-segunda-asignacion>
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <i class="bi bi-person-plus text-primary" aria-hidden="true"></i>
+                                <div><strong>Segundo responsable (opcional)</strong><div class="small text-muted">Se notificará y tendrá acceso para gestionar el mismo ticket.</div></div>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-lg-5">
+                                    <label class="form-label fw-semibold" for="segunda-subdireccion-{{ $configuracion->id }}">Segunda subdirección</label>
+                                    <select id="segunda-subdireccion-{{ $configuracion->id }}" name="segunda_subdireccion_responsable" class="form-select" data-segunda-subdireccion>
+                                        <option value="">Sin segunda subdirección</option>
+                                        @foreach($subdirecciones as $subdireccion)
+                                            <option value="{{ $subdireccion }}" @selected($segundaSubdireccionSeleccionada === $subdireccion)>{{ $subdireccion }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-lg-7">
+                                    <label class="form-label fw-semibold" for="segundo-responsable-{{ $configuracion->id }}">Segundo responsable</label>
+                                    <select id="segundo-responsable-{{ $configuracion->id }}" name="segundo_responsable_funcionario_ac_id" class="form-select" data-segundo-responsable>
+                                        <option value="">Seleccione primero una subdirección…</option>
+                                        @foreach($funcionarios as $persona)
+                                            <option value="{{ $persona->id }}" data-subdireccion="{{ $persona->subdireccion_dependencia }}" @selected((int) $segundoResponsableSeleccionado === $persona->id)>
+                                                {{ $persona->nombre_completo }} — {{ $persona->jefatura ? 'Subdirector(a) (Jefatura)' : ($persona->cargo_funcion ?: $persona->unidad_departamento) }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
             </form>
         @empty
@@ -283,6 +345,31 @@ document.addEventListener('DOMContentLoaded', () => {
         subdireccion.addEventListener('change', () => filtrarResponsables(false));
         responsable.addEventListener('change', sincronizarUnidad);
         filtrarResponsables(true);
+
+        const segundaSubdireccion = formulario.querySelector('[data-segunda-subdireccion]');
+        const segundoResponsable = formulario.querySelector('[data-segundo-responsable]');
+        if (!segundaSubdireccion || !segundoResponsable) {
+            return;
+        }
+
+        const filtrarSegundosResponsables = (mantenerSeleccion = false) => {
+            const seleccionada = segundaSubdireccion.value;
+
+            segundoResponsable.querySelectorAll('option[data-subdireccion]').forEach((opcion) => {
+                const coincide = seleccionada !== '' && opcion.dataset.subdireccion === seleccionada;
+                opcion.hidden = !coincide;
+                opcion.disabled = !coincide;
+
+                if (!coincide && opcion.selected && !mantenerSeleccion) {
+                    segundoResponsable.value = '';
+                }
+            });
+
+            segundoResponsable.disabled = seleccionada === '';
+        };
+
+        segundaSubdireccion.addEventListener('change', () => filtrarSegundosResponsables(false));
+        filtrarSegundosResponsables(true);
     });
 });
 </script>

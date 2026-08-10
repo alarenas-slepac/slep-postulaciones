@@ -16,7 +16,9 @@ class TicketController extends Controller
 
     public function index(Request $request): View
     {
-        $query = CentroOperacionesTicket::query()->with(['incidencia.establecimiento', 'responsable'])->latest();
+        $query = CentroOperacionesTicket::query()
+            ->with(['incidencia.establecimiento', 'responsable', 'segundoResponsable'])
+            ->latest();
         $this->aplicarAlcance($query, $request);
 
         return view('centro-operaciones.tickets.index', ['tickets' => $query->paginate(25)]);
@@ -28,26 +30,18 @@ class TicketController extends Controller
         $this->aplicarAlcance($query, $request);
         abort_unless($query->exists(), 403);
 
-        // Cargar segunda subdirección y responsable de la configuración del ticket
-        $ticket->loadMissing(['configuracion', 'configuracion.segundaSubdireccionResponsable', 'configuracion.segundaResponsableSubdireccion']);
+        $ticket->loadMissing([
+            'incidencia.establecimiento',
+            'incidencia.reporte.reportadoPor',
+            'responsable',
+            'segundoResponsable',
+            'configuracion',
+        ]);
 
         return view('centro-operaciones.tickets.show', [
             'ticket' => $ticket,
-            'subdirecciones' => $this->getSubdirecciones(),
-            'responsables' => $this->getResponsables(),
+            'puedeResolver' => $this->puedeResolver($request, $ticket),
         ]);
-    }
-
-    private function getSubdirecciones()
-    {
-        // Método para cargar subdirecciones dinámicas para el formulario (opcional)
-        return []; // Esto podría ser dinámico, como una lista de subdirecciones desde la base de datos
-    }
-
-    private function getResponsables()
-    {
-        // Método para cargar responsables dinámicos para el formulario
-        return FuncionarioAcAutorizado::all();
     }
 
     public function resolver(Request $request, CentroOperacionesTicket $ticket): RedirectResponse
@@ -84,7 +78,11 @@ class TicketController extends Controller
             })->pluck('subdireccion_dependencia');
         $query->where(function ($q) use ($funcionario, $subdirecciones) {
             $q->where('responsable_funcionario_ac_id', $funcionario->id)
-                ->when($subdirecciones->isNotEmpty(), fn ($sq) => $sq->orWhereIn('subdireccion_dependencia', $subdirecciones));
+                ->orWhere('segundo_responsable_funcionario_ac_id', $funcionario->id)
+                ->when($subdirecciones->isNotEmpty(), function ($sq) use ($subdirecciones) {
+                    $sq->orWhereIn('subdireccion_dependencia', $subdirecciones)
+                        ->orWhereIn('segunda_subdireccion_responsable', $subdirecciones);
+                });
         });
     }
 
@@ -94,7 +92,13 @@ class TicketController extends Controller
         if ($request->user()->hasRole('funcionario_directivo_estab')) {
             return (int) $request->user()->establecimiento_id === (int) $ticket->incidencia->establecimiento_id;
         }
-        return (int) $this->funcionario($request->user())?->id === (int) $ticket->responsable_funcionario_ac_id;
+        $funcionarioId = $this->funcionario($request->user())?->id;
+
+        return $funcionarioId !== null
+            && in_array((int) $funcionarioId, [
+                (int) $ticket->responsable_funcionario_ac_id,
+                (int) $ticket->segundo_responsable_funcionario_ac_id,
+            ], true);
     }
 
     private function funcionario($usuario): ?FuncionarioAcAutorizado
