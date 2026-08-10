@@ -5,6 +5,7 @@ namespace App\Http\Controllers\CentroOperaciones;
 use App\Http\Controllers\Controller;
 use App\Models\CentroOperacionesIncidenteConfiguracion;
 use App\Models\FuncionarioAcAutorizado;
+use App\Services\CentroOperaciones\TicketService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -14,9 +15,15 @@ use Illuminate\View\View;
 
 class IncidenteConfiguracionController extends Controller
 {
+    public function __construct(private readonly TicketService $tickets)
+    {
+    }
+
     public function index(): View
     {
-        $configuraciones = CentroOperacionesIncidenteConfiguracion::with('responsable')->orderBy('tipo')->get();
+        $configuraciones = CentroOperacionesIncidenteConfiguracion::with(['responsable', 'segundoResponsable'])
+            ->orderBy('tipo')
+            ->get();
         $funcionarios = FuncionarioAcAutorizado::query()->where('estado_autorizacion', 'activo')
             ->whereNotNull('unidad_departamento')->whereNotNull('subdireccion_dependencia')
             ->orderBy('subdireccion_dependencia')->orderByDesc('jefatura')
@@ -26,20 +33,19 @@ class IncidenteConfiguracionController extends Controller
             ->values();
 
         $subdirecciones = $funcionarios->pluck('subdireccion_dependencia')->unique()->sort()->values();
-        $responsables = $funcionarios->pluck('nombre')->unique()->sort()->values();
-
         return view('centro-operaciones.configuraciones.index', compact(
             'configuraciones',
             'funcionarios',
-            'subdirecciones',
-            'responsables'
+            'subdirecciones'
         ));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $datos = $this->validar($request, true);
+        $datos = $this->normalizarSegundaAsignacion($datos);
         $responsable = $this->responsableSeleccionado($datos);
+        $this->validarSegundoResponsable($datos);
         $nombreNormalizado = Str::lower(Str::ascii(trim($datos['nombre'])));
         $nombreReservado = collect(config('centro_operaciones.incidencias', []))
             ->contains(fn (array $incidencia) =>
@@ -71,11 +77,12 @@ class IncidenteConfiguracionController extends Controller
             $sufijo++;
         }
 
-        CentroOperacionesIncidenteConfiguracion::query()->create($datos + [
+        $configuracion = CentroOperacionesIncidenteConfiguracion::query()->create($datos + [
             'tipo' => $tipo,
             'unidad_departamento' => $responsable->unidad_departamento,
             'activo' => $request->boolean('activo'),
         ]);
+        $this->tickets->sincronizarAsignaciones($configuracion);
 
         return back()->with('success', 'La incidencia fue creada y ya está disponible en el reporte diario.');
     }
@@ -83,18 +90,15 @@ class IncidenteConfiguracionController extends Controller
     public function update(Request $request, CentroOperacionesIncidenteConfiguracion $configuracion): RedirectResponse
     {
         $datos = $this->validar($request);
+        $datos = $this->normalizarSegundaAsignacion($datos);
         $responsable = $this->responsableSeleccionado($datos);
+        $this->validarSegundoResponsable($datos);
         $configuracion->update($datos + [
             'unidad_departamento' => $responsable->unidad_departamento,
             'activo' => $request->boolean('activo'),
-            // Incluir los nuevos campos de segundo responsable
-            'segunda_subdireccion_responsable' => $request->filled('segunda_subdireccion_responsable')
-                ? $request->input('segunda_subdireccion_responsable')
-                : null,
-            'segunda_responsable_subdireccion' => $request->filled('segunda_responsable_subdireccion')
-                ? $request->input('segunda_responsable_subdireccion')
-                : null,
         ]);
+        $configuracion->refresh();
+        $this->tickets->sincronizarAsignaciones($configuracion);
 
         return back()->with('success', 'Configuración actualizada.');
     }
@@ -117,13 +121,16 @@ class IncidenteConfiguracionController extends Controller
             ],
             'segunda_subdireccion_responsable' => [
                 'nullable',
+                'required_with:segundo_responsable_funcionario_ac_id',
                 'string',
                 'max:255',
                 Rule::exists('funcionarios_ac_autorizados', 'subdireccion_dependencia')
                     ->where('estado_autorizacion', 'activo'),
             ],
-            'segunda_responsable_subdireccion' => [
+            'segundo_responsable_funcionario_ac_id' => [
                 'nullable',
+                'required_with:segunda_subdireccion_responsable',
+                'different:responsable_funcionario_ac_id',
                 Rule::exists('funcionarios_ac_autorizados', 'id')
                     ->where('estado_autorizacion', 'activo'),
             ],
@@ -147,7 +154,7 @@ class IncidenteConfiguracionController extends Controller
             'subdireccion_dependencia' => 'subdirección',
             'responsable_funcionario_ac_id' => 'responsable de subdirección',
             'segunda_subdireccion_responsable' => 'segunda subdirección responsable',
-            'segunda_responsable_subdireccion' => 'segundo responsable de subdirección',
+            'segundo_responsable_funcionario_ac_id' => 'segundo responsable de subdirección',
             'plazo_dias' => 'plazo',
         ]);
     }
@@ -168,5 +175,39 @@ class IncidenteConfiguracionController extends Controller
         }
 
         return $responsable;
+    }
+
+    /** @param array<string, mixed> $datos */
+    private function validarSegundoResponsable(array $datos): void
+    {
+        $segundoResponsableId = $datos['segundo_responsable_funcionario_ac_id'] ?? null;
+        $segundaSubdireccion = $datos['segunda_subdireccion_responsable'] ?? null;
+
+        if (! $segundoResponsableId && ! $segundaSubdireccion) {
+            return;
+        }
+
+        $segundoResponsable = FuncionarioAcAutorizado::query()
+            ->whereKey($segundoResponsableId)
+            ->where('estado_autorizacion', 'activo')
+            ->where('subdireccion_dependencia', $segundaSubdireccion)
+            ->first();
+
+        if (! $segundoResponsable || ! $segundoResponsable->estaActivo()) {
+            throw ValidationException::withMessages([
+                'segundo_responsable_funcionario_ac_id' => 'Selecciona un segundo responsable activo que pertenezca a la segunda subdirección indicada.',
+            ]);
+        }
+    }
+
+    /** @param array<string, mixed> $datos
+     *  @return array<string, mixed>
+     */
+    private function normalizarSegundaAsignacion(array $datos): array
+    {
+        $datos['segunda_subdireccion_responsable'] = $datos['segunda_subdireccion_responsable'] ?? null;
+        $datos['segundo_responsable_funcionario_ac_id'] = $datos['segundo_responsable_funcionario_ac_id'] ?? null;
+
+        return $datos;
     }
 }

@@ -26,6 +26,7 @@ class CentroOperacionesReporteServiceTest extends TestCase
         try {
             $operaciones->up();
             $extension->up();
+            $this->createTicketTables();
 
             DB::table('establecimientos')->insert([
                 'id' => 1,
@@ -61,7 +62,10 @@ class CentroOperacionesReporteServiceTest extends TestCase
                     'estudiantes_presentes' => 80,
                     'docentes_presentes' => 8,
                     'asistentes_presentes' => 4,
-                    'servicios' => ['agua_potable' => 'operativo'],
+                    'servicios' => [
+                        'agua_potable' => 'operativo',
+                        'extintores' => 'critico',
+                    ],
                     'afectaciones' => [],
                     'incidencias' => ['corte_agua'],
                     'incidencia_detalles' => ['corte_agua' => 'Corte informado en el sector.'],
@@ -70,8 +74,7 @@ class CentroOperacionesReporteServiceTest extends TestCase
                 ]
             );
 
-            $this->assertCount(1, $reporte->incidencias);
-            $this->assertSame('corte_agua', $reporte->incidencias->first()->tipo);
+            $this->assertCount(2, $reporte->incidencias);
             $this->assertDatabaseHas('centro_operaciones_incidencias', [
                 'reporte_id' => $reporte->id,
                 'establecimiento_id' => 1,
@@ -79,7 +82,27 @@ class CentroOperacionesReporteServiceTest extends TestCase
                 'severidad' => 'critico',
                 'estado' => 'activa',
             ]);
+            $this->assertDatabaseHas('centro_operaciones_incidencias', [
+                'reporte_id' => $reporte->id,
+                'establecimiento_id' => 1,
+                'tipo' => 'extintor_no_operativo',
+                'severidad' => 'critico',
+                'estado' => 'activa',
+            ]);
+            $this->assertDatabaseCount('centro_operaciones_tickets', 2);
+            $this->assertSame(
+                2,
+                DB::table('centro_operaciones_tickets')->distinct()->count('incidencia_id')
+            );
+            $this->assertSame(
+                2,
+                DB::table('centro_operaciones_tickets')
+                    ->where('estado', 'pendiente_asignacion')
+                    ->count()
+            );
         } finally {
+            Schema::dropIfExists('centro_operaciones_tickets');
+            Schema::dropIfExists('centro_operaciones_incidente_configuraciones');
             $extension->down();
             $operaciones->down();
             Schema::dropIfExists('users');
@@ -230,6 +253,44 @@ class CentroOperacionesReporteServiceTest extends TestCase
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->softDeletes();
+        });
+    }
+
+    private function createTicketTables(): void
+    {
+        Schema::create('centro_operaciones_incidente_configuraciones', function (Blueprint $table) {
+            $table->id();
+            $table->string('tipo')->unique();
+            $table->string('nombre')->nullable();
+            $table->string('severidad')->nullable();
+            $table->string('unidad_departamento')->nullable();
+            $table->string('subdireccion_dependencia')->nullable();
+            $table->foreignId('responsable_funcionario_ac_id')->nullable();
+            $table->string('segunda_subdireccion_responsable')->nullable();
+            $table->foreignId('segundo_responsable_funcionario_ac_id')->nullable();
+            $table->unsignedSmallInteger('plazo_dias')->default(4);
+            $table->boolean('activo')->default(true);
+            $table->timestamps();
+        });
+        Schema::create('centro_operaciones_tickets', function (Blueprint $table) {
+            $table->id();
+            $table->string('numero')->nullable()->unique();
+            $table->foreignId('incidencia_id')->unique();
+            $table->foreignId('configuracion_id')->nullable();
+            $table->string('unidad_departamento')->nullable();
+            $table->string('subdireccion_dependencia')->nullable();
+            $table->foreignId('responsable_funcionario_ac_id')->nullable();
+            $table->string('segunda_subdireccion_responsable')->nullable();
+            $table->foreignId('segundo_responsable_funcionario_ac_id')->nullable();
+            $table->foreignId('creado_por_id')->nullable();
+            $table->timestamp('vence_en')->nullable();
+            $table->string('estado')->default('asignado');
+            $table->timestamp('notificado_responsable_en')->nullable();
+            $table->timestamp('escalado_en')->nullable();
+            $table->timestamp('resuelto_en')->nullable();
+            $table->foreignId('resuelto_por_id')->nullable();
+            $table->text('resolucion')->nullable();
+            $table->timestamps();
         });
     }
 }

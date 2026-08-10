@@ -1,6 +1,41 @@
 <?php
 
 return [
+    '2026.8.10.369' => [
+        'date' => '2026-08-10',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Corrección integral de tickets y segundo responsable',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/IncidenteConfiguracionController.php',
+            'app/Http/Controllers/CentroOperaciones/ReporteController.php',
+            'app/Http/Controllers/CentroOperaciones/TicketController.php',
+            'app/Http/Requests/CentroOperaciones/GuardarReporteRequest.php',
+            'app/Mail/CentroOperacionesTicketMail.php',
+            'app/Models/CentroOperacionesIncidenteConfiguracion.php',
+            'app/Models/CentroOperacionesTicket.php',
+            'app/Services/CentroOperaciones/ReporteService.php',
+            'app/Services/CentroOperaciones/TicketService.php',
+            'config/centro_operaciones.php',
+            'database/migrations/2026_08_10_090000_repair_centro_operaciones_tickets.php',
+            'resources/views/centro-operaciones/configuraciones/index.blade.php',
+            'resources/views/centro-operaciones/tickets/index.blade.php',
+            'resources/views/centro-operaciones/tickets/show.blade.php',
+            'resources/views/centro-operaciones/tickets/pdf.blade.php',
+            'resources/views/emails/centro-operaciones-ticket.blade.php',
+            'tests/Feature/CentroOperacionesTicketServiceTest.php',
+            'tests/Feature/CentroOperacionesReporteServiceTest.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+        ],
+        'changes' => [
+            'Garantiza un ticket único por cada incidencia del reporte diario, incluidas Otro incidente y las incidencias automáticas.',
+            'Crea tickets pendientes de asignación cuando el tipo aún no tiene una configuración activa y completa, evitando omisiones silenciosas.',
+            'Implementa el segundo responsable mediante una clave foránea validada contra su subdirección, con acceso, resolución y notificación.',
+            'Repara el detalle del ticket eliminando rutas, relaciones y consultas API inexistentes, y muestra correctamente asignaciones y plazos pendientes.',
+            'Restaura Sismo, Evacuación y Otro incidente, y ejecuta la sincronización automática de extintores durante el guardado del reporte.',
+            'Regulariza configuraciones y tickets históricos mediante una migración idempotente compatible con los datos existentes.',
+        ],
+        'roles' => ['Administrador', 'Funcionario AC', 'Directivo de Establecimiento', 'Dirección Ejecutiva', 'Comunicaciones'],
+    ],
     '2026.8.6.368' => [
         'date' => '2026-08-06',
         'module' => 'Centro de Operaciones',

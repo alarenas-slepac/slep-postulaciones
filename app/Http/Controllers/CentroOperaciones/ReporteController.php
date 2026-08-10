@@ -132,7 +132,9 @@ class ReporteController extends Controller
             ->where('establecimiento_id', $establecimiento->id)
             ->where('unidad_codigo', $unidadCodigo)
             ->where('estado', 'activa')
-            ->where('tipo', '!=', 'control_plagas_vencido')
+            ->whereNotIn('tipo', collect(config('centro_operaciones.incidencias', []))
+                ->filter(fn (array $incidencia) => (bool) ($incidencia['automatic'] ?? false))
+                ->keys())
             ->when($reporte, fn ($query) => $query->where('reporte_id', '!=', $reporte->id))
             ->oldest('created_at')
             ->get();
