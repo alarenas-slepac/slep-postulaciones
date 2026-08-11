@@ -7,6 +7,7 @@ use App\Models\DocumentType;
 use App\Models\PostulantProfile;
 use App\Models\ReemplazoPersonal;
 use App\Models\SolicitudReemplazo;
+use App\Models\SolicitudReemplazoAutorizacionDocente;
 use App\Models\User;
 use App\Models\UserDocument;
 use App\Services\SolicitudReemplazoAutorizacionDocenteService;
@@ -73,6 +74,76 @@ class SolicitudReemplazoAutorizacionDocenteServiceTest extends TestCase
             'inhabilidades_menores',
             'idoneidad_religion',
         ], $documentos->pluck('type.slug')->all());
+    }
+
+    public function test_exige_inhabilidades_pero_no_idoneidad_fuera_del_area_religion(): void
+    {
+        $solicitud = $this->solicitud('Educador(a) Diferencial');
+        $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
+
+        foreach ($service->slugsRequeridos($solicitud) as $slug) {
+            $this->crearDocumento($slug);
+        }
+
+        $documentos = $service->documentosRequeridos($solicitud);
+
+        $this->assertSame([
+            'antecedentes_especiales',
+            'titulo',
+            'titulo_mencion',
+            'inhabilidades_menores',
+        ], $documentos->pluck('type.slug')->all());
+        $this->assertNotContains('idoneidad_religion', $documentos->pluck('type.slug')->all());
+    }
+
+    public function test_correo_formatea_el_rut_con_puntos_y_guion(): void
+    {
+        $solicitud = $this->solicitud('Educador(a) Diferencial');
+        $solicitud->postulante->user->rut = '188138101';
+
+        $autorizacion = new SolicitudReemplazoAutorizacionDocente();
+        $autorizacion->solicitud_reemplazo_id = 30;
+        $autorizacion->setRelation('solicitud', $solicitud);
+
+        $html = view('emails.solicitud-autorizacion-docente', [
+            'autorizacion' => $autorizacion,
+            'documentos' => collect(),
+        ])->render();
+
+        $this->assertStringContainsString('<strong>RUT:</strong> 18.813.810-1', $html);
+    }
+
+    public function test_bloquea_aprobacion_uatp_sin_numero_de_registro(): void
+    {
+        $solicitud = $this->solicitud('Educador(a) Diferencial');
+        $solicitud->setRelation('autorizacionDocente', null);
+
+        $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
+
+        $this->assertFalse($service->cumpleRegistroParaAprobacionUatp($solicitud));
+    }
+
+    public function test_habilita_aprobacion_uatp_al_ingresar_numero_de_registro(): void
+    {
+        $solicitud = $this->solicitud('Educador(a) Diferencial');
+        $autorizacion = new SolicitudReemplazoAutorizacionDocente();
+        $autorizacion->numero_autorizacion = 'AUT-2026-00125';
+        $solicitud->setRelation('autorizacionDocente', $autorizacion);
+
+        $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
+
+        $this->assertTrue($service->cumpleRegistroParaAprobacionUatp($solicitud));
+    }
+
+    public function test_no_bloquea_aprobacion_uatp_en_solicitud_que_no_requiere_autorizacion_docente(): void
+    {
+        $solicitud = $this->solicitud('Educador(a) Diferencial');
+        $solicitud->propone_reemplazo = false;
+        $solicitud->setRelation('autorizacionDocente', null);
+
+        $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
+
+        $this->assertTrue($service->cumpleRegistroParaAprobacionUatp($solicitud));
     }
 
     public function test_informa_documentos_faltantes_antes_de_enviar_el_expediente(): void

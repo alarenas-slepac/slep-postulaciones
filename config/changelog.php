@@ -1,6 +1,60 @@
 <?php
 
 return [
+    '2026.8.11.375' => [
+        'date' => '2026-08-11',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Número de registro obligatorio para aprobación UATP',
+        'files' => [
+            'app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php',
+            'app/Services/SolicitudReemplazoAutorizacionDocenteService.php',
+            'config/changelog.php',
+            'resources/views/gestion/solicitudes-reemplazo/show.blade.php',
+            'tests/Feature/SolicitudReemplazoAutorizacionDocenteServiceTest.php',
+        ],
+        'changes' => [
+            'Exige el número de registro de la autorización docente antes de que UATP apruebe una solicitud docente con postulante propuesto y la envíe a Validación.',
+            'Deshabilita el botón Aprobar y enviar a Validación mientras el número esté pendiente, mostrando una advertencia con la acción requerida.',
+            'Mantiene disponible el rechazo UATP aunque todavía no exista número de registro.',
+            'Refuerza la misma regla en el backend para impedir que la aprobación se ejecute mediante una solicitud directa.',
+            'Mantiene sin cambios el flujo UATP de las solicitudes que no requieren autorización docente.',
+        ],
+        'roles' => ['Coordinador UATP'],
+    ],
+    '2026.8.11.374' => [
+        'date' => '2026-08-11',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Documentos correctos y RUT formateado en autorización docente',
+        'files' => [
+            'app/Services/SolicitudReemplazoAutorizacionDocenteService.php',
+            'config/changelog.php',
+            'resources/views/emails/solicitud-autorizacion-docente.blade.php',
+            'resources/views/gestion/solicitudes-reemplazo/show.blade.php',
+            'tests/Feature/SolicitudReemplazoAutorizacionDocenteServiceTest.php',
+        ],
+        'changes' => [
+            'Exige y adjunta el Certificado de Inhabilidades para trabajar con menores en toda solicitud de autorización docente, sin depender del área de desempeño.',
+            'Mantiene el Certificado de Idoneidad para Religión exclusivamente para solicitudes de Religión Católica o Religión Evangélica.',
+            'Muestra el RUT del postulante con puntos y guion en el correo de autorización docente.',
+            'Actualiza la ayuda visible de UATP para diferenciar los documentos generales del documento exclusivo de Religión.',
+            'Agrega pruebas para áreas religiosas y no religiosas, además del formato chileno del RUT.',
+        ],
+        'roles' => ['Coordinador UATP'],
+    ],
+    '2026.8.11.373' => [
+        'date' => '2026-08-11',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Ícono visible en Configuración reemplazos',
+        'files' => [
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Reemplaza el ícono no disponible del acceso Configuración reemplazos por un ícono de configuración compatible con la colección cargada por el sistema.',
+            'Mantiene sin cambios la ruta, visibilidad y permisos exclusivos del rol administrador.',
+        ],
+        'roles' => ['Administrador'],
+    ],
     '2026.8.11.372' => [
         'date' => '2026-08-11',
         'module' => 'Solicitudes de reemplazo',
