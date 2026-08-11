@@ -22,10 +22,10 @@ class SolicitudReemplazoAutorizacionDocenteService
             'antecedentes_especiales',
             'titulo',
             'titulo_mencion',
+            'inhabilidades_menores',
         ];
 
         if ($this->esAreaReligion($solicitud)) {
-            $slugs[] = 'inhabilidades_menores';
             $slugs[] = 'idoneidad_religion';
         }
 
@@ -42,6 +42,17 @@ class SolicitudReemplazoAutorizacionDocenteService
         return $esDocente
             && (bool) $solicitud->propone_reemplazo
             && $solicitud->postulante?->user !== null;
+    }
+
+    public function cumpleRegistroParaAprobacionUatp(SolicitudReemplazo $solicitud): bool
+    {
+        if (! $this->esSolicitudDocenteConPropuesta($solicitud)) {
+            return true;
+        }
+
+        $solicitud->loadMissing('autorizacionDocente');
+
+        return filled(trim((string) $solicitud->autorizacionDocente?->numero_autorizacion));
     }
 
     public function esAreaReligion(SolicitudReemplazo $solicitud): bool

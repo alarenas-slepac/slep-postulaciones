@@ -101,7 +101,7 @@ class SlepUiRegistry
             'Administración' => [
                 self::entry('Usuarios y roles', 'admin.users.index', 'bi-people-fill', ['admin'], 'admin.users'),
                 self::entry('Roles', 'admin.roles.index', 'bi-person-gear', ['admin'], 'admin.roles'),
-                self::entry('Configuración reemplazos', 'admin.solicitudes-reemplazo-configuracion.edit', 'bi-envelope-gear', ['admin']),
+                self::entry('Configuración reemplazos', 'admin.solicitudes-reemplazo-configuracion.edit', 'bi-gear', ['admin']),
                 self::entry('Establecimientos', 'admin.establecimientos.index', 'bi-building', ['admin'], 'admin.establecimientos'),
                 self::entry('Admisión Escolar', 'admin.admision-escolar.index', 'bi-buildings', ['admin', 'coordinador_uatp', 'comunicaciones'], 'admin.admision-escolar'),
                 self::entry('Alumnos prioritarios', 'admin.alumnos-prioritarios.index', 'bi-percent', ['admin'], 'admin.alumnos-prioritarios'),

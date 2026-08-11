@@ -508,6 +508,8 @@ class SolicitudReemplazoGestionController extends Controller
             && $solicitud->postulante?->user !== null;
         $autorizacionDocente = $solicitud->autorizacionDocente;
         $autorizacionDocenteService = app(SolicitudReemplazoAutorizacionDocenteService::class);
+        $puedeAprobarUatpPorAutorizacionDocente = $autorizacionDocenteService
+            ->cumpleRegistroParaAprobacionUatp($solicitud);
         $documentoTituloPostulante = $canGestionarAutorizacionDocente
             ? $autorizacionDocenteService->documentoTitulo($solicitud)
             : null;
@@ -659,6 +661,7 @@ class SolicitudReemplazoGestionController extends Controller
             'solicitudesAnterioresRelacionadas' => $solicitudesAnterioresRelacionadas,
             'canGestionarAutorizacionDocente' => $canGestionarAutorizacionDocente,
             'autorizacionDocente' => $autorizacionDocente,
+            'puedeAprobarUatpPorAutorizacionDocente' => $puedeAprobarUatpPorAutorizacionDocente,
             'documentoTituloPostulante' => $documentoTituloPostulante,
             'autorizacionDocenteRequiereReligion' => $autorizacionDocenteRequiereReligion,
         ]);
@@ -2408,10 +2411,19 @@ class SolicitudReemplazoGestionController extends Controller
         return null;
     }
 
-    public function uatpAprobar(Request $request, SolicitudReemplazo $solicitud)
-    {
+    public function uatpAprobar(
+        Request $request,
+        SolicitudReemplazo $solicitud,
+        SolicitudReemplazoAutorizacionDocenteService $autorizacionDocenteService
+    ) {
         if ($solicitud->estado !== 'pendiente_uatp') {
             return back()->withErrors(['estado' => 'La solicitud no está en estado Pendiente UATP.']);
+        }
+
+        if (! $autorizacionDocenteService->cumpleRegistroParaAprobacionUatp($solicitud)) {
+            return back()->withErrors([
+                'autorizacion_docente' => 'Debe ingresar el número de registro de la autorización docente antes de aprobar y enviar la solicitud a Validación.',
+            ]);
         }
 
         $data = $request->validate([

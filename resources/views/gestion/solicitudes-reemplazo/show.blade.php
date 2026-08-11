@@ -235,7 +235,7 @@
         </div>
     @endif
 
-    @if ($canUatp && $s->estado === 'pendiente_uatp')
+    @if ($canUatp && $s->estado === 'pendiente_uatp' && !empty($puedeAprobarUatpPorAutorizacionDocente))
         <div class="modal fade" id="modalUatpAprobar" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
@@ -675,9 +675,10 @@
                             </div>
 
                             <div class="form-text mt-2">
-                                Incluye antecedentes especiales, título profesional o técnico y título con mención.
+                                Incluye antecedentes especiales, título profesional o técnico, título con mención
+                                y Certificado de Inhabilidades para trabajar con menores.
                                 @if (!empty($autorizacionDocenteRequiereReligion))
-                                    Para Religión también exige Inhabilidades para trabajar con menores e Idoneidad para Religión.
+                                    Para Religión también exige Idoneidad para Religión.
                                 @endif
                             </div>
 
@@ -1460,12 +1461,29 @@
         <div class="card mb-4">
             <div class="card-header fw-semibold">Acciones UATP</div>
             <div class="card-body">
-                <div class="alert alert-info">
-                    Al aprobar, la solicitud pasará a <strong>Pendiente de Validación</strong> y se notificará al establecimiento que debe esperar la revisión de la Subdirección de Planificación y Control de Gestión antes de continuar con GDP.
-                </div>
+                @if (!empty($puedeAprobarUatpPorAutorizacionDocente))
+                    <div class="alert alert-info">
+                        Al aprobar, la solicitud pasará a <strong>Pendiente de Validación</strong> y se notificará al establecimiento que debe esperar la revisión de la Subdirección de Planificación y Control de Gestión antes de continuar con GDP.
+                    </div>
+                @else
+                    <div class="alert alert-warning">
+                        <div class="fw-semibold">Falta el número de registro de la autorización docente.</div>
+                        <div>Debe ingresarlo antes de aprobar y enviar la solicitud a Validación. Mientras esté pendiente, solo podrá rechazar la solicitud.</div>
+                    </div>
+                @endif
 
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalUatpAprobar">
+                    <button
+                        type="button"
+                        class="btn btn-success"
+                        @if (!empty($puedeAprobarUatpPorAutorizacionDocente))
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalUatpAprobar"
+                        @else
+                            disabled
+                            title="Debe ingresar el número de registro de la autorización docente"
+                        @endif
+                    >
                         Aprobar y enviar a Validación
                     </button>
 

@@ -15,7 +15,7 @@
     <li><strong>Establecimiento:</strong> {{ $solicitud?->establecimiento?->nombre_establecimiento ?? '—' }}</li>
     <li><strong>Área de desempeño:</strong> {{ $solicitud?->areaDesempeno?->nombre ?? '—' }}</li>
     <li><strong>Postulante propuesto:</strong> {{ $postulante?->full_name ?? '—' }}</li>
-    <li><strong>RUT:</strong> {{ $postulante?->rut ?? '—' }}</li>
+    <li><strong>RUT:</strong> {{ \App\Support\Rut::format($postulante?->rut) ?? '—' }}</li>
     <li><strong>Período:</strong> {{ optional($solicitud?->fecha_inicio)->format('d/m/Y') ?? '—' }} al {{ optional($solicitud?->fecha_termino)->format('d/m/Y') ?? '—' }}</li>
 </ul>
 
