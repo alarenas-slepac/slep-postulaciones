@@ -113,10 +113,22 @@ class SolicitudReemplazoAutorizacionDocenteServiceTest extends TestCase
         $this->assertStringContainsString('<strong>RUT:</strong> 18.813.810-1', $html);
     }
 
-    public function test_bloquea_aprobacion_uatp_sin_numero_de_registro(): void
+    public function test_no_bloquea_aprobacion_uatp_antes_de_solicitar_la_autorizacion(): void
     {
         $solicitud = $this->solicitud('Educador(a) Diferencial');
         $solicitud->setRelation('autorizacionDocente', null);
+
+        $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
+
+        $this->assertTrue($service->cumpleRegistroParaAprobacionUatp($solicitud));
+    }
+
+    public function test_bloquea_aprobacion_uatp_sin_numero_despues_de_solicitar_la_autorizacion(): void
+    {
+        $solicitud = $this->solicitud('Educador(a) Diferencial');
+        $autorizacion = new SolicitudReemplazoAutorizacionDocente();
+        $autorizacion->solicitado_at = now();
+        $solicitud->setRelation('autorizacionDocente', $autorizacion);
 
         $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
 
@@ -127,6 +139,7 @@ class SolicitudReemplazoAutorizacionDocenteServiceTest extends TestCase
     {
         $solicitud = $this->solicitud('Educador(a) Diferencial');
         $autorizacion = new SolicitudReemplazoAutorizacionDocente();
+        $autorizacion->solicitado_at = now();
         $autorizacion->numero_autorizacion = 'AUT-2026-00125';
         $solicitud->setRelation('autorizacionDocente', $autorizacion);
 

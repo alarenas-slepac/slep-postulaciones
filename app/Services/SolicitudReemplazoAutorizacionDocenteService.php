@@ -51,8 +51,13 @@ class SolicitudReemplazoAutorizacionDocenteService
         }
 
         $solicitud->loadMissing('autorizacionDocente');
+        $autorizacion = $solicitud->autorizacionDocente;
 
-        return filled(trim((string) $solicitud->autorizacionDocente?->numero_autorizacion));
+        if (! $autorizacion || blank($autorizacion->solicitado_at)) {
+            return true;
+        }
+
+        return filled(trim((string) $autorizacion->numero_autorizacion));
     }
 
     public function esAreaReligion(SolicitudReemplazo $solicitud): bool
