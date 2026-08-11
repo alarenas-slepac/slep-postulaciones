@@ -173,6 +173,11 @@ class SolicitudReemplazo extends Model
         return $this->hasMany(SolicitudReemplazoJornada::class, 'solicitud_reemplazo_id');
     }
 
+    public function autorizacionDocente()
+    {
+        return $this->hasOne(SolicitudReemplazoAutorizacionDocente::class, 'solicitud_reemplazo_id');
+    }
+
     public function observacionesFlujo(): HasMany
     {
         return $this->hasMany(SolicitudReemplazoObservacion::class, 'solicitud_reemplazo_id')->latest();
@@ -287,4 +292,3 @@ public function contratoPostulante()
         return $this->belongsTo(self::class, 'solicitud_anterior_id');
     }
 }
-

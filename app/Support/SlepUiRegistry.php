@@ -81,6 +81,7 @@ class SlepUiRegistry
                 self::entry('Agendamiento Proyector y Salas', 'gestion.agendamientos-recursos.index', 'bi-calendar-event', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac', 'secretaria_direccion_ejecutiva']),
                 self::entry('Solicitudes reemplazo', 'funcionario.solicitudes-reemplazo.index', 'bi-clipboard-check', ['funcionario_estab'], 'funcionario.solicitudes-reemplazo'),
                 self::entry('Gestión reemplazos', 'gestion.solicitudes-reemplazo.index', 'bi-kanban', ['admin', 'coordinador_uatp', 'coordinador_gdp', 'funcionario_slep', 'supervisor_plani'], 'gestion.solicitudes-reemplazo'),
+                self::entry('Autorizaciones docentes', 'gestion.autorizaciones-docentes.index', 'bi-patch-check', ['admin', 'coordinador_uatp']),
                 self::entry('Finiquitos reemplazos', 'gestion.solicitudes-reemplazo.finiquitos.index', 'bi-receipt-cutoff', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'gestion.solicitudes-reemplazo'),
                 self::entry('Padrón reemplazos', 'reemplazos.index', 'bi-person-lines-fill', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'reemplazos'),
                 self::entry('Buscador postulantes', 'reemplazos.buscador-postulantes.index', 'bi-search', ['admin', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_slep', 'funcionario_estab']),
@@ -100,6 +101,7 @@ class SlepUiRegistry
             'Administración' => [
                 self::entry('Usuarios y roles', 'admin.users.index', 'bi-people-fill', ['admin'], 'admin.users'),
                 self::entry('Roles', 'admin.roles.index', 'bi-person-gear', ['admin'], 'admin.roles'),
+                self::entry('Configuración reemplazos', 'admin.solicitudes-reemplazo-configuracion.edit', 'bi-envelope-gear', ['admin']),
                 self::entry('Establecimientos', 'admin.establecimientos.index', 'bi-building', ['admin'], 'admin.establecimientos'),
                 self::entry('Admisión Escolar', 'admin.admision-escolar.index', 'bi-buildings', ['admin', 'coordinador_uatp', 'comunicaciones'], 'admin.admision-escolar'),
                 self::entry('Alumnos prioritarios', 'admin.alumnos-prioritarios.index', 'bi-percent', ['admin'], 'admin.alumnos-prioritarios'),
@@ -161,6 +163,7 @@ class SlepUiRegistry
                 self::entry('Agendamiento Proyector y Salas', 'gestion.agendamientos-recursos.index', 'bi-calendar-event', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac', 'secretaria_direccion_ejecutiva']),
             self::entry('Nueva solicitud de cometido', 'tramites.cometidos-funcionarios.create', 'bi-plus-circle', ['funcionario_estab', 'funcionario_ac', 'director_ejecutivo']),
             self::entry('Gestión de reemplazos', 'gestion.solicitudes-reemplazo.index', 'bi-kanban', ['admin', 'coordinador_uatp', 'coordinador_gdp', 'funcionario_slep', 'supervisor_plani'], 'gestion.solicitudes-reemplazo'),
+            self::entry('Autorizaciones docentes', 'gestion.autorizaciones-docentes.index', 'bi-patch-check', ['admin', 'coordinador_uatp']),
             self::entry('Finiquitos reemplazos', 'gestion.solicitudes-reemplazo.finiquitos.index', 'bi-receipt-cutoff', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'gestion.solicitudes-reemplazo'),
             self::entry('Buscador postulantes', 'reemplazos.buscador-postulantes.index', 'bi-search', ['admin', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_slep', 'funcionario_estab']),
             self::entry('Bolsa de Trabajo', 'gestion.bolsa-trabajo.index', 'bi-briefcase', ['admin', 'funcionario_slep'], 'gestion.bolsa-trabajo'),

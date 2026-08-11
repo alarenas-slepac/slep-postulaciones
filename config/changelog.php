@@ -1,6 +1,43 @@
 <?php
 
 return [
+    '2026.8.11.371' => [
+        'date' => '2026-08-11',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Autorizaciones docentes UATP y acceso de Planificación a OT',
+        'files' => [
+            'app/Http/Controllers/Admin/SolicitudReemplazoConfiguracionController.php',
+            'app/Http/Controllers/Gestion/AutorizacionDocenteController.php',
+            'app/Http/Controllers/Gestion/OrdenTrabajoPdfController.php',
+            'app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php',
+            'app/Mail/SolicitudAutorizacionDocenteMail.php',
+            'app/Models/SolicitudReemplazo.php',
+            'app/Models/SolicitudReemplazoAutorizacionDocente.php',
+            'app/Models/SolicitudReemplazoConfiguracion.php',
+            'app/Services/SolicitudReemplazoAutorizacionDocenteService.php',
+            'app/Support/ModuleRegistry.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_11_090000_create_solicitud_reemplazo_autorizaciones_docentes_tables.php',
+            'resources/views/admin/solicitudes-reemplazo-configuracion/edit.blade.php',
+            'resources/views/emails/solicitud-autorizacion-docente.blade.php',
+            'resources/views/gestion/autorizaciones-docentes/index.blade.php',
+            'resources/views/gestion/solicitudes-reemplazo/index.blade.php',
+            'resources/views/gestion/solicitudes-reemplazo/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/OrdenTrabajoSupervisorPlanificacionAccessTest.php',
+            'tests/Feature/SolicitudReemplazoAutorizacionDocenteServiceTest.php',
+        ],
+        'changes' => [
+            'Permite a supervisor_plani ver y descargar órdenes de trabajo existentes sin autorizar su creación o regeneración.',
+            'Agrega en revisión UATP de solicitudes docentes con propuesta accesos a la ficha del postulante y al título cargado.',
+            'Envía a un correo administrable el expediente de autorización docente con antecedentes especiales, título profesional o técnico y título con mención.',
+            'Para Religión Católica o Religión Evangélica exige y adjunta además Inhabilidades para trabajar con menores e Idoneidad para Religión.',
+            'Registra por solicitud el número y estado independiente de la autorización docente, inicialmente En trámite, sin interrumpir el flujo del reemplazo.',
+            'Incorpora una bandeja para coordinador_uatp y admin con estados En trámite, Aprobada y Rechazada, filtros y trazabilidad de responsables.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación'],
+    ],
     '2026.8.10.370' => [
         'date' => '2026-08-10',
         'module' => 'Centro de Operaciones',
@@ -2251,8 +2288,27 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.8.3.361',
+    'current_version' => '2026.8.11.371',
     'entries' => [
+
+        [
+            'version' => '2026.8.11.371',
+            'title' => 'Autorizaciones docentes UATP y acceso a órdenes de trabajo',
+            'summary' => 'Incorpora seguimiento no bloqueante de autorizaciones docentes y corrige la consulta de OT para Planificación.',
+            'roles' => [
+                'admin',
+                'coordinador_uatp',
+                'supervisor_plani',
+            ],
+            'items' => [
+                'UATP puede revisar la ficha y el título del postulante propuesto antes de solicitar una autorización docente.',
+                'El expediente se envía a un correo configurable con los documentos obligatorios y requisitos adicionales para Religión.',
+                'Cada autorización conserva número, estado, documentos enviados, destinatario, fechas y responsables.',
+                'La bandeja de autorizaciones permite cambiar entre En trámite, Aprobada y Rechazada sin alterar el flujo de la solicitud.',
+                'Planificación puede consultar y descargar la OT existente sin regenerarla.',
+            ],
+            'published_at' => '2026-08-11 12:20:00',
+        ],
 
         [
             'version' => '2026.8.3.361',

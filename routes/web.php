@@ -54,6 +54,7 @@ use App\Http\Controllers\Admin\AsignaturaPersonalizadaController;
 use App\Http\Controllers\FuncionarioEstab\SolicitudReemplazoController;
 use App\Http\Controllers\MessagingController;
 use App\Http\Controllers\Gestion\SolicitudReemplazoGestionController;
+use App\Http\Controllers\Gestion\AutorizacionDocenteController;
 use App\Http\Controllers\Reemplazos\BuscadorPostulantesController;
 use App\Http\Controllers\Gestion\OrdenTrabajoPdfController;
 use App\Http\Controllers\Gestion\EstadisticasController;
@@ -65,6 +66,7 @@ use App\Http\Controllers\Postulante\OfertaLaboralController;
 use App\Http\Controllers\Admin\RestrictedRutController;
 use App\Http\Controllers\Admin\PermisoSinGoceExcepcionController;
 use App\Http\Controllers\Admin\NotificationDispatchLogController;
+use App\Http\Controllers\Admin\SolicitudReemplazoConfiguracionController;
 use App\Http\Controllers\IncumplimientoLaboralController;
 use App\Http\Controllers\ChangeLogController;
 use App\Http\Controllers\Endeudamiento\MaeCargaController;
@@ -394,6 +396,13 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     // Admin: Usuarios
     // -------------------------
     Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/solicitudes-reemplazo/configuracion', [SolicitudReemplazoConfiguracionController::class, 'edit'])
+            ->middleware(['ensure.role:admin', 'ensure.active-role:admin'])
+            ->name('solicitudes-reemplazo-configuracion.edit');
+        Route::put('/solicitudes-reemplazo/configuracion', [SolicitudReemplazoConfiguracionController::class, 'update'])
+            ->middleware(['ensure.role:admin', 'ensure.active-role:admin'])
+            ->name('solicitudes-reemplazo-configuracion.update');
+
         Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
         Route::get('/users/create', [UserManagementController::class, 'create'])->name('users.create');
         Route::get('/users/export', [UserManagementController::class, 'export'])->name('users.export');
@@ -1203,6 +1212,14 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     // -------------------------
     Route::prefix('gestion')->name('gestion.')->group(function () {
 
+        Route::get('/autorizaciones-docentes', [AutorizacionDocenteController::class, 'index'])
+            ->middleware(['ensure.role:admin|coordinador_uatp', 'ensure.active-role:admin|coordinador_uatp'])
+            ->name('autorizaciones-docentes.index');
+
+        Route::patch('/autorizaciones-docentes/{autorizacion}/estado', [AutorizacionDocenteController::class, 'actualizarEstado'])
+            ->middleware(['ensure.role:admin|coordinador_uatp', 'ensure.active-role:admin|coordinador_uatp'])
+            ->name('autorizaciones-docentes.estado.update');
+
         Route::get('/solicitudes-reemplazo', [SolicitudReemplazoGestionController::class, 'index'])
             ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani')
             ->name('solicitudes-reemplazo.index');
@@ -1252,6 +1269,14 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::post('/solicitudes-reemplazo/{solicitud}/uatp/rechazar', [SolicitudReemplazoGestionController::class, 'uatpRechazar'])
             ->middleware('ensure.role:admin|coordinador_uatp')
             ->name('solicitudes-reemplazo.uatp.rechazar');
+
+        Route::post('/solicitudes-reemplazo/{solicitud}/autorizacion-docente/solicitar', [AutorizacionDocenteController::class, 'solicitar'])
+            ->middleware(['ensure.role:admin|coordinador_uatp', 'ensure.active-role:admin|coordinador_uatp'])
+            ->name('solicitudes-reemplazo.autorizacion-docente.solicitar');
+
+        Route::patch('/solicitudes-reemplazo/{solicitud}/autorizacion-docente/{autorizacion}/numero', [AutorizacionDocenteController::class, 'guardarNumero'])
+            ->middleware(['ensure.role:admin|coordinador_uatp', 'ensure.active-role:admin|coordinador_uatp'])
+            ->name('solicitudes-reemplazo.autorizacion-docente.numero.update');
 
         Route::post('/solicitudes-reemplazo/{solicitud}/uatp/reabrir', [SolicitudReemplazoGestionController::class, 'uatpReabrir'])
             ->middleware('ensure.role:admin|funcionario_slep|supervisor_plani|coordinador_gdp')
@@ -1388,12 +1413,12 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
         // Ver Orden de Trabajo (PDF) - inline
         Route::get('/solicitudes-reemplazo/{solicitud}/orden-trabajo', [OrdenTrabajoPdfController::class, 'show'])
-            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|funcionario_estab')
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani|funcionario_estab')
             ->name('solicitudes-reemplazo.ot');
 
         // Descargar Orden de Trabajo (PDF)
         Route::get('/solicitudes-reemplazo/{solicitud}/orden-trabajo/download', [OrdenTrabajoPdfController::class, 'download'])
-            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|funcionario_estab')
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani|funcionario_estab')
             ->name('solicitudes-reemplazo.ot.download');
     });
 });

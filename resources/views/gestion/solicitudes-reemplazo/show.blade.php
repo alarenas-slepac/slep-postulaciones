@@ -265,6 +265,63 @@
         </div>
     @endif
 
+    @if (!empty($canGestionarAutorizacionDocente) && $autorizacionDocente)
+        <div class="modal fade" id="modalAutorizacionDocente" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Registrar autorización docente</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.autorizacion-docente.numero.update', [$s, $autorizacionDocente]) }}">
+                        @csrf
+                        @method('PATCH')
+                        <div class="modal-body">
+                            <div class="alert alert-info">
+                                <div class="fw-semibold">Expediente enviado</div>
+                                <div>
+                                    Destino: {{ $autorizacionDocente->correo_destino ?: '—' }}
+                                    @if ($autorizacionDocente->correo_enviado_at)
+                                        — {{ cl_datetime($autorizacionDocente->correo_enviado_at, 'd/m/Y H:i') }}
+                                    @endif
+                                </div>
+                                <div class="small mt-1">La autorización se mantiene como seguimiento paralelo y no interrumpe el flujo del reemplazo.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="numero_autorizacion" class="form-label fw-semibold">
+                                    Número de autorización <span class="text-danger">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="numero_autorizacion"
+                                    name="numero_autorizacion"
+                                    class="form-control @error('numero_autorizacion') is-invalid @enderror"
+                                    value="{{ old('numero_autorizacion', $autorizacionDocente->numero_autorizacion) }}"
+                                    maxlength="120"
+                                    required
+                                >
+                                @error('numero_autorizacion')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="small text-muted">
+                                Estado actual: <strong>{{ $autorizacionDocente->estado_label }}</strong>.
+                                El estado se administra desde la bandeja de autorizaciones docentes.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <a href="{{ route('gestion.autorizaciones-docentes.index') }}" class="btn btn-outline-primary">Ir a autorizaciones</a>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                            <button type="submit" class="btn btn-primary">Guardar número</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if (!empty($canPlaniReview))
         <div class="modal fade" id="modalPlaniValidar" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">
@@ -565,6 +622,84 @@
                         <div class="fw-semibold">
                             {{ $postUser?->rut ?? '—' }} — {{ $postUser?->full_name ?? '—' }}
                         </div>
+
+                        @if (!empty($canGestionarAutorizacionDocente))
+                            @php
+                                $tituloEsPdf = $documentoTituloPostulante
+                                    && (
+                                        str_contains(strtolower((string) $documentoTituloPostulante->mime), 'pdf')
+                                        || Str::endsWith(strtolower((string) $documentoTituloPostulante->path), '.pdf')
+                                    );
+                            @endphp
+
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <a
+                                    class="btn btn-sm btn-outline-primary"
+                                    target="_blank"
+                                    rel="noopener"
+                                    href="{{ route('reemplazos.buscador-postulantes.perfil.view', $post) }}"
+                                >
+                                    <i class="bi bi-person-vcard"></i> Ver ficha del postulante
+                                </a>
+
+                                @if ($documentoTituloPostulante)
+                                    <a
+                                        class="btn btn-sm btn-outline-primary"
+                                        target="_blank"
+                                        rel="noopener"
+                                        href="{{ $tituloEsPdf
+                                            ? route('reemplazos.documents.preview', $documentoTituloPostulante)
+                                            : route('reemplazos.documents.download', $documentoTituloPostulante) }}"
+                                    >
+                                        <i class="bi bi-file-earmark-text"></i> Ver título
+                                    </a>
+                                @else
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Sin título cargado</button>
+                                @endif
+
+                                @if ($s->estado === 'pendiente_uatp')
+                                    @if ($autorizacionDocente?->correo_enviado_at)
+                                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalAutorizacionDocente">
+                                            <i class="bi bi-patch-check"></i>
+                                            {{ $autorizacionDocente->numero_autorizacion ? 'Actualizar número de autorización' : 'Ingresar número de autorización' }}
+                                        </button>
+                                    @else
+                                        <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.autorizacion-docente.solicitar', $s) }}" class="d-inline">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('Se enviará por correo el expediente documental requerido y se registrará la autorización En trámite. ¿Desea continuar?');">
+                                                <i class="bi bi-send-check"></i> Enviar expediente y solicitar autorización
+                                            </button>
+                                        </form>
+                                    @endif
+                                @endif
+                            </div>
+
+                            <div class="form-text mt-2">
+                                Incluye antecedentes especiales, título profesional o técnico y título con mención.
+                                @if (!empty($autorizacionDocenteRequiereReligion))
+                                    Para Religión también exige Inhabilidades para trabajar con menores e Idoneidad para Religión.
+                                @endif
+                            </div>
+
+                            @if ($autorizacionDocente)
+                                @php
+                                    $autorizacionEstadoClase = match ($autorizacionDocente->estado) {
+                                        'aprobada' => 'alert-success',
+                                        'rechazada' => 'alert-danger',
+                                        default => 'alert-warning',
+                                    };
+                                @endphp
+                                <div class="alert {{ $autorizacionEstadoClase }} mt-3 mb-0 py-2">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                                        <strong>Autorización docente: {{ $autorizacionDocente->estado_label }}</strong>
+                                        <span>N.º {{ $autorizacionDocente->numero_autorizacion ?: 'pendiente de registro' }}</span>
+                                    </div>
+                                    @if ($autorizacionDocente->observacion_estado)
+                                        <div class="small mt-1">{{ $autorizacionDocente->observacion_estado }}</div>
+                                    @endif
+                                </div>
+                            @endif
+                        @endif
                     </div>
                 @endif
             </div>
@@ -1001,12 +1136,12 @@
         </div>
     </div>
     {{-- Orden de trabajo (Funcionario SLEP) --}}
-    @if (($canCrearOt ?? false) || in_array($s->estado, ['aceptada', 'cerrado'], true))
+    @if (($canCrearOt ?? false) || in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true))
         <div class="card mb-4">
             <div class="card-header fw-semibold">Orden de trabajo</div>
             <div class="card-body">
 
-                @if ($s->estado === 'aceptada')
+                @if (in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true))
                     <div class="alert alert-success mb-0">
                         <div class="fw-semibold">Orden de trabajo creada</div>
                         <div class="mt-2">
@@ -1018,6 +1153,19 @@
                             <div><strong>Fecha creación:</strong>
                                 {{ cl_datetime($s->orden_trabajo_creada_at, 'd/m/Y H:i') }}</div>
                         </div>
+
+                        @if (!empty($s->orden_trabajo_pdf_path))
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
+                                    href="{{ route('gestion.solicitudes-reemplazo.ot', $s) }}">
+                                    Ver Orden de Trabajo
+                                </a>
+                                <a class="btn btn-sm btn-success"
+                                    href="{{ route('gestion.solicitudes-reemplazo.ot.download', $s) }}">
+                                    Descargar Orden de Trabajo
+                                </a>
+                            </div>
+                        @endif
 
                         @if ($titularEsDocente)
                             <hr class="my-3">
@@ -1566,6 +1714,17 @@
         });
     })();
     </script>
+
+    @if (request()->boolean('abrir_autorizacion_docente') && !empty($canGestionarAutorizacionDocente) && $autorizacionDocente)
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalElement = document.getElementById('modalAutorizacionDocente');
+            if (modalElement && window.bootstrap) {
+                window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+            }
+        });
+        </script>
+    @endif
 @endpush
 
 @endsection
