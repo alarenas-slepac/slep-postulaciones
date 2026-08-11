@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.8.11.372' => [
+        'date' => '2026-08-11',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Corrección de migración de autorizaciones docentes',
+        'files' => [
+            'config/changelog.php',
+            'database/migrations/2026_08_11_090000_create_solicitud_reemplazo_autorizaciones_docentes_tables.php',
+        ],
+        'changes' => [
+            'Asigna nombres breves y explícitos a las claves foráneas e índices de las autorizaciones docentes.',
+            'Evita el error MySQL 1059 provocado por identificadores automáticos que superaban el límite de 64 caracteres.',
+            'Mantiene las mismas relaciones, reglas de borrado y unicidad previstas originalmente.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP'],
+    ],
     '2026.8.11.371' => [
         'date' => '2026-08-11',
         'module' => 'Solicitudes de reemplazo',
@@ -2288,8 +2303,24 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.8.11.371',
+    'current_version' => '2026.8.11.372',
     'entries' => [
+
+        [
+            'version' => '2026.8.11.372',
+            'title' => 'Corrección de migración de autorizaciones docentes',
+            'summary' => 'Corrige los nombres de claves e índices para ejecutar la migración en MySQL sin superar el límite de identificadores.',
+            'roles' => [
+                'admin',
+                'coordinador_uatp',
+            ],
+            'items' => [
+                'Utiliza nombres explícitos de menos de 64 caracteres para todas las claves foráneas nuevas.',
+                'Conserva la relación única entre solicitud de reemplazo y autorización docente.',
+                'Permite recuperar una instalación donde la tabla de autorizaciones quedó parcialmente creada.',
+            ],
+            'published_at' => '2026-08-11 14:30:00',
+        ],
 
         [
             'version' => '2026.8.11.371',
