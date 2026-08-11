@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.8.11.376' => [
+        'date' => '2026-08-11',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Bloqueo UATP posterior a la solicitud de autorización docente',
+        'files' => [
+            'app/Services/SolicitudReemplazoAutorizacionDocenteService.php',
+            'config/changelog.php',
+            'tests/Feature/SolicitudReemplazoAutorizacionDocenteServiceTest.php',
+        ],
+        'changes' => [
+            'Mantiene habilitada la acción Aprobar y enviar a Validación mientras UATP todavía no haya enviado el expediente para solicitar la autorización docente.',
+            'Activa el bloqueo por falta de número de registro únicamente después de ejecutar Enviar expediente y solicitar autorización.',
+            'Vuelve a habilitar la aprobación cuando se registra el número de autorización y mantiene siempre disponible la opción Rechazar.',
+            'Aplica la misma condición en la interfaz y en la validación del backend.',
+        ],
+        'roles' => ['Coordinador UATP'],
+    ],
     '2026.8.11.375' => [
         'date' => '2026-08-11',
         'module' => 'Solicitudes de reemplazo',
