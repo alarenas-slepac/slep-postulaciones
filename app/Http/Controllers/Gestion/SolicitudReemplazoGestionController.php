@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\RestrictedRutService;
+use App\Services\SolicitudReemplazoAutorizacionDocenteService;
 
 class SolicitudReemplazoGestionController extends Controller
 {
@@ -441,6 +442,9 @@ class SolicitudReemplazoGestionController extends Controller
             'cerradoPor',
             'reemplazoAjusteUser',
             'observacionesFlujo.user',
+            'autorizacionDocente.solicitadoPor',
+            'autorizacionDocente.numeroRegistradoPor',
+            'autorizacionDocente.estadoActualizadoPor',
         ]);
 
         $isAdmin = method_exists($user, 'hasRole') ? $user->hasRole('admin') : false;
@@ -497,6 +501,18 @@ class SolicitudReemplazoGestionController extends Controller
             );
 
         $titularEsDocente = $this->estamentoFromEstatuto($solicitud->funcionarioTitular?->estatuto) === 'docente';
+        $activeRole = method_exists($user, 'activeRoleName') ? (string) $user->activeRoleName() : '';
+        $canGestionarAutorizacionDocente = in_array($activeRole, ['admin', 'coordinador_uatp'], true)
+            && $titularEsDocente
+            && (bool) $solicitud->propone_reemplazo
+            && $solicitud->postulante?->user !== null;
+        $autorizacionDocente = $solicitud->autorizacionDocente;
+        $autorizacionDocenteService = app(SolicitudReemplazoAutorizacionDocenteService::class);
+        $documentoTituloPostulante = $canGestionarAutorizacionDocente
+            ? $autorizacionDocenteService->documentoTitulo($solicitud)
+            : null;
+        $autorizacionDocenteRequiereReligion = $canGestionarAutorizacionDocente
+            && $autorizacionDocenteService->esAreaReligion($solicitud);
         $estadosRevisionConAntecedentes = ['pendiente_uatp', 'rechazada_uatp', 'pendiente_validacion', 'rechazada_plani'];
         $estadosHistorialConAntecedentes = array_merge($estadosRevisionConAntecedentes, ['derivada_slep', 'aceptada', 'cerrado', 'cerrada']);
         $esRolRevisionHistorial = method_exists($user, 'hasAnyRole')
@@ -641,6 +657,10 @@ class SolicitudReemplazoGestionController extends Controller
             'tieneFiniquitoAsociado' => $tieneFiniquitoAsociado,
             'mostrarSolicitudesAnterioresRelacionadas' => $mostrarSolicitudesAnterioresRelacionadas,
             'solicitudesAnterioresRelacionadas' => $solicitudesAnterioresRelacionadas,
+            'canGestionarAutorizacionDocente' => $canGestionarAutorizacionDocente,
+            'autorizacionDocente' => $autorizacionDocente,
+            'documentoTituloPostulante' => $documentoTituloPostulante,
+            'autorizacionDocenteRequiereReligion' => $autorizacionDocenteRequiereReligion,
         ]);
     }
 

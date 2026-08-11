@@ -30,24 +30,29 @@ class OrdenTrabajoPdfController extends Controller
             'coordinador_gdp',
             'coordinador_gdp_admin',
             'funcionario_slep',
+            'supervisor_plani',
             'funcionario_estab',
         ];
+        $activeRole = $user && method_exists($user, 'activeRoleName')
+            ? (string) $user->activeRoleName()
+            : '';
 
         $hasAccess = $user && method_exists($user, 'hasAnyRole')
-            ? $user->hasAnyRole($allowedRoles)
+            ? in_array($activeRole, $allowedRoles, true) && $user->hasAnyRole($allowedRoles)
             : false;
 
         abort_unless($hasAccess, 403);
 
         // Seguridad extra: funcionario_estab solo puede ver OT de su establecimiento
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('funcionario_estab')) {
+        if ($activeRole === 'funcionario_estab') {
             $user->loadMissing('establecimiento');
             abort_unless($user->establecimiento && (int) $solicitud->establecimiento_id === (int) $user->establecimiento->id, 403);
         }
 
         if ($request->boolean('regenerar')) {
             $canRegenerate = $user && method_exists($user, 'hasAnyRole')
-                ? $user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin', 'funcionario_slep'])
+                ? $activeRole !== 'supervisor_plani'
+                    && $user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin', 'funcionario_slep'])
                 : false;
 
             if ($canRegenerate) {

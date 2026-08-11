@@ -97,6 +97,13 @@
             $isFuncionarioSlepRole = $userAuth && method_exists($userAuth, 'hasRole') ? $userAuth->hasRole('funcionario_slep') : false;
             $isCoordinadorUatp = $userAuth && method_exists($userAuth, 'hasRole') ? $userAuth->hasRole('coordinador_uatp') : false;
             $isCoordinadorPlani = $userAuth && method_exists($userAuth, 'hasAnyRole') ? $userAuth->hasAnyRole(['supervisor_plani', 'coordinador_plani']) : false;
+            $activeRole = $userAuth && method_exists($userAuth, 'activeRoleName') ? (string) $userAuth->activeRoleName() : '';
+            $otDownloadUrl = fn ($solicitud) => route(
+                'gestion.solicitudes-reemplazo.ot.download',
+                $activeRole === 'supervisor_plani'
+                    ? ['solicitud' => $solicitud]
+                    : ['solicitud' => $solicitud, 'regenerar' => 1]
+            );
             $canExportSolicitudes = $userAuth && method_exists($userAuth, 'hasAnyRole') ? $userAuth->hasAnyRole(['admin', 'coordinador_gdp']) : false;
 
             $hasPendientesUatpFilters = collect(['p_numero', 'p_establecimiento_id', 'p_titular', 'p_desde', 'p_hasta'])
@@ -346,7 +353,7 @@
                                             <a class="btn btn-sm btn-outline-secondary" href="{{ route('gestion.solicitudes-reemplazo.contrato-trabajo.download', $s) }}">CT</a>
                                         @endif
                                         @if (!empty($s->orden_trabajo_pdf_path))
-                                            <a class="btn btn-sm btn-outline-success-dark" href="{{ route('gestion.solicitudes-reemplazo.ot.download', ['solicitud' => $s, 'regenerar' => 1]) }}">OT</a>
+                                            <a class="btn btn-sm btn-outline-success-dark" href="{{ $otDownloadUrl($s) }}">OT</a>
                                         @endif
                                     </td>
                                 </tr>
@@ -585,7 +592,7 @@
                                         <td class="text-end text-nowrap">
                                             <a class="btn btn-sm btn-outline-primary" href="{{ route('gestion.solicitudes-reemplazo.show', $s) }}">Ver</a>
                                             @if (!empty($s->contrato_trabajo_docx_path))<a class="btn btn-sm btn-outline-secondary" href="{{ route('gestion.solicitudes-reemplazo.contrato-trabajo.download', $s) }}">CT</a>@endif
-                                            @if (!empty($s->orden_trabajo_pdf_path))<a class="btn btn-sm btn-outline-success-dark" href="{{ route('gestion.solicitudes-reemplazo.ot.download', ['solicitud' => $s, 'regenerar' => 1]) }}">OT</a>@endif
+                                            @if (!empty($s->orden_trabajo_pdf_path))<a class="btn btn-sm btn-outline-success-dark" href="{{ $otDownloadUrl($s) }}">OT</a>@endif
                                         </td>
                                     </tr>
                                 @empty

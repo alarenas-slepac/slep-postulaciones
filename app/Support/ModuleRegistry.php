@@ -12,6 +12,7 @@ class ModuleRegistry
     {
         if (Str::startsWith($name, 'reemplazos.personal.')) return 'reemplazos.personal';
         if (Str::startsWith($name, 'reemplazos.')) return 'reemplazos';
+        if (Str::startsWith($name, 'gestion.autorizaciones-docentes.')) return 'gestion.solicitudes-reemplazo';
 
         // messages.* -> messages
         if (Str::startsWith($name, 'messages.')) return 'messages';
