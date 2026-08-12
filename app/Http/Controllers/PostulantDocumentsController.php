@@ -157,17 +157,31 @@ class PostulantDocumentsController extends Controller
     {
         $path = ltrim($type->template_path ?? '', '/'); // templates/xxx.pdf
         abort_if($path === '', 404);
-    
+
+        $headers = [
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ];
+
+        // Las plantillas incluidas con el sistema tienen prioridad sobre las
+        // copias históricas que puedan permanecer en el almacenamiento público.
+        $bundledPath = resource_path($path);
+        if (is_file($bundledPath)) {
+            return response()->download($bundledPath, basename($path), $headers);
+        }
+
         $disk = Storage::disk('public'); // storage/app/public
-    
-        if (!$disk->exists($path)) {
+
+        if (! $disk->exists($path)) {
             // útil para depurar en logs
             \Log::error('Template no existe', ['fullpath' => $disk->path($path), 'path' => $path]);
             abort(404);
         }
-    
-        return $disk->download($path, basename($path));
+
+        return $disk->download($path, basename($path), $headers);
     }
+
     public function download(UserDocument $document)
     {
         $this->authorize('view', $document); // o la policy que uses
