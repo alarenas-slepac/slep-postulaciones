@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.8.12.378' => [
+        'date' => '2026-08-12',
+        'module' => 'Mis documentos',
+        'title' => 'Persistencia de nueva plantilla de declaración para cargo público',
+        'files' => [
+            'app/Http/Controllers/PostulantDocumentsController.php',
+            'config/changelog.php',
+            'resources/templates/declaracion_cargo_publico.pdf',
+            'resources/views/postulant/documents/index.blade.php',
+            'storage/app/public/templates/declaracion_cargo_publico.pdf',
+            'tests/Feature/PostulantDocumentsTemplateDownloadTest.php',
+        ],
+        'changes' => [
+            'Traslada la plantilla oficial de Declaración jurada para ejercer cargo público desde el almacenamiento persistente a los recursos versionados del sistema.',
+            'Da prioridad a las plantillas incluidas en cada despliegue por sobre copias históricas conservadas en storage.',
+            'Agrega una versión a la URL de descarga y cabeceras sin caché para impedir que el navegador reutilice el PDF anterior.',
+            'Mantiene el almacenamiento público como respaldo para las demás plantillas existentes.',
+        ],
+        'roles' => ['Postulante', 'Funcionario'],
+    ],
     '2026.8.12.377' => [
         'date' => '2026-08-12',
         'module' => 'Mis documentos',

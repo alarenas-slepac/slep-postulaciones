@@ -48,7 +48,10 @@
                                     @endunless
                                 </div>
                                 @if ($type->template_path)
-                                    <a class="small" href="{{ route('postulant.documents.template', $type) }}">
+                                    <a class="small" href="{{ route('postulant.documents.template', [
+                                        'type' => $type,
+                                        'v' => $type->slug === 'declaracion_cargo_publico' ? '2026.8.12.378' : null,
+                                    ]) }}">
                                         <i class="bi bi-download"></i> Descargar plantilla
                                     </a>
                                 @endif
