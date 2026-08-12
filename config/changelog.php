@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.8.12.377' => [
+        'date' => '2026-08-12',
+        'module' => 'Mis documentos',
+        'title' => 'Nueva plantilla de declaración jurada para ejercer cargo público',
+        'files' => [
+            'config/changelog.php',
+            'storage/app/public/templates/declaracion_cargo_publico.pdf',
+        ],
+        'changes' => [
+            'Incorpora la nueva plantilla oficial descargable de Declaración jurada para ejercer cargo público en la sección Mis documentos.',
+            'Mantiene sin cambios el flujo de carga, revisión y reemplazo del documento firmado por el postulante o funcionario.',
+        ],
+        'roles' => ['Postulante', 'Funcionario'],
+    ],
     '2026.8.11.376' => [
         'date' => '2026-08-11',
         'module' => 'Solicitudes de reemplazo',
