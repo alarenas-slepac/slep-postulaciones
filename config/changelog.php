@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.13.379' => [
+        'date' => '2026-08-13',
+        'module' => 'Administración',
+        'title' => 'Acceso visible a correos masivos por rol',
+        'files' => [
+            'app/Support/ModuleRegistry.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'resources/views/partials/navbar.blade.php',
+            'tests/Feature/AdminBulkRoleMailMenuTest.php',
+        ],
+        'changes' => [
+            'Agrega Correos masivos por rol al inicio del grupo Administración de la barra lateral moderna.',
+            'Ubica el acceso junto a Usuarios y roles e Historial de notificaciones para facilitar su descubrimiento.',
+            'Mantiene la visibilidad y el acceso restringidos al rol Administrador, en concordancia con la ruta existente.',
+            'Incorpora el enlace equivalente en la navegación antigua y registra el módulo con nombre y sección consistentes.',
+        ],
+        'roles' => ['Administrador'],
+    ],
     '2026.8.12.378' => [
         'date' => '2026-08-12',
         'module' => 'Mis documentos',

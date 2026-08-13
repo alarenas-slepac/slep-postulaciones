@@ -100,6 +100,8 @@ class SlepUiRegistry
             ],
             'Administración' => [
                 self::entry('Usuarios y roles', 'admin.users.index', 'bi-people-fill', ['admin'], 'admin.users'),
+                self::entry('Correos masivos por rol', 'admin.bulk-role-mail.index', 'bi-envelope-at', ['admin'], 'admin.bulk-role-mail'),
+                self::entry('Historial de notificaciones', 'admin.notification-logs.index', 'bi-envelope-check', ['admin'], 'admin.notification-logs'),
                 self::entry('Roles', 'admin.roles.index', 'bi-person-gear', ['admin'], 'admin.roles'),
                 self::entry('Configuración reemplazos', 'admin.solicitudes-reemplazo-configuracion.edit', 'bi-gear', ['admin']),
                 self::entry('Establecimientos', 'admin.establecimientos.index', 'bi-building', ['admin'], 'admin.establecimientos'),
@@ -133,7 +135,6 @@ class SlepUiRegistry
                 self::entry('Endeudamiento', 'endeudamiento.cargas.index', 'bi-calculator', ['admin', 'funcionario_slep'], 'endeudamiento'),
                 self::entry('Liquidaciones', 'liquidaciones.cargas.index', 'bi-receipt-cutoff', ['admin', 'funcionario_slep'], 'liquidaciones'),
                 self::entry('Revisión documentos', 'admin.documents.index', 'bi-file-earmark-check', ['admin', 'funcionario_slep', 'coordinador_gdp'], 'admin.documents'),
-                self::entry('Historial notificaciones', 'admin.notification-logs.index', 'bi-bell', ['admin'], 'admin.notification-logs'),
             ],
             'Comunicación' => [
                 self::entry('Mensajes', 'messages.index', 'bi-chat-square-dots', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_establecimiento', 'funcionario_directivo_estab', 'funcionario_directivo_establecimiento', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_juridica', 'funcionario_daf_compra', 'funcionario_ac', 'funcionario', 'postulante'], 'messages'),
