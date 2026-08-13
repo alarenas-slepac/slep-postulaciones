@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class SolicitudReemplazoConfiguracion extends Model
 {
     public const CORREO_AUTORIZACIONES_DOCENTES = 'correo_autorizaciones_docentes';
+    public const CORREO_REMUNERACIONES_DEUDA_PENSION = 'correo_encargada_remuneraciones_deuda_pension';
 
     protected $table = 'solicitud_reemplazo_configuraciones';
 
@@ -32,6 +33,18 @@ class SolicitudReemplazoConfiguracion extends Model
     {
         $correo = static::query()
             ->where('clave', self::CORREO_AUTORIZACIONES_DOCENTES)
+            ->where('activo', true)
+            ->value('valor');
+
+        $correo = trim((string) $correo);
+
+        return filter_var($correo, FILTER_VALIDATE_EMAIL) ? $correo : null;
+    }
+
+    public static function correoEncargadaRemuneracionesDeudaPension(): ?string
+    {
+        $correo = static::query()
+            ->where('clave', self::CORREO_REMUNERACIONES_DEUDA_PENSION)
             ->where('activo', true)
             ->value('valor');
 

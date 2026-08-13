@@ -40,6 +40,8 @@ class PostulantProfile extends Model
         'banco',
         'tipo_cuenta',
         'numero_cuenta',
+        'deudor_pension_alimentos',
+        'deudor_pension_alimentos_marcado_at',
     ];
 
     protected function casts(): array
@@ -50,6 +52,8 @@ class PostulantProfile extends Model
             'semestres' => 'integer',
             'horas_totales' => 'integer',
             'anios_experiencia' => 'integer',
+            'deudor_pension_alimentos' => 'boolean',
+            'deudor_pension_alimentos_marcado_at' => 'datetime',
         ];
     }
 
@@ -106,6 +110,11 @@ class PostulantProfile extends Model
     {
         return $this->hasOne(PostulantProfileContrato::class, 'postulant_profile_id')
             ->latestOfMany();
+    }
+
+    public function deudasPensionAlimentos(): HasMany
+    {
+        return $this->hasMany(SolicitudReemplazoDeudaPension::class, 'postulant_profile_id');
     }
 
     // Para no romper lo antiguo:

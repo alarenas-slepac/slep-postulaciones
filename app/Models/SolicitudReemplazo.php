@@ -178,6 +178,11 @@ class SolicitudReemplazo extends Model
         return $this->hasOne(SolicitudReemplazoAutorizacionDocente::class, 'solicitud_reemplazo_id');
     }
 
+    public function deudaPension()
+    {
+        return $this->hasOne(SolicitudReemplazoDeudaPension::class, 'solicitud_reemplazo_id');
+    }
+
     public function observacionesFlujo(): HasMany
     {
         return $this->hasMany(SolicitudReemplazoObservacion::class, 'solicitud_reemplazo_id')->latest();
