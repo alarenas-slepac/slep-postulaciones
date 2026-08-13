@@ -5,7 +5,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1">Correos por rol</h1>
-            <p class="text-muted mb-0">Envía una comunicación institucional a los usuarios asociados a uno o varios roles.</p>
+            <p class="text-muted mb-0">Envía una comunicación institucional a usuarios que tengan uno de los roles seleccionados y su correo verificado.</p>
         </div>
         <a href="{{ route('admin.notification-logs.index') }}" class="btn btn-outline-secondary">Historial de notificaciones</a>
     </div>
@@ -36,7 +36,7 @@
                                 <input class="form-check-input mt-1" type="checkbox" name="roles[]" value="{{ $role['name'] }}" @checked(in_array($role['name'], old('roles', []), true))>
                                 <span>
                                     <span class="fw-semibold d-block">{{ $role['label'] }}</span>
-                                    <span class="small text-muted">{{ $role['recipients_count'] }} usuario(s) con correo</span>
+                                    <span class="small text-muted">{{ $role['recipients_count'] }} usuario(s) con correo verificado</span>
                                 </span>
                             </label>
                         </div>

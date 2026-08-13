@@ -51,4 +51,18 @@ class AdminBulkRoleMailMenuTest extends TestCase
         $this->assertStringContainsString("route('admin.bulk-role-mail.index')", $navbar);
         $this->assertStringContainsString('Correos masivos por rol', $navbar);
     }
+
+    public function test_envio_y_contadores_exigen_correo_verificado(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/Admin/BulkRoleMailController.php'));
+        $job = file_get_contents(app_path('Jobs/SendBulkRoleMail.php'));
+        $view = file_get_contents(resource_path('views/admin/bulk-role-mail/index.blade.php'));
+
+        $this->assertStringContainsString("whereNotNull('email_verified_at')", $controller);
+        $this->assertStringContainsString("whereNotNull('users.email_verified_at')", $controller);
+        $this->assertStringContainsString('hasAnyRole($this->roles)', $job);
+        $this->assertStringContainsString('! $user->email_verified_at', $job);
+        $this->assertStringContainsString('usuario(s) con correo verificado', $view);
+        $this->assertStringContainsString('Los roles seleccionados no tienen usuarios con un correo válido y verificado.', $controller);
+    }
 }
