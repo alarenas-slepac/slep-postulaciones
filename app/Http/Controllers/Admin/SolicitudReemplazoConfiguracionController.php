@@ -12,7 +12,7 @@ class SolicitudReemplazoConfiguracionController extends Controller
     {
         $this->assertAdminActivo($request);
 
-        $configuracion = SolicitudReemplazoConfiguracion::query()->firstOrCreate(
+        $correoAutorizaciones = SolicitudReemplazoConfiguracion::query()->firstOrCreate(
             ['clave' => SolicitudReemplazoConfiguracion::CORREO_AUTORIZACIONES_DOCENTES],
             [
                 'nombre' => 'Correo para autorizaciones docentes',
@@ -21,7 +21,16 @@ class SolicitudReemplazoConfiguracionController extends Controller
             ]
         );
 
-        return view('admin.solicitudes-reemplazo-configuracion.edit', compact('configuracion'));
+        $correoRemuneraciones = SolicitudReemplazoConfiguracion::query()->firstOrCreate(
+            ['clave' => SolicitudReemplazoConfiguracion::CORREO_REMUNERACIONES_DEUDA_PENSION],
+            [
+                'nombre' => 'Correo encargada de remuneraciones',
+                'descripcion' => 'Destinataria de antecedentes de postulantes con deuda de pensión de alimentos.',
+                'activo' => false,
+            ]
+        );
+
+        return view('admin.solicitudes-reemplazo-configuracion.edit', compact('correoAutorizaciones', 'correoRemuneraciones'));
     }
 
     public function update(Request $request)
@@ -30,9 +39,12 @@ class SolicitudReemplazoConfiguracionController extends Controller
 
         $data = $request->validate([
             'correo_autorizaciones_docentes' => ['required', 'email:rfc', 'max:255'],
-            'activo' => ['nullable', 'boolean'],
+            'autorizaciones_docentes_activo' => ['nullable', 'boolean'],
+            'correo_encargada_remuneraciones' => ['nullable', 'required_if:deuda_pension_activo,1', 'email:rfc', 'max:255'],
+            'deuda_pension_activo' => ['nullable', 'boolean'],
         ], [], [
             'correo_autorizaciones_docentes' => 'correo para autorizaciones docentes',
+            'correo_encargada_remuneraciones' => 'correo de la encargada de remuneraciones',
         ]);
 
         SolicitudReemplazoConfiguracion::query()->updateOrCreate(
@@ -41,14 +53,25 @@ class SolicitudReemplazoConfiguracionController extends Controller
                 'valor' => trim((string) $data['correo_autorizaciones_docentes']),
                 'nombre' => 'Correo para autorizaciones docentes',
                 'descripcion' => 'Destinatario institucional de los expedientes enviados por UATP para solicitar una autorización docente.',
-                'activo' => $request->boolean('activo'),
+                'activo' => $request->boolean('autorizaciones_docentes_activo'),
+                'updated_by' => $request->user()->id,
+            ]
+        );
+
+        SolicitudReemplazoConfiguracion::query()->updateOrCreate(
+            ['clave' => SolicitudReemplazoConfiguracion::CORREO_REMUNERACIONES_DEUDA_PENSION],
+            [
+                'valor' => trim((string) ($data['correo_encargada_remuneraciones'] ?? '')) ?: null,
+                'nombre' => 'Correo encargada de remuneraciones',
+                'descripcion' => 'Destinataria de antecedentes de postulantes con deuda de pensión de alimentos.',
+                'activo' => $request->boolean('deuda_pension_activo'),
                 'updated_by' => $request->user()->id,
             ]
         );
 
         return redirect()
             ->route('admin.solicitudes-reemplazo-configuracion.edit')
-            ->with('success', 'Configuración de autorizaciones docentes actualizada.');
+            ->with('success', 'Configuración de solicitudes de reemplazo actualizada.');
     }
 
     private function assertAdminActivo(Request $request): void

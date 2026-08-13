@@ -18,6 +18,7 @@ use App\Http\Controllers\PostulantProfileController;
 use App\Http\Controllers\PostulantDocumentsController;
 use App\Http\Controllers\Postulante\MisReemplazosController;
 use App\Http\Controllers\Postulante\MisFiniquitosController;
+use App\Http\Controllers\Postulante\DeudaPensionAlimentosController as PostulanteDeudaPensionAlimentosController;
 
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\PostulacionAdminController;
@@ -54,6 +55,7 @@ use App\Http\Controllers\Admin\AsignaturaPersonalizadaController;
 use App\Http\Controllers\FuncionarioEstab\SolicitudReemplazoController;
 use App\Http\Controllers\MessagingController;
 use App\Http\Controllers\Gestion\SolicitudReemplazoGestionController;
+use App\Http\Controllers\Gestion\DeudaPensionAlimentosController as GestionDeudaPensionAlimentosController;
 use App\Http\Controllers\Gestion\AutorizacionDocenteController;
 use App\Http\Controllers\Reemplazos\BuscadorPostulantesController;
 use App\Http\Controllers\Gestion\OrdenTrabajoPdfController;
@@ -373,7 +375,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     Route::get('/reemplazos/documentos/{document}/preview', [\App\Http\Controllers\Admin\DocumentReviewController::class, 'previewView'])
         ->name('reemplazos.documents.preview');
 
-    
+
     Route::put('/reemplazos/documentos/{document}', [\App\Http\Controllers\Admin\DocumentReviewController::class, 'update'])
         ->name('reemplazos.documents.update');
 
@@ -810,6 +812,18 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     Route::get('/postulante/mis-finiquitos/{solicitud}/descargar', [MisFiniquitosController::class, 'descargar'])
         ->middleware('ensure.role:postulante|funcionario')
         ->name('postulant.finiquitos.descargar');
+
+    Route::prefix('postulante/deudas-pension-alimentos')
+        ->middleware('ensure.role:postulante|funcionario')
+        ->name('postulant.deudas-pension-alimentos.')
+        ->group(function () {
+            Route::get('/', [PostulanteDeudaPensionAlimentosController::class, 'index'])->name('index');
+            Route::get('/{deuda}', [PostulanteDeudaPensionAlimentosController::class, 'show'])->name('show');
+            Route::post('/{deuda}/resolucion', [PostulanteDeudaPensionAlimentosController::class, 'guardarResolucion'])->name('resolucion.store');
+            Route::get('/{deuda}/certificado', [PostulanteDeudaPensionAlimentosController::class, 'certificado'])->name('certificado');
+            Route::get('/{deuda}/resolucion', [PostulanteDeudaPensionAlimentosController::class, 'resolucion'])->name('resolucion');
+            Route::get('/{deuda}/declaracion', [PostulanteDeudaPensionAlimentosController::class, 'declaracion'])->name('declaracion');
+        });
 
 
     // -------------------------
@@ -1334,6 +1348,23 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::delete('/solicitudes-reemplazo/finiquitos/{solicitud}/eliminar-firmado', [SolicitudReemplazoGestionController::class, 'eliminarFiniquitoFirmado'])
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
             ->name('solicitudes-reemplazo.finiquitos.eliminar-firmado');
+
+        Route::prefix('deudas-pension-alimentos')
+            ->middleware(['ensure.role:admin|funcionario_slep', 'ensure.active-role:admin|funcionario_slep'])
+            ->name('deudas-pension-alimentos.')
+            ->group(function () {
+                Route::get('/', [GestionDeudaPensionAlimentosController::class, 'index'])->name('index');
+                Route::get('/{deuda}', [GestionDeudaPensionAlimentosController::class, 'show'])->name('show');
+                Route::post('/{deuda}/certificado', [GestionDeudaPensionAlimentosController::class, 'guardarCertificado'])->name('certificado.store');
+                Route::get('/{deuda}/certificado', [GestionDeudaPensionAlimentosController::class, 'certificado'])->name('certificado');
+                Route::get('/{deuda}/resolucion', [GestionDeudaPensionAlimentosController::class, 'resolucion'])->name('resolucion');
+                Route::get('/{deuda}/declaracion', [GestionDeudaPensionAlimentosController::class, 'declaracion'])->name('declaracion');
+                Route::post('/{deuda}/enviar-remuneraciones', [GestionDeudaPensionAlimentosController::class, 'enviar'])->name('enviar');
+            });
+
+        Route::post('/solicitudes-reemplazo/{solicitud}/deuda-pension-alimentos/activar', [GestionDeudaPensionAlimentosController::class, 'activar'])
+            ->middleware(['ensure.role:admin|funcionario_slep', 'ensure.active-role:admin|funcionario_slep'])
+            ->name('solicitudes-reemplazo.deuda-pension-alimentos.activar');
 
         // ver solicitud
         Route::get('/solicitudes-reemplazo/{solicitud}', [SolicitudReemplazoGestionController::class, 'show'])

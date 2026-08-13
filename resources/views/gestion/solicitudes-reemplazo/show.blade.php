@@ -18,6 +18,25 @@
             <div class="text-muted">Estado: <span class="fw-semibold">{{ $s->estado }}</span></div>
         </div>
         <div class="d-flex gap-2">
+            @if (!empty($canGestionarDeudaPension))
+                @if ($deudaPension)
+                    <a class="btn btn-outline-danger" href="{{ route('gestion.deudas-pension-alimentos.show', $deudaPension) }}">
+                        <i class="bi bi-shield-exclamation"></i> Ver deuda de pensión
+                    </a>
+                @elseif ($s->postulant_profile_id)
+                    <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.deuda-pension-alimentos.activar', $s) }}" onsubmit="return confirm('¿Confirma que el postulante registra deuda de pensión de alimentos? La solicitud quedará bloqueada hasta enviar los antecedentes a Remuneraciones.');">
+                        @csrf
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-shield-exclamation"></i> Activar Deuda Pensión de Alimentos
+                        </button>
+                    </form>
+                @else
+                    <button type="button" class="btn btn-outline-danger" disabled title="Primero debe existir una persona reemplazante asociada a la solicitud.">
+                        <i class="bi bi-shield-exclamation"></i> Activar Deuda Pensión de Alimentos
+                    </button>
+                @endif
+            @endif
+
             @if (!empty($lockedByOtContrato) && $s->estado === 'derivada_slep')
                 <span class="badge bg-secondary align-self-center">Bloqueada: OT/Contrato generado</span>
             @endif
@@ -77,6 +96,24 @@
                     <li>{{ $e }}</li>
                 @endforeach
             </ul>
+        </div>
+    @endif
+
+    @if (!empty($canVerDeudaPension) && !empty($deudaPensionBloqueaFlujo) && $deudaPension)
+        <div class="alert alert-danger d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="fw-semibold"><i class="bi bi-lock-fill me-1"></i> Solicitud bloqueada por deuda de pensión de alimentos</div>
+                <div class="small mt-1">Se mantendrá en Derivada SLEP y no permitirá generar Orden de Trabajo ni Contrato hasta enviar el expediente completo a Remuneraciones.</div>
+            </div>
+            <a class="btn btn-light" href="{{ route('gestion.deudas-pension-alimentos.show', $deudaPension) }}">Gestionar expediente</a>
+        </div>
+    @elseif (!empty($canVerDeudaPension) && $deudaPension)
+        <div class="alert alert-success d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="fw-semibold"><i class="bi bi-unlock-fill me-1"></i> Expediente de deuda enviado a Remuneraciones</div>
+                <div class="small mt-1">La solicitud está desbloqueada y puede continuar con la Orden de Trabajo o el Contrato.</div>
+            </div>
+            <a class="btn btn-light" href="{{ route('gestion.deudas-pension-alimentos.show', $deudaPension) }}">Ver expediente</a>
         </div>
     @endif
 

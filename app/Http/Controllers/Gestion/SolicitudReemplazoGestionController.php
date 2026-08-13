@@ -7,6 +7,7 @@ use App\Mail\OrdenTrabajoCreada;
 use App\Mail\OrdenTrabajoCorreoInstitucionalSoporteTi;
 use App\Mail\ContratoTrabajoFirmadoEnviado;
 use App\Models\SolicitudReemplazo;
+use App\Models\SolicitudReemplazoDeudaPension;
 use App\Models\ReemplazoPersonal;
 use App\Models\SolicitudReemplazoJornada;
 use App\Models\SolicitudReemplazoObservacion;
@@ -445,6 +446,8 @@ class SolicitudReemplazoGestionController extends Controller
             'autorizacionDocente.solicitadoPor',
             'autorizacionDocente.numeroRegistradoPor',
             'autorizacionDocente.estadoActualizadoPor',
+            'deudaPension.postulante.user',
+            'derivadaA.roles',
         ]);
 
         $isAdmin = method_exists($user, 'hasRole') ? $user->hasRole('admin') : false;
@@ -455,7 +458,10 @@ class SolicitudReemplazoGestionController extends Controller
             ? $user->hasRole('funcionario_slep')
             : false;
 
+        $deudaPension = $solicitud->deudaPension;
+        $deudaPensionBloqueaFlujo = $this->deudaPensionBloqueaFlujo($solicitud);
         $canCrearOt = $solicitud->estado === 'derivada_slep'
+            && ! $deudaPensionBloqueaFlujo
             && (
                 $isAdmin
                 || $isGdp
@@ -502,6 +508,15 @@ class SolicitudReemplazoGestionController extends Controller
 
         $titularEsDocente = $this->estamentoFromEstatuto($solicitud->funcionarioTitular?->estatuto) === 'docente';
         $activeRole = method_exists($user, 'activeRoleName') ? (string) $user->activeRoleName() : '';
+        $tieneFuncionarioSlepAsignado = $solicitud->derivada_a_user_id
+            && $solicitud->derivadaA
+            && method_exists($solicitud->derivadaA, 'hasRole')
+            && $solicitud->derivadaA->hasRole('funcionario_slep');
+        $canVerDeudaPension = in_array($activeRole, ['admin', 'funcionario_slep'], true)
+            && $tieneFuncionarioSlepAsignado
+            && ($activeRole === 'admin' || (int) $solicitud->derivada_a_user_id === (int) $user->id);
+        $canGestionarDeudaPension = $canVerDeudaPension
+            && $solicitud->estado === 'derivada_slep';
         $canGestionarAutorizacionDocente = in_array($activeRole, ['admin', 'coordinador_uatp'], true)
             && $titularEsDocente
             && (bool) $solicitud->propone_reemplazo
@@ -664,6 +679,10 @@ class SolicitudReemplazoGestionController extends Controller
             'puedeAprobarUatpPorAutorizacionDocente' => $puedeAprobarUatpPorAutorizacionDocente,
             'documentoTituloPostulante' => $documentoTituloPostulante,
             'autorizacionDocenteRequiereReligion' => $autorizacionDocenteRequiereReligion,
+            'canGestionarDeudaPension' => $canGestionarDeudaPension,
+            'deudaPension' => $deudaPension,
+            'deudaPensionBloqueaFlujo' => $deudaPensionBloqueaFlujo,
+            'canVerDeudaPension' => $canVerDeudaPension,
         ]);
     }
 
@@ -1392,6 +1411,12 @@ class SolicitudReemplazoGestionController extends Controller
             abort_unless((int) $solicitud->derivada_a_user_id === (int) $user->id, 403);
         }
 
+        if ($this->deudaPensionBloqueaFlujo($solicitud)) {
+            return back()->withErrors([
+                'deuda_pension' => 'La solicitud tiene una deuda de pensión de alimentos activa. Debes completar el expediente y enviarlo a Remuneraciones antes de generar la Orden de Trabajo.',
+            ])->withInput();
+        }
+
         $inicioMin = $solicitud->fecha_inicio?->toDateString();
         $inicioMax = $solicitud->fecha_termino?->toDateString();
 
@@ -1475,6 +1500,12 @@ class SolicitudReemplazoGestionController extends Controller
             $s = SolicitudReemplazo::whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
 
             abort_unless($s->estado === 'derivada_slep', 403);
+
+            if ($this->deudaPensionBloqueaFlujo($s)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'deuda_pension' => 'La solicitud continúa bloqueada por deuda de pensión de alimentos pendiente de envío a Remuneraciones.',
+                ]);
+            }
 
             // Si no venía con propuesta, asignamos el postulante seleccionado
             if (!$s->propone_reemplazo) {
@@ -1936,6 +1967,15 @@ class SolicitudReemplazoGestionController extends Controller
             || !empty($s->contrato_trabajo_firmado_enviado_at);
     }
 
+    private function deudaPensionBloqueaFlujo(SolicitudReemplazo $solicitud): bool
+    {
+        $solicitud->loadMissing('deudaPension.postulante.user');
+        $deuda = $solicitud->deudaPension;
+
+        return $deuda
+            && $deuda->estadoFlujo() !== SolicitudReemplazoDeudaPension::ESTADO_ENVIADO;
+    }
+
     private function hasFiniquitoAsociado(SolicitudReemplazo $s): bool
     {
         return (bool) $s->finiquito_pagado
@@ -1969,6 +2009,12 @@ class SolicitudReemplazoGestionController extends Controller
 
         if (!$isAdmin && !$isGdp) {
             abort_unless((int) $solicitud->derivada_a_user_id === (int) $user->id, 403);
+        }
+
+        if ($this->deudaPensionBloqueaFlujo($solicitud)) {
+            return back()->withErrors([
+                'deuda_pension' => 'La solicitud tiene una deuda de pensión de alimentos activa. Debes completar el expediente y enviarlo a Remuneraciones antes de generar el Contrato.',
+            ])->withInput();
         }
 
         $solicitud->loadMissing(['funcionarioTitular', 'areaDesempeno', 'establecimiento', 'jornadas', 'postulante.user']);
@@ -2011,7 +2057,7 @@ class SolicitudReemplazoGestionController extends Controller
         if (!$pp) {
             return back()->withErrors(['postulant_profile_id' => 'Postulante no encontrado.'])->withInput();
         }
-        
+
 
         $isEpSelected = ($solicitud->areaDesempeno?->slug === 'educadora_de_parvulos');
         $epAreaIds = [];
@@ -2138,6 +2184,12 @@ class SolicitudReemplazoGestionController extends Controller
 
         if (!$isAdmin && !$isGdp) {
             abort_unless((int) $solicitud->derivada_a_user_id === (int) $user->id, 403);
+        }
+
+        if ($this->deudaPensionBloqueaFlujo($solicitud)) {
+            return back()->withErrors([
+                'deuda_pension' => 'La solicitud tiene una deuda de pensión de alimentos activa. Debes enviar el expediente a Remuneraciones antes de cargar el Contrato final.',
+            ])->withInput();
         }
 
         $solicitud->loadMissing(['funcionarioTitular']);
