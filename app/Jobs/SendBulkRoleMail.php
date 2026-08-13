@@ -31,8 +31,11 @@ class SendBulkRoleMail implements ShouldQueue
     {
         $user = User::query()->find($this->userId);
 
-        if (! $user || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
-            Log::warning('Correo masivo por rol omitido: destinatario inválido.', [
+        $hasSelectedRole = $user
+            && (empty($this->roles) || $user->hasAnyRole($this->roles));
+
+        if (! $user || ! $hasSelectedRole || ! $user->email_verified_at || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+            Log::warning('Correo masivo por rol omitido: destinatario sin rol seleccionado, inválido o sin correo verificado.', [
                 'user_id' => $this->userId,
             ]);
             return;

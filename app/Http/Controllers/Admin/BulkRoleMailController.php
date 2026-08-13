@@ -21,7 +21,8 @@ class BulkRoleMailController extends Controller
             ->withCount([
                 'users as recipients_count' => fn ($query) => $query
                     ->whereNotNull('email')
-                    ->where('email', '!=', ''),
+                    ->where('email', '!=', '')
+                    ->whereNotNull('email_verified_at'),
             ])
             ->orderBy('name')
             ->get()
@@ -55,7 +56,7 @@ class BulkRoleMailController extends Controller
             ->values();
 
         if ($recipientIds->isEmpty()) {
-            return back()->withInput()->withErrors(['roles' => 'Los roles seleccionados no tienen usuarios con un correo válido registrado.']);
+            return back()->withInput()->withErrors(['roles' => 'Los roles seleccionados no tienen usuarios con un correo válido y verificado.']);
         }
 
         foreach ($recipientIds as $userId) {
@@ -81,6 +82,7 @@ class BulkRoleMailController extends Controller
             ->select('users.id')
             ->whereNotNull('users.email')
             ->where('users.email', '!=', '')
+            ->whereNotNull('users.email_verified_at')
             ->whereHas('roles', fn ($query) => $query->whereIn('name', $roles))
             ->orderBy('users.id');
     }

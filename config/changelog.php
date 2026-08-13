@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.13.381' => [
+        'date' => '2026-08-13',
+        'module' => 'Administración',
+        'title' => 'Correos masivos sólo para usuarios verificados',
+        'files' => [
+            'app/Http/Controllers/Admin/BulkRoleMailController.php',
+            'app/Jobs/SendBulkRoleMail.php',
+            'config/changelog.php',
+            'resources/views/admin/bulk-role-mail/index.blade.php',
+            'tests/Feature/AdminBulkRoleMailMenuTest.php',
+        ],
+        'changes' => [
+            'Filtra los destinatarios por rol y exige que email_verified_at tenga una fecha de verificación.',
+            'Actualiza los contadores del formulario para mostrar únicamente usuarios con correo verificado.',
+            'Vuelve a validar el rol y el correo verificado al ejecutar el trabajo en cola para evitar envíos si alguno cambia después de programarlo.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP'],
+    ],
     '2026.8.13.380' => [
         'date' => '2026-08-13',
         'module' => 'Administración',
