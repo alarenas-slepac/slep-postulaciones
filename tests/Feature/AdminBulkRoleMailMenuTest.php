@@ -21,19 +21,24 @@ class AdminBulkRoleMailMenuTest extends TestCase
         $this->assertIsInt($usuarios);
         $this->assertSame($usuarios + 1, $correos);
         $this->assertSame($correos + 1, $historial);
+        $this->assertContains(
+            'Correos masivos por rol',
+            collect(SlepUiRegistry::menuGroups(null, 'coordinador_gdp'))->flatten(1)->pluck('label')
+        );
         $this->assertNotContains(
             'Correos masivos por rol',
             collect(SlepUiRegistry::menuGroups(null, 'funcionario_slep'))->flatten(1)->pluck('label')
         );
     }
 
-    public function test_modulo_y_ruta_conservan_acceso_exclusivo_para_administrador(): void
+    public function test_ruta_permite_administrador_y_coordinador_gdp_sin_exigir_modulo_adicional(): void
     {
         $route = app('router')->getRoutes()->getByName('admin.bulk-role-mail.index');
         $middleware = $route?->gatherMiddleware() ?? [];
 
         $this->assertNotNull($route);
-        $this->assertContains('ensure.role:admin', $middleware);
+        $this->assertContains('ensure.role:admin|coordinador_gdp', $middleware);
+        $this->assertNotContains('ensure.module', $middleware);
         $this->assertSame('Administración', ModuleRegistry::defaultMeta('admin.bulk-role-mail')['section']);
         $this->assertSame('Correos masivos por rol', ModuleRegistry::defaultMeta('admin.bulk-role-mail')['name']);
     }
