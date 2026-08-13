@@ -398,9 +398,9 @@
                         </li>
                     @endif
 
-                    @if ($isAdmin && ($u->canAnyModule(['admin.users', 'admin.roles', 'admin.restricted-ruts', 'admin.notification-logs'], $activeRole) || Route::has('admin.postulaciones.index')))
+                    @if ($isAdmin && ($u->canAnyModule(['admin.users', 'admin.roles', 'admin.restricted-ruts', 'admin.notification-logs', 'admin.bulk-role-mail'], $activeRole) || Route::has('admin.postulaciones.index')))
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle {{ request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*') || request()->routeIs('admin.restricted-ruts.*') || request()->routeIs('admin.notification-logs.*') || request()->routeIs('admin.postulaciones.*') ? 'active' : '' }}"
+                            <a class="nav-link dropdown-toggle {{ request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*') || request()->routeIs('admin.restricted-ruts.*') || request()->routeIs('admin.notification-logs.*') || request()->routeIs('admin.bulk-role-mail.*') || request()->routeIs('admin.postulaciones.*') ? 'active' : '' }}"
                                 href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-shield-lock"></i> Administración
                             </a>
@@ -414,11 +414,14 @@
                                 @if ($u->canModule('admin.roles', $activeRole) && Route::has('admin.roles.index'))
                                     <li><a class="dropdown-item" href="{{ route('admin.roles.index') }}"><i class="bi bi-key"></i> Roles (módulos)</a></li>
                                 @endif
-                                @if ($u->canModule('admin.restricted-ruts', $activeRole) && Route::has('admin.restricted-ruts.index'))
-                                    <li><a class="dropdown-item" href="{{ route('admin.restricted-ruts.index') }}"><i class="bi bi-shield-exclamation"></i> Restricciones para ejercer</a></li>
+                                @if ($u->canModule('admin.bulk-role-mail', $activeRole) && Route::has('admin.bulk-role-mail.index'))
+                                    <li><a class="dropdown-item" href="{{ route('admin.bulk-role-mail.index') }}"><i class="bi bi-envelope-at"></i> Correos masivos por rol</a></li>
                                 @endif
                                 @if ($u->canModule('admin.notification-logs', $activeRole) && Route::has('admin.notification-logs.index'))
                                     <li><a class="dropdown-item" href="{{ route('admin.notification-logs.index') }}"><i class="bi bi-envelope-check"></i> Historial de notificaciones</a></li>
+                                @endif
+                                @if ($u->canModule('admin.restricted-ruts', $activeRole) && Route::has('admin.restricted-ruts.index'))
+                                    <li><a class="dropdown-item" href="{{ route('admin.restricted-ruts.index') }}"><i class="bi bi-shield-exclamation"></i> Restricciones para ejercer</a></li>
                                 @endif
                             </ul>
                         </li>
