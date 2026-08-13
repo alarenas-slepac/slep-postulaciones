@@ -34,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Route::middleware(['web', 'auth', 'verified', 'ensure.module', 'ensure.role:admin'])
+        Route::middleware(['web', 'auth', 'verified', 'ensure.role:admin|coordinador_gdp'])
             ->prefix('admin/correos-por-rol')
             ->name('admin.bulk-role-mail.')
             ->group(function (): void {

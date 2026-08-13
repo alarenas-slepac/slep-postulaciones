@@ -100,7 +100,7 @@ class SlepUiRegistry
             ],
             'Administración' => [
                 self::entry('Usuarios y roles', 'admin.users.index', 'bi-people-fill', ['admin'], 'admin.users'),
-                self::entry('Correos masivos por rol', 'admin.bulk-role-mail.index', 'bi-envelope-at', ['admin'], 'admin.bulk-role-mail'),
+                self::entry('Correos masivos por rol', 'admin.bulk-role-mail.index', 'bi-envelope-at', ['admin', 'coordinador_gdp']),
                 self::entry('Historial de notificaciones', 'admin.notification-logs.index', 'bi-envelope-check', ['admin'], 'admin.notification-logs'),
                 self::entry('Roles', 'admin.roles.index', 'bi-person-gear', ['admin'], 'admin.roles'),
                 self::entry('Configuración reemplazos', 'admin.solicitudes-reemplazo-configuracion.edit', 'bi-gear', ['admin']),

@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.13.380' => [
+        'date' => '2026-08-13',
+        'module' => 'Administración',
+        'title' => 'Correos masivos disponibles para Coordinación GDP',
+        'files' => [
+            'app/Providers/AppServiceProvider.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'resources/views/partials/navbar.blade.php',
+            'tests/Feature/AdminBulkRoleMailMenuTest.php',
+        ],
+        'changes' => [
+            'Permite al rol Coordinador GDP acceder a Correos masivos por rol y enviar comunicaciones a los roles disponibles.',
+            'Muestra el acceso dentro del grupo Administración tanto en la barra lateral moderna como en la navegación antigua.',
+            'Mantiene excluidos los demás roles y evita depender de una asignación adicional en la matriz de módulos.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP'],
+    ],
     '2026.8.13.379' => [
         'date' => '2026-08-13',
         'module' => 'Administración',
