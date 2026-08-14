@@ -21,6 +21,22 @@ class SolicitudReemplazoAutorizacionDocenteService
         $slugs = [
             'antecedentes_especiales',
             'titulo',
+            'inhabilidades_menores',
+        ];
+
+        if ($this->esAreaReligion($solicitud)) {
+            $slugs[] = 'idoneidad_religion';
+        }
+
+        return $slugs;
+    }
+
+    /** @return array<int, string> */
+    public function slugsAdjuntables(SolicitudReemplazo $solicitud): array
+    {
+        $slugs = [
+            'antecedentes_especiales',
+            'titulo',
             'titulo_mencion',
             'inhabilidades_menores',
         ];
@@ -84,7 +100,8 @@ class SolicitudReemplazoAutorizacionDocenteService
             ]);
         }
 
-        $slugs = $this->slugsRequeridos($solicitud);
+        $slugsRequeridos = $this->slugsRequeridos($solicitud);
+        $slugs = $this->slugsAdjuntables($solicitud);
         $tipos = DocumentType::query()
             ->whereIn('slug', $slugs)
             ->get()
@@ -110,7 +127,9 @@ class SolicitudReemplazoAutorizacionDocenteService
             $path = (string) ($documento?->path ?? '');
 
             if (! $tipo || ! $documento || $path === '' || ! Storage::disk($disk)->exists($path)) {
-                $faltantes[] = $etiqueta;
+                if (in_array($slug, $slugsRequeridos, true)) {
+                    $faltantes[] = $etiqueta;
+                }
                 continue;
             }
 

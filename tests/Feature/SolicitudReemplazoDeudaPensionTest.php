@@ -16,7 +16,6 @@ class SolicitudReemplazoDeudaPensionTest extends TestCase
         $deuda = new SolicitudReemplazoDeudaPension([
             'certificado_deuda_path' => 'certificado.pdf',
             'resolucion_path' => 'resolucion.pdf',
-            'valor_cuota_alimentaria' => 150000,
         ]);
         $deuda->certificado_subido_at = Carbon::parse('2026-08-13 09:00:00');
         $deuda->resolucion_subida_at = Carbon::parse('2026-08-13 09:30:00');
@@ -40,6 +39,25 @@ class SolicitudReemplazoDeudaPensionTest extends TestCase
             SolicitudReemplazoDeudaPension::ESTADO_LISTO_ENVIO,
             $deuda->estadoFlujo($declaracion)
         );
+    }
+
+    public function test_resolucion_completa_el_paso_del_postulante_sin_ingresar_valor(): void
+    {
+        $deuda = new SolicitudReemplazoDeudaPension([
+            'resolucion_path' => 'resolucion.pdf',
+        ]);
+
+        $this->assertSame(
+            SolicitudReemplazoDeudaPension::ESTADO_PENDIENTE_SLEP,
+            $deuda->estadoFlujo()
+        );
+
+        $controller = file_get_contents(app_path('Http/Controllers/Postulante/DeudaPensionAlimentosController.php'));
+        $vista = file_get_contents(resource_path('views/postulant/deudas-pension-alimentos/show.blade.php'));
+
+        $this->assertStringNotContainsString("'valor_cuota_alimentaria' =>", $controller);
+        $this->assertStringNotContainsString('name="valor_cuota_alimentaria"', $vista);
+        $this->assertStringNotContainsString('name="observacion_postulante"', $vista);
     }
 
     public function test_rutas_separan_gestion_slep_y_expediente_del_postulante(): void

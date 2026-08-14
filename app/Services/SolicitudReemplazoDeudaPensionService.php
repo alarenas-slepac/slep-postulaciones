@@ -28,9 +28,6 @@ class SolicitudReemplazoDeudaPensionService
         if (! $deuda->resolucion_path || ! Storage::disk('local')->exists($deuda->resolucion_path)) {
             $errores[] = 'Falta la resolución o dictamen actualizado cargado por el postulante.';
         }
-        if ($deuda->valor_cuota_alimentaria === null || (float) $deuda->valor_cuota_alimentaria <= 0) {
-            $errores[] = 'Falta informar un valor válido de cuota alimentaria.';
-        }
         if (! $declaracion?->path || ! Storage::disk('public')->exists($declaracion->path)) {
             $errores[] = 'Falta la declaración jurada vigente para ejercer cargo público.';
         }

@@ -16,10 +16,9 @@
     <li><strong>RUT:</strong> {{ \App\Support\Rut::format($postulante?->rut) ?? '—' }}</li>
     <li><strong>Establecimiento:</strong> {{ $solicitud?->establecimiento?->nombre_establecimiento ?? '—' }}</li>
     <li><strong>Estado de la solicitud:</strong> {{ ucfirst(str_replace('_', ' ', (string) $solicitud?->estado)) }}</li>
-    <li><strong>Valor informado de cuota alimentaria:</strong> ${{ number_format((float) $deuda->valor_cuota_alimentaria, 0, ',', '.') }}</li>
 </ul>
 
-<p>Se adjuntan el certificado de deuda, la resolución o dictamen actualizado y la declaración jurada vigente para ejercer cargo público.</p>
+<p>Se adjuntan el certificado de deuda, la resolución o dictamen actualizado —donde consta el valor de la cuota alimentaria— y la declaración jurada vigente para ejercer cargo público.</p>
 
 <p>Una vez enviado este correo, el sistema desbloquea la solicitud para continuar con la Orden de Trabajo o el Contrato.</p>
 

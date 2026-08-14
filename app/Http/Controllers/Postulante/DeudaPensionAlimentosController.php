@@ -37,17 +37,14 @@ class DeudaPensionAlimentosController extends Controller
     public function guardarResolucion(Request $request, SolicitudReemplazoDeudaPension $deuda)
     {
         $this->assertPropietario($request, $deuda);
-        $data = $request->validate([
+        $request->validate([
             'resolucion' => ['required', 'file', 'mimetypes:application/pdf', 'mimes:pdf', 'max:10240'],
-            'valor_cuota_alimentaria' => ['required', 'numeric', 'min:1', 'max:9999999999.99'],
-            'observacion_postulante' => ['nullable', 'string', 'max:2000'],
         ], [
             'resolucion.mimetypes' => 'La resolución o dictamen debe ser un archivo PDF.',
             'resolucion.mimes' => 'La resolución o dictamen debe ser un archivo PDF.',
             'resolucion.max' => 'La resolución o dictamen no puede superar 10 MB.',
         ], [
             'resolucion' => 'resolución o dictamen',
-            'valor_cuota_alimentaria' => 'valor de cuota alimentaria',
         ]);
 
         $archivo = $request->file('resolucion');
@@ -63,8 +60,6 @@ class DeudaPensionAlimentosController extends Controller
             'resolucion_nombre_original' => $archivo->getClientOriginalName(),
             'resolucion_mime' => 'application/pdf',
             'resolucion_size' => $archivo->getSize(),
-            'valor_cuota_alimentaria' => $data['valor_cuota_alimentaria'],
-            'observacion_postulante' => $data['observacion_postulante'] ?? null,
             'resolucion_subida_por_user_id' => $request->user()->id,
             'resolucion_subida_at' => now(),
         ])->save();
