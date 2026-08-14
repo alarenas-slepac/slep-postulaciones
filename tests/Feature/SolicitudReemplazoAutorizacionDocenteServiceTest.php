@@ -56,7 +56,7 @@ class SolicitudReemplazoAutorizacionDocenteServiceTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_exige_cinco_documentos_cuando_el_area_es_religion(): void
+    public function test_adjunta_titulo_con_mencion_cuando_esta_disponible_en_area_religion(): void
     {
         $solicitud = $this->solicitud('Religión Católica');
         $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
@@ -64,6 +64,7 @@ class SolicitudReemplazoAutorizacionDocenteServiceTest extends TestCase
         foreach ($service->slugsRequeridos($solicitud) as $slug) {
             $this->crearDocumento($slug);
         }
+        $this->crearDocumento('titulo_mencion');
 
         $documentos = $service->documentosRequeridos($solicitud);
 
@@ -76,7 +77,28 @@ class SolicitudReemplazoAutorizacionDocenteServiceTest extends TestCase
         ], $documentos->pluck('type.slug')->all());
     }
 
-    public function test_exige_inhabilidades_pero_no_idoneidad_fuera_del_area_religion(): void
+    public function test_adjunta_titulo_con_mencion_cuando_esta_disponible_fuera_del_area_religion(): void
+    {
+        $solicitud = $this->solicitud('Educador(a) Diferencial');
+        $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
+
+        foreach ($service->slugsRequeridos($solicitud) as $slug) {
+            $this->crearDocumento($slug);
+        }
+        $this->crearDocumento('titulo_mencion');
+
+        $documentos = $service->documentosRequeridos($solicitud);
+
+        $this->assertSame([
+            'antecedentes_especiales',
+            'titulo',
+            'titulo_mencion',
+            'inhabilidades_menores',
+        ], $documentos->pluck('type.slug')->all());
+        $this->assertNotContains('idoneidad_religion', $documentos->pluck('type.slug')->all());
+    }
+
+    public function test_titulo_con_mencion_es_opcional_y_no_bloquea_el_envio(): void
     {
         $solicitud = $this->solicitud('Educador(a) Diferencial');
         $service = app(SolicitudReemplazoAutorizacionDocenteService::class);
@@ -90,10 +112,9 @@ class SolicitudReemplazoAutorizacionDocenteServiceTest extends TestCase
         $this->assertSame([
             'antecedentes_especiales',
             'titulo',
-            'titulo_mencion',
             'inhabilidades_menores',
         ], $documentos->pluck('type.slug')->all());
-        $this->assertNotContains('idoneidad_religion', $documentos->pluck('type.slug')->all());
+        $this->assertNotContains('titulo_mencion', $service->slugsRequeridos($solicitud));
     }
 
     public function test_correo_formatea_el_rut_con_puntos_y_guion(): void

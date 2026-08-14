@@ -712,8 +712,8 @@
                             </div>
 
                             <div class="form-text mt-2">
-                                Incluye antecedentes especiales, título profesional o técnico, título con mención
-                                y Certificado de Inhabilidades para trabajar con menores.
+                                Incluye antecedentes especiales, título profesional o técnico y Certificado de
+                                Inhabilidades para trabajar con menores. El título con mención se adjuntará sólo si está disponible.
                                 @if (!empty($autorizacionDocenteRequiereReligion))
                                     Para Religión también exige Idoneidad para Religión.
                                 @endif

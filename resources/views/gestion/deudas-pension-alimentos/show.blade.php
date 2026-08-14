@@ -24,7 +24,7 @@
             <div class="dpa-summary">
                 <div class="dpa-summary__item"><div class="dpa-summary__label">Estado solicitud</div><div class="dpa-summary__value">{{ ucfirst(str_replace('_', ' ', (string) $solicitud?->estado)) }}</div></div>
                 <div class="dpa-summary__item"><div class="dpa-summary__label">Establecimiento</div><div class="dpa-summary__value fs-6">{{ $solicitud?->establecimiento?->nombre_establecimiento ?? '—' }}</div></div>
-                <div class="dpa-summary__item"><div class="dpa-summary__label">Cuota informada</div><div class="dpa-summary__value">{{ $deuda->valor_cuota_alimentaria !== null ? '$' . number_format((float) $deuda->valor_cuota_alimentaria, 0, ',', '.') : 'Pendiente' }}</div></div>
+                <div class="dpa-summary__item"><div class="dpa-summary__label">Resolución o dictamen</div><div class="dpa-summary__value fs-6">{{ $deuda->resolucion_path ? 'Documento cargado' : 'Pendiente' }}</div></div>
             </div>
         </div>
 

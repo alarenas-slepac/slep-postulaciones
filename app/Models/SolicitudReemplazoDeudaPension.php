@@ -31,8 +31,6 @@ class SolicitudReemplazoDeudaPension extends Model
         'resolucion_nombre_original',
         'resolucion_mime',
         'resolucion_size',
-        'valor_cuota_alimentaria',
-        'observacion_postulante',
         'resolucion_subida_por_user_id',
         'resolucion_subida_at',
         'correo_destino',
@@ -47,7 +45,6 @@ class SolicitudReemplazoDeudaPension extends Model
             'certificado_deuda_size' => 'integer',
             'certificado_subido_at' => 'datetime',
             'resolucion_size' => 'integer',
-            'valor_cuota_alimentaria' => 'decimal:2',
             'resolucion_subida_at' => 'datetime',
             'enviado_at' => 'datetime',
         ];
@@ -124,7 +121,7 @@ class SolicitudReemplazoDeudaPension extends Model
             return self::ESTADO_PENDIENTE_DOCUMENTOS;
         }
 
-        if (! $this->resolucion_path || $this->valor_cuota_alimentaria === null || (float) $this->valor_cuota_alimentaria <= 0) {
+        if (! $this->resolucion_path) {
             return self::ESTADO_PENDIENTE_POSTULANTE;
         }
 

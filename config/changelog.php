@@ -35,7 +35,7 @@ return [
             'Permite activar la deuda sólo cuando la solicitud está en Derivada SLEP, tiene postulante y cuenta con un funcionario SLEP asignado.',
             'Marca al postulante como deudor y crea un expediente asociado al número y estado de la solicitud, mostrando su RUT con puntos y guion.',
             'Bloquea la generación de Orden de Trabajo y Contrato mientras el expediente activo no haya sido enviado a Remuneraciones; sin activación, el flujo permanece intacto.',
-            'Permite a SLEP cargar el certificado de deuda y al postulante cargar o reemplazar la resolución o dictamen junto con el valor de la cuota alimentaria.',
+            'Permite a SLEP cargar el certificado de deuda y al postulante cargar o reemplazar únicamente la resolución o dictamen; el valor de la cuota alimentaria se consulta directamente en ese documento.',
             'Consulta dinámicamente la declaración jurada vigente para ejercer cargo público, con fecha de carga, vista y descarga.',
             'Envía los tres documentos mediante correo auditado a la casilla configurable de Remuneraciones y desbloquea la solicitud después del envío.',
             'Incorpora bandejas y detalles para funcionario SLEP y postulante con una presentación coherente con Cometidos funcionarios.',
@@ -247,7 +247,7 @@ return [
         'changes' => [
             'Permite a supervisor_plani ver y descargar órdenes de trabajo existentes sin autorizar su creación o regeneración.',
             'Agrega en revisión UATP de solicitudes docentes con propuesta accesos a la ficha del postulante y al título cargado.',
-            'Envía a un correo administrable el expediente de autorización docente con antecedentes especiales, título profesional o técnico y título con mención.',
+            'Envía a un correo administrable el expediente de autorización docente con antecedentes especiales, título profesional o técnico y, si está disponible, título con mención.',
             'Para Religión Católica o Religión Evangélica exige y adjunta además Inhabilidades para trabajar con menores e Idoneidad para Religión.',
             'Registra por solicitud el número y estado independiente de la autorización docente, inicialmente En trámite, sin interrumpir el flujo del reemplazo.',
             'Incorpora una bandeja para coordinador_uatp y admin con estados En trámite, Aprobada y Rechazada, filtros y trazabilidad de responsables.',
