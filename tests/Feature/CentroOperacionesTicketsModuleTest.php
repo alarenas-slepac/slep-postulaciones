@@ -9,11 +9,16 @@ use Tests\TestCase;
 
 class CentroOperacionesTicketsModuleTest extends TestCase
 {
-    public function test_catalogo_excluye_otro_y_conserva_plazo_por_defecto(): void
+    public function test_reparacion_incluye_todas_las_incidencias_y_conserva_plazo_por_defecto(): void
     {
-        $migration = file_get_contents(database_path('migrations/2026_08_06_120000_create_centro_operaciones_tickets_tables.php'));
-        $this->assertStringContainsString("\$tipo === 'otro'", $migration);
-        $this->assertStringContainsString("->default(4)", $migration);
+        $migrationInicial = file_get_contents(database_path('migrations/2026_08_06_120000_create_centro_operaciones_tickets_tables.php'));
+        $reparacion = file_get_contents(database_path('migrations/2026_08_10_090000_repair_centro_operaciones_tickets.php'));
+        $servicio = file_get_contents(app_path('Services/CentroOperaciones/TicketService.php'));
+
+        $this->assertStringContainsString("->default(4)", $migrationInicial);
+        $this->assertStringContainsString('completarConfiguraciones()', $reparacion);
+        $this->assertStringContainsString('crearTicketsFaltantes()', $reparacion);
+        $this->assertStringNotContainsString("\$incidencia->tipo === 'otro'", $servicio);
     }
 
     public function test_clave_foranea_de_responsable_usa_un_nombre_compatible_con_mysql(): void
@@ -66,6 +71,7 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("name('tickets.pdf')", $routes);
         $this->assertStringContainsString("name('tickets.imagenes.store')", $routes);
         $this->assertStringContainsString("name('tickets.imagenes.show')", $routes);
+        $this->assertStringContainsString("name('centro-operaciones.tickets.verificar')", $routes);
     }
 
     public function test_mantenedor_permite_crear_y_asignar_por_subdireccion(): void
@@ -77,10 +83,12 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("->where('subdireccion_dependencia', \$datos['subdireccion_dependencia'])", $controller);
         $this->assertStringContainsString('48 - strlen($terminacion)', $controller);
         $this->assertStringContainsString('Nueva incidencia', $view);
-        $this->assertStringContainsString('>1</span> Subdirección', $view);
-        $this->assertStringContainsString('>2</span> Responsable de subdirección', $view);
+        $this->assertStringContainsString('<span class="co-step-number">1</span> Subdirección', $view);
+        $this->assertStringContainsString('<span class="co-step-number">2</span> Responsable de subdirección', $view);
         $this->assertStringContainsString('Subdirector(a) (Jefatura)', $view);
         $this->assertStringContainsString('data-subdireccion', $view);
+        $this->assertStringContainsString('segunda_subdireccion_responsable', $view);
+        $this->assertStringContainsString('segundo_responsable_funcionario_ac_id', $view);
     }
 
     public function test_mantenedor_y_tickets_comparten_la_linea_visual_del_centro_de_operaciones(): void
@@ -166,6 +174,23 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("'resolucion' => \$resolucion", $servicio);
         $this->assertStringNotContainsString("->whereNotIn('tipo', \$tiposIncidencia)\n            ->delete();", $servicio);
         $this->assertStringContainsString("->where('estado', 'activa')", $formulario);
+        $this->assertStringContainsString('$this->sincronizarExtintores($reporte, $usuario, $ahora);', $servicio);
+        $this->assertStringNotContainsString("where('tipo', '!=', 'otro')", $servicio);
+    }
+
+    public function test_segundo_responsable_usa_clave_foranea_y_no_rutas_inexistentes(): void
+    {
+        $migration = file_get_contents(database_path('migrations/2026_08_10_090000_repair_centro_operaciones_tickets.php'));
+        $modelo = file_get_contents(app_path('Models/CentroOperacionesTicket.php'));
+        $controlador = file_get_contents(app_path('Http/Controllers/CentroOperaciones/TicketController.php'));
+        $detalle = file_get_contents(resource_path('views/centro-operaciones/tickets/show.blade.php'));
+
+        $this->assertStringContainsString('co_ticket_segundo_resp_fk', $migration);
+        $this->assertStringContainsString('segundo_responsable_funcionario_ac_id', $modelo);
+        $this->assertStringContainsString("orWhere('segundo_responsable_funcionario_ac_id'", $controlador);
+        $this->assertStringNotContainsString('tickets.update-second-responsible', $detalle);
+        $this->assertStringNotContainsString('/api/subdirecciones', $detalle);
+        $this->assertStringNotContainsString('/api/responsables', $detalle);
     }
 
     public function test_escalamiento_esta_programado(): void
@@ -194,15 +219,33 @@ class CentroOperacionesTicketsModuleTest extends TestCase
     {
         $detalle = file_get_contents(resource_path('views/centro-operaciones/tickets/show.blade.php'));
         $pdf = file_get_contents(resource_path('views/centro-operaciones/tickets/pdf.blade.php'));
-        $pdfService = file_get_contents(app_path('Services/CentroOperaciones/TicketPdfService.php'));
+        $documentoService = file_get_contents(app_path('Services/CentroOperaciones/TicketDocumentoService.php'));
 
         $this->assertSame(10, config('centro_operaciones.ticket_imagenes.maximo'));
         $this->assertSame(20, config('centro_operaciones.ticket_imagenes.maximo_mb'));
         $this->assertStringContainsString('name="imagenes[]"', $detalle);
         $this->assertStringContainsString('multiple required', $detalle);
         $this->assertStringContainsString('20 MB por imagen', $detalle);
-        $this->assertStringContainsString('Descargar PDF', $detalle);
+        $this->assertStringContainsString('Ver informe PDF', $detalle);
         $this->assertStringContainsString('$imagenesPdf as $imagen', $pdf);
-        $this->assertStringContainsString('base64_encode($contenido)', $pdfService);
+        $this->assertStringContainsString('base64_encode($disco->get($imagen->path))', $documentoService);
+        $this->assertStringContainsString("'imagenes' => \$ticket->imagenes->map", $documentoService);
+    }
+
+    public function test_informe_incluye_firma_y_verificacion_documental(): void
+    {
+        $migration = file_get_contents(database_path('migrations/2026_08_10_160000_add_verification_and_signatures_to_centro_operaciones_tickets.php'));
+        $servicio = file_get_contents(app_path('Services/CentroOperaciones/TicketDocumentoService.php'));
+        $pdf = file_get_contents(resource_path('views/centro-operaciones/tickets/pdf.blade.php'));
+        $detalleReporte = file_get_contents(resource_path('views/centro-operaciones/reportes/show.blade.php'));
+
+        $this->assertStringContainsString('centro_operaciones_ticket_firmas', $migration);
+        $this->assertStringContainsString('reportado_por_nombre', $migration);
+        $this->assertStringContainsString('registrarFirmaResolucion', $servicio);
+        $this->assertStringContainsString('verificarIntegridad', $servicio);
+        $this->assertStringContainsString('Firma electrónica y verificación documental', $pdf);
+        $this->assertStringContainsString('Huella de datos SHA-256', $pdf);
+        $this->assertStringContainsString('$reporte->reportado_por_nombre_visible', $detalleReporte);
+        $this->assertStringNotContainsString('Usuario no disponible', $detalleReporte);
     }
 }

@@ -6,10 +6,12 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Route;
 use App\Support\ChangeLog;
 use App\Models\Conversation;
 use App\Policies\ConversationPolicy;
 use App\Services\CentroOperaciones\IncidenciaCatalogo;
+use App\Http\Controllers\Admin\BulkRoleMailController;
 use Vonage\Client;
 use Vonage\Client\Credentials\Basic;
 
@@ -32,6 +34,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Route::middleware(['web', 'auth', 'verified', 'ensure.role:admin|coordinador_gdp'])
+            ->prefix('admin/correos-por-rol')
+            ->name('admin.bulk-role-mail.')
+            ->group(function (): void {
+                Route::get('/', [BulkRoleMailController::class, 'index'])->name('index');
+                Route::post('/', [BulkRoleMailController::class, 'send'])->name('send');
+            });
+
         // Evitar lógica de URL en consola para no interferir con composer/artisan.
         if ($this->app->runningInConsole()) {
             // Si quieres que la paginación Bootstrap afecte también a comandos que renderizan vistas,

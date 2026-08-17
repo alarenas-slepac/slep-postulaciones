@@ -18,6 +18,7 @@ use App\Http\Controllers\PostulantProfileController;
 use App\Http\Controllers\PostulantDocumentsController;
 use App\Http\Controllers\Postulante\MisReemplazosController;
 use App\Http\Controllers\Postulante\MisFiniquitosController;
+use App\Http\Controllers\Postulante\DeudaPensionAlimentosController as PostulanteDeudaPensionAlimentosController;
 
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\PostulacionAdminController;
@@ -54,6 +55,8 @@ use App\Http\Controllers\Admin\AsignaturaPersonalizadaController;
 use App\Http\Controllers\FuncionarioEstab\SolicitudReemplazoController;
 use App\Http\Controllers\MessagingController;
 use App\Http\Controllers\Gestion\SolicitudReemplazoGestionController;
+use App\Http\Controllers\Gestion\DeudaPensionAlimentosController as GestionDeudaPensionAlimentosController;
+use App\Http\Controllers\Gestion\AutorizacionDocenteController;
 use App\Http\Controllers\Reemplazos\BuscadorPostulantesController;
 use App\Http\Controllers\Gestion\OrdenTrabajoPdfController;
 use App\Http\Controllers\Gestion\EstadisticasController;
@@ -65,6 +68,7 @@ use App\Http\Controllers\Postulante\OfertaLaboralController;
 use App\Http\Controllers\Admin\RestrictedRutController;
 use App\Http\Controllers\Admin\PermisoSinGoceExcepcionController;
 use App\Http\Controllers\Admin\NotificationDispatchLogController;
+use App\Http\Controllers\Admin\SolicitudReemplazoConfiguracionController;
 use App\Http\Controllers\IncumplimientoLaboralController;
 use App\Http\Controllers\ChangeLogController;
 use App\Http\Controllers\Endeudamiento\MaeCargaController;
@@ -153,6 +157,11 @@ Route::get('/certificados/verificar/{codigo}', CertificadoVerificacionController
     ->where('codigo', '[A-Fa-f0-9]{32}')
     ->name('certificados.verificar');
 
+Route::get('/verificar-ticket/{codigo}', [CentroOperacionesTicketController::class, 'verificar'])
+    ->middleware('throttle:60,1')
+    ->where('codigo', '[A-Za-z0-9-]{16,40}')
+    ->name('centro-operaciones.tickets.verificar');
+
 // =========================
 //  RUTAS PROTEGIDAS POR MÓDULO
 // =========================
@@ -162,7 +171,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::middleware('ensure.role:admin|director_ejecutivo|secretaria_direccion_ejecutiva|comunicaciones|funcionario_ac|funcionario_directivo_estab')->group(function () {
             Route::get('/tickets', [CentroOperacionesTicketController::class, 'index'])->name('tickets.index');
             Route::get('/tickets/{ticket}', [CentroOperacionesTicketController::class, 'show'])->whereNumber('ticket')->name('tickets.show');
-            Route::get('/tickets/{ticket}/pdf', [CentroOperacionesTicketController::class, 'pdf'])->whereNumber('ticket')->name('tickets.pdf');
+            Route::get('/tickets/{ticket}/informe', [CentroOperacionesTicketController::class, 'pdf'])->whereNumber('ticket')->name('tickets.pdf');
             Route::post('/tickets/{ticket}/imagenes', [CentroOperacionesTicketController::class, 'subirImagenes'])->whereNumber('ticket')->name('tickets.imagenes.store');
             Route::get('/tickets/{ticket}/imagenes/{imagen}', [CentroOperacionesTicketController::class, 'imagen'])
                 ->whereNumber(['ticket', 'imagen'])
@@ -370,7 +379,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     Route::get('/reemplazos/documentos/{document}/preview', [\App\Http\Controllers\Admin\DocumentReviewController::class, 'previewView'])
         ->name('reemplazos.documents.preview');
 
-    
+
     Route::put('/reemplazos/documentos/{document}', [\App\Http\Controllers\Admin\DocumentReviewController::class, 'update'])
         ->name('reemplazos.documents.update');
 
@@ -393,6 +402,13 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     // Admin: Usuarios
     // -------------------------
     Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/solicitudes-reemplazo/configuracion', [SolicitudReemplazoConfiguracionController::class, 'edit'])
+            ->middleware(['ensure.role:admin', 'ensure.active-role:admin'])
+            ->name('solicitudes-reemplazo-configuracion.edit');
+        Route::put('/solicitudes-reemplazo/configuracion', [SolicitudReemplazoConfiguracionController::class, 'update'])
+            ->middleware(['ensure.role:admin', 'ensure.active-role:admin'])
+            ->name('solicitudes-reemplazo-configuracion.update');
+
         Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
         Route::get('/users/create', [UserManagementController::class, 'create'])->name('users.create');
         Route::get('/users/export', [UserManagementController::class, 'export'])->name('users.export');
@@ -801,6 +817,18 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         ->middleware('ensure.role:postulante|funcionario')
         ->name('postulant.finiquitos.descargar');
 
+    Route::prefix('postulante/deudas-pension-alimentos')
+        ->middleware('ensure.role:postulante|funcionario')
+        ->name('postulant.deudas-pension-alimentos.')
+        ->group(function () {
+            Route::get('/', [PostulanteDeudaPensionAlimentosController::class, 'index'])->name('index');
+            Route::get('/{deuda}', [PostulanteDeudaPensionAlimentosController::class, 'show'])->name('show');
+            Route::post('/{deuda}/resolucion', [PostulanteDeudaPensionAlimentosController::class, 'guardarResolucion'])->name('resolucion.store');
+            Route::get('/{deuda}/certificado', [PostulanteDeudaPensionAlimentosController::class, 'certificado'])->name('certificado');
+            Route::get('/{deuda}/resolucion', [PostulanteDeudaPensionAlimentosController::class, 'resolucion'])->name('resolucion');
+            Route::get('/{deuda}/declaracion', [PostulanteDeudaPensionAlimentosController::class, 'declaracion'])->name('declaracion');
+        });
+
 
     // -------------------------
     // Trámites: Licencias Médicas
@@ -1202,6 +1230,14 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     // -------------------------
     Route::prefix('gestion')->name('gestion.')->group(function () {
 
+        Route::get('/autorizaciones-docentes', [AutorizacionDocenteController::class, 'index'])
+            ->middleware(['ensure.role:admin|coordinador_uatp', 'ensure.active-role:admin|coordinador_uatp'])
+            ->name('autorizaciones-docentes.index');
+
+        Route::patch('/autorizaciones-docentes/{autorizacion}/estado', [AutorizacionDocenteController::class, 'actualizarEstado'])
+            ->middleware(['ensure.role:admin|coordinador_uatp', 'ensure.active-role:admin|coordinador_uatp'])
+            ->name('autorizaciones-docentes.estado.update');
+
         Route::get('/solicitudes-reemplazo', [SolicitudReemplazoGestionController::class, 'index'])
             ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani')
             ->name('solicitudes-reemplazo.index');
@@ -1251,6 +1287,14 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::post('/solicitudes-reemplazo/{solicitud}/uatp/rechazar', [SolicitudReemplazoGestionController::class, 'uatpRechazar'])
             ->middleware('ensure.role:admin|coordinador_uatp')
             ->name('solicitudes-reemplazo.uatp.rechazar');
+
+        Route::post('/solicitudes-reemplazo/{solicitud}/autorizacion-docente/solicitar', [AutorizacionDocenteController::class, 'solicitar'])
+            ->middleware(['ensure.role:admin|coordinador_uatp', 'ensure.active-role:admin|coordinador_uatp'])
+            ->name('solicitudes-reemplazo.autorizacion-docente.solicitar');
+
+        Route::patch('/solicitudes-reemplazo/{solicitud}/autorizacion-docente/{autorizacion}/numero', [AutorizacionDocenteController::class, 'guardarNumero'])
+            ->middleware(['ensure.role:admin|coordinador_uatp', 'ensure.active-role:admin|coordinador_uatp'])
+            ->name('solicitudes-reemplazo.autorizacion-docente.numero.update');
 
         Route::post('/solicitudes-reemplazo/{solicitud}/uatp/reabrir', [SolicitudReemplazoGestionController::class, 'uatpReabrir'])
             ->middleware('ensure.role:admin|funcionario_slep|supervisor_plani|coordinador_gdp')
@@ -1308,6 +1352,23 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::delete('/solicitudes-reemplazo/finiquitos/{solicitud}/eliminar-firmado', [SolicitudReemplazoGestionController::class, 'eliminarFiniquitoFirmado'])
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
             ->name('solicitudes-reemplazo.finiquitos.eliminar-firmado');
+
+        Route::prefix('deudas-pension-alimentos')
+            ->middleware(['ensure.role:admin|funcionario_slep', 'ensure.active-role:admin|funcionario_slep'])
+            ->name('deudas-pension-alimentos.')
+            ->group(function () {
+                Route::get('/', [GestionDeudaPensionAlimentosController::class, 'index'])->name('index');
+                Route::get('/{deuda}', [GestionDeudaPensionAlimentosController::class, 'show'])->name('show');
+                Route::post('/{deuda}/certificado', [GestionDeudaPensionAlimentosController::class, 'guardarCertificado'])->name('certificado.store');
+                Route::get('/{deuda}/certificado', [GestionDeudaPensionAlimentosController::class, 'certificado'])->name('certificado');
+                Route::get('/{deuda}/resolucion', [GestionDeudaPensionAlimentosController::class, 'resolucion'])->name('resolucion');
+                Route::get('/{deuda}/declaracion', [GestionDeudaPensionAlimentosController::class, 'declaracion'])->name('declaracion');
+                Route::post('/{deuda}/enviar-remuneraciones', [GestionDeudaPensionAlimentosController::class, 'enviar'])->name('enviar');
+            });
+
+        Route::post('/solicitudes-reemplazo/{solicitud}/deuda-pension-alimentos/activar', [GestionDeudaPensionAlimentosController::class, 'activar'])
+            ->middleware(['ensure.role:admin|funcionario_slep', 'ensure.active-role:admin|funcionario_slep'])
+            ->name('solicitudes-reemplazo.deuda-pension-alimentos.activar');
 
         // ver solicitud
         Route::get('/solicitudes-reemplazo/{solicitud}', [SolicitudReemplazoGestionController::class, 'show'])
@@ -1387,12 +1448,12 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
         // Ver Orden de Trabajo (PDF) - inline
         Route::get('/solicitudes-reemplazo/{solicitud}/orden-trabajo', [OrdenTrabajoPdfController::class, 'show'])
-            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|funcionario_estab')
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani|funcionario_estab')
             ->name('solicitudes-reemplazo.ot');
 
         // Descargar Orden de Trabajo (PDF)
         Route::get('/solicitudes-reemplazo/{solicitud}/orden-trabajo/download', [OrdenTrabajoPdfController::class, 'download'])
-            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|funcionario_estab')
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani|funcionario_estab')
             ->name('solicitudes-reemplazo.ot.download');
     });
 });

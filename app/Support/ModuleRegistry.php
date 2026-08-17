@@ -12,6 +12,9 @@ class ModuleRegistry
     {
         if (Str::startsWith($name, 'reemplazos.personal.')) return 'reemplazos.personal';
         if (Str::startsWith($name, 'reemplazos.')) return 'reemplazos';
+        if (Str::startsWith($name, 'gestion.autorizaciones-docentes.')) return 'gestion.solicitudes-reemplazo';
+        if (Str::startsWith($name, 'gestion.deudas-pension-alimentos.')) return 'gestion.solicitudes-reemplazo';
+        if (Str::startsWith($name, 'postulant.deudas-pension-alimentos.')) return 'postulant.reemplazos';
 
         // messages.* -> messages
         if (Str::startsWith($name, 'messages.')) return 'messages';
@@ -59,7 +62,7 @@ class ModuleRegistry
             Str::startsWith($key, 'admin.documents') => 'Revisión',
             $key === 'admin.admision-escolar' => 'Administración',
             $key === 'messages' => 'Comunicación',
-            Str::startsWith($key, 'admin.users') || Str::startsWith($key, 'admin.roles') || Str::startsWith($key, 'admin.restricted-ruts') || Str::startsWith($key, 'admin.notification-logs') => 'Administración',
+            Str::startsWith($key, 'admin.users') || Str::startsWith($key, 'admin.roles') || Str::startsWith($key, 'admin.restricted-ruts') || Str::startsWith($key, 'admin.notification-logs') || Str::startsWith($key, 'admin.bulk-role-mail') => 'Administración',
             Str::startsWith($key, 'postulant.profile') || Str::startsWith($key, 'postulant.documents') || Str::startsWith($key, 'postulant.reemplazos') || Str::startsWith($key, 'postulant.ofertas-laborales') => 'Postulación',
             $key === 'tramites' => 'Trámites',
             default => 'Otros',
@@ -80,6 +83,7 @@ class ModuleRegistry
             'admin.restricted-ruts' => 'Restricciones para ejercer',
             'admin.permiso-sin-goce-excepciones' => 'Excepciones permiso sin goce',
             'admin.notification-logs' => 'Historial de notificaciones',
+            'admin.bulk-role-mail' => 'Correos masivos por rol',
             'admin.admision-escolar' => 'Admisión Escolar',
             'admin.viaticos-reembolsos' => 'Viáticos y Reembolsos',
             'admin.funcionarios-viatico-anexo' => 'Funcionarios viático por anexo',
@@ -119,6 +123,7 @@ class ModuleRegistry
             'tramites' => 38,
             'admin.restricted-ruts' => 70,
             'admin.notification-logs' => 75,
+            'admin.bulk-role-mail' => 74,
             'admin.admision-escolar' => 15,
             'admin.viaticos-reembolsos' => 24,
             'admin.funcionarios-viatico-anexo' => 24,

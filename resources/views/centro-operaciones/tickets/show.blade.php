@@ -8,6 +8,7 @@
 @php
     $estadoTicket = strtolower($ticket->estado);
     $estadoLabel = match ($estadoTicket) {
+        'pendiente_asignacion' => 'Pendiente de asignación',
         'asignado' => 'Asignado',
         'vencido' => 'Vencido',
         'escalado' => 'Escalado',
@@ -29,8 +30,8 @@
         </div>
         <div class="co-hero-actions">
             <span class="co-ticket-status co-ticket-status--{{ $estadoTicket }} co-ticket-status--large"><i></i>{{ $estadoLabel }}</span>
-            <a class="btn btn-outline-danger" href="{{ route('centro-operaciones.tickets.pdf', $ticket) }}">
-                <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
+            <a class="btn btn-primary" href="{{ route('centro-operaciones.tickets.pdf', $ticket) }}" target="_blank" rel="noopener">
+                <i class="bi bi-file-earmark-pdf"></i> Ver informe PDF
             </a>
             <a class="btn btn-outline-secondary" href="{{ route('centro-operaciones.tickets.index') }}">
                 <i class="bi bi-arrow-left"></i> Volver a tickets
@@ -54,7 +55,7 @@
 
     <div class="co-detail-meta co-ticket-meta">
         <div><span>Creado</span><strong>{{ $ticket->created_at->format('d/m/Y H:i') }} hrs.</strong></div>
-        <div><span>Vencimiento</span><strong class="{{ in_array($estadoTicket, ['vencido', 'escalado'], true) ? 'text-danger' : '' }}">{{ $ticket->vence_en->format('d/m/Y H:i') }} hrs.</strong></div>
+        <div><span>Vencimiento</span><strong class="{{ in_array($estadoTicket, ['vencido', 'escalado'], true) ? 'text-danger' : '' }}">{{ $ticket->vence_en ? $ticket->vence_en->format('d/m/Y H:i').' hrs.' : 'Se definirá al asignar' }}</strong></div>
         <div><span>Responsable</span><strong>{{ $ticket->responsable?->nombre_completo ?? 'Sin responsable' }}</strong></div>
         <div><span>Estado</span><strong>{{ $estadoLabel }}</strong></div>
     </div>
@@ -69,7 +70,7 @@
                 <div><span><i class="bi bi-exclamation-triangle"></i> Incidencia</span><strong>{{ $ticket->incidencia->tipo_label }}</strong></div>
                 <div><span><i class="bi bi-card-text"></i> Detalle</span><p>{{ $ticket->incidencia->descripcion ?: 'Sin detalle informado.' }}</p></div>
                 <div><span><i class="bi bi-building"></i> Establecimiento</span><strong>{{ $ticket->incidencia->establecimiento?->nombre_establecimiento ?? 'Sin establecimiento' }}</strong></div>
-                <div><span><i class="bi bi-person-check"></i> Reportado por</span><strong>{{ $ticket->incidencia->reporte?->reportadoPor?->name ?? 'Usuario no disponible' }}</strong></div>
+                <div><span><i class="bi bi-person-check"></i> Reportado por</span><strong>{{ $ticket->incidencia->reporte?->reportado_por_nombre_visible ?? 'Usuario registrado sin nombre disponible' }}</strong></div>
             </div>
         </section>
 
@@ -82,22 +83,9 @@
                 <div><span><i class="bi bi-person-badge"></i> Responsable</span><strong>{{ $ticket->responsable?->nombre_completo ?? 'Sin responsable' }}</strong></div>
                 <div><span><i class="bi bi-people"></i> Unidad</span><strong>{{ $ticket->unidad_departamento ?: 'Sin unidad registrada' }}</strong></div>
                 <div><span><i class="bi bi-building-gear"></i> Subdirección</span><strong>{{ $ticket->subdireccion_dependencia ?: 'Sin subdirección registrada' }}</strong></div>
-                <div><span><i class="bi bi-hourglass-split"></i> Plazo límite</span><strong>{{ $ticket->vence_en->translatedFormat('d \d\e F \d\e Y, H:i') }} hrs.</strong></div>
-
-                <!-- Segundo responsable -->
-                @if($ticket->segunda_subdireccion_responsable)
-                    <div class="co-second-responsible">
-                        <span><i class="bi bi-person-plus"></i> Segundo responsable (subdirección)</span>
-                        <strong>{{ $ticket->segunda_subdireccion_responsable }}</strong>
-                    </div>
-                @endif
-
-                @if($ticket->segunda_responsable_subdireccion)
-                    <div class="co-second-responsible">
-                        <span><i class="bi bi-person-plus"></i> Segundo responsable (subdirección)</span>
-                        <strong>{{ $ticket->segunda_responsable_subdireccion }}</strong>
-                    </div>
-                @endif
+                <div><span><i class="bi bi-hourglass-split"></i> Plazo límite</span><strong>{{ $ticket->vence_en ? $ticket->vence_en->translatedFormat('d \d\e F \d\e Y, H:i').' hrs.' : 'Pendiente de asignación' }}</strong></div>
+                <div><span><i class="bi bi-person-plus"></i> Segundo responsable</span><strong>{{ $ticket->segundoResponsable?->nombre_completo ?? 'No asignado' }}</strong></div>
+                <div><span><i class="bi bi-building-gear"></i> Segunda subdirección</span><strong>{{ $ticket->segunda_subdireccion_responsable ?: 'No asignada' }}</strong></div>
             </div>
         </section>
     </div>
@@ -150,63 +138,12 @@
         @endif
     </section>
 
-    @if(Route::has('centro-operaciones.tickets.update-second-responsible'))
-    <!-- Formulario para editar segundo responsable -->
-    <section class="co-card co-resolution-card">
-        <div class="co-card-head">
-            <div><span class="co-eyebrow">Asignación</span><h2>Segundo responsable (opcional)</h2></div>
-            <i class="bi bi-person-plus co-card-head-icon" aria-hidden="true"></i>
-        </div>
-
-        <form method="POST" action="{{ route('centro-operaciones.tickets.update-second-responsible', $ticket) }}" class="co-resolution-form">
-            @csrf
-            @method('PUT')
-
-            <div class="row">
-                <div class="col-md-6">
-                    <label for="segunda_subdireccion_responsable">
-                        <strong>Segunda subdirección responsable</strong>
-                        <span>Seleccione la subdirección (opcional)</span>
-                    </label>
-                    <select id="segunda_subdireccion_responsable" name="segunda_subdireccion_responsable" class="form-select">
-                        <option value="">— Ninguno —</option>
-                        @foreach($subdirecciones as $subdir)
-                            <option value="{{ $subdir->id }}" {{ $ticket->segunda_subdireccion_responsable == $subdir->id ? 'selected' : '' }}>
-                                {{ $subdir->nombre }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="col-md-6">
-                    <label for="segunda_responsable_subdireccion">
-                        <strong>Segundo responsable de subdirección</strong>
-                        <span>Seleccione el responsable (opcional)</span>
-                    </label>
-                    <select id="segunda_responsable_subdireccion" name="segunda_responsable_subdireccion" class="form-select">
-                        <option value="">— Ninguno —</option>
-                        @foreach($responsables as $resp)
-                            <option value="{{ $resp->id }}" {{ $ticket->segunda_responsable_subdireccion == $resp->id ? 'selected' : '' }}>
-                                {{ $resp->nombre }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
-            <div class="co-resolution-actions mt-3">
-                <button class="btn btn-primary"><i class="bi bi-save"></i> Guardar cambios</button>
-            </div>
-        </form>
-    </section>
-    @endif
-
     <section class="co-card co-resolution-card">
         <div class="co-card-head">
             <div><span class="co-eyebrow">Cierre y trazabilidad</span><h2>{{ $estadoTicket === 'resuelto' ? 'Resolución registrada' : 'Resolver ticket' }}</h2></div>
             <i class="bi {{ $estadoTicket === 'resuelto' ? 'bi-shield-check' : 'bi-check2-square' }} co-card-head-icon" aria-hidden="true"></i>
         </div>
-        @if($estadoTicket !== 'resuelto')
+        @if($estadoTicket !== 'resuelto' && $puedeResolver)
             <form method="POST" action="{{ route('centro-operaciones.tickets.resolver', $ticket) }}" class="co-resolution-form">
                 @csrf
                 @method('PATCH')
@@ -220,59 +157,28 @@
                     <button class="btn btn-success"><i class="bi bi-check2-circle"></i> Resolver ticket</button>
                 </div>
             </form>
-        @else
+        @elseif($estadoTicket === 'resuelto')
             <div class="co-resolution-result">
                 <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-                <div><strong>Ticket resuelto</strong><p>{{ $ticket->resolucion ?: 'Sin detalle de resolución.' }}</p>@if($ticket->resuelto_en)<small>Registrado el {{ $ticket->resuelto_en->format('d/m/Y H:i') }} hrs.</small>@endif</div>
+                <div>
+                    <strong>Ticket resuelto</strong>
+                    <p>{{ $ticket->resolucion ?: 'Sin detalle de resolución.' }}</p>
+                    @if($ticket->firmaResolucion)
+                        <small>
+                            Firmado electrónicamente por {{ $ticket->firmaResolucion->nombre_firmante }}
+                            el {{ $ticket->firmaResolucion->fecha_firma?->format('d/m/Y H:i') }} hrs.
+                        </small>
+                    @elseif($ticket->resuelto_en)
+                        <small>Registrado el {{ $ticket->resuelto_en->format('d/m/Y H:i') }} hrs.</small>
+                    @endif
+                </div>
+            </div>
+        @else
+            <div class="alert alert-info mb-0">
+                El ticket está visible para seguimiento, pero su resolución corresponde a las personas responsables asignadas.
             </div>
         @endif
     </section>
 </div>
 
-@section('scripts')
-    <script>
-        // Cargar subdirecciones dinámicas
-        function loadSubdirecciones() {
-            fetch('/api/subdirecciones')
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('segunda_subdireccion_responsable');
-                    if (select) {
-                        select.innerHTML = '<option value="">— Ninguno —</option>' +
-                            data.map(s => `<option value="${s.id}" ${select.value === s.id ? 'selected' : ''}>${s.nombre}</option>`).join('');
-                    }
-                })
-                .catch(console.error);
-        }
-
-        // Cargar responsables dinámicos
-        function loadResponsables() {
-            fetch('/api/responsables')
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('segunda_responsable_subdireccion');
-                    if (select) {
-                        select.innerHTML = '<option value="">— Ninguno —</option>' +
-                            data.map(s => `<option value="${s.id}" ${select.value === s.id ? 'selected' : ''}>${s.nombre}</option>`).join('');
-                    }
-                })
-                .catch(console.error);
-        }
-
-        // Cargar al cargar la página
-        document.addEventListener('DOMContentLoaded', function () {
-            loadSubdirecciones();
-            loadResponsables();
-        });
-
-        // Recargar al cambio en el primer selector
-        document.getElementById('segunda_subdireccion_responsable')?.addEventListener('change', function () {
-            loadResponsables();
-        });
-
-        // Recargar al cambio en el segundo selector
-        document.getElementById('segunda_responsable_subdireccion')?.addEventListener('change', function () {
-            loadResponsables();
-        });
-    </script>
 @endsection

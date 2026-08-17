@@ -11,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ReporteService
@@ -52,6 +53,9 @@ class ReporteService
                 'regla_version' => '1.1',
                 'version' => 1,
             ]);
+            if (Schema::hasColumn($reporte->getTable(), 'reportado_por_nombre')) {
+                $reporte->reportado_por_nombre = $usuario->display_name;
+            }
 
             $this->aplicarDatos($reporte, $datos);
             $reporte->save();
@@ -75,6 +79,9 @@ class ReporteService
             $reporte = CentroOperacionesReporte::query()->lockForUpdate()->findOrFail($reporte->id);
             $reporte->version++;
             $reporte->reportado_por_id = $usuario->id;
+            if (Schema::hasColumn($reporte->getTable(), 'reportado_por_nombre')) {
+                $reporte->reportado_por_nombre = $usuario->display_name;
+            }
             $reporte->reportado_en = $ahora;
             $this->aplicarDatos($reporte, $datos);
             $reporte->save();
@@ -150,10 +157,11 @@ class ReporteService
             ->reject(fn ($tipo) => (bool) config("centro_operaciones.incidencias.{$tipo}.automatic", false))
             ->unique()
             ->values();
+        $tiposAutomaticos = $this->tiposIncidenciaAutomaticos();
         $incidenciasRetiradas = CentroOperacionesIncidencia::query()
             ->where('reporte_id', $reporte->id)
             ->where('estado', 'activa')
-            ->where('tipo', '!=', 'control_plagas_vencido')
+            ->whereNotIn('tipo', $tiposAutomaticos)
             ->whereNotIn('tipo', $tiposIncidencia);
         $this->resolverIncidencias(
             $incidenciasRetiradas,
@@ -199,6 +207,7 @@ class ReporteService
             ->whereIn('id', $idsResolucion)
             ->where('establecimiento_id', $reporte->establecimiento_id)
             ->where('unidad_codigo', $reporte->unidad_codigo)
+            ->whereNotIn('tipo', $tiposAutomaticos)
             ->where('estado', 'activa');
         $this->resolverIncidencias(
             $incidenciasResueltas,
@@ -209,6 +218,8 @@ class ReporteService
         );
 
         $this->sincronizarControlPlagas($reporte, $usuario, $ahora);
+        $reporte->load('servicios');
+        $this->sincronizarExtintores($reporte, $usuario, $ahora);
     }
 
     private function actualizarEstado(CentroOperacionesReporte $reporte): void
@@ -371,16 +382,25 @@ class ReporteService
                 'updated_at' => $ahora,
             ]);
 
-        CentroOperacionesTicket::query()
-            ->whereIn('incidencia_id', $ids)
-            ->where('estado', '!=', 'resuelto')
-            ->update([
-                'estado' => 'resuelto',
-                'resuelto_en' => $ahora,
-                'resuelto_por_id' => $usuario->id,
-                'resolucion' => $resolucion,
-                'updated_at' => $ahora,
-            ]);
+        if (Schema::hasTable('centro_operaciones_tickets')) {
+            $tickets = CentroOperacionesTicket::query()
+                ->whereIn('incidencia_id', $ids)
+                ->where('estado', '!=', 'resuelto')
+                ->get();
+
+            foreach ($tickets as $ticket) {
+                $ticket->update([
+                    'estado' => 'resuelto',
+                    'resuelto_en' => $ahora,
+                    'resuelto_por_id' => $usuario->id,
+                    'resolucion' => $resolucion,
+                    'updated_at' => $ahora,
+                ]);
+                if (Schema::hasTable('centro_operaciones_ticket_firmas')) {
+                    app(TicketDocumentoService::class)->registrarFirmaResolucion($ticket->fresh(), $usuario);
+                }
+            }
+        }
     }
 
     /** @return array<int, string> */
@@ -391,9 +411,22 @@ class ReporteService
 
     private function generarTickets(CentroOperacionesReporte $reporte, User $usuario): void
     {
+        if (! Schema::hasTable('centro_operaciones_tickets')) {
+            return;
+        }
+
         $tickets = app(TicketService::class);
-        $reporte->incidencias()->where('estado', 'activa')->where('tipo', '!=', 'otro')
+        $reporte->incidencias()->where('estado', 'activa')
             ->whereDoesntHave('ticket')->get()
             ->each(fn (CentroOperacionesIncidencia $incidencia) => $tickets->crearParaIncidencia($incidencia, $usuario));
+    }
+
+    /** @return array<int, string> */
+    private function tiposIncidenciaAutomaticos(): array
+    {
+        return collect(config('centro_operaciones.incidencias', []))
+            ->filter(fn (array $incidencia) => (bool) ($incidencia['automatic'] ?? false))
+            ->keys()
+            ->all();
     }
 }

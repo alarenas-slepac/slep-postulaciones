@@ -67,6 +67,7 @@
                     @php
                         $estadoTicket = strtolower($ticket->estado);
                         $estadoLabel = match ($estadoTicket) {
+                            'pendiente_asignacion' => 'Pendiente de asignación',
                             'asignado' => 'Asignado',
                             'vencido' => 'Vencido',
                             'escalado' => 'Escalado',
@@ -91,13 +92,16 @@
                         <td>
                             <div class="co-table-primary">{{ $ticket->responsable?->nombre_completo ?? 'Sin responsable' }}</div>
                             <small class="co-table-secondary">{{ $ticket->unidad_departamento }}</small>
+                            @if($ticket->segundoResponsable)
+                                <small class="co-table-secondary">También: {{ $ticket->segundoResponsable->nombre_completo }}</small>
+                            @endif
                         </td>
                         <td>
                             <div class="co-deadline {{ in_array($estadoTicket, ['vencido', 'escalado'], true) ? 'co-deadline--late' : '' }}">
                                 <i class="bi bi-clock" aria-hidden="true"></i>
                                 <span>
-                                    <strong>{{ $ticket->vence_en->format('d/m/Y') }}</strong>
-                                    <small>{{ $ticket->vence_en->format('H:i') }} hrs.</small>
+                                    <strong>{{ $ticket->vence_en?->format('d/m/Y') ?? 'Sin plazo' }}</strong>
+                                    <small>{{ $ticket->vence_en ? $ticket->vence_en->format('H:i').' hrs.' : 'Pendiente de asignación' }}</small>
                                 </span>
                             </div>
                         </td>

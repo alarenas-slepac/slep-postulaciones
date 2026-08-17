@@ -7,23 +7,29 @@ use App\Http\Requests\CentroOperaciones\SubirTicketImagenesRequest;
 use App\Models\CentroOperacionesTicket;
 use App\Models\CentroOperacionesTicketImagen;
 use App\Models\FuncionarioAcAutorizado;
+use App\Services\CentroOperaciones\TicketDocumentoService;
 use App\Services\CentroOperaciones\TicketImagenService;
-use App\Services\CentroOperaciones\TicketPdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TicketController extends Controller
 {
     private const ROLES_TODOS = ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones'];
 
+    public function __construct(private readonly TicketDocumentoService $documentos)
+    {
+    }
+
     public function index(Request $request): View
     {
-        $query = CentroOperacionesTicket::query()->with(['incidencia.establecimiento', 'responsable'])->latest();
+        $query = CentroOperacionesTicket::query()
+            ->with(['incidencia.establecimiento', 'responsable', 'segundoResponsable'])
+            ->latest();
         $this->aplicarAlcance($query, $request);
 
         return view('centro-operaciones.tickets.index', ['tickets' => $query->paginate(25)]);
@@ -31,23 +37,22 @@ class TicketController extends Controller
 
     public function show(Request $request, CentroOperacionesTicket $ticket): View
     {
-        $this->asegurarAcceso($request, $ticket);
+        $this->autorizarTicket($request, $ticket);
 
-        // Cargar segunda subdirección y responsable de la configuración del ticket
         $ticket->loadMissing([
             'incidencia.establecimiento',
             'incidencia.reporte.reportadoPor',
             'responsable',
-            'imagenes',
+            'segundoResponsable',
             'configuracion',
-            'configuracion.segundaSubdireccionResponsable',
-            'configuracion.segundaResponsableSubdireccion',
+            'resueltoPor',
+            'firmaResolucion',
+            'imagenes',
         ]);
 
         return view('centro-operaciones.tickets.show', [
             'ticket' => $ticket,
-            'subdirecciones' => $this->getSubdirecciones(),
-            'responsables' => $this->getResponsables(),
+            'puedeResolver' => $this->puedeResolver($request, $ticket),
             'puedeSubirImagenes' => $this->puedeSubirImagenes($request, $ticket),
         ]);
     }
@@ -68,22 +73,12 @@ class TicketController extends Controller
         );
     }
 
-    public function pdf(
-        Request $request,
-        CentroOperacionesTicket $ticket,
-        TicketPdfService $servicio
-    ): Response {
-        $this->asegurarAcceso($request, $ticket);
-
-        return $servicio->render($ticket)->download($ticket->numero.'.pdf');
-    }
-
     public function imagen(
         Request $request,
         CentroOperacionesTicket $ticket,
         CentroOperacionesTicketImagen $imagen
     ): StreamedResponse {
-        $this->asegurarAcceso($request, $ticket);
+        $this->autorizarTicket($request, $ticket);
         abort_unless((int) $imagen->ticket_id === (int) $ticket->id, 404);
         abort_unless(Storage::disk('local')->exists($imagen->path), 404);
 
@@ -98,18 +93,6 @@ class TicketController extends Controller
         );
     }
 
-    private function getSubdirecciones()
-    {
-        // Método para cargar subdirecciones dinámicas para el formulario (opcional)
-        return []; // Esto podría ser dinámico, como una lista de subdirecciones desde la base de datos
-    }
-
-    private function getResponsables()
-    {
-        // Método para cargar responsables dinámicos para el formulario
-        return FuncionarioAcAutorizado::all();
-    }
-
     public function resolver(Request $request, CentroOperacionesTicket $ticket): RedirectResponse
     {
         $request->validate(['resolucion' => ['required', 'string', 'max:2000']]);
@@ -119,9 +102,48 @@ class TicketController extends Controller
         DB::transaction(function () use ($ticket, $request) {
             $ticket->update(['estado' => 'resuelto', 'resuelto_en' => now(), 'resuelto_por_id' => $request->user()->id, 'resolucion' => $request->string('resolucion')->trim()]);
             $ticket->incidencia()->update(['estado' => 'resuelta', 'resuelta_en' => now(), 'resuelta_por_id' => $request->user()->id]);
+            $this->documentos->registrarFirmaResolucion($ticket->fresh(), $request->user(), $request);
         });
 
         return back()->with('success', 'Ticket resuelto correctamente.');
+    }
+
+    public function pdf(Request $request, CentroOperacionesTicket $ticket): Response
+    {
+        $this->autorizarTicket($request, $ticket);
+        $contenido = $this->documentos->generarPdf($ticket);
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$ticket->numero.'.pdf"',
+            'Cache-Control' => 'private, no-store, max-age=0',
+        ]);
+    }
+
+    public function verificar(string $codigo): View
+    {
+        $ticket = CentroOperacionesTicket::query()
+            ->with([
+                'incidencia.establecimiento',
+                'incidencia.reporte.reportadoPor',
+                'firmaResolucion',
+                'responsable',
+                'segundoResponsable',
+            ])
+            ->where('codigo_validacion', strtoupper($codigo))
+            ->first();
+        $integridad = $ticket
+            ? $this->documentos->verificarIntegridad($ticket)
+            : ['hash_actual' => '', 'integro' => false];
+
+        return view('centro-operaciones.tickets.verificar', compact('ticket', 'integridad'));
+    }
+
+    private function autorizarTicket(Request $request, CentroOperacionesTicket $ticket): void
+    {
+        $query = CentroOperacionesTicket::query()->whereKey($ticket->id);
+        $this->aplicarAlcance($query, $request);
+        abort_unless($query->exists(), 403);
     }
 
     private function aplicarAlcance($query, Request $request): void
@@ -144,15 +166,12 @@ class TicketController extends Controller
             })->pluck('subdireccion_dependencia');
         $query->where(function ($q) use ($funcionario, $subdirecciones) {
             $q->where('responsable_funcionario_ac_id', $funcionario->id)
-                ->when($subdirecciones->isNotEmpty(), fn ($sq) => $sq->orWhereIn('subdireccion_dependencia', $subdirecciones));
+                ->orWhere('segundo_responsable_funcionario_ac_id', $funcionario->id)
+                ->when($subdirecciones->isNotEmpty(), function ($sq) use ($subdirecciones) {
+                    $sq->orWhereIn('subdireccion_dependencia', $subdirecciones)
+                        ->orWhereIn('segunda_subdireccion_responsable', $subdirecciones);
+                });
         });
-    }
-
-    private function asegurarAcceso(Request $request, CentroOperacionesTicket $ticket): void
-    {
-        $query = CentroOperacionesTicket::query()->whereKey($ticket->id);
-        $this->aplicarAlcance($query, $request);
-        abort_unless($query->exists(), 403);
     }
 
     private function puedeSubirImagenes(Request $request, CentroOperacionesTicket $ticket): bool
@@ -170,12 +189,26 @@ class TicketController extends Controller
         if ($request->user()->hasRole('funcionario_directivo_estab')) {
             return (int) $request->user()->establecimiento_id === (int) $ticket->incidencia->establecimiento_id;
         }
-        return (int) $this->funcionario($request->user())?->id === (int) $ticket->responsable_funcionario_ac_id;
+        $funcionarioId = $this->funcionario($request->user())?->id;
+
+        return $funcionarioId !== null
+            && in_array((int) $funcionarioId, [
+                (int) $ticket->responsable_funcionario_ac_id,
+                (int) $ticket->segundo_responsable_funcionario_ac_id,
+            ], true);
     }
 
     private function funcionario($usuario): ?FuncionarioAcAutorizado
     {
-        return FuncionarioAcAutorizado::query()->where('registered_user_id', $usuario->id)
-            ->orWhere('rut_normalizado', $usuario->rut_normalized)->first();
+        $rutNormalizado = $usuario->rut_normalized;
+
+        return FuncionarioAcAutorizado::query()
+            ->where(function ($query) use ($usuario, $rutNormalizado) {
+                $query->where('registered_user_id', $usuario->id);
+                if ($rutNormalizado !== '') {
+                    $query->orWhere('rut_normalizado', $rutNormalizado);
+                }
+            })
+            ->first();
     }
 }

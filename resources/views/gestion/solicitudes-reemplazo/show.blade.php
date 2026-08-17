@@ -18,6 +18,25 @@
             <div class="text-muted">Estado: <span class="fw-semibold">{{ $s->estado }}</span></div>
         </div>
         <div class="d-flex gap-2">
+            @if (!empty($canGestionarDeudaPension))
+                @if ($deudaPension)
+                    <a class="btn btn-outline-danger" href="{{ route('gestion.deudas-pension-alimentos.show', $deudaPension) }}">
+                        <i class="bi bi-shield-exclamation"></i> Ver deuda de pensión
+                    </a>
+                @elseif ($s->postulant_profile_id)
+                    <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.deuda-pension-alimentos.activar', $s) }}" onsubmit="return confirm('¿Confirma que el postulante registra deuda de pensión de alimentos? La solicitud quedará bloqueada hasta enviar los antecedentes a Remuneraciones.');">
+                        @csrf
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-shield-exclamation"></i> Activar Deuda Pensión de Alimentos
+                        </button>
+                    </form>
+                @else
+                    <button type="button" class="btn btn-outline-danger" disabled title="Primero debe existir una persona reemplazante asociada a la solicitud.">
+                        <i class="bi bi-shield-exclamation"></i> Activar Deuda Pensión de Alimentos
+                    </button>
+                @endif
+            @endif
+
             @if (!empty($lockedByOtContrato) && $s->estado === 'derivada_slep')
                 <span class="badge bg-secondary align-self-center">Bloqueada: OT/Contrato generado</span>
             @endif
@@ -77,6 +96,24 @@
                     <li>{{ $e }}</li>
                 @endforeach
             </ul>
+        </div>
+    @endif
+
+    @if (!empty($canVerDeudaPension) && !empty($deudaPensionBloqueaFlujo) && $deudaPension)
+        <div class="alert alert-danger d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="fw-semibold"><i class="bi bi-lock-fill me-1"></i> Solicitud bloqueada por deuda de pensión de alimentos</div>
+                <div class="small mt-1">Se mantendrá en Derivada SLEP y no permitirá generar Orden de Trabajo ni Contrato hasta enviar el expediente completo a Remuneraciones.</div>
+            </div>
+            <a class="btn btn-light" href="{{ route('gestion.deudas-pension-alimentos.show', $deudaPension) }}">Gestionar expediente</a>
+        </div>
+    @elseif (!empty($canVerDeudaPension) && $deudaPension)
+        <div class="alert alert-success d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="fw-semibold"><i class="bi bi-unlock-fill me-1"></i> Expediente de deuda enviado a Remuneraciones</div>
+                <div class="small mt-1">La solicitud está desbloqueada y puede continuar con la Orden de Trabajo o el Contrato.</div>
+            </div>
+            <a class="btn btn-light" href="{{ route('gestion.deudas-pension-alimentos.show', $deudaPension) }}">Ver expediente</a>
         </div>
     @endif
 
@@ -235,7 +272,7 @@
         </div>
     @endif
 
-    @if ($canUatp && $s->estado === 'pendiente_uatp')
+    @if ($canUatp && $s->estado === 'pendiente_uatp' && !empty($puedeAprobarUatpPorAutorizacionDocente))
         <div class="modal fade" id="modalUatpAprobar" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
@@ -258,6 +295,63 @@
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
                             <button type="submit" class="btn btn-success">Aprobar y enviar a Validación</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if (!empty($canGestionarAutorizacionDocente) && $autorizacionDocente)
+        <div class="modal fade" id="modalAutorizacionDocente" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Registrar autorización docente</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.autorizacion-docente.numero.update', [$s, $autorizacionDocente]) }}">
+                        @csrf
+                        @method('PATCH')
+                        <div class="modal-body">
+                            <div class="alert alert-info">
+                                <div class="fw-semibold">Expediente enviado</div>
+                                <div>
+                                    Destino: {{ $autorizacionDocente->correo_destino ?: '—' }}
+                                    @if ($autorizacionDocente->correo_enviado_at)
+                                        — {{ cl_datetime($autorizacionDocente->correo_enviado_at, 'd/m/Y H:i') }}
+                                    @endif
+                                </div>
+                                <div class="small mt-1">La autorización se mantiene como seguimiento paralelo y no interrumpe el flujo del reemplazo.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="numero_autorizacion" class="form-label fw-semibold">
+                                    Número de autorización <span class="text-danger">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="numero_autorizacion"
+                                    name="numero_autorizacion"
+                                    class="form-control @error('numero_autorizacion') is-invalid @enderror"
+                                    value="{{ old('numero_autorizacion', $autorizacionDocente->numero_autorizacion) }}"
+                                    maxlength="120"
+                                    required
+                                >
+                                @error('numero_autorizacion')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="small text-muted">
+                                Estado actual: <strong>{{ $autorizacionDocente->estado_label }}</strong>.
+                                El estado se administra desde la bandeja de autorizaciones docentes.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <a href="{{ route('gestion.autorizaciones-docentes.index') }}" class="btn btn-outline-primary">Ir a autorizaciones</a>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                            <button type="submit" class="btn btn-primary">Guardar número</button>
                         </div>
                     </form>
                 </div>
@@ -565,6 +659,85 @@
                         <div class="fw-semibold">
                             {{ $postUser?->rut ?? '—' }} — {{ $postUser?->full_name ?? '—' }}
                         </div>
+
+                        @if (!empty($canGestionarAutorizacionDocente))
+                            @php
+                                $tituloEsPdf = $documentoTituloPostulante
+                                    && (
+                                        str_contains(strtolower((string) $documentoTituloPostulante->mime), 'pdf')
+                                        || Str::endsWith(strtolower((string) $documentoTituloPostulante->path), '.pdf')
+                                    );
+                            @endphp
+
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <a
+                                    class="btn btn-sm btn-outline-primary"
+                                    target="_blank"
+                                    rel="noopener"
+                                    href="{{ route('reemplazos.buscador-postulantes.perfil.view', $post) }}"
+                                >
+                                    <i class="bi bi-person-vcard"></i> Ver ficha del postulante
+                                </a>
+
+                                @if ($documentoTituloPostulante)
+                                    <a
+                                        class="btn btn-sm btn-outline-primary"
+                                        target="_blank"
+                                        rel="noopener"
+                                        href="{{ $tituloEsPdf
+                                            ? route('reemplazos.documents.preview', $documentoTituloPostulante)
+                                            : route('reemplazos.documents.download', $documentoTituloPostulante) }}"
+                                    >
+                                        <i class="bi bi-file-earmark-text"></i> Ver título
+                                    </a>
+                                @else
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Sin título cargado</button>
+                                @endif
+
+                                @if ($s->estado === 'pendiente_uatp')
+                                    @if ($autorizacionDocente?->correo_enviado_at)
+                                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalAutorizacionDocente">
+                                            <i class="bi bi-patch-check"></i>
+                                            {{ $autorizacionDocente->numero_autorizacion ? 'Actualizar número de autorización' : 'Ingresar número de autorización' }}
+                                        </button>
+                                    @else
+                                        <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.autorizacion-docente.solicitar', $s) }}" class="d-inline">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('Se enviará por correo el expediente documental requerido y se registrará la autorización En trámite. ¿Desea continuar?');">
+                                                <i class="bi bi-send-check"></i> Enviar expediente y solicitar autorización
+                                            </button>
+                                        </form>
+                                    @endif
+                                @endif
+                            </div>
+
+                            <div class="form-text mt-2">
+                                Incluye antecedentes especiales, título profesional o técnico y Certificado de
+                                Inhabilidades para trabajar con menores. El título con mención se adjuntará sólo si está disponible.
+                                @if (!empty($autorizacionDocenteRequiereReligion))
+                                    Para Religión también exige Idoneidad para Religión.
+                                @endif
+                            </div>
+
+                            @if ($autorizacionDocente)
+                                @php
+                                    $autorizacionEstadoClase = match ($autorizacionDocente->estado) {
+                                        'aprobada' => 'alert-success',
+                                        'rechazada' => 'alert-danger',
+                                        default => 'alert-warning',
+                                    };
+                                @endphp
+                                <div class="alert {{ $autorizacionEstadoClase }} mt-3 mb-0 py-2">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                                        <strong>Autorización docente: {{ $autorizacionDocente->estado_label }}</strong>
+                                        <span>N.º {{ $autorizacionDocente->numero_autorizacion ?: 'pendiente de registro' }}</span>
+                                    </div>
+                                    @if ($autorizacionDocente->observacion_estado)
+                                        <div class="small mt-1">{{ $autorizacionDocente->observacion_estado }}</div>
+                                    @endif
+                                </div>
+                            @endif
+                        @endif
                     </div>
                 @endif
             </div>
@@ -1001,12 +1174,12 @@
         </div>
     </div>
     {{-- Orden de trabajo (Funcionario SLEP) --}}
-    @if (($canCrearOt ?? false) || in_array($s->estado, ['aceptada', 'cerrado'], true))
+    @if (($canCrearOt ?? false) || in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true))
         <div class="card mb-4">
             <div class="card-header fw-semibold">Orden de trabajo</div>
             <div class="card-body">
 
-                @if ($s->estado === 'aceptada')
+                @if (in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true))
                     <div class="alert alert-success mb-0">
                         <div class="fw-semibold">Orden de trabajo creada</div>
                         <div class="mt-2">
@@ -1018,6 +1191,19 @@
                             <div><strong>Fecha creación:</strong>
                                 {{ cl_datetime($s->orden_trabajo_creada_at, 'd/m/Y H:i') }}</div>
                         </div>
+
+                        @if (!empty($s->orden_trabajo_pdf_path))
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
+                                    href="{{ route('gestion.solicitudes-reemplazo.ot', $s) }}">
+                                    Ver Orden de Trabajo
+                                </a>
+                                <a class="btn btn-sm btn-success"
+                                    href="{{ route('gestion.solicitudes-reemplazo.ot.download', $s) }}">
+                                    Descargar Orden de Trabajo
+                                </a>
+                            </div>
+                        @endif
 
                         @if ($titularEsDocente)
                             <hr class="my-3">
@@ -1312,12 +1498,29 @@
         <div class="card mb-4">
             <div class="card-header fw-semibold">Acciones UATP</div>
             <div class="card-body">
-                <div class="alert alert-info">
-                    Al aprobar, la solicitud pasará a <strong>Pendiente de Validación</strong> y se notificará al establecimiento que debe esperar la revisión de la Subdirección de Planificación y Control de Gestión antes de continuar con GDP.
-                </div>
+                @if (!empty($puedeAprobarUatpPorAutorizacionDocente))
+                    <div class="alert alert-info">
+                        Al aprobar, la solicitud pasará a <strong>Pendiente de Validación</strong> y se notificará al establecimiento que debe esperar la revisión de la Subdirección de Planificación y Control de Gestión antes de continuar con GDP.
+                    </div>
+                @else
+                    <div class="alert alert-warning">
+                        <div class="fw-semibold">Falta el número de registro de la autorización docente.</div>
+                        <div>Debe ingresarlo antes de aprobar y enviar la solicitud a Validación. Mientras esté pendiente, solo podrá rechazar la solicitud.</div>
+                    </div>
+                @endif
 
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalUatpAprobar">
+                    <button
+                        type="button"
+                        class="btn btn-success"
+                        @if (!empty($puedeAprobarUatpPorAutorizacionDocente))
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalUatpAprobar"
+                        @else
+                            disabled
+                            title="Debe ingresar el número de registro de la autorización docente"
+                        @endif
+                    >
                         Aprobar y enviar a Validación
                     </button>
 
@@ -1566,6 +1769,17 @@
         });
     })();
     </script>
+
+    @if (request()->boolean('abrir_autorizacion_docente') && !empty($canGestionarAutorizacionDocente) && $autorizacionDocente)
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalElement = document.getElementById('modalAutorizacionDocente');
+            if (modalElement && window.bootstrap) {
+                window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+            }
+        });
+        </script>
+    @endif
 @endpush
 
 @endsection
