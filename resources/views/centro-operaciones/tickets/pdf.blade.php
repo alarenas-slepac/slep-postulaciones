@@ -39,6 +39,12 @@
         .severity { color: #9d2424; font-weight: bold; text-transform: uppercase; }
         .resolution { background: #eff9f3; border-left: 3px solid #268455; padding: 9px 10px; white-space: pre-wrap; }
         .pending { background: #fff8e7; border-left: 3px solid #d89a19; padding: 9px 10px; color: #6c541b; }
+        .photo-section { page-break-inside: auto; }
+        .photo-grid { margin: -4px; font-size: 0; }
+        .photo { width: 50%; display: inline-block; padding: 4px; vertical-align: top; page-break-inside: avoid; }
+        .photo-box { border: 1px solid #d6e0ea; padding: 5px; }
+        .photo img { width: 100%; max-height: 220px; display: block; object-fit: contain; }
+        .photo-caption { margin-top: 4px; color: #617286; font-size: 8px; text-align: center; }
         .signature { width: 100%; border-collapse: collapse; }
         .signature td { vertical-align: top; }
         .signature-mark { width: 54px; height: 54px; border: 2px solid #268455; color: #268455; text-align: center; font-size: 25px; font-weight: bold; line-height: 50px; }
@@ -155,8 +161,26 @@
     </div>
 </div>
 
+@if($imagenesPdf->isNotEmpty())
+    <div class="section photo-section">
+        <div class="section-head"><h2>4. Registro fotográfico del establecimiento</h2></div>
+        <div class="section-body">
+            <div class="photo-grid">
+                @foreach($imagenesPdf as $imagen)
+                    <div class="photo">
+                        <div class="photo-box">
+                            <img src="{{ $imagen }}" alt="Fotografía {{ $loop->iteration }}">
+                            <div class="photo-caption">Fotografía {{ $loop->iteration }} de {{ $imagenesPdf->count() }}</div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endif
+
 <div class="section">
-    <div class="section-head"><h2>4. Firma electrónica y verificación documental</h2></div>
+    <div class="section-head"><h2>{{ $imagenesPdf->isNotEmpty() ? '5' : '4' }}. Firma electrónica y verificación documental</h2></div>
     <div class="section-body">
         <table class="final-grid">
             <tr>

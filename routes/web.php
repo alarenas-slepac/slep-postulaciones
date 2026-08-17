@@ -172,6 +172,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::get('/tickets', [CentroOperacionesTicketController::class, 'index'])->name('tickets.index');
             Route::get('/tickets/{ticket}', [CentroOperacionesTicketController::class, 'show'])->whereNumber('ticket')->name('tickets.show');
             Route::get('/tickets/{ticket}/informe', [CentroOperacionesTicketController::class, 'pdf'])->whereNumber('ticket')->name('tickets.pdf');
+            Route::post('/tickets/{ticket}/imagenes', [CentroOperacionesTicketController::class, 'subirImagenes'])->whereNumber('ticket')->name('tickets.imagenes.store');
+            Route::get('/tickets/{ticket}/imagenes/{imagen}', [CentroOperacionesTicketController::class, 'imagen'])
+                ->whereNumber(['ticket', 'imagen'])
+                ->name('tickets.imagenes.show');
             Route::patch('/tickets/{ticket}/resolver', [CentroOperacionesTicketController::class, 'resolver'])->whereNumber('ticket')->name('tickets.resolver');
         });
         Route::middleware('ensure.role:admin')->group(function () {

@@ -49,7 +49,7 @@
     @if($errors->any())
         <div class="alert alert-danger co-flash-message align-items-start">
             <i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i>
-            <div><strong>Revisa la resolución ingresada.</strong><ul class="mb-0 mt-1">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+            <div><strong>Revisa la información ingresada.</strong><ul class="mb-0 mt-1">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
         </div>
     @endif
 
@@ -89,6 +89,54 @@
             </div>
         </section>
     </div>
+
+    <section class="co-card co-ticket-gallery-card">
+        <div class="co-card-head">
+            <div>
+                <span class="co-eyebrow">Complemento del establecimiento</span>
+                <h2>Registro fotográfico</h2>
+            </div>
+            <span class="co-count">{{ $ticket->imagenes->count() }}/{{ config('centro_operaciones.ticket_imagenes.maximo', 10) }}</span>
+        </div>
+
+        @if($ticket->imagenes->isEmpty())
+            <div class="co-empty">
+                <i class="bi bi-images" aria-hidden="true"></i>
+                El establecimiento todavía no ha agregado fotografías.
+            </div>
+        @else
+            <div class="co-ticket-gallery">
+                @foreach($ticket->imagenes as $imagen)
+                    <a href="{{ route('centro-operaciones.tickets.imagenes.show', [$ticket, $imagen]) }}" target="_blank" rel="noopener">
+                        <img src="{{ route('centro-operaciones.tickets.imagenes.show', [$ticket, $imagen]) }}" alt="Fotografía {{ $loop->iteration }} del ticket {{ $ticket->numero }}" loading="lazy">
+                        <span>Fotografía {{ $loop->iteration }}</span>
+                    </a>
+                @endforeach
+            </div>
+        @endif
+
+        @if($puedeSubirImagenes)
+            @if($ticket->imagenes->count() < config('centro_operaciones.ticket_imagenes.maximo', 10))
+                <form method="POST" action="{{ route('centro-operaciones.tickets.imagenes.store', $ticket) }}" enctype="multipart/form-data" class="co-ticket-upload-form">
+                    @csrf
+                    <div>
+                        <label class="form-label fw-semibold" for="imagenes">Subir fotos</label>
+                        <input id="imagenes" name="imagenes[]" type="file" class="form-control @error('imagenes') is-invalid @enderror" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple required>
+                        <div class="form-text">
+                            JPG, PNG o WebP. Máximo 20 MB por imagen y 10 imágenes acumuladas por ticket.
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-cloud-arrow-up"></i> Subir fotos
+                    </button>
+                </form>
+            @else
+                <div class="co-ticket-upload-limit">
+                    <i class="bi bi-check-circle"></i> Este ticket alcanzó el máximo de 10 imágenes.
+                </div>
+            @endif
+        @endif
+    </section>
 
     <section class="co-card co-resolution-card">
         <div class="co-card-head">

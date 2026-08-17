@@ -27,6 +27,7 @@ class CentroOperacionesTicketServiceTest extends TestCase
     {
         foreach ([
             'centro_operaciones_ticket_firmas',
+            'centro_operaciones_ticket_imagenes',
             'centro_operaciones_tickets',
             'centro_operaciones_incidente_configuraciones',
             'centro_operaciones_incidencias',
@@ -290,6 +291,15 @@ class CentroOperacionesTicketServiceTest extends TestCase
             $table->timestamp('fecha_firma');
             $table->string('token_firma')->unique();
             $table->char('hash_firma', 64);
+            $table->timestamps();
+        });
+        Schema::create('centro_operaciones_ticket_imagenes', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('ticket_id');
+            $table->string('path');
+            $table->string('mime_type');
+            $table->unsignedBigInteger('size_bytes');
+            $table->foreignId('subida_por_id')->nullable();
             $table->timestamps();
         });
     }

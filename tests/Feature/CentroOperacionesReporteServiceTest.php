@@ -120,6 +120,7 @@ class CentroOperacionesReporteServiceTest extends TestCase
             $operaciones->up();
             $extension->up();
             CarbonImmutable::setTestNow('2026-08-05 10:00:00');
+            $this->createTicketTables();
 
             DB::table('establecimientos')->insert([
                 'id' => 1,
@@ -185,6 +186,8 @@ class CentroOperacionesReporteServiceTest extends TestCase
             ]);
         } finally {
             CarbonImmutable::setTestNow();
+            Schema::dropIfExists('centro_operaciones_tickets');
+            Schema::dropIfExists('centro_operaciones_incidente_configuraciones');
             $extension->down();
             $operaciones->down();
             Schema::dropIfExists('users');
@@ -201,6 +204,7 @@ class CentroOperacionesReporteServiceTest extends TestCase
         try {
             $operaciones->up();
             $extension->up();
+            $this->createTicketTables();
             DB::table('establecimientos')->insert([
                 'id' => 1,
                 'nombre_establecimiento' => 'Liceo Nueva Zelandia',
@@ -234,6 +238,8 @@ class CentroOperacionesReporteServiceTest extends TestCase
             $this->assertSame('simulacro', $reporte->incidencias->sole()->modalidad);
             $this->assertSame('albergue', $reporte->afectaciones->sole()->tipo);
         } finally {
+            Schema::dropIfExists('centro_operaciones_tickets');
+            Schema::dropIfExists('centro_operaciones_incidente_configuraciones');
             $extension->down();
             $operaciones->down();
             Schema::dropIfExists('users');

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Schema;
 
@@ -60,4 +61,5 @@ class CentroOperacionesTicket extends Model
     public function creadoPor(): BelongsTo { return $this->belongsTo(User::class, 'creado_por_id')->withTrashed(); }
     public function resueltoPor(): BelongsTo { return $this->belongsTo(User::class, 'resuelto_por_id')->withTrashed(); }
     public function firmaResolucion(): HasOne { return $this->hasOne(CentroOperacionesTicketFirma::class, 'ticket_id'); }
+    public function imagenes(): HasMany { return $this->hasMany(CentroOperacionesTicketImagen::class, 'ticket_id')->oldest(); }
 }

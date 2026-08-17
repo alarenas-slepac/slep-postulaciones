@@ -3,14 +3,19 @@
 namespace App\Http\Controllers\CentroOperaciones;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CentroOperaciones\SubirTicketImagenesRequest;
 use App\Models\CentroOperacionesTicket;
+use App\Models\CentroOperacionesTicketImagen;
 use App\Models\FuncionarioAcAutorizado;
 use App\Services\CentroOperaciones\TicketDocumentoService;
+use App\Services\CentroOperaciones\TicketImagenService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TicketController extends Controller
 {
@@ -42,12 +47,50 @@ class TicketController extends Controller
             'configuracion',
             'resueltoPor',
             'firmaResolucion',
+            'imagenes',
         ]);
 
         return view('centro-operaciones.tickets.show', [
             'ticket' => $ticket,
             'puedeResolver' => $this->puedeResolver($request, $ticket),
+            'puedeSubirImagenes' => $this->puedeSubirImagenes($request, $ticket),
         ]);
+    }
+
+    public function subirImagenes(
+        SubirTicketImagenesRequest $request,
+        CentroOperacionesTicket $ticket,
+        TicketImagenService $servicio
+    ): RedirectResponse {
+        $archivos = $request->file('imagenes', []);
+        $servicio->guardar($ticket, $request->user(), $archivos);
+
+        return back()->with(
+            'success',
+            count($archivos) === 1
+                ? 'Fotografía agregada correctamente.'
+                : 'Fotografías agregadas correctamente.'
+        );
+    }
+
+    public function imagen(
+        Request $request,
+        CentroOperacionesTicket $ticket,
+        CentroOperacionesTicketImagen $imagen
+    ): StreamedResponse {
+        $this->autorizarTicket($request, $ticket);
+        abort_unless((int) $imagen->ticket_id === (int) $ticket->id, 404);
+        abort_unless(Storage::disk('local')->exists($imagen->path), 404);
+
+        return Storage::disk('local')->response(
+            $imagen->path,
+            'fotografia-ticket-'.$imagen->id.'.jpg',
+            [
+                'Content-Type' => $imagen->mime_type,
+                'Content-Disposition' => 'inline',
+                'Cache-Control' => 'private, max-age=3600',
+            ]
+        );
     }
 
     public function resolver(Request $request, CentroOperacionesTicket $ticket): RedirectResponse
@@ -129,6 +172,15 @@ class TicketController extends Controller
                         ->orWhereIn('segunda_subdireccion_responsable', $subdirecciones);
                 });
         });
+    }
+
+    private function puedeSubirImagenes(Request $request, CentroOperacionesTicket $ticket): bool
+    {
+        $usuario = $request->user();
+        $ticket->loadMissing('incidencia');
+
+        return $usuario->hasRole('funcionario_directivo_estab')
+            && (int) $usuario->establecimiento_id === (int) $ticket->incidencia?->establecimiento_id;
     }
 
     private function puedeResolver(Request $request, CentroOperacionesTicket $ticket): bool

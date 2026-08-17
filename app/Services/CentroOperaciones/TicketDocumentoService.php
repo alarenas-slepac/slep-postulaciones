@@ -9,7 +9,9 @@ use App\Models\User;
 use App\Support\Cometidos\SimpleQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class TicketDocumentoService
@@ -80,6 +82,7 @@ class TicketDocumentoService
             'validacionUrl' => $url,
             'qrDataUri' => SimpleQrCode::dataUri($url, 3, 3),
             'logoDataUri' => $this->logoDataUri(),
+            'imagenesPdf' => $this->imagenesPdf($ticket),
         ])->setPaper('a4', 'portrait')->output();
     }
 
@@ -152,6 +155,12 @@ class TicketDocumentoService
                 'segunda_subdireccion' => $ticket->segunda_subdireccion_responsable,
                 'segundo_responsable' => $ticket->segundoResponsable?->nombre_completo,
             ],
+            'imagenes' => $ticket->imagenes->map(fn ($imagen) => [
+                'id' => $imagen->id,
+                'mime_type' => $imagen->mime_type,
+                'size_bytes' => $imagen->size_bytes,
+                'sha256' => $this->hashImagen($imagen->path),
+            ])->all(),
             'firma' => $firma ? [
                 'tipo' => $firma->tipo_firma,
                 'nombre' => $firma->nombre_firmante,
@@ -180,7 +189,32 @@ class TicketDocumentoService
             'creadoPor',
             'resueltoPor',
             'firmaResolucion',
+            'imagenes',
         ]);
+    }
+
+    /** @return Collection<int, string> */
+    private function imagenesPdf(CentroOperacionesTicket $ticket): Collection
+    {
+        $disco = Storage::disk('local');
+
+        return $ticket->imagenes
+            ->map(function ($imagen) use ($disco) {
+                if (! $disco->exists($imagen->path)) {
+                    return null;
+                }
+
+                return 'data:'.$imagen->mime_type.';base64,'.base64_encode($disco->get($imagen->path));
+            })
+            ->filter()
+            ->values();
+    }
+
+    private function hashImagen(string $path): ?string
+    {
+        $disco = Storage::disk('local');
+
+        return $disco->exists($path) ? hash('sha256', $disco->get($path)) : null;
     }
 
     private function logoDataUri(): ?string

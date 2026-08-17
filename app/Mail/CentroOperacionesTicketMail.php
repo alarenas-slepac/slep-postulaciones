@@ -20,7 +20,7 @@ class CentroOperacionesTicketMail extends Mailable implements ShouldQueue
 
     public function build(): self
     {
-        $this->ticket->loadMissing(['incidencia.establecimiento', 'responsable', 'segundoResponsable']);
+        $this->ticket->loadMissing(['incidencia.establecimiento', 'responsable', 'segundoResponsable', 'imagenes']);
         $pdf = app(TicketDocumentoService::class)->generarPdf($this->ticket);
         $asunto = $this->evento === 'escalamiento' ? 'Ticket vencido' : 'Nuevo ticket asignado';
 

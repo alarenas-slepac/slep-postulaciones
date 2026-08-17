@@ -15,6 +15,15 @@ return [
 
     'rol_reporte' => 'funcionario_directivo_estab',
 
+    'ticket_imagenes' => [
+        'maximo' => 10,
+        'maximo_mb' => 20,
+        'maximo_megapixeles' => 40,
+        'ancho_maximo' => 1600,
+        'alto_maximo' => 1200,
+        'calidad' => 80,
+    ],
+
     'servicios' => [
         'agua_potable' => ['label' => 'Agua potable', 'icon' => 'bi-droplet-fill'],
         'energia_electrica' => ['label' => 'Energía eléctrica', 'icon' => 'bi-lightning-charge-fill'],
