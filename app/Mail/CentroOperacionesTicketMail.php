@@ -3,7 +3,7 @@
 namespace App\Mail;
 
 use App\Models\CentroOperacionesTicket;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\CentroOperaciones\TicketPdfService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -20,8 +20,7 @@ class CentroOperacionesTicketMail extends Mailable implements ShouldQueue
 
     public function build(): self
     {
-        $this->ticket->loadMissing(['incidencia.establecimiento', 'responsable']);
-        $pdf = Pdf::loadView('centro-operaciones.tickets.pdf', ['ticket' => $this->ticket]);
+        $pdf = app(TicketPdfService::class)->render($this->ticket);
         $asunto = $this->evento === 'escalamiento' ? 'Ticket vencido' : 'Nuevo ticket asignado';
 
         return $this->subject("{$asunto} · {$this->ticket->numero}")

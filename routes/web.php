@@ -162,6 +162,11 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::middleware('ensure.role:admin|director_ejecutivo|secretaria_direccion_ejecutiva|comunicaciones|funcionario_ac|funcionario_directivo_estab')->group(function () {
             Route::get('/tickets', [CentroOperacionesTicketController::class, 'index'])->name('tickets.index');
             Route::get('/tickets/{ticket}', [CentroOperacionesTicketController::class, 'show'])->whereNumber('ticket')->name('tickets.show');
+            Route::get('/tickets/{ticket}/pdf', [CentroOperacionesTicketController::class, 'pdf'])->whereNumber('ticket')->name('tickets.pdf');
+            Route::post('/tickets/{ticket}/imagenes', [CentroOperacionesTicketController::class, 'subirImagenes'])->whereNumber('ticket')->name('tickets.imagenes.store');
+            Route::get('/tickets/{ticket}/imagenes/{imagen}', [CentroOperacionesTicketController::class, 'imagen'])
+                ->whereNumber(['ticket', 'imagen'])
+                ->name('tickets.imagenes.show');
             Route::patch('/tickets/{ticket}/resolver', [CentroOperacionesTicketController::class, 'resolver'])->whereNumber('ticket')->name('tickets.resolver');
         });
         Route::middleware('ensure.role:admin')->group(function () {

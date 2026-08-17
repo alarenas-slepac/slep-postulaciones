@@ -231,5 +231,20 @@ class CentroOperacionesReporteServiceTest extends TestCase
             $table->id();
             $table->softDeletes();
         });
+        Schema::create('centro_operaciones_incidente_configuraciones', function (Blueprint $table) {
+            $table->id();
+            $table->string('tipo')->unique();
+            $table->boolean('activo')->default(true);
+            $table->unsignedBigInteger('responsable_funcionario_ac_id')->nullable();
+        });
+        Schema::create('centro_operaciones_tickets', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('incidencia_id')->unique();
+            $table->string('estado')->default('asignado');
+            $table->timestamp('resuelto_en')->nullable();
+            $table->unsignedBigInteger('resuelto_por_id')->nullable();
+            $table->text('resolucion')->nullable();
+            $table->timestamps();
+        });
     }
 }

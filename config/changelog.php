@@ -1,6 +1,36 @@
 <?php
 
 return [
+    '2026.8.17.369' => [
+        'date' => '2026-08-17',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Registro fotográfico en tickets de incidencias',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/TicketController.php',
+            'app/Http/Requests/CentroOperaciones/SubirTicketImagenesRequest.php',
+            'app/Mail/CentroOperacionesTicketMail.php',
+            'app/Models/CentroOperacionesTicket.php',
+            'app/Models/CentroOperacionesTicketImagen.php',
+            'app/Services/CentroOperaciones/TicketImagenService.php',
+            'app/Services/CentroOperaciones/TicketPdfService.php',
+            'config/centro_operaciones.php',
+            'database/migrations/2026_08_17_120000_create_centro_operaciones_ticket_imagenes_table.php',
+            'resources/css/centro-operaciones.css',
+            'resources/views/centro-operaciones/tickets/show.blade.php',
+            'resources/views/centro-operaciones/tickets/pdf.blade.php',
+            'routes/web.php',
+            'public/build/manifest.json',
+            'public/build/assets/centro-operaciones-D-9J3sds.css',
+            'tests/Feature/CentroOperacionesReporteServiceTest.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+        ],
+        'changes' => [
+            'Permite al directivo del establecimiento complementar sus tickets con hasta 10 fotografías de 20 MB cada una.',
+            'Guarda las imágenes optimizadas en almacenamiento privado y protege su consulta con el alcance del ticket.',
+            'Incorpora la galería al detalle y embebe las fotografías en el PDF descargable y en futuras notificaciones.',
+        ],
+        'roles' => ['Directivo de Establecimiento', 'Usuarios con acceso a tickets'],
+    ],
     '2026.8.6.368' => [
         'date' => '2026-08-06',
         'module' => 'Centro de Operaciones',

@@ -3,12 +3,19 @@
 namespace App\Http\Controllers\CentroOperaciones;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CentroOperaciones\SubirTicketImagenesRequest;
 use App\Models\CentroOperacionesTicket;
+use App\Models\CentroOperacionesTicketImagen;
 use App\Models\FuncionarioAcAutorizado;
+use App\Services\CentroOperaciones\TicketImagenService;
+use App\Services\CentroOperaciones\TicketPdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TicketController extends Controller
 {
@@ -24,18 +31,71 @@ class TicketController extends Controller
 
     public function show(Request $request, CentroOperacionesTicket $ticket): View
     {
-        $query = CentroOperacionesTicket::query()->whereKey($ticket->id);
-        $this->aplicarAlcance($query, $request);
-        abort_unless($query->exists(), 403);
+        $this->asegurarAcceso($request, $ticket);
 
         // Cargar segunda subdirección y responsable de la configuración del ticket
-        $ticket->loadMissing(['configuracion', 'configuracion.segundaSubdireccionResponsable', 'configuracion.segundaResponsableSubdireccion']);
+        $ticket->loadMissing([
+            'incidencia.establecimiento',
+            'incidencia.reporte.reportadoPor',
+            'responsable',
+            'imagenes',
+            'configuracion',
+            'configuracion.segundaSubdireccionResponsable',
+            'configuracion.segundaResponsableSubdireccion',
+        ]);
 
         return view('centro-operaciones.tickets.show', [
             'ticket' => $ticket,
             'subdirecciones' => $this->getSubdirecciones(),
             'responsables' => $this->getResponsables(),
+            'puedeSubirImagenes' => $this->puedeSubirImagenes($request, $ticket),
         ]);
+    }
+
+    public function subirImagenes(
+        SubirTicketImagenesRequest $request,
+        CentroOperacionesTicket $ticket,
+        TicketImagenService $servicio
+    ): RedirectResponse {
+        $archivos = $request->file('imagenes', []);
+        $servicio->guardar($ticket, $request->user(), $archivos);
+
+        return back()->with(
+            'success',
+            count($archivos) === 1
+                ? 'Fotografía agregada correctamente.'
+                : 'Fotografías agregadas correctamente.'
+        );
+    }
+
+    public function pdf(
+        Request $request,
+        CentroOperacionesTicket $ticket,
+        TicketPdfService $servicio
+    ): Response {
+        $this->asegurarAcceso($request, $ticket);
+
+        return $servicio->render($ticket)->download($ticket->numero.'.pdf');
+    }
+
+    public function imagen(
+        Request $request,
+        CentroOperacionesTicket $ticket,
+        CentroOperacionesTicketImagen $imagen
+    ): StreamedResponse {
+        $this->asegurarAcceso($request, $ticket);
+        abort_unless((int) $imagen->ticket_id === (int) $ticket->id, 404);
+        abort_unless(Storage::disk('local')->exists($imagen->path), 404);
+
+        return Storage::disk('local')->response(
+            $imagen->path,
+            'fotografia-ticket-'.$imagen->id.'.jpg',
+            [
+                'Content-Type' => $imagen->mime_type,
+                'Content-Disposition' => 'inline',
+                'Cache-Control' => 'private, max-age=3600',
+            ]
+        );
     }
 
     private function getSubdirecciones()
@@ -86,6 +146,22 @@ class TicketController extends Controller
             $q->where('responsable_funcionario_ac_id', $funcionario->id)
                 ->when($subdirecciones->isNotEmpty(), fn ($sq) => $sq->orWhereIn('subdireccion_dependencia', $subdirecciones));
         });
+    }
+
+    private function asegurarAcceso(Request $request, CentroOperacionesTicket $ticket): void
+    {
+        $query = CentroOperacionesTicket::query()->whereKey($ticket->id);
+        $this->aplicarAlcance($query, $request);
+        abort_unless($query->exists(), 403);
+    }
+
+    private function puedeSubirImagenes(Request $request, CentroOperacionesTicket $ticket): bool
+    {
+        $usuario = $request->user();
+        $ticket->loadMissing('incidencia');
+
+        return $usuario->hasRole('funcionario_directivo_estab')
+            && (int) $usuario->establecimiento_id === (int) $ticket->incidencia?->establecimiento_id;
     }
 
     private function puedeResolver(Request $request, CentroOperacionesTicket $ticket): bool

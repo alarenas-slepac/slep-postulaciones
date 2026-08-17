@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Support\SlepUiRegistry;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class CentroOperacionesTicketsModuleTest extends TestCase
@@ -26,6 +28,34 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         );
     }
 
+    public function test_migracion_de_imagenes_crea_la_tabla_aditiva(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+        });
+        Schema::create('centro_operaciones_tickets', function (Blueprint $table) {
+            $table->id();
+        });
+        $migration = require database_path('migrations/2026_08_17_120000_create_centro_operaciones_ticket_imagenes_table.php');
+
+        try {
+            $migration->up();
+
+            $this->assertTrue(Schema::hasTable('centro_operaciones_ticket_imagenes'));
+            $this->assertTrue(Schema::hasColumns('centro_operaciones_ticket_imagenes', [
+                'ticket_id',
+                'path',
+                'mime_type',
+                'size_bytes',
+                'subida_por_id',
+            ]));
+        } finally {
+            $migration->down();
+            Schema::dropIfExists('centro_operaciones_tickets');
+            Schema::dropIfExists('users');
+        }
+    }
+
     public function test_rutas_de_tickets_mantenedor_y_resolucion_estan_registradas(): void
     {
         $routes = file_get_contents(base_path('routes/web.php'));
@@ -33,6 +63,9 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("name('configuraciones.index')", $routes);
         $this->assertStringContainsString("name('configuraciones.store')", $routes);
         $this->assertStringContainsString("name('tickets.resolver')", $routes);
+        $this->assertStringContainsString("name('tickets.pdf')", $routes);
+        $this->assertStringContainsString("name('tickets.imagenes.store')", $routes);
+        $this->assertStringContainsString("name('tickets.imagenes.show')", $routes);
     }
 
     public function test_mantenedor_permite_crear_y_asignar_por_subdireccion(): void
@@ -44,8 +77,8 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("->where('subdireccion_dependencia', \$datos['subdireccion_dependencia'])", $controller);
         $this->assertStringContainsString('48 - strlen($terminacion)', $controller);
         $this->assertStringContainsString('Nueva incidencia', $view);
-        $this->assertStringContainsString('1. Subdirección', $view);
-        $this->assertStringContainsString('2. Responsable de subdirección', $view);
+        $this->assertStringContainsString('>1</span> Subdirección', $view);
+        $this->assertStringContainsString('>2</span> Responsable de subdirección', $view);
         $this->assertStringContainsString('Subdirector(a) (Jefatura)', $view);
         $this->assertStringContainsString('data-subdireccion', $view);
     }
@@ -139,5 +172,37 @@ class CentroOperacionesTicketsModuleTest extends TestCase
     {
         $console = file_get_contents(base_path('routes/console.php'));
         $this->assertStringContainsString("Schedule::command('incidencias:escalar-tickets')->hourly()", $console);
+    }
+
+    public function test_fotografias_de_ticket_tienen_persistencia_privada_y_alcance_por_establecimiento(): void
+    {
+        $migration = file_get_contents(database_path('migrations/2026_08_17_120000_create_centro_operaciones_ticket_imagenes_table.php'));
+        $request = file_get_contents(app_path('Http/Requests/CentroOperaciones/SubirTicketImagenesRequest.php'));
+        $service = file_get_contents(app_path('Services/CentroOperaciones/TicketImagenService.php'));
+
+        $this->assertStringContainsString("Schema::create('centro_operaciones_ticket_imagenes'", $migration);
+        $this->assertStringContainsString('->cascadeOnDelete()', $migration);
+        $this->assertStringContainsString("hasRole('funcionario_directivo_estab')", $request);
+        $this->assertStringContainsString('establecimiento_id', $request);
+        $this->assertStringContainsString("'mimes:jpg,jpeg,png,webp'", $request);
+        $this->assertStringContainsString("Storage::disk('local')", $service);
+        $this->assertStringContainsString('lockForUpdate()', $service);
+        $this->assertStringContainsString('toJpeg(', $service);
+    }
+
+    public function test_detalle_y_pdf_incorporan_hasta_diez_fotografias_de_veinte_mb(): void
+    {
+        $detalle = file_get_contents(resource_path('views/centro-operaciones/tickets/show.blade.php'));
+        $pdf = file_get_contents(resource_path('views/centro-operaciones/tickets/pdf.blade.php'));
+        $pdfService = file_get_contents(app_path('Services/CentroOperaciones/TicketPdfService.php'));
+
+        $this->assertSame(10, config('centro_operaciones.ticket_imagenes.maximo'));
+        $this->assertSame(20, config('centro_operaciones.ticket_imagenes.maximo_mb'));
+        $this->assertStringContainsString('name="imagenes[]"', $detalle);
+        $this->assertStringContainsString('multiple required', $detalle);
+        $this->assertStringContainsString('20 MB por imagen', $detalle);
+        $this->assertStringContainsString('Descargar PDF', $detalle);
+        $this->assertStringContainsString('$imagenesPdf as $imagen', $pdf);
+        $this->assertStringContainsString('base64_encode($contenido)', $pdfService);
     }
 }
