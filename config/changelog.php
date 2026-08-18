@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.18.385' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Resolución docente obligatoria antes del cierre',
+        'files' => ['app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php', 'app/Http/Controllers/Postulante/MisReemplazosController.php', 'app/Mail/ResolucionDocenteFirmadaEnviada.php', 'app/Models/SolicitudReemplazo.php', 'app/Services/ResolucionDocenteDocxService.php', 'database/migrations/2026_08_18_120000_add_resolucion_docente_fields_to_solicitudes_reemplazo.php', 'resources/templates/resolucion_docente_reemplazo.docx', 'resources/views/emails/resolucion-docente-firmada-enviada.blade.php', 'resources/views/gestion/solicitudes-reemplazo/show.blade.php', 'resources/views/postulant/reemplazos/index.blade.php', 'resources/views/postulant/reemplazos/show.blade.php', 'routes/web.php'],
+        'changes' => ['Genera un DOCX de resolución docente desde plantilla y elimina el resaltado amarillo.', 'Exige PDF firmado y notificación al establecimiento y postulante antes de cerrar solicitudes docentes aceptadas.', 'Publica la resolución firmada en Mis Reemplazos con acceso protegido.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Postulante'],
+    ],
     '2026.8.18.384' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',

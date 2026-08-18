@@ -116,6 +116,16 @@ class MisReemplazosController extends Controller
         ]);
     }
 
+    public function resolucionDocenteFirmada(Request $request, SolicitudReemplazo $solicitud)
+    {
+        $profile = $request->user()?->postulantProfile;
+        abort_unless($profile, 404);
+        abort_unless((int) $solicitud->postulant_profile_id === (int) $profile->id, 403);
+        $path = (string) ($solicitud->resolucion_docente_firmada_pdf_path ?? '');
+        abort_unless($path !== '' && Storage::disk('local')->exists($path), 404);
+        return response()->file(Storage::disk('local')->path($path), ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="resolucion_docente_firmada.pdf"']);
+    }
+
     public function contratoFirmado(Request $request, SolicitudReemplazo $solicitud)
     {
         $profile = $request->user()?->postulantProfile;

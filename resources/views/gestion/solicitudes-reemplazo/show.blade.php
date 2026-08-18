@@ -1173,6 +1173,18 @@
             @endif
         </div>
     </div>
+    @if ($titularEsDocente && $s->estado === 'aceptada' && auth()->user()?->hasAnyRole(['admin','coordinador_gdp','coordinador_gdp_admin','funcionario_slep']))
+        <div class="card mb-4 border-primary"><div class="card-header fw-semibold">Resolución docente</div><div class="card-body">
+            <div class="small text-muted mb-3">Debe generarse, revisarse, firmarse y notificarse antes de cerrar esta solicitud.</div>
+            <div class="d-flex flex-wrap gap-2">
+                <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.resolucion-docente.generar', $s) }}">@csrf<button class="btn btn-outline-primary btn-sm">{{ $s->resolucion_docente_docx_path ? 'Regenerar DOCX' : 'Generar DOCX' }}</button></form>
+                @if ($s->resolucion_docente_docx_path)<a class="btn btn-outline-secondary btn-sm" href="{{ route('gestion.solicitudes-reemplazo.resolucion-docente.download', $s) }}">Descargar DOCX</a>@endif
+                @if ($s->resolucion_docente_firmada_pdf_path)<a class="btn btn-outline-success btn-sm" target="_blank" href="{{ route('gestion.solicitudes-reemplazo.resolucion-docente.firmada.download', $s) }}">Ver PDF firmado</a>@endif
+            </div>
+            @if ($s->resolucion_docente_docx_path)<form class="mt-3" method="POST" enctype="multipart/form-data" action="{{ route('gestion.solicitudes-reemplazo.resolucion-docente.firmada', $s) }}">@csrf<label class="form-label">Cargar resolución firmada (PDF)</label><div class="input-group"><input class="form-control" type="file" name="resolucion_docente_firmada_pdf" accept="application/pdf" required><button class="btn btn-success">Cargar y notificar</button></div></form>@endif
+            @if ($s->resolucion_docente_notificada_at)<div class="alert alert-success mt-3 mb-0">PDF firmado notificado. El cierre está habilitado.</div>@elseif ($s->resolucion_docente_firmada_pdf_path)<div class="alert alert-warning mt-3 mb-0">PDF cargado, pendiente de notificación.</div>@endif
+        </div></div>
+    @endif
     {{-- Orden de trabajo (Funcionario SLEP) --}}
     @if (($canCrearOt ?? false) || in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true))
         <div class="card mb-4">
