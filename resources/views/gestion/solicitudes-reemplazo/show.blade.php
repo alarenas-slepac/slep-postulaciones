@@ -259,7 +259,9 @@
                     <textarea name="observacion" class="form-control" rows="3" minlength="3" maxlength="5000" required placeholder="Registra la gestión realizada, avances, contactos o pendientes de la OT..."></textarea>
                     <button type="submit" class="btn btn-warning mt-2">Registrar observación</button>
                 </form>
-                @php($otObservaciones = $s->observacionesFlujo->where('etapa', 'ot'))
+                @php
+                    $otObservaciones = $s->observacionesFlujo->where('etapa', 'ot');
+                @endphp
                 @if ($otObservaciones->count())
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
@@ -288,7 +290,12 @@
                 <div class="modal-header"><h5 class="modal-title">Derivar caso a administrador/coordinador</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body"><p class="text-muted">Usa esta acción cuando no encuentres un reemplazo y necesites que otro responsable continúe la revisión.</p>
                     <label class="form-label">Responsable <span class="text-danger">*</span></label>
-                    <select name="responsable_user_id" class="form-select mb-3" required><option value="">Selecciona un responsable</option>@foreach ($responsablesGestion as $responsable)<option value="{{ $responsable->id }}">{{ $responsable->full_name }} ({{ $responsable->email }})</option>@endforeach</select>
+                    <select name="responsable_user_id" class="form-select mb-3" required>
+                        <option value="">Selecciona un responsable</option>
+                        @foreach ($responsablesGestion as $responsable)
+                            <option value="{{ $responsable->id }}">{{ $responsable->full_name }} ({{ $responsable->email }})</option>
+                        @endforeach
+                    </select>
                     <label class="form-label">Observación de la derivación <span class="text-danger">*</span></label><textarea name="observacion" class="form-control" rows="4" minlength="3" maxlength="5000" required></textarea>
                 </div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary">Derivar caso</button></div>
             </form>
