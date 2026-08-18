@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.18.393' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Acceso del postulante a Mis Finiquitos',
+        'files' => ['app/Support/ModuleRegistry.php', 'app/Support/SlepUiRegistry.php', 'app/Http/Controllers/Postulante/MisFiniquitosController.php', 'config/changelog.php', 'tests/Feature/PostulanteFiniquitosAccessTest.php'],
+        'changes' => ['Asocia Mis Finiquitos al módulo autorizado de Mis Reemplazos y normaliza correctamente RUT terminados en k minúscula para evitar respuestas 403 al listar o descargar documentos propios.'],
+        'roles' => ['Postulante', 'Funcionario'],
+    ],
     '2026.8.18.392' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',

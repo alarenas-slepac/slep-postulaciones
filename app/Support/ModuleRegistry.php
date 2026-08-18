@@ -15,6 +15,7 @@ class ModuleRegistry
         if (Str::startsWith($name, 'gestion.autorizaciones-docentes.')) return 'gestion.solicitudes-reemplazo';
         if (Str::startsWith($name, 'gestion.deudas-pension-alimentos.')) return 'gestion.solicitudes-reemplazo';
         if (Str::startsWith($name, 'postulant.deudas-pension-alimentos.')) return 'postulant.reemplazos';
+        if (Str::startsWith($name, 'postulant.finiquitos.')) return 'postulant.reemplazos';
 
         // messages.* -> messages
         if (Str::startsWith($name, 'messages.')) return 'messages';
