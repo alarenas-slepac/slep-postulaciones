@@ -4189,7 +4189,10 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
             $anterior = null;
             if (! empty($actual->solicitud_anterior_id)) {
                 $anterior = $grupo->firstWhere('id', (int) $actual->solicitud_anterior_id);
-                if ($anterior && ! $this->mismaLlaveContinuidadFiniquito($actual, $anterior)) {
+                if ($anterior && (
+                    ! $this->mismaLlaveContinuidadFiniquito($actual, $anterior)
+                    || ! $this->fechasConectanContinuidad($anterior->fecha_termino, $actual->fecha_inicio_trabajo)
+                )) {
                     $anterior = null;
                 }
             }
@@ -4256,10 +4259,6 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
 
                 if (! $this->mismaLlaveContinuidadFiniquito($actual, $posible)) {
                     return false;
-                }
-
-                if ((int) ($posible->solicitud_anterior_id ?? 0) === (int) $actual->id) {
-                    return true;
                 }
 
                 return $this->fechasConectanContinuidad($actual->fecha_termino, $posible->fecha_inicio_trabajo);

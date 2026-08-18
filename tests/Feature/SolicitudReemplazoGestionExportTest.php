@@ -7,6 +7,7 @@ use App\Models\SolicitudReemplazo;
 use App\Models\SolicitudReemplazoJornada;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -108,6 +109,46 @@ class SolicitudReemplazoGestionExportTest extends TestCase
         $this->assertContains('finiquitoFirmadoCargadoPor:id,rut,nombres,apellido_paterno,apellido_materno,email', $signerRelations);
     }
 
+    public function test_finiquito_breaks_an_explicit_continuity_when_effective_start_has_a_gap(): void
+    {
+        $primera = $this->solicitudFiniquito(101, '2026-04-28', '2026-05-13');
+        $anterior = $this->solicitudFiniquito(102, '2026-05-14', '2026-06-12');
+        $actual = $this->solicitudFiniquito(103, '2026-06-16', '2026-07-12', 102);
+        $ultima = $this->solicitudFiniquito(104, '2026-07-13', '2026-08-11', 103);
+        $relacionadas = collect(['KK' => collect([$primera, $anterior, $actual, $ultima])]);
+        $controller = app(SolicitudReemplazoGestionController::class);
+
+        $continuidadAnterior = $this->invokePrivate($controller, 'continuidadFiniquito', [$anterior, $relacionadas]);
+        $continuidadActual = $this->invokePrivate($controller, 'continuidadFiniquito', [$ultima, $relacionadas]);
+
+        $this->assertSame([101, 102], $continuidadAnterior['cadena']->pluck('id')->all());
+        $this->assertSame([103, 104], $continuidadActual['cadena']->pluck('id')->all());
+        $this->assertSame('2026-06-16', $continuidadActual['inicio']->format('Y-m-d'));
+        $this->assertTrue($this->invokePrivate(
+            $controller,
+            'esSolicitudFinalCadenaFiniquito',
+            [$anterior, $relacionadas, Carbon::parse('2026-08-18')]
+        ));
+    }
+
+    public function test_finiquito_keeps_an_explicit_continuity_when_effective_dates_connect(): void
+    {
+        $anterior = $this->solicitudFiniquito(101, '2026-05-14', '2026-06-12');
+        $actual = $this->solicitudFiniquito(102, '2026-06-13', '2026-07-12', 101);
+        $relacionadas = collect(['KK' => collect([$anterior, $actual])]);
+        $controller = app(SolicitudReemplazoGestionController::class);
+
+        $continuidad = $this->invokePrivate($controller, 'continuidadFiniquito', [$actual, $relacionadas]);
+
+        $this->assertSame([101, 102], $continuidad['cadena']->pluck('id')->all());
+        $this->assertSame('2026-05-14', $continuidad['inicio']->format('Y-m-d'));
+        $this->assertFalse($this->invokePrivate(
+            $controller,
+            'esSolicitudFinalCadenaFiniquito',
+            [$anterior, $relacionadas, Carbon::parse('2026-08-18')]
+        ));
+    }
+
     private function solicitudWithJornadas(string $estado, array $jornadas): SolicitudReemplazo
     {
         $solicitud = new SolicitudReemplazo();
@@ -128,6 +169,26 @@ class SolicitudReemplazoGestionExportTest extends TestCase
         ]);
 
         return $jornada;
+    }
+
+    private function solicitudFiniquito(int $id, string $inicioTrabajo, string $termino, ?int $anteriorId = null): SolicitudReemplazo
+    {
+        $solicitud = new SolicitudReemplazo();
+        $solicitud->forceFill([
+            'id' => $id,
+            'postulant_profile_id' => 501,
+            'contrato_trabajo_postulant_profile_id' => 501,
+            'solicitud_anterior_id' => $anteriorId,
+            'fecha_inicio_trabajo' => $inicioTrabajo,
+            'fecha_termino' => $termino,
+            'rut_titular_normalizado' => 'TITULAR-K',
+            'rut_reemplazo_normalizado' => 'REEMPLAZO-KK',
+        ]);
+        $solicitud->setRelation('funcionarioTitular', null);
+        $solicitud->setRelation('postulante', null);
+        $solicitud->setRelation('contratoPostulante', null);
+
+        return $solicitud;
     }
 
     private function invokePrivate(object $object, string $method, array $arguments): mixed

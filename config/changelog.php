@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.18.392' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Continuidad laboral según inicio efectivo',
+        'files' => ['app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php', 'config/changelog.php', 'tests/Feature/SolicitudReemplazoGestionExportTest.php'],
+        'changes' => ['Impide unir períodos de finiquito con días sin cobertura, aunque exista una referencia histórica a la solicitud anterior, validando siempre el término previo contra el inicio efectivo de trabajo.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.18.391' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',
