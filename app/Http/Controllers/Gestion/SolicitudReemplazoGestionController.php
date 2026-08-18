@@ -514,15 +514,18 @@ class SolicitudReemplazoGestionController extends Controller
                 || ($isFuncionarioSlep && (int) $solicitud->derivada_a_user_id === (int) $user->id)
             );
 
-        $hasOrdenTrabajo = !empty($solicitud->orden_trabajo_pdf_path)
-            || !empty($solicitud->orden_trabajo_creada_at)
-            || !empty($solicitud->orden_trabajo_creada_por_user_id);
-        $canRegistrarOtObservacion = $hasOrdenTrabajo
-            && in_array((string) $solicitud->estado, ['aceptada', 'cerrado', 'cerrada'], true)
+        $estadosConBitacora = [
+            'pendiente_uatp', 'rechazada_uatp', 'pendiente_validacion', 'rechazada_plani',
+            'pendiente_gdp', 'derivada_slep', 'aceptada',
+        ];
+        $canRegistrarSolicitudObservacion = in_array((string) $solicitud->estado, $estadosConBitacora, true)
             && (
                 $isAdmin
                 || $isGdp
-                || ($isFuncionarioSlep && (int) $solicitud->derivada_a_user_id === (int) $user->id)
+                || ($isFuncionarioSlep && in_array((string) $solicitud->estado, ['derivada_slep', 'aceptada'], true)
+                    && (int) $solicitud->derivada_a_user_id === (int) $user->id)
+                || ($canUatp && in_array((string) $solicitud->estado, ['pendiente_uatp', 'rechazada_uatp'], true))
+                || ($canPlani && in_array((string) $solicitud->estado, ['pendiente_validacion', 'rechazada_plani'], true))
             );
         $canDerivarGestion = $solicitud->estado === 'derivada_slep'
             && !$lockedByOtContrato
@@ -720,7 +723,7 @@ class SolicitudReemplazoGestionController extends Controller
             'lockedByOtContrato' => $lockedByOtContrato,
             'candidatosOt' => $candidatos,
             'canInformarObservacion' => $canInformarObservacion,
-            'canRegistrarOtObservacion' => $canRegistrarOtObservacion,
+            'canRegistrarSolicitudObservacion' => $canRegistrarSolicitudObservacion,
             'canDerivarGestion' => $canDerivarGestion,
             'canCerrarSinOt' => $canCerrarSinOt,
             'responsablesGestion' => $responsablesGestion,
@@ -1230,20 +1233,24 @@ class SolicitudReemplazoGestionController extends Controller
             ->with('status', 'Observación informada correctamente.');
     }
 
-    public function registrarObservacionOt(Request $request, SolicitudReemplazo $solicitud)
+    public function registrarObservacionSolicitud(Request $request, SolicitudReemplazo $solicitud)
     {
         $user = $request->user();
-        abort_unless(method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin', 'funcionario_slep']), 403);
-        abort_unless($this->hasOrdenTrabajo($solicitud), 403);
-        if (!$user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin'])) abort_unless((int) $solicitud->derivada_a_user_id === (int) $user->id, 403);
+        abort_unless(method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'coordinador_uatp', 'coordinador_gdp', 'coordinador_gdp_admin', 'supervisor_plani', 'funcionario_slep']), 403);
+        abort_unless(in_array((string) $solicitud->estado, ['pendiente_uatp', 'rechazada_uatp', 'pendiente_validacion', 'rechazada_plani', 'pendiente_gdp', 'derivada_slep', 'aceptada'], true), 403);
+        $allowed = $user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin'])
+            || ($user->hasRole('coordinador_uatp') && in_array((string) $solicitud->estado, ['pendiente_uatp', 'rechazada_uatp'], true))
+            || ($user->hasRole('supervisor_plani') && in_array((string) $solicitud->estado, ['pendiente_validacion', 'rechazada_plani'], true))
+            || ($user->hasRole('funcionario_slep') && in_array((string) $solicitud->estado, ['derivada_slep', 'aceptada'], true) && (int) $solicitud->derivada_a_user_id === (int) $user->id);
+        abort_unless($allowed, 403);
         $data = $request->validate(['observacion' => ['required', 'string', 'min:3', 'max:5000']], [], ['observacion' => 'observación o gestión realizada']);
         SolicitudReemplazoObservacion::create([
             'solicitud_reemplazo_id' => $solicitud->id,
-            'etapa' => 'ot', 'accion' => 'observacion_gestion',
+            'etapa' => 'solicitud', 'accion' => 'observacion_gestion',
             'estado_origen' => $solicitud->estado, 'estado_destino' => $solicitud->estado,
             'observacion' => trim((string) $data['observacion']), 'user_id' => $user->id,
         ]);
-        return back()->with('status', 'Observación de la OT registrada correctamente.');
+        return back()->with('status', 'Observación de la solicitud registrada correctamente.');
     }
 
     public function derivarCasoGestion(Request $request, SolicitudReemplazo $solicitud)
@@ -1256,7 +1263,7 @@ class SolicitudReemplazoGestionController extends Controller
         $responsable = User::query()->whereKey($data['responsable_user_id'])->whereHas('roles', fn ($q) => $q->whereIn('name', ['admin', 'coordinador_gdp', 'coordinador_gdp_admin']))->firstOrFail();
         SolicitudReemplazoObservacion::create([
             'solicitud_reemplazo_id' => $solicitud->id,
-            'etapa' => 'ot', 'accion' => 'derivacion_gestion',
+            'etapa' => 'solicitud', 'accion' => 'derivacion_gestion',
             'estado_origen' => $solicitud->estado, 'estado_destino' => $solicitud->estado,
             'observacion' => trim((string) $data['observacion']), 'user_id' => $user->id,
         ]);
@@ -1275,18 +1282,13 @@ class SolicitudReemplazoGestionController extends Controller
             abort_unless($s->estado === 'derivada_slep' && !$this->hasOrdenOrContrato($s), 403);
             SolicitudReemplazoObservacion::create([
                 'solicitud_reemplazo_id' => $s->id,
-                'etapa' => 'ot', 'accion' => 'cierre_sin_ot',
+                'etapa' => 'solicitud', 'accion' => 'cierre_sin_ot',
                 'estado_origen' => $s->estado, 'estado_destino' => 'cerrado',
                 'observacion' => trim((string) $data['observacion']), 'user_id' => $user->id,
             ]);
             $s->forceFill(['estado' => 'cerrado', 'cerrado_por_user_id' => $user->id, 'cerrado_at' => now()])->save();
         });
         return back()->with('status', 'Solicitud cerrada con observación administrativa, sin Orden de Trabajo.');
-    }
-
-    private function hasOrdenTrabajo(SolicitudReemplazo $s): bool
-    {
-        return !empty($s->orden_trabajo_pdf_path) || !empty($s->orden_trabajo_creada_at) || !empty($s->orden_trabajo_creada_por_user_id);
     }
 
     /**
