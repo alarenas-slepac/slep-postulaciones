@@ -864,6 +864,7 @@ class SolicitudReemplazoGestionController extends Controller
     public function slepGenerarResolucionDocente(Request $request, SolicitudReemplazo $solicitud, ResolucionDocenteDocxService $service)
     {
         $this->authorizeResolucionDocente($request, $solicitud);
+        abort_unless($solicitud->estado === 'aceptada', 403);
         $solicitud->loadMissing(['funcionarioTitular', 'postulante.user']);
         abort_unless($this->estamentoFromEstatuto($solicitud->funcionarioTitular?->estatuto) === 'docente', 403);
         $path = $service->generateAndStore($solicitud);
@@ -890,7 +891,6 @@ class SolicitudReemplazoGestionController extends Controller
     public function slepSubirResolucionDocenteFirmada(Request $request, SolicitudReemplazo $solicitud)
     {
         $this->authorizeResolucionDocente($request, $solicitud);
-        abort_unless($solicitud->resolucion_docente_docx_path, 422);
         $data = $request->validate(['resolucion_docente_firmada_pdf' => ['required', 'file', 'mimes:pdf', 'max:15360']]);
         $solicitud->loadMissing(['establecimiento', 'funcionarioTitular', 'areaDesempeno', 'postulante.user']);
         $recipients = $this->buildContratoFirmadoRecipients($solicitud);
@@ -904,7 +904,9 @@ class SolicitudReemplazoGestionController extends Controller
             foreach ($recipients as $recipient) NotificationAudit::sendMail($recipient['email'], new ResolucionDocenteFirmadaEnviada($solicitud->fresh(['establecimiento', 'funcionarioTitular', 'areaDesempeno', 'postulante.user']), $recipient['label']), ['event_key' => 'solicitud_reemplazo.resolucion_docente_firmada_enviada', 'description' => 'Envío de resolución docente firmada', 'subject' => "Resolución docente firmada reemplazo {$solicitud->numero_solicitud}", 'recipient_name' => $recipient['label'], 'related' => $solicitud]);
         } catch (\Throwable $e) { report($e); return back()->withErrors(['resolucion_docente_firmada_pdf' => 'El PDF se cargó, pero falló la notificación. Puedes reintentar el envío.']); }
         $solicitud->forceFill(['resolucion_docente_notificada_por_user_id' => $request->user()->id, 'resolucion_docente_notificada_at' => now()])->save();
-        return back()->with('status', 'Resolución docente firmada cargada y notificada. Ahora puedes cerrar la solicitud.');
+        return back()->with('status', $solicitud->estado === 'aceptada'
+            ? 'Resolución docente firmada cargada y notificada. Ahora puedes cerrar la solicitud.'
+            : 'Resolución docente firmada cargada y notificada para la solicitud cerrada.');
     }
 
     public function downloadResolucionDocenteFirmada(SolicitudReemplazo $solicitud)
@@ -919,7 +921,9 @@ class SolicitudReemplazoGestionController extends Controller
         $user = $request->user();
         abort_unless(method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin', 'funcionario_slep']), 403);
         if (!$user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin'])) abort_unless((int) $solicitud->derivada_a_user_id === (int) $user->id, 403);
-        abort_unless($solicitud->estado === 'aceptada', 403);
+        abort_unless(in_array((string) $solicitud->estado, ['aceptada', 'cerrado', 'cerrada'], true), 403);
+        $solicitud->loadMissing('funcionarioTitular');
+        abort_unless($this->estamentoFromEstatuto($solicitud->funcionarioTitular?->estatuto) === 'docente', 403);
     }
 
     private function resolucionDocenteCompleta(SolicitudReemplazo $s): bool
