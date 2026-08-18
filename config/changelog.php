@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.18.391' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Reducción de memoria en finiquitos',
+        'files' => ['app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php', 'config/changelog.php'],
+        'changes' => ['Usa proyecciones y relaciones mínimas durante el cálculo de continuidad, hidrata los datos completos sólo al presentar o exportar resultados y evita cargas de jornadas por fila.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.18.390' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',
