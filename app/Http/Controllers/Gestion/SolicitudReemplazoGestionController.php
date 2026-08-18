@@ -3483,6 +3483,12 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $page = max(1, (int) $request->query('page', 1));
         $perPage = 25;
         $items = $filtradas->slice(($page - 1) * $perPage, $perPage)->values();
+
+        // Cargar las relaciones de firma sobre la colección Eloquent antes
+        // de entregarla al paginador, evitando depender de métodos internos
+        // de la colección almacenada por LengthAwarePaginator.
+        $items->load($this->relacionesFiniquitos());
+
         $finiquitos = new \Illuminate\Pagination\LengthAwarePaginator(
             $items,
             $filtradas->count(),
@@ -3493,10 +3499,6 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
                 'query' => $request->query(),
             ]
         );
-
-        // Completar las relaciones que utiliza la vista sólo para los
-        // registros visibles en la página actual.
-        $finiquitos->getCollection()->load($this->relacionesFiniquitos());
 
         $establecimientos = Establecimiento::query()
             ->orderBy('nombre_establecimiento')
