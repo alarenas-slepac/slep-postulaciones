@@ -333,11 +333,11 @@ class SolicitudReemplazoGestionController extends Controller
 
         $filename = 'solicitudes_reemplazo_' . $scopeLabel . '_' . now()->format('Ymd_His') . '.csv';
 
-        return response()->streamDownload(function () use ($query) {
+        return response()->streamDownload(function () use ($query, $scope) {
             $handle = fopen('php://output', 'w');
             fwrite($handle, "\xEF\xBB\xBF"); // BOM UTF-8 para Excel
 
-            fputcsv($handle, [
+            $headers = [
                 'N solicitud',
                 'Estado',
                 'Fecha solicitud',
@@ -353,6 +353,20 @@ class SolicitudReemplazoGestionController extends Controller
                 'Horas titular pedagogicas',
                 'Horas reemplazo cronologicas',
                 'Horas reemplazo pedagogicas',
+            ];
+
+            if ($scope === 'gdp') {
+                array_push($headers,
+                    'Horas reemplazo efectivo Subvencion General Basica',
+                    'Horas reemplazo efectivo Subvencion General Media',
+                    'Horas reemplazo efectivo SEP Basica',
+                    'Horas reemplazo efectivo SEP Media',
+                    'Horas reemplazo efectivo PIE Basica',
+                    'Horas reemplazo efectivo PIE Media',
+                );
+            }
+
+            array_push($headers,
                 'Reemplazo RUT',
                 'Reemplazo nombre',
                 'Tipo reemplazo',
@@ -367,15 +381,17 @@ class SolicitudReemplazoGestionController extends Controller
                 'Justificacion UATP',
                 'Motivo rechazo Planificacion',
                 'Observacion SLEP',
-            ], ';');
+            );
 
-            $query->chunk(500, function ($rows) use ($handle) {
+            fputcsv($handle, $headers, ';');
+
+            $query->chunk(500, function ($rows) use ($handle, $scope) {
                 foreach ($rows as $s) {
                     $titular = $s->funcionarioTitular;
                     $postulante = $s->postulante ?? $s->contratoPostulante;
                     $postulanteUser = $postulante?->user;
 
-                    fputcsv($handle, [
+                    $row = [
                         $s->numero_solicitud,
                         $this->estadoSolicitudLabel($s->estado),
                         optional($s->created_at)->format('d-m-Y H:i'),
@@ -383,16 +399,23 @@ class SolicitudReemplazoGestionController extends Controller
                         optional($s->fecha_termino)->format('d-m-Y'),
                         $s->establecimiento?->rbd,
                         $s->establecimiento?->nombre_establecimiento,
-                        $titular?->rut,
-                        $titular?->nombre,
+                        $this->formatRutChile($titular?->rut ?: $s->rut_titular_normalizado),
+                        $this->uppercaseExport($titular?->nombre),
                         $titular?->estatuto,
                         $s->areaDesempeno?->nombre,
                         $this->formatDecimalExport($s->horas_aula_cronologicas_titular),
                         $this->formatDecimalExport($s->horas_aula_pedagogicas_titular),
                         $this->formatDecimalExport($s->horas_aula_cronologicas_reemplazo),
                         $this->formatDecimalExport($s->horas_aula_pedagogicas_reemplazo),
-                        $postulanteUser?->rut,
-                        $this->userNombreExport($postulanteUser),
+                    ];
+
+                    if ($scope === 'gdp') {
+                        array_push($row, ...array_values($this->replacementEffectiveHoursExport($s)));
+                    }
+
+                    array_push($row,
+                        $this->formatRutChile($postulanteUser?->rut ?: $s->rut_reemplazo_normalizado),
+                        $this->userNombreCompletoExport($postulanteUser),
                         $s->tipo_reemplazo,
                         optional($s->uatp_decision_at)->format('d-m-Y H:i'),
                         $this->userNombreExport($s->uatpDecisionUser),
@@ -405,7 +428,9 @@ class SolicitudReemplazoGestionController extends Controller
                         $this->cleanCsvText($s->justificacion_tecnica_uatp),
                         $this->cleanCsvText($s->plani_motivo_rechazo),
                         $this->cleanCsvText($s->observacion_slep),
-                    ], ';');
+                    );
+
+                    fputcsv($handle, $row, ';');
                 }
             });
 
@@ -4053,6 +4078,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
                 'derivadaA',
                 'uatpDecisionUser',
                 'planiDecisionUser',
+                'jornadas',
             ]);
 
         if ($scope === 'uatp') {
@@ -4157,6 +4183,84 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         }
 
         return trim($nombre . (!empty($user->rut) ? ' (' . $user->rut . ')' : ''));
+    }
+
+    private function userNombreCompletoExport($user): string
+    {
+        if (!$user) {
+            return '';
+        }
+
+        $nombre = trim(($user->apellido_paterno ?? '') . ' ' . ($user->apellido_materno ?? '') . ' ' . ($user->nombres ?? ''));
+        if ($nombre === '') {
+            $nombre = trim((string) ($user->name ?? ''));
+        }
+
+        return $this->uppercaseExport($nombre);
+    }
+
+    private function uppercaseExport($value): string
+    {
+        return mb_strtoupper($this->cleanCsvText($value), 'UTF-8');
+    }
+
+    private function replacementEffectiveHoursExport(SolicitudReemplazo $solicitud): array
+    {
+        $hours = [
+            'general_basica' => '',
+            'general_media' => '',
+            'sep_basica' => '',
+            'sep_media' => '',
+            'pie_basica' => '',
+            'pie_media' => '',
+        ];
+
+        if (!in_array((string) $solicitud->estado, ['aceptada', 'cerrado', 'cerrada'], true)) {
+            return $hours;
+        }
+
+        $totals = array_fill_keys(array_keys($hours), 0.0);
+
+        foreach (($solicitud->jornadas ?? collect()) as $jornada) {
+            $financing = $this->replacementFinancingExportKey($jornada->financiamiento);
+            if ($financing === null) {
+                continue;
+            }
+
+            $totals[$financing . '_basica'] += (float) ($jornada->reemplazo_basica ?? 0);
+            $totals[$financing . '_media'] += (float) ($jornada->reemplazo_media ?? 0);
+        }
+
+        return array_map(fn (float $value): string => $this->formatDecimalExport($value), $totals);
+    }
+
+    private function replacementFinancingExportKey(?string $financing): ?string
+    {
+        $normalized = mb_strtoupper(trim((string) $financing), 'UTF-8');
+        $normalized = strtr($normalized, [
+            'Á' => 'A',
+            'É' => 'E',
+            'Í' => 'I',
+            'Ó' => 'O',
+            'Ú' => 'U',
+            'Ü' => 'U',
+            'Ñ' => 'N',
+        ]);
+        $normalized = trim((string) preg_replace('/[^A-Z0-9]+/', ' ', $normalized));
+
+        if (preg_match('/(^| )(SEP|S E P)($| )/', $normalized) === 1) {
+            return 'sep';
+        }
+
+        if (preg_match('/(^| )(PIE|P I E)($| )/', $normalized) === 1) {
+            return 'pie';
+        }
+
+        if (str_contains($normalized, 'GENERAL') || preg_match('/(^| )GRAL($| )/', $normalized) === 1) {
+            return 'general';
+        }
+
+        return null;
     }
 
     private function formatDecimalExport($value): string

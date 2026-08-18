@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.8.18.384' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Detalle de identidad y horas efectivas en descarga GDP',
+        'files' => [
+            'app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php',
+            'config/changelog.php',
+            'tests/Feature/SolicitudReemplazoGestionExportTest.php',
+        ],
+        'changes' => [
+            'Formatea los RUT del titular y del reemplazante con puntos y guion en la descarga de solicitudes.',
+            'Exporta los nombres del titular y del reemplazante en mayúsculas y sin agregar el RUT al nombre del reemplazante.',
+            'Agrega a la descarga GDP las horas efectivas de reemplazo de Básica y Media para Subvención General, SEP y PIE en solicitudes aceptadas o cerradas.',
+            'Reconoce variantes históricas de los nombres de financiamiento y mantiene vacías las nuevas columnas en estados anteriores a la aceptación.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP'],
+    ],
     '2026.8.17.383' => [
         'date' => '2026-08-17',
         'module' => 'Centro de Operaciones',
