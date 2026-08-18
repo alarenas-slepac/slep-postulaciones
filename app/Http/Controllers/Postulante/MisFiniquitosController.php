@@ -92,6 +92,6 @@ class MisFiniquitosController extends Controller
 
     private function rutComparable(string $rut): string
     {
-        return strtoupper(preg_replace('/[^0-9K]/', '', $rut));
+        return strtoupper(preg_replace('/[^0-9Kk]/', '', $rut));
     }
 }
