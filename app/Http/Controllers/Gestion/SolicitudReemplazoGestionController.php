@@ -3333,6 +3333,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         }
 
         $baseQuery = SolicitudReemplazo::query()
+            ->select($this->columnasFiniquitosListado())
             ->with($relacionesFiniquitosBase)
             ->whereIn('estado', ['aceptada', 'cerrado'])
             ->whereNotNull('fecha_inicio_trabajo')
@@ -3428,7 +3429,8 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $relacionadasPorRut = collect();
         if ($ruts->isNotEmpty()) {
             $relacionadasPorRut = SolicitudReemplazo::query()
-                ->with($relacionesFiniquitosBase)
+                ->select($this->columnasContinuidadFiniquitos())
+                ->with($this->relacionesContinuidadFiniquitos())
                 ->whereIn('estado', ['aceptada', 'cerrado'])
                 ->whereNotNull('fecha_inicio_trabajo')
                 ->whereNotNull('fecha_termino')
@@ -3488,7 +3490,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         // hace sobre cada modelo para no depender del tipo concreto de la
         // colección después de aplicar filtros y slice.
         foreach ($items as $item) {
-            $item->load($this->relacionesFiniquitos());
+            $item->load($this->relacionesFirmantesFiniquito());
         }
 
         $finiquitos = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -3539,7 +3541,8 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         }
 
         $baseQuery = SolicitudReemplazo::query()
-            ->with($this->relacionesFiniquitos())
+            ->select($this->columnasFiniquitosListado())
+            ->with($this->relacionesFiniquitos(false))
             ->whereIn('estado', ['aceptada', 'cerrado'])
             ->whereNotNull('fecha_inicio_trabajo')
             ->whereNotNull('fecha_termino')
@@ -3634,7 +3637,8 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $relacionadasPorRut = collect();
         if ($ruts->isNotEmpty()) {
             $relacionadasPorRut = SolicitudReemplazo::query()
-                ->with($this->relacionesFiniquitos())
+                ->select($this->columnasContinuidadFiniquitos())
+                ->with($this->relacionesContinuidadFiniquitos())
                 ->whereIn('estado', ['aceptada', 'cerrado'])
                 ->whereNotNull('fecha_inicio_trabajo')
                 ->whereNotNull('fecha_termino')
@@ -3675,6 +3679,13 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         if ($categoriaGestion !== 'todos') {
             $filtradas = $filtradas->filter(fn ($s) => $s->categoria_finiquito === $categoriaGestion)->values();
         }
+
+        // Cargar los datos de presentación sólo después de resolver la
+        // continuidad histórica de todas las candidatas.
+        $filtradas->load($this->relacionesFiniquitos());
+        $filtradas->load([
+            'jornadas:id,solicitud_reemplazo_id,reemplazo_basica,reemplazo_media,reemplazo_total',
+        ]);
 
         $filename = 'finiquitos_reemplazos_' . $categoriaGestion . '_' . now()->format('Ymd_His') . '.xls';
 
@@ -4057,18 +4068,65 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         return 'Jornada informada en la solicitud de reemplazo';
     }
 
+    private function columnasFiniquitosListado(): array
+    {
+        return [
+            'id', 'establecimiento_id', 'reemplazo_personal_id',
+            'postulant_profile_id', 'contrato_trabajo_postulant_profile_id',
+            'solicitud_anterior_id', 'numero_solicitud', 'estado',
+            'tipo_reemplazo', 'aaee_categoria', 'fecha_inicio_trabajo',
+            'fecha_termino', 'rut_titular_normalizado', 'rut_reemplazo_normalizado',
+            'finiquito_estado', 'finiquito_monto', 'finiquito_fecha_emision',
+            'finiquito_observacion', 'finiquito_pdf_path',
+            'finiquito_generado_por_user_id', 'finiquito_generado_at',
+            'finiquito_firmado_pdf_path', 'finiquito_firmado_observacion',
+            'finiquito_firmado_cargado_por_user_id', 'finiquito_firmado_cargado_at',
+            'horas_aula_cronologicas_reemplazo', 'horas_aula_pedagogicas_reemplazo',
+        ];
+    }
+
+    private function columnasContinuidadFiniquitos(): array
+    {
+        return [
+            'id', 'reemplazo_personal_id', 'postulant_profile_id',
+            'contrato_trabajo_postulant_profile_id', 'solicitud_anterior_id',
+            'numero_solicitud', 'fecha_inicio_trabajo', 'fecha_termino',
+            'rut_titular_normalizado', 'rut_reemplazo_normalizado',
+        ];
+    }
+
+    private function relacionesContinuidadFiniquitos(): array
+    {
+        return [
+            'funcionarioTitular:id,rut',
+            'postulante:id,user_id',
+            'postulante.user:id,rut',
+            'contratoPostulante:id,user_id',
+            'contratoPostulante.user:id,rut',
+        ];
+    }
+
+    private function relacionesFirmantesFiniquito(): array
+    {
+        return [
+            'finiquitoGeneradoPor:id,rut,nombres,apellido_paterno,apellido_materno,email',
+            'finiquitoFirmadoCargadoPor:id,rut,nombres,apellido_paterno,apellido_materno,email',
+        ];
+    }
+
     private function relacionesFiniquitos(bool $incluirFirmantes = true): array
     {
         $relaciones = [
             'establecimiento:id,rbd,nombre_establecimiento,comuna,sala_cuna',
             'funcionarioTitular:id,rut,nombre,estatuto',
+            'postulante:id,user_id',
             'postulante.user:id,rut,nombres,apellido_paterno,apellido_materno,email',
+            'contratoPostulante:id,user_id',
             'contratoPostulante.user:id,rut,nombres,apellido_paterno,apellido_materno,email',
         ];
 
         if ($incluirFirmantes) {
-            $relaciones[] = 'finiquitoGeneradoPor:id,rut,nombres,apellido_paterno,apellido_materno,email';
-            $relaciones[] = 'finiquitoFirmadoCargadoPor:id,rut,nombres,apellido_paterno,apellido_materno,email';
+            $relaciones = array_merge($relaciones, $this->relacionesFirmantesFiniquito());
         }
 
         return $relaciones;
@@ -4124,7 +4182,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
             // La continuidad sólo necesita los datos de la solicitud y del
             // reemplazante; las relaciones de firmantes se cargan al final
             // únicamente para las filas visibles.
-            $actual->loadMissing($this->relacionesFiniquitos(false));
+            $actual->loadMissing($this->relacionesContinuidadFiniquitos());
             $cadena->push($actual);
             $visitados[(int) $actual->id] = true;
 

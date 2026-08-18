@@ -83,6 +83,31 @@ class SolicitudReemplazoGestionExportTest extends TestCase
         ));
     }
 
+    public function test_finiquito_bulk_queries_use_minimal_columns_and_relations(): void
+    {
+        $controller = app(SolicitudReemplazoGestionController::class);
+
+        $columns = $this->invokePrivate($controller, 'columnasContinuidadFiniquitos', []);
+        $relations = $this->invokePrivate($controller, 'relacionesContinuidadFiniquitos', []);
+
+        $this->assertContains('solicitud_anterior_id', $columns);
+        $this->assertContains('rut_reemplazo_normalizado', $columns);
+        $this->assertContains('postulante:id,user_id', $relations);
+        $this->assertContains('contratoPostulante.user:id,rut', $relations);
+        $this->assertNotContains('establecimiento:id,rbd,nombre_establecimiento,comuna,sala_cuna', $relations);
+    }
+
+    public function test_finiquito_display_relations_keep_signer_fields_separate(): void
+    {
+        $controller = app(SolicitudReemplazoGestionController::class);
+
+        $baseRelations = $this->invokePrivate($controller, 'relacionesFiniquitos', [false]);
+        $signerRelations = $this->invokePrivate($controller, 'relacionesFirmantesFiniquito', []);
+
+        $this->assertNotContains('finiquitoGeneradoPor:id,rut,nombres,apellido_paterno,apellido_materno,email', $baseRelations);
+        $this->assertContains('finiquitoFirmadoCargadoPor:id,rut,nombres,apellido_paterno,apellido_materno,email', $signerRelations);
+    }
+
     private function solicitudWithJornadas(string $estado, array $jornadas): SolicitudReemplazo
     {
         $solicitud = new SolicitudReemplazo();
