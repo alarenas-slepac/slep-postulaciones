@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.18.386' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Corrección de datos en resolución docente',
+        'files' => ['app/Services/ResolucionDocenteDocxService.php', 'config/changelog.php'],
+        'changes' => ['Reemplaza también el marcador del establecimiento dentro de los considerandos.', 'Genera las iniciales usando la funcionaria SLEP a la que se derivó la solicitud, con nombre y ambos apellidos en minúsculas.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.18.385' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',
