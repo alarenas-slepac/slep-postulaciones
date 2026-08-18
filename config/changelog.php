@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.18.390' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Optimización del listado de finiquitos',
+        'files' => ['app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php', 'config/changelog.php'],
+        'changes' => ['Reduce la carga de relaciones de firmantes durante el cálculo de cadenas históricas y las carga sólo para las filas visibles, evitando tiempos de espera y errores 503 en el listado de finiquitos.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.18.389' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',

@@ -3320,6 +3320,12 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $user = $request->user();
         abort_unless(method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'coordinador_gdp', 'funcionario_slep']), 403);
 
+        // Los usuarios que generaron/cargaron la firma sólo se muestran en la
+        // página actual. Evitar cargarlos para las 1.500 candidatas y para
+        // cada solicitud de las cadenas históricas reduce el uso de memoria y
+        // el tiempo de respuesta de este listado.
+        $relacionesFiniquitosBase = $this->relacionesFiniquitos(false);
+
         $cutoff = Carbon::today()->subDays(6);
         $estadoFiniquito = (string) $request->query('estado_finiquito', 'pendientes');
         if (!in_array($estadoFiniquito, ['pendientes', 'generados', 'completados', 'todos'], true)) {
@@ -3327,7 +3333,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         }
 
         $baseQuery = SolicitudReemplazo::query()
-            ->with($this->relacionesFiniquitos())
+            ->with($relacionesFiniquitosBase)
             ->whereIn('estado', ['aceptada', 'cerrado'])
             ->whereNotNull('fecha_inicio_trabajo')
             ->whereNotNull('fecha_termino')
@@ -3422,7 +3428,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $relacionadasPorRut = collect();
         if ($ruts->isNotEmpty()) {
             $relacionadasPorRut = SolicitudReemplazo::query()
-                ->with($this->relacionesFiniquitos())
+                ->with($relacionesFiniquitosBase)
                 ->whereIn('estado', ['aceptada', 'cerrado'])
                 ->whereNotNull('fecha_inicio_trabajo')
                 ->whereNotNull('fecha_termino')
@@ -3487,6 +3493,10 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
                 'query' => $request->query(),
             ]
         );
+
+        // Completar las relaciones que utiliza la vista sólo para los
+        // registros visibles en la página actual.
+        $finiquitos->getCollection()->load($this->relacionesFiniquitos());
 
         $establecimientos = Establecimiento::query()
             ->orderBy('nombre_establecimiento')
@@ -4043,16 +4053,21 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         return 'Jornada informada en la solicitud de reemplazo';
     }
 
-    private function relacionesFiniquitos(): array
+    private function relacionesFiniquitos(bool $incluirFirmantes = true): array
     {
-        return [
+        $relaciones = [
             'establecimiento:id,rbd,nombre_establecimiento,comuna,sala_cuna',
             'funcionarioTitular:id,rut,nombre,estatuto',
             'postulante.user:id,rut,nombres,apellido_paterno,apellido_materno,email',
             'contratoPostulante.user:id,rut,nombres,apellido_paterno,apellido_materno,email',
-            'finiquitoGeneradoPor:id,rut,nombres,apellido_paterno,apellido_materno,email',
-            'finiquitoFirmadoCargadoPor:id,rut,nombres,apellido_paterno,apellido_materno,email',
         ];
+
+        if ($incluirFirmantes) {
+            $relaciones[] = 'finiquitoGeneradoPor:id,rut,nombres,apellido_paterno,apellido_materno,email';
+            $relaciones[] = 'finiquitoFirmadoCargadoPor:id,rut,nombres,apellido_paterno,apellido_materno,email';
+        }
+
+        return $relaciones;
     }
 
     private function rutReemplazanteComparable(SolicitudReemplazo $solicitud): string
@@ -4102,7 +4117,10 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $visitados = [];
 
         while ($actual && ! isset($visitados[(int) $actual->id])) {
-            $actual->loadMissing($this->relacionesFiniquitos());
+            // La continuidad sólo necesita los datos de la solicitud y del
+            // reemplazante; las relaciones de firmantes se cargan al final
+            // únicamente para las filas visibles.
+            $actual->loadMissing($this->relacionesFiniquitos(false));
             $cadena->push($actual);
             $visitados[(int) $actual->id] = true;
 
