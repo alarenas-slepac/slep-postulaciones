@@ -47,7 +47,7 @@ class ResolucionDocenteDocxService
 
     private function values(SolicitudReemplazo $s): array
     {
-        $s->loadMissing(['establecimiento', 'funcionarioTitular', 'areaDesempeno', 'postulante.user', 'jornadas']);
+        $s->loadMissing(['establecimiento', 'funcionarioTitular', 'areaDesempeno', 'postulante.user', 'derivadaA', 'jornadas']);
         $user = $s->postulante?->user;
         $tit = $s->funcionarioTitular;
         $full = fn ($x) => mb_strtoupper(trim((string) ($x?->full_name ?? $x?->nombre ?? '')), 'UTF-8');
@@ -61,12 +61,19 @@ class ResolucionDocenteDocxService
             $value = (float) ($j->reemplazo_total ?? 0); if ($value > 0) $sub[$label] = ($sub[$label] ?? 0) + $value;
         }
         $subText = implode('; ', array_map(fn ($label, $hours) => mb_strtoupper($label, 'UTF-8') . ': ' . rtrim(rtrim(number_format($hours, 2, ',', ''), '0'), ',') . ' HORAS', array_keys($sub), $sub));
-        $initials = mb_strtolower(implode('', array_map(fn ($v) => mb_substr($v, 0, 1), preg_split('/\s+/', trim((string) ($user?->full_name ?? ''))))), 'UTF-8');
+        $derivada = $s->derivadaA;
+        $initials = mb_strtolower(implode('', array_map(
+            fn ($value) => mb_substr(trim((string) $value), 0, 1),
+            [$derivada?->nombres, $derivada?->apellido_paterno, $derivada?->apellido_materno]
+        )), 'UTF-8');
+        $establecimiento = mb_strtoupper((string) ($s->establecimiento?->nombre_establecimiento ?? $s->establecimiento?->nombre ?? ''), 'UTF-8');
         return [
-            '[NOMBRE ESTABLECIMIENTO]' => mb_strtoupper((string) ($s->establecimiento?->nombre_establecimiento ?? $s->establecimiento?->nombre ?? ''), 'UTF-8'),
+            '[NOMBRE ESTABLECIMIENTO]' => $establecimiento,
+            '{NOMBRE ESTABLECIMIENTO}' => $establecimiento,
+            '{NOMBRE  ESTABLECIMIENTO}' => $establecimiento,
             '[NOMBRE REEMPLAZO]' => $full($user), '[RUT REEMPLAZO]' => $rut($user),
             '[ÁREA DE DESEMPEÑO]' => mb_strtoupper((string) ($s->areaDesempeno?->nombre ?? ''), 'UTF-8'),
-            '[ESTABLECIMIENTO]' => mb_strtoupper((string) ($s->establecimiento?->nombre_establecimiento ?? $s->establecimiento?->nombre ?? ''), 'UTF-8'),
+            '[ESTABLECIMIENTO]' => $establecimiento,
             '[HORAS TOTALES]' => (string) $s->jornadas->sum('reemplazo_total'), '[TOTAL HORAS BASICA]' => (string) $basic, '[TOTAL HORAS MEDIA]' => (string) $media,
             '[NOMBRE TITULAR]' => $full($tit), '[RUT TITULAR]' => $rut($tit),
             '[FECHA INICIO DE REEMPLAZO]' => optional($s->fecha_inicio_trabajo ?? $s->fecha_inicio)->format('d/m/Y'),
