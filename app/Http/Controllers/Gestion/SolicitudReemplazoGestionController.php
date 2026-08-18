@@ -3484,10 +3484,12 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $perPage = 25;
         $items = $filtradas->slice(($page - 1) * $perPage, $perPage)->values();
 
-        // Cargar las relaciones de firma sobre la colección Eloquent antes
-        // de entregarla al paginador, evitando depender de métodos internos
-        // de la colección almacenada por LengthAwarePaginator.
-        $items->load($this->relacionesFiniquitos());
+        // Cargar las relaciones de firma sólo para las filas visibles. Se
+        // hace sobre cada modelo para no depender del tipo concreto de la
+        // colección después de aplicar filtros y slice.
+        foreach ($items as $item) {
+            $item->load($this->relacionesFiniquitos());
+        }
 
         $finiquitos = new \Illuminate\Pagination\LengthAwarePaginator(
             $items,
