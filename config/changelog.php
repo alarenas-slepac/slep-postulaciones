@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.18.387' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Carga de resolución docente en solicitudes cerradas',
+        'files' => ['app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php', 'config/changelog.php', 'resources/views/gestion/solicitudes-reemplazo/show.blade.php'],
+        'changes' => ['Permite cargar y notificar el PDF firmado en solicitudes docentes cerradas, aunque no tengan DOCX generado previamente.', 'Mantiene la generación DOCX y la regla de cierre restringidas al flujo de solicitudes aceptadas.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.18.386' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',
