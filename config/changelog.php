@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.18.389' => [
+        'date' => '2026-08-18',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Bitácora transversal de solicitudes',
+        'files' => ['app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php', 'config/changelog.php', 'resources/views/gestion/solicitudes-reemplazo/show.blade.php', 'routes/web.php'],
+        'changes' => ['Permite registrar observaciones acumulativas durante las etapas institucionales desde el envío hasta Derivada SLEP y Aceptada.', 'La bitácora deja de depender de la existencia de una Orden de Trabajo y conserva registros anteriores asociados a OT.'],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor Planificación', 'Funcionario SLEP'],
+    ],
     '2026.8.18.388' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',

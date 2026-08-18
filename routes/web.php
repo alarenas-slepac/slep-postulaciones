@@ -1414,9 +1414,9 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
             ->name('solicitudes-reemplazo.observacion.store');
 
-        Route::post('/solicitudes-reemplazo/{solicitud}/orden-trabajo/observacion', [SolicitudReemplazoGestionController::class, 'registrarObservacionOt'])
-            ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
-            ->name('solicitudes-reemplazo.orden-trabajo.observacion.store');
+        Route::post('/solicitudes-reemplazo/{solicitud}/observacion-bitacora', [SolicitudReemplazoGestionController::class, 'registrarObservacionSolicitud'])
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani')
+            ->name('solicitudes-reemplazo.bitacora.observacion.store');
         Route::post('/solicitudes-reemplazo/{solicitud}/derivar-gestion', [SolicitudReemplazoGestionController::class, 'derivarCasoGestion'])
             ->middleware('ensure.role:funcionario_slep')
             ->name('solicitudes-reemplazo.derivar-gestion');

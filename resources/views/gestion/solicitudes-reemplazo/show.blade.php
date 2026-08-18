@@ -249,23 +249,23 @@
         </div>
     @endif
 
-    @if (!empty($canRegistrarOtObservacion))
+    @if (!empty($canRegistrarSolicitudObservacion))
         <div class="card mb-4 border-warning">
-            <div class="card-header fw-semibold">Bitácora de gestión de la Orden de Trabajo</div>
+            <div class="card-header fw-semibold">Bitácora de la solicitud</div>
             <div class="card-body">
-                <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.orden-trabajo.observacion.store', $s) }}" class="mb-4">
+                <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.bitacora.observacion.store', $s) }}" class="mb-4">
                     @csrf
                     <label class="form-label">Observación o gestión realizada <span class="text-danger">*</span></label>
-                    <textarea name="observacion" class="form-control" rows="3" minlength="3" maxlength="5000" required placeholder="Registra la gestión realizada, avances, contactos o pendientes de la OT..."></textarea>
+                    <textarea name="observacion" class="form-control" rows="3" minlength="3" maxlength="5000" required placeholder="Registra la gestión realizada, avances, contactos o pendientes de la solicitud..."></textarea>
                     <button type="submit" class="btn btn-warning mt-2">Registrar observación</button>
                 </form>
                 @php
-                    $otObservaciones = $s->observacionesFlujo->where('etapa', 'ot');
+                    $otObservaciones = $s->observacionesFlujo->filter(fn ($obs) => in_array($obs->etapa, ['solicitud', 'ot'], true));
                 @endphp
                 @if ($otObservaciones->count())
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
-                            <thead><tr><th>Funcionaria responsable</th><th>Fecha</th><th>Observación / gestión</th></tr></thead>
+                            <thead><tr><th>Responsable</th><th>Fecha</th><th>Observación / gestión</th></tr></thead>
                             <tbody>
                                 @foreach ($otObservaciones as $otObs)
                                     <tr>
