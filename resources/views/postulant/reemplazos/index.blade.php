@@ -182,6 +182,9 @@
                                             @if (!empty($s->orden_trabajo_pdf_path))
                                             <a href="{{ route('postulant.reemplazos.ot', $s) }}" class="btn btn-sm btn-outline-success-dark" target="_blank" rel="noopener">Ver OT</a>
                                             @endif
+                                            @if (!empty($s->resolucion_docente_firmada_pdf_path))
+                                            <a href="{{ route('postulant.reemplazos.resolucion-docente', $s) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">Resolución</a>
+                                            @endif
                                             @if (!empty($s->horario_titular_pdf_path))
                                                 <a href="{{ route('postulant.reemplazos.horario-titular', $s) }}" class="btn btn-sm btn-outline-info" target="_blank" rel="noopener">Horario titular</a>
                                             @endif

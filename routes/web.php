@@ -801,6 +801,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         ->middleware('ensure.role:postulante|funcionario')
         ->name('postulant.reemplazos.ot');
 
+    Route::get('/postulante/mis-reemplazos/{solicitud}/resolucion-docente', [MisReemplazosController::class, 'resolucionDocenteFirmada'])
+        ->middleware('ensure.role:postulante|funcionario')
+        ->name('postulant.reemplazos.resolucion-docente');
+
     Route::get('/postulante/mis-reemplazos/{solicitud}/contrato-firmado', [MisReemplazosController::class, 'contratoFirmado'])
         ->middleware('ensure.role:postulante|funcionario')
         ->name('postulant.reemplazos.contrato-firmado');
@@ -1388,6 +1392,15 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::post('/solicitudes-reemplazo/{solicitud}/cerrar-docente', [SolicitudReemplazoGestionController::class, 'cerrarSolicitudDocente'])
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
             ->name('solicitudes-reemplazo.slep.cerrar-docente');
+
+        Route::post('/solicitudes-reemplazo/{solicitud}/resolucion-docente/generar', [SolicitudReemplazoGestionController::class, 'slepGenerarResolucionDocente'])
+            ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')->name('solicitudes-reemplazo.resolucion-docente.generar');
+        Route::get('/solicitudes-reemplazo/{solicitud}/resolucion-docente/download', [SolicitudReemplazoGestionController::class, 'downloadResolucionDocente'])
+            ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')->name('solicitudes-reemplazo.resolucion-docente.download');
+        Route::post('/solicitudes-reemplazo/{solicitud}/resolucion-docente/firmada', [SolicitudReemplazoGestionController::class, 'slepSubirResolucionDocenteFirmada'])
+            ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')->name('solicitudes-reemplazo.resolucion-docente.firmada');
+        Route::get('/solicitudes-reemplazo/{solicitud}/resolucion-docente/firmada/download', [SolicitudReemplazoGestionController::class, 'downloadResolucionDocenteFirmada'])
+            ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep|supervisor_plani|funcionario_estab')->name('solicitudes-reemplazo.resolucion-docente.firmada.download');
 
         Route::post('/solicitudes-reemplazo/{solicitud}/retornar-derivada-slep', [SolicitudReemplazoGestionController::class, 'retornarDerivadaSlep'])
             ->middleware('ensure.role:admin|coordinador_gdp')

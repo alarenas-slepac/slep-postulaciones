@@ -127,6 +127,9 @@ class SolicitudReemplazo extends Model
         'corregida_establecimiento_at',
         'corregida_establecimiento_user_id',
         'correccion_establecimiento_observacion',
+        'resolucion_docente_docx_path', 'resolucion_docente_generada_por_user_id', 'resolucion_docente_generada_at',
+        'resolucion_docente_firmada_pdf_path', 'resolucion_docente_firmada_subida_por_user_id',
+        'resolucion_docente_firmada_subida_at', 'resolucion_docente_notificada_por_user_id', 'resolucion_docente_notificada_at',
     ];
 
     protected $casts = [
@@ -166,6 +169,9 @@ class SolicitudReemplazo extends Model
         'reemplazo_ajuste_at' => 'datetime',
         'fecha_ultima_devolucion' => 'datetime',
         'corregida_establecimiento_at' => 'datetime',
+        'resolucion_docente_generada_at' => 'datetime',
+        'resolucion_docente_firmada_subida_at' => 'datetime',
+        'resolucion_docente_notificada_at' => 'datetime',
     ];
 
     public function jornadas(): HasMany
