@@ -56,6 +56,13 @@
                 </button>
             @endif
 
+            @if (!empty($canDerivarGestion))
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalDerivarGestion">Derivar a administrador/coordinador</button>
+            @endif
+            @if (!empty($canCerrarSinOt))
+                <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalCerrarSinOt">Cerrar sin Orden de Trabajo</button>
+            @endif
+
             @if (!empty($canCerrarSolicitudDocente))
                 <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalCerrarSolicitudDocente">
                     Cerrar solicitud
@@ -240,6 +247,63 @@
                 </div>
             </div>
         </div>
+    @endif
+
+    @if (!empty($canRegistrarOtObservacion))
+        <div class="card mb-4 border-warning">
+            <div class="card-header fw-semibold">Bitácora de gestión de la Orden de Trabajo</div>
+            <div class="card-body">
+                <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.orden-trabajo.observacion.store', $s) }}" class="mb-4">
+                    @csrf
+                    <label class="form-label">Observación o gestión realizada <span class="text-danger">*</span></label>
+                    <textarea name="observacion" class="form-control" rows="3" minlength="3" maxlength="5000" required placeholder="Registra la gestión realizada, avances, contactos o pendientes de la OT..."></textarea>
+                    <button type="submit" class="btn btn-warning mt-2">Registrar observación</button>
+                </form>
+                @php($otObservaciones = $s->observacionesFlujo->where('etapa', 'ot'))
+                @if ($otObservaciones->count())
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Funcionaria responsable</th><th>Fecha</th><th>Observación / gestión</th></tr></thead>
+                            <tbody>
+                                @foreach ($otObservaciones as $otObs)
+                                    <tr>
+                                        <td>{{ $otObs->user?->nombre_completo ?: ($otObs->user?->full_name ?: $otObs->user?->email ?: '—') }}</td>
+                                        <td class="text-nowrap">{{ cl_datetime($otObs->created_at, 'd/m/Y H:i') }}</td>
+                                        <td style="white-space: pre-line">{{ $otObs->observacion ?: $otObs->motivo ?: '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="text-muted small">Aún no hay observaciones registradas para esta OT.</div>
+                @endif
+            </div>
+        </div>
+    @endif
+
+    @if (!empty($canDerivarGestion))
+        <div class="modal fade" id="modalDerivarGestion" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content">
+            <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.derivar-gestion', $s) }}">@csrf
+                <div class="modal-header"><h5 class="modal-title">Derivar caso a administrador/coordinador</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body"><p class="text-muted">Usa esta acción cuando no encuentres un reemplazo y necesites que otro responsable continúe la revisión.</p>
+                    <label class="form-label">Responsable <span class="text-danger">*</span></label>
+                    <select name="responsable_user_id" class="form-select mb-3" required><option value="">Selecciona un responsable</option>@foreach ($responsablesGestion as $responsable)<option value="{{ $responsable->id }}">{{ $responsable->full_name }} ({{ $responsable->email }})</option>@endforeach</select>
+                    <label class="form-label">Observación de la derivación <span class="text-danger">*</span></label><textarea name="observacion" class="form-control" rows="4" minlength="3" maxlength="5000" required></textarea>
+                </div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary">Derivar caso</button></div>
+            </form>
+        </div></div></div>
+    @endif
+
+    @if (!empty($canCerrarSinOt))
+        <div class="modal fade" id="modalCerrarSinOt" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content">
+            <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.cerrar-sin-orden-trabajo', $s) }}">@csrf
+                <div class="modal-header"><h5 class="modal-title">Cerrar sin Orden de Trabajo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body"><div class="alert alert-warning">Esta facultad es exclusiva de administrador/coordinador y se utilizará cuando no exista reemplazo ni OT asociada.</div>
+                    <label class="form-label">Observación de cierre <span class="text-danger">*</span></label><textarea name="observacion" class="form-control" rows="5" minlength="3" maxlength="5000" required placeholder="Indica las gestiones realizadas y el motivo por el cual se cierra sin reemplazo..."></textarea>
+                </div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-success">Confirmar cierre</button></div>
+            </form>
+        </div></div></div>
     @endif
 
     @if (!empty($canCerrarSolicitudDocente))

@@ -1414,6 +1414,16 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
             ->name('solicitudes-reemplazo.observacion.store');
 
+        Route::post('/solicitudes-reemplazo/{solicitud}/orden-trabajo/observacion', [SolicitudReemplazoGestionController::class, 'registrarObservacionOt'])
+            ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
+            ->name('solicitudes-reemplazo.orden-trabajo.observacion.store');
+        Route::post('/solicitudes-reemplazo/{solicitud}/derivar-gestion', [SolicitudReemplazoGestionController::class, 'derivarCasoGestion'])
+            ->middleware('ensure.role:funcionario_slep')
+            ->name('solicitudes-reemplazo.derivar-gestion');
+        Route::post('/solicitudes-reemplazo/{solicitud}/cerrar-sin-orden-trabajo', [SolicitudReemplazoGestionController::class, 'cerrarSolicitudSinOt'])
+            ->middleware('ensure.role:admin|coordinador_gdp')
+            ->name('solicitudes-reemplazo.cerrar-sin-orden-trabajo');
+
         // Funcionario SLEP: crear orden de trabajo
         Route::post('/solicitudes-reemplazo/{solicitud}/orden-trabajo', [SolicitudReemplazoGestionController::class, 'slepCrearOrdenTrabajo'])
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
