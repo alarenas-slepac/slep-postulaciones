@@ -9,14 +9,9 @@ class ResolucionDocenteDocxService
 {
     public function generateAndStore(SolicitudReemplazo $solicitud): string
     {
-        $relative = 'templates/resolucion_docente_reemplazo.docx';
-        if (!Storage::disk('local')->exists($relative)) {
-            $fallback = resource_path('templates/resolucion_docente_reemplazo.docx');
-            if (!is_file($fallback)) throw new \RuntimeException('No existe la plantilla de resolución docente.');
-            Storage::disk('local')->put($relative, file_get_contents($fallback));
-        }
+        $templatePath = $this->templatePath();
         $tmp = tempnam(sys_get_temp_dir(), 'res_') . '.docx';
-        copy(Storage::disk('local')->path($relative), $tmp);
+        copy($templatePath, $tmp);
         $zip = new \ZipArchive();
         if ($zip->open($tmp) !== true) throw new \RuntimeException('No se pudo abrir la plantilla DOCX.');
         $values = $this->values($solicitud);
@@ -43,6 +38,37 @@ class ResolucionDocenteDocxService
         $path = "{$dir}/RESOLUCION_DOCENTE_{$solicitud->numero_solicitud}.docx";
         Storage::disk('local')->put($path, file_get_contents($tmp)); @unlink($tmp);
         return $path;
+    }
+
+    private function templatePath(): string
+    {
+        $relative = 'templates/resolucion_docente_reemplazo.docx';
+        $versionedPath = resource_path('templates/resolucion_docente_reemplazo.docx');
+        $disk = Storage::disk('local');
+
+        if (is_file($versionedPath)) {
+            $versionedHash = hash_file('sha256', $versionedPath);
+            $storedHash = $disk->exists($relative)
+                ? hash_file('sha256', $disk->path($relative))
+                : false;
+
+            if (!is_string($versionedHash)) {
+                throw new \RuntimeException('No se pudo leer la plantilla de resolución docente.');
+            }
+
+            if (!is_string($storedHash) || !hash_equals($versionedHash, $storedHash)) {
+                $contents = file_get_contents($versionedPath);
+                if ($contents === false || !$disk->put($relative, $contents)) {
+                    throw new \RuntimeException('No se pudo actualizar la plantilla de resolución docente.');
+                }
+            }
+        }
+
+        if (!$disk->exists($relative)) {
+            throw new \RuntimeException('No existe la plantilla de resolución docente.');
+        }
+
+        return $disk->path($relative);
     }
 
     private function values(SolicitudReemplazo $s): array
