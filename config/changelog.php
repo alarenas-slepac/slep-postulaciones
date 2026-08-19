@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.19.396' => [
+        'date' => '2026-08-19',
+        'module' => 'Buscador de postulantes',
+        'title' => 'Reemplazos cerrados vigentes en el buscador',
+        'files' => ['app/Http/Controllers/Reemplazos/BuscadorPostulantesController.php', 'config/changelog.php', 'tests/Feature/BuscadorPostulantesReemplazosActivosTest.php'],
+        'changes' => ['Marca como En reemplazo las solicitudes en estado aceptada o cerrado cuando la fecha actual permanece dentro del período de inicio y término informado.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Coordinador UATP', 'Funcionario SLEP', 'Funcionario de establecimiento'],
+    ],
     '2026.8.19.395' => [
         'date' => '2026-08-19',
         'module' => 'Solicitudes de reemplazo',
