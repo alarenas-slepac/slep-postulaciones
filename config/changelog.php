@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.19.397' => [
+        'date' => '2026-08-19',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Enfoque comunal y mayor altura del mapa territorial',
+        'files' => ['config/changelog.php', 'public/build/manifest.json', 'public/build/assets/centro-operaciones-BmuOP_BR.js', 'public/build/assets/centro-operaciones-Bz3vIAYi.css', 'resources/css/centro-operaciones.css', 'resources/js/centro-operaciones.js', 'resources/views/centro-operaciones/panel.blade.php', 'tests/Feature/CentroOperacionesMapControlsTest.php'],
+        'changes' => ['Agrega botones para enfocar el mapa en Lota, Coronel, San Pedro de la Paz y Santa Juana usando las coordenadas vigentes de sus establecimientos.', 'Permite volver a la vista territorial completa y aumenta la altura del mapa en 25% para escritorio y 20% para TV y dispositivos móviles.'],
+        'roles' => ['Usuarios con acceso al Centro de Operaciones'],
+    ],
     '2026.8.19.396' => [
         'date' => '2026-08-19',
         'module' => 'Buscador de postulantes',

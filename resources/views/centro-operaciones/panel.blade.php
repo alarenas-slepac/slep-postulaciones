@@ -102,6 +102,15 @@
 
         <section class="co-card co-map-card">
             <div class="co-card-head"><div><span class="co-eyebrow">Georreferencia</span><h2>Mapa de establecimientos</h2></div></div>
+            <div class="co-map-toolbar" aria-label="Controles del mapa territorial">
+                <span class="co-map-toolbar-label"><i class="bi bi-geo-alt"></i> Enfocar comuna</span>
+                <div class="co-map-commune-buttons" role="group" aria-label="Enfocar mapa por comuna">
+                    <button type="button" class="co-map-commune-button is-active" data-map-commune="" aria-controls="co-map" aria-pressed="true">Ver territorio</button>
+                    @foreach(['Lota', 'Coronel', 'San Pedro de la Paz', 'Santa Juana'] as $comunaMapa)
+                        <button type="button" class="co-map-commune-button" data-map-commune="{{ $comunaMapa }}" aria-controls="co-map" aria-pressed="false">{{ $comunaMapa }}</button>
+                    @endforeach
+                </div>
+            </div>
             <div id="co-map" aria-label="Mapa de establecimientos"></div>
             <div class="co-map-legend">
                 @foreach($estadoLabels as $estado => $label)<span><i class="co-dot co-dot--{{ $estado }}"></i>{{ $label }}</span>@endforeach
