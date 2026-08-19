@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.19.395' => [
+        'date' => '2026-08-19',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Corrección territorial en resolución docente',
+        'files' => ['config/changelog.php', 'resources/templates/resolucion_docente_reemplazo.docx', 'tests/Feature/ResolucionDocenteTemplateTest.php'],
+        'changes' => ['Corrige en el considerando 5° de la resolución docente la referencia a Andalién Sur por Servicio Local de Educación Pública de Andalién Costa.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.19.394' => [
         'date' => '2026-08-19',
         'module' => 'Solicitudes de reemplazo',
