@@ -6,6 +6,11 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 const formatNumber = (value) => new Intl.NumberFormat('es-CL').format(Number(value || 0));
 const formatPercent = (value) => new Intl.NumberFormat('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Number(value || 0));
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[char]);
+const normalizeCommune = (value) => String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLocaleLowerCase('es-CL');
 const stateLabel = { operativo: 'Operativo', alerta: 'Alerta', critico: 'Crítico', sin_reporte: 'Sin reporte' };
 const statePriority = { sin_reporte: 0, operativo: 1, alerta: 2, critico: 3 };
 
@@ -66,6 +71,10 @@ function initPanel(root) {
     const raw = document.getElementById('co-dashboard-data');
     let data = raw ? JSON.parse(raw.textContent) : null;
     const mapElement = document.getElementById('co-map');
+    const mapCommuneButtons = Array.from(root.querySelectorAll('[data-map-commune]'));
+    let activeMapCommune = '';
+    let territoryMapPoints = [];
+    let mapPointsByCommune = new Map();
     let map;
     let markerLayer;
 
@@ -85,14 +94,50 @@ function initPanel(root) {
         }).addTo(map);
     }
 
+    const focusMapPoints = (points, maxZoom) => {
+        if (!map || !points.length) return;
+        if (points.length === 1) {
+            map.setView(points[0], maxZoom);
+            return;
+        }
+        map.fitBounds(points, { padding: [35, 35], maxZoom });
+    };
+
+    const refreshMapCommuneButtons = () => {
+        mapCommuneButtons.forEach((button) => {
+            const commune = normalizeCommune(button.dataset.mapCommune);
+            const active = commune === activeMapCommune;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            button.disabled = commune !== '' && !mapPointsByCommune.has(commune);
+        });
+    };
+
+    const focusMapCommune = (commune) => {
+        activeMapCommune = normalizeCommune(commune);
+        refreshMapCommuneButtons();
+        const points = activeMapCommune
+            ? (mapPointsByCommune.get(activeMapCommune) ?? [])
+            : territoryMapPoints;
+        focusMapPoints(points, activeMapCommune ? 14 : 12);
+    };
+
+    mapCommuneButtons.forEach((button) => {
+        button.addEventListener('click', () => focusMapCommune(button.dataset.mapCommune));
+    });
+
     const renderMap = (payload) => {
         if (!map || !markerLayer) return;
         markerLayer.clearLayers();
+        mapPointsByCommune = new Map();
         const bounds = [];
         payload.establecimientos.forEach((item) => {
             if (!Number.isFinite(item.latitud) || !Number.isFinite(item.longitud)) return;
             const point = [item.latitud, item.longitud];
             bounds.push(point);
+            const commune = normalizeCommune(item.comuna);
+            if (!mapPointsByCommune.has(commune)) mapPointsByCommune.set(commune, []);
+            mapPointsByCommune.get(commune).push(point);
             const reportUrl = item.reporte_id ? root.dataset.reportUrl.replace('__ID__', item.reporte_id) : '';
             const reportLink = reportUrl ? `<a href="${escapeHtml(reportUrl)}">Ver reporte</a>` : '';
             const logo = item.logo_url
@@ -104,7 +149,10 @@ function initPanel(root) {
                 title: `${item.nombre} · ${stateLabel[item.estado]}`,
             }).bindPopup(`<div class="co-leaflet-popup"><div class="co-leaflet-popup-header">${logo}<div class="co-leaflet-popup-copy"><strong>${escapeHtml(item.nombre)}</strong><span>${escapeHtml(item.comuna)} · ${escapeHtml(stateLabel[item.estado] ?? item.estado)}</span></div></div>${reportLink}</div>`).addTo(markerLayer);
         });
-        if (bounds.length) map.fitBounds(bounds, { padding: [25, 25], maxZoom: 12 });
+        territoryMapPoints = bounds;
+        if (activeMapCommune && !mapPointsByCommune.has(activeMapCommune)) activeMapCommune = '';
+        refreshMapCommuneButtons();
+        focusMapCommune(activeMapCommune);
     };
 
     const renderMetrics = (payload) => {
