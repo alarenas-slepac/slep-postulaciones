@@ -51,12 +51,18 @@ class ResolucionDocenteTemplateTest extends TestCase
             }
 
             if ($insideConsiderandos && preg_match('/^\s*(\d+)°/u', $plainText, $matches) === 1) {
-                $numbers[] = (int) $matches[1];
-                $texts[] = $plainText;
+                $number = (int) $matches[1];
+                $numbers[] = $number;
+                $texts[$number] = $plainText;
             }
         }
 
         $this->assertSame(range(1, 14), $numbers);
+        $this->assertStringContainsString(
+            'Servicio Local de Educación Pública de Andalién Costa',
+            $texts[5]
+        );
+        $this->assertStringNotContainsString('Andalién Sur', implode("\n", $texts));
         $this->assertStringNotContainsString(
             'es del caso indicar que, este Servicio Local de Educación Pública',
             implode("\n", $texts)
