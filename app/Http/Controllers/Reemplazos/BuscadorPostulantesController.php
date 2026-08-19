@@ -558,7 +558,7 @@ class BuscadorPostulantesController extends Controller
                 $query->whereIn('postulant_profile_id', $profileIds)
                     ->orWhereIn('contrato_trabajo_postulant_profile_id', $profileIds);
             })
-            ->where('estado', 'aceptada')
+            ->whereIn('estado', ['aceptada', 'cerrado'])
             ->whereDate('fecha_inicio', '<=', $hoy)
             ->whereDate('fecha_termino', '>=', $hoy)
             ->orderBy('fecha_termino')
