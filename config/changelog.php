@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.19.394' => [
+        'date' => '2026-08-19',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Actualización de considerandos en resolución docente',
+        'files' => ['app/Services/ResolucionDocenteDocxService.php', 'config/changelog.php', 'resources/templates/resolucion_docente_reemplazo.docx', 'tests/Feature/ResolucionDocenteTemplateTest.php'],
+        'changes' => ['Elimina el considerando 6° relativo a la puesta en funcionamiento del SLEP y renumera consecutivamente los considerandos posteriores.', 'Sincroniza la plantilla versionada con la copia local antes de generar nuevas resoluciones docentes.'],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.18.393' => [
         'date' => '2026-08-18',
         'module' => 'Solicitudes de reemplazo',
