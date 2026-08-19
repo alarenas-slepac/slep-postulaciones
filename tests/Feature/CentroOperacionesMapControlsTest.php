@@ -26,4 +26,36 @@ class CentroOperacionesMapControlsTest extends TestCase
         $this->assertStringContainsString('body.co-tv-mode #co-map { height: 408px;', $styles);
         $this->assertStringContainsString('#co-map { height: 396px;', $styles);
     }
+
+    public function test_botones_comunales_siguen_habilitados_sin_establecimientos_georreferenciados(): void
+    {
+        $script = file_get_contents(resource_path('js/centro-operaciones.js'));
+
+        foreach (['Lota', 'Coronel', 'San Pedro de la Paz', 'Santa Juana'] as $commune) {
+            $this->assertStringContainsString("normalizeCommune('{$commune}')", $script);
+        }
+
+        $this->assertStringContainsString('communeMapFallbacks.has(commune)', $script);
+        $this->assertStringContainsString('map.setView(fallback.center, fallback.zoom);', $script);
+        $this->assertStringNotContainsString(
+            "button.disabled = commune !== '' && !mapPointsByCommune.has(commune);",
+            $script
+        );
+    }
+
+    public function test_aliases_historicos_se_asocian_a_los_botones_comunales(): void
+    {
+        $script = file_get_contents(resource_path('js/centro-operaciones.js'));
+
+        $this->assertStringContainsString(
+            "[normalizeCommune('SAN PEDRO'), normalizeCommune('San Pedro de la Paz')]",
+            $script
+        );
+        $this->assertStringContainsString(
+            "[normalizeCommune('STA. JUANA'), normalizeCommune('Santa Juana')]",
+            $script
+        );
+        $this->assertStringContainsString('const communeKey = (value)', $script);
+        $this->assertStringContainsString('const commune = communeKey(item.comuna);', $script);
+    }
 }

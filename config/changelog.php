@@ -1,6 +1,14 @@
 <?php
 
 return [
+    '2026.8.19.398' => [
+        'date' => '2026-08-19',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Reconocimiento de alias en el enfoque comunal',
+        'files' => ['config/changelog.php', 'public/build/manifest.json', 'public/build/assets/centro-operaciones-Bx_Kv9Gd.js', 'resources/js/centro-operaciones.js', 'tests/Feature/CentroOperacionesMapControlsTest.php'],
+        'changes' => ['Asocia los valores históricos SAN PEDRO y STA. JUANA de la tabla establecimientos con los botones San Pedro de la Paz y Santa Juana.', 'Mantiene habilitados los botones aun sin establecimientos georreferenciados y usa un centro territorial de respaldo cuando no hay coordenadas disponibles.'],
+        'roles' => ['Usuarios con acceso al Centro de Operaciones'],
+    ],
     '2026.8.19.397' => [
         'date' => '2026-08-19',
         'module' => 'Centro de Operaciones',

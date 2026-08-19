@@ -11,6 +11,20 @@ const normalizeCommune = (value) => String(value ?? '')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLocaleLowerCase('es-CL');
+const communeAliases = new Map([
+    [normalizeCommune('SAN PEDRO'), normalizeCommune('San Pedro de la Paz')],
+    [normalizeCommune('STA. JUANA'), normalizeCommune('Santa Juana')],
+]);
+const communeKey = (value) => {
+    const normalized = normalizeCommune(value);
+    return communeAliases.get(normalized) ?? normalized;
+};
+const communeMapFallbacks = new Map([
+    [normalizeCommune('Lota'), { center: [-37.0894, -73.1579], zoom: 12 }],
+    [normalizeCommune('Coronel'), { center: [-37.0164, -73.1335], zoom: 12 }],
+    [normalizeCommune('San Pedro de la Paz'), { center: [-36.8403, -73.1031], zoom: 12 }],
+    [normalizeCommune('Santa Juana'), { center: [-37.1742, -72.9428], zoom: 12 }],
+]);
 const stateLabel = { operativo: 'Operativo', alerta: 'Alerta', critico: 'Crítico', sin_reporte: 'Sin reporte' };
 const statePriority = { sin_reporte: 0, operativo: 1, alerta: 2, critico: 3 };
 
@@ -105,21 +119,28 @@ function initPanel(root) {
 
     const refreshMapCommuneButtons = () => {
         mapCommuneButtons.forEach((button) => {
-            const commune = normalizeCommune(button.dataset.mapCommune);
+            const commune = communeKey(button.dataset.mapCommune);
             const active = commune === activeMapCommune;
             button.classList.toggle('is-active', active);
             button.setAttribute('aria-pressed', active ? 'true' : 'false');
-            button.disabled = commune !== '' && !mapPointsByCommune.has(commune);
+            button.disabled = commune !== ''
+                && !mapPointsByCommune.has(commune)
+                && !communeMapFallbacks.has(commune);
         });
     };
 
     const focusMapCommune = (commune) => {
-        activeMapCommune = normalizeCommune(commune);
+        activeMapCommune = communeKey(commune);
         refreshMapCommuneButtons();
         const points = activeMapCommune
             ? (mapPointsByCommune.get(activeMapCommune) ?? [])
             : territoryMapPoints;
-        focusMapPoints(points, activeMapCommune ? 14 : 12);
+        const fallback = communeMapFallbacks.get(activeMapCommune);
+        if (points.length) {
+            focusMapPoints(points, activeMapCommune ? 14 : 12);
+        } else if (fallback && map) {
+            map.setView(fallback.center, fallback.zoom);
+        }
     };
 
     mapCommuneButtons.forEach((button) => {
@@ -135,7 +156,7 @@ function initPanel(root) {
             if (!Number.isFinite(item.latitud) || !Number.isFinite(item.longitud)) return;
             const point = [item.latitud, item.longitud];
             bounds.push(point);
-            const commune = normalizeCommune(item.comuna);
+            const commune = communeKey(item.comuna);
             if (!mapPointsByCommune.has(commune)) mapPointsByCommune.set(commune, []);
             mapPointsByCommune.get(commune).push(point);
             const reportUrl = item.reporte_id ? root.dataset.reportUrl.replace('__ID__', item.reporte_id) : '';
@@ -150,7 +171,9 @@ function initPanel(root) {
             }).bindPopup(`<div class="co-leaflet-popup"><div class="co-leaflet-popup-header">${logo}<div class="co-leaflet-popup-copy"><strong>${escapeHtml(item.nombre)}</strong><span>${escapeHtml(item.comuna)} · ${escapeHtml(stateLabel[item.estado] ?? item.estado)}</span></div></div>${reportLink}</div>`).addTo(markerLayer);
         });
         territoryMapPoints = bounds;
-        if (activeMapCommune && !mapPointsByCommune.has(activeMapCommune)) activeMapCommune = '';
+        if (activeMapCommune
+            && !mapPointsByCommune.has(activeMapCommune)
+            && !communeMapFallbacks.has(activeMapCommune)) activeMapCommune = '';
         refreshMapCommuneButtons();
         focusMapCommune(activeMapCommune);
     };
