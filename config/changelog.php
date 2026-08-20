@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.8.20.402' => [
+        'date' => '2026-08-20',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Corrección de fecha en cálculo de vigencia IRTE',
+        'files' => [
+            'app/Services/CentroOperaciones/ConsolidadoService.php',
+            'config/changelog.php',
+            'tests/Feature/CentroOperacionesMapControlsTest.php',
+        ],
+        'changes' => [
+            'Captura la fecha consultada dentro del callback que determina si la evaluación IRTE de cada establecimiento está vigente.',
+            'Evita el error 500 por variable fecha indefinida al abrir el panel del Centro de Operaciones.',
+        ],
+        'roles' => ['Usuarios con acceso al Centro de Operaciones'],
+    ],
     '2026.8.20.401' => [
         'date' => '2026-08-20',
         'module' => 'Centro de Operaciones',

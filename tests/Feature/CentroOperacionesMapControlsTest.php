@@ -68,6 +68,10 @@ class CentroOperacionesMapControlsTest extends TestCase
 
         $this->assertStringContainsString("'puntaje' => \$riesgoActivo ? (int) \$riesgo->irte : 0", $consolidado);
         $this->assertStringContainsString("'activa' => \$riesgoActivo", $consolidado);
+        $this->assertMatchesRegularExpression(
+            '/\$filas\s*=\s*\$contextos->map\(function.*?use\s*\(.*?\$fecha.*?\)\s*\{/s',
+            $consolidado
+        );
         $this->assertStringContainsString('const riskScore = Number(item.riesgo?.puntaje ?? 0);', $script);
         $this->assertStringContainsString('markerIcon(item.estado, activeRisk ? item.riesgo.categoria : null, riskScore)', $script);
         $this->assertStringContainsString("marker.on('mouseover'", $script);
