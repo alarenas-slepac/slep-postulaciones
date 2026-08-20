@@ -243,11 +243,12 @@
                     @php
                         $canLiquidacionesAdmin = ($isAdmin || $isSlep) && Route::has('liquidaciones.cargas.index');
                         $canEndeudamientoAdmin = ($isAdmin || $isSlep) && Route::has('endeudamiento.cargas.index');
+                        $canDescuentosCgr = ($isAdmin || $isSlep) && Route::has('descuentos-cgr.index');
                     @endphp
 
-                    @if ($canLiquidacionesAdmin || $canEndeudamientoAdmin)
+                    @if ($canLiquidacionesAdmin || $canEndeudamientoAdmin || $canDescuentosCgr)
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle {{ request()->routeIs('liquidaciones.cargas.*') || request()->routeIs('endeudamiento.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
+                            <a class="nav-link dropdown-toggle {{ request()->routeIs('liquidaciones.cargas.*') || request()->routeIs('endeudamiento.*') || request()->routeIs('descuentos-cgr.*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-cash-stack"></i> Remuneraciones
                             </a>
                             <ul class="dropdown-menu">
@@ -257,7 +258,18 @@
                                     <li><a class="dropdown-item {{ request()->routeIs('liquidaciones.cargas.create') ? 'active' : '' }}" href="{{ route('liquidaciones.cargas.create') }}"><i class="bi bi-upload"></i> Nueva carga</a></li>
                                 @endif
 
-                                @if ($canLiquidacionesAdmin && $canEndeudamientoAdmin)
+                                @if (($canLiquidacionesAdmin || $canEndeudamientoAdmin) && $canDescuentosCgr)
+                                    <li><hr class="dropdown-divider"></li>
+                                @endif
+
+                                @if ($canDescuentosCgr)
+                                    <li><h6 class="dropdown-header">Contraloría</h6></li>
+                                    <li><a class="dropdown-item {{ request()->routeIs('descuentos-cgr.index', 'descuentos-cgr.show', 'descuentos-cgr.edit') ? 'active' : '' }}" href="{{ route('descuentos-cgr.index') }}"><i class="bi bi-bank"></i> Descuentos CGR</a></li>
+                                    <li><a class="dropdown-item {{ request()->routeIs('descuentos-cgr.create') ? 'active' : '' }}" href="{{ route('descuentos-cgr.create') }}"><i class="bi bi-plus-circle"></i> Nuevo descuento</a></li>
+                                    <li><a class="dropdown-item {{ request()->routeIs('descuentos-cgr.utm.*') ? 'active' : '' }}" href="{{ route('descuentos-cgr.utm.index') }}"><i class="bi bi-currency-exchange"></i> Valores UTM</a></li>
+                                @endif
+
+                                @if (($canLiquidacionesAdmin || $canDescuentosCgr) && $canEndeudamientoAdmin)
                                     <li><hr class="dropdown-divider"></li>
                                 @endif
 

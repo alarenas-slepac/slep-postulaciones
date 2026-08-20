@@ -1,6 +1,41 @@
 <?php
 
 return [
+    '2026.8.20.404' => [
+        'date' => '2026-08-20',
+        'module' => 'Remuneraciones',
+        'title' => 'Módulo de Descuentos CGR y mantenedor UTM',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Http/Controllers/Remuneraciones/UtmValorController.php',
+            'app/Http/Middleware/EnsureModuleAccess.php',
+            'app/Http/Requests/Remuneraciones/GuardarDescuentoCgrRequest.php',
+            'app/Models/DescuentoCgr.php',
+            'app/Models/UtmValor.php',
+            'app/Services/Remuneraciones/CronogramaDescuentoCgrService.php',
+            'app/Services/Remuneraciones/UtmImportService.php',
+            'app/Support/ModuleRegistry.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_20_180000_create_descuentos_cgr_tables_and_module.php',
+            'resources/views/dashboard/admin.blade.php',
+            'resources/views/partials/navbar.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/form.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/index.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/utm/index.blade.php',
+            'routes/web.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Incorpora el registro y edición de resoluciones CGR con su PDF privado y los parámetros financieros dictaminados.',
+            'Calcula el cronograma mensual sobre el saldo en UTM, la UTM vigente de cada periodo y el interés mensual informado.',
+            'Agrega el mantenedor de valores UTM con ingreso individual, edición, plantilla e importación masiva atómica.',
+            'Impide valores UTM duplicados para un mismo mes y año y señala los periodos pendientes en los cronogramas.',
+            'Muestra Descuentos CGR y Valores UTM en una sección Remuneraciones aunque el catálogo visual de módulos aún no se haya sincronizado.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.8.20.403' => [
         'date' => '2026-08-20',
         'module' => 'Centro de Operaciones',
