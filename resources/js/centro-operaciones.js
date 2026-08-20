@@ -29,12 +29,12 @@ const stateLabel = { operativo: 'Operativo', alerta: 'Alerta', critico: 'Crític
 const statePriority = { sin_reporte: 0, operativo: 1, alerta: 2, critico: 3 };
 const riskLabel = { estable: 'Estable', monitoreo: 'Monitoreo', atencion_prioritaria: 'Atención prioritaria', critico: 'Crítico' };
 
-const markerIcon = (state, riskCategory) => {
-    const size = state === 'critico' ? 20 : 17;
+const markerIcon = (state, riskCategory, riskScore) => {
+    const size = state === 'critico' ? 38 : 34;
 
     return L.divIcon({
         className: `co-map-marker co-map-marker--${state} co-map-risk--${riskCategory || 'sin_evaluacion'}`,
-        html: '<span></span>',
+        html: `<span><b>${escapeHtml(riskScore)}</b></span>`,
         iconSize: L.point(size, size),
         iconAnchor: L.point(size / 2, size / 2),
         popupAnchor: L.point(0, -(size / 2)),
@@ -162,17 +162,43 @@ function initPanel(root) {
             mapPointsByCommune.get(commune).push(point);
             const reportUrl = item.reporte_id ? root.dataset.reportUrl.replace('__ID__', item.reporte_id) : '';
             const reportLink = reportUrl ? `<a href="${escapeHtml(reportUrl)}">Ver reporte</a>` : '';
+            const riskScore = Number(item.riesgo?.puntaje ?? 0);
+            const activeRisk = item.riesgo?.activa === true;
             const logo = item.logo_url
                 ? `<div class="co-leaflet-popup-logo"><img src="${escapeHtml(item.logo_url)}" alt="Logo de ${escapeHtml(item.nombre)}"></div>`
                 : '<div class="co-leaflet-popup-logo co-leaflet-popup-logo--fallback"><i class="bi bi-building" aria-hidden="true"></i></div>';
-            const riskText = item.riesgo
-                ? `IRTE ${item.riesgo.irte} · ${riskLabel[item.riesgo.categoria] ?? item.riesgo.categoria}${item.riesgo.vencido ? ' · Evaluación vencida' : ''}`
-                : 'Sin evaluación IRTE';
-            L.marker(point, {
-                icon: markerIcon(item.estado, item.riesgo?.categoria),
+            const riskText = activeRisk
+                ? `${riskLabel[item.riesgo.categoria] ?? item.riesgo.categoria} · Evaluación activa`
+                : item.riesgo?.vencido
+                    ? 'Sin evaluación activa · Última evaluación vencida'
+                    : 'Sin evaluación activa';
+            const popupContent = `<div class="co-leaflet-popup"><div class="co-leaflet-popup-header">${logo}<div class="co-leaflet-popup-copy"><strong>${escapeHtml(item.nombre)}</strong><span>${escapeHtml(item.comuna)} · ${escapeHtml(stateLabel[item.estado] ?? item.estado)}</span></div><div class="co-leaflet-popup-risk"><small>Puntaje de riesgo</small><strong>${escapeHtml(riskScore)}</strong></div></div><div class="co-leaflet-popup-risk-state">${escapeHtml(riskText)}</div>${reportLink}</div>`;
+            const marker = L.marker(point, {
+                icon: markerIcon(item.estado, activeRisk ? item.riesgo.categoria : null, riskScore),
                 coState: item.estado,
-                title: `${item.nombre} · ${stateLabel[item.estado]}`,
-            }).bindPopup(`<div class="co-leaflet-popup"><div class="co-leaflet-popup-header">${logo}<div class="co-leaflet-popup-copy"><strong>${escapeHtml(item.nombre)}</strong><span>${escapeHtml(item.comuna)} · ${escapeHtml(stateLabel[item.estado] ?? item.estado)}</span><span>${escapeHtml(riskText)}</span></div></div>${reportLink}</div>`).addTo(markerLayer);
+                title: `${item.nombre} · ${stateLabel[item.estado]} · Puntaje de riesgo ${riskScore}`,
+            }).bindPopup(popupContent, {
+                closeButton: false,
+                autoPan: false,
+                className: 'co-map-hover-popup',
+            });
+            let popupCloseTimer;
+            const cancelPopupClose = () => window.clearTimeout(popupCloseTimer);
+            const schedulePopupClose = () => {
+                cancelPopupClose();
+                popupCloseTimer = window.setTimeout(() => marker.closePopup(), 180);
+            };
+            marker.on('mouseover', () => {
+                cancelPopupClose();
+                marker.openPopup();
+            });
+            marker.on('mouseout', schedulePopupClose);
+            marker.on('popupopen', (event) => {
+                const popupElement = event.popup.getElement();
+                popupElement?.addEventListener('mouseenter', cancelPopupClose);
+                popupElement?.addEventListener('mouseleave', schedulePopupClose);
+            });
+            marker.addTo(markerLayer);
         });
         territoryMapPoints = bounds;
         if (activeMapCommune

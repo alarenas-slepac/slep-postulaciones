@@ -128,6 +128,7 @@
                 <span class="co-map-legend-separator">Borde: riesgo IRTE</span>
                 <span><i class="co-risk-ring co-risk-ring--critico"></i>Crítico</span>
                 <span><i class="co-risk-ring co-risk-ring--atencion_prioritaria"></i>Atención</span>
+                <span class="co-map-legend-separator">Número: puntaje IRTE activo</span>
             </div>
         </section>
     </div>

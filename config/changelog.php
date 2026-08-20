@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.8.20.401' => [
+        'date' => '2026-08-20',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Puntaje IRTE visible en el mapa territorial',
+        'files' => [
+            'app/Services/CentroOperaciones/ConsolidadoService.php',
+            'config/changelog.php',
+            'public/build/assets/centro-operaciones-CfpfUu1G.js',
+            'public/build/assets/centro-operaciones-D69Fg0P8.css',
+            'public/build/manifest.json',
+            'resources/css/centro-operaciones.css',
+            'resources/js/centro-operaciones.js',
+            'resources/views/centro-operaciones/panel.blade.php',
+            'tests/Feature/CentroOperacionesMapControlsTest.php',
+        ],
+        'changes' => [
+            'Muestra dentro de cada marcador el puntaje IRTE de la evaluación activa y utiliza cero cuando no existe una evaluación vigente.',
+            'Abre al pasar el mouse una ficha flotante con el logo, nombre, estado y puntaje de riesgo del establecimiento.',
+        ],
+        'roles' => ['Usuarios con acceso al Centro de Operaciones'],
+    ],
     '2026.8.20.400' => [
         'date' => '2026-08-20',
         'module' => 'Centro de Operaciones',
