@@ -1,6 +1,37 @@
 <?php
 
 return [
+    '2026.8.20.403' => [
+        'date' => '2026-08-20',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Acceso integral para Gabinete SLEP',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/ReporteController.php',
+            'app/Http/Controllers/CentroOperaciones/TicketController.php',
+            'app/Http/Middleware/EnsureModuleAccess.php',
+            'app/Http/Requests/CentroOperaciones/GuardarReporteRequest.php',
+            'app/Http/Requests/CentroOperaciones/SubirTicketImagenesRequest.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/centro_operaciones.php',
+            'config/changelog.php',
+            'resources/views/centro-operaciones/reportes/form.blade.php',
+            'resources/views/centro-operaciones/reportes/history.blade.php',
+            'resources/views/centro-operaciones/reportes/seleccionar-establecimiento.blade.php',
+            'resources/views/centro-operaciones/riesgos/index.blade.php',
+            'resources/views/centro-operaciones/tickets/index.blade.php',
+            'resources/views/partials/navbar.blade.php',
+            'routes/web.php',
+            'tests/Feature/CentroOperacionesRoleAccessTest.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+        ],
+        'changes' => [
+            'Habilita a Gabinete SLEP en todas las rutas del Centro de Operaciones: panel, historial, reportes, riesgos, tickets y mantenedores.',
+            'Permite a Gabinete seleccionar cualquier establecimiento para registrar o actualizar el reporte del dÃ­a, conservando la restricciÃ³n que impide editar reportes histÃ³ricos.',
+            'Otorga alcance territorial completo sobre tickets, incluyendo resoluciÃ³n, informe PDF y registro fotogrÃ¡fico.',
+            'Expone los nuevos accesos en la navegaciÃ³n principal y en los accesos internos del mÃ³dulo.',
+        ],
+        'roles' => ['Gabinete SLEP'],
+    ],
     '2026.8.20.402' => [
         'date' => '2026-08-20',
         'module' => 'Centro de Operaciones',

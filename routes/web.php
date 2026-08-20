@@ -170,7 +170,7 @@ Route::get('/verificar-ticket/{codigo}', [CentroOperacionesTicketController::cla
 Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
     Route::prefix('centro-operaciones')->name('centro-operaciones.')->group(function () {
-        Route::middleware('ensure.role:admin|director_ejecutivo|secretaria_direccion_ejecutiva|comunicaciones|funcionario_ac|funcionario_directivo_estab')->group(function () {
+        Route::middleware('ensure.role:admin|director_ejecutivo|secretaria_direccion_ejecutiva|comunicaciones|gabinete_slep|funcionario_ac|funcionario_directivo_estab')->group(function () {
             Route::get('/tickets', [CentroOperacionesTicketController::class, 'index'])->name('tickets.index');
             Route::get('/tickets/{ticket}', [CentroOperacionesTicketController::class, 'show'])->whereNumber('ticket')->name('tickets.show');
             Route::get('/tickets/{ticket}/informe', [CentroOperacionesTicketController::class, 'pdf'])->whereNumber('ticket')->name('tickets.pdf');
@@ -180,7 +180,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
                 ->name('tickets.imagenes.show');
             Route::patch('/tickets/{ticket}/resolver', [CentroOperacionesTicketController::class, 'resolver'])->whereNumber('ticket')->name('tickets.resolver');
         });
-        Route::middleware('ensure.role:admin')->group(function () {
+        Route::middleware('ensure.role:admin|gabinete_slep')->group(function () {
             Route::get('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'index'])->name('configuraciones.index');
             Route::post('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'store'])->name('configuraciones.store');
             Route::put('/mantenedor-incidencias/{configuracion}', [CentroOperacionesIncidenteConfiguracionController::class, 'update'])->whereNumber('configuracion')->name('configuraciones.update');
@@ -208,10 +208,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             });
 
         Route::get('/reporte-diario', [CentroOperacionesReporteController::class, 'create'])
-            ->middleware('ensure.role:funcionario_directivo_estab')
+            ->middleware('ensure.role:funcionario_directivo_estab|gabinete_slep')
             ->name('reportes.create');
         Route::post('/reportes', [CentroOperacionesReporteController::class, 'store'])
-            ->middleware('ensure.role:funcionario_directivo_estab')
+            ->middleware('ensure.role:funcionario_directivo_estab|gabinete_slep')
             ->name('reportes.store');
         Route::get('/historial', [CentroOperacionesReporteController::class, 'history'])
             ->middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|secretaria_direccion_ejecutiva|funcionario_directivo_estab')
@@ -221,11 +221,11 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->whereNumber('reporte')
             ->name('reportes.show');
         Route::get('/reportes/{reporte}/editar', [CentroOperacionesReporteController::class, 'edit'])
-            ->middleware('ensure.role:funcionario_directivo_estab')
+            ->middleware('ensure.role:funcionario_directivo_estab|gabinete_slep')
             ->whereNumber('reporte')
             ->name('reportes.edit');
         Route::put('/reportes/{reporte}', [CentroOperacionesReporteController::class, 'update'])
-            ->middleware('ensure.role:funcionario_directivo_estab')
+            ->middleware('ensure.role:funcionario_directivo_estab|gabinete_slep')
             ->whereNumber('reporte')
             ->name('reportes.update');
     });

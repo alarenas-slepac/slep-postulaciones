@@ -63,7 +63,7 @@
                                 {{ $opcion['label'] }}
                             </span>
                         @else
-                            <a class="btn co-unit-option {{ $activa ? 'btn-primary is-active' : 'btn-outline-primary' }}" href="{{ route('centro-operaciones.reportes.create', array_filter(['unidad' => $opcion['codigo']])) }}" @if($activa) aria-current="page" @endif>
+                            <a class="btn co-unit-option {{ $activa ? 'btn-primary is-active' : 'btn-outline-primary' }}" href="{{ route('centro-operaciones.reportes.create', array_filter(['establecimiento' => $establecimiento->id, 'unidad' => $opcion['codigo']])) }}" @if($activa) aria-current="page" @endif>
                                 <i class="bi {{ $activa ? 'bi-check-circle-fill' : 'bi-building' }}" aria-hidden="true"></i>
                                 {{ $opcion['label'] }}
                             </a>
@@ -81,6 +81,7 @@
     <form method="POST" action="{{ $editando ? route('centro-operaciones.reportes.update', $reporte) : route('centro-operaciones.reportes.store') }}">
         @csrf
         @if($editando) @method('PUT') @endif
+        <input type="hidden" name="establecimiento_id" value="{{ $establecimiento->id }}">
         <input type="hidden" name="unidad_codigo" value="{{ $unidadCodigo }}">
 
         <section class="co-card co-form-section">

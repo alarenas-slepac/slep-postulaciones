@@ -15,6 +15,10 @@ return [
 
     'rol_reporte' => 'funcionario_directivo_estab',
 
+    'roles_gestion_total' => [
+        'gabinete_slep',
+    ],
+
     'ticket_imagenes' => [
         'maximo' => 10,
         'maximo_mb' => 20,

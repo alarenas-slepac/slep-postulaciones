@@ -136,7 +136,7 @@ class CentroOperacionesTicketsModuleTest extends TestCase
             $navbar
         );
         $this->assertStringContainsString(
-            '$canManageCentroOperacionesTickets = $u->hasRole(\'admin\');',
+            '$canManageCentroOperacionesTickets = $u->hasAnyRole([\'admin\', \'gabinete_slep\']);',
             $navbar
         );
         $this->assertStringContainsString(
@@ -162,6 +162,12 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertNotContains('Mantenedor de incidencias', $menuDirector);
         $this->assertContains('Tickets de incidencias', $menuAdmin);
         $this->assertContains('Mantenedor de incidencias', $menuAdmin);
+
+        $menuGabinete = collect(SlepUiRegistry::menuGroups(null, 'gabinete_slep'))
+            ->flatten(1)
+            ->pluck('label');
+        $this->assertContains('Tickets de incidencias', $menuGabinete);
+        $this->assertContains('Mantenedor de incidencias', $menuGabinete);
     }
 
     public function test_reporte_resuelve_el_ticket_y_conserva_la_incidencia(): void
@@ -208,6 +214,7 @@ class CentroOperacionesTicketsModuleTest extends TestCase
         $this->assertStringContainsString("Schema::create('centro_operaciones_ticket_imagenes'", $migration);
         $this->assertStringContainsString('->cascadeOnDelete()', $migration);
         $this->assertStringContainsString("hasRole('funcionario_directivo_estab')", $request);
+        $this->assertStringContainsString("hasRole('gabinete_slep')", $request);
         $this->assertStringContainsString('establecimiento_id', $request);
         $this->assertStringContainsString("'mimes:jpg,jpeg,png,webp'", $request);
         $this->assertStringContainsString("Storage::disk('local')", $service);
