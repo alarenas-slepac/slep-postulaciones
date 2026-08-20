@@ -45,6 +45,15 @@
 
 
 
+        @if (in_array($activeRole, ['admin', 'funcionario_slep'], true) && Route::has('descuentos-cgr.index'))
+            <div class="dashboard-section mb-4">
+                <h3 class="h6 text-uppercase text-muted mb-2">Remuneraciones</h3>
+                <div class="dashboard-grid">
+                    <a href="{{ route('descuentos-cgr.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-bank tile-icon"></i><div><h3 class="h6 m-0 text-dark">Descuentos CGR</h3><p class="text-muted small m-0">Resoluciones, cronogramas y valores UTM</p></div></div></div></a>
+                </div>
+            </div>
+        @endif
+
         @if ($u->canModule('endeudamiento', $activeRole) && Route::has('endeudamiento.cargas.index'))
             <div class="dashboard-section mb-4">
                 <h3 class="h6 text-uppercase text-muted mb-2">Endeudamiento</h3>

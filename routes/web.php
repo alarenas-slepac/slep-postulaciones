@@ -80,6 +80,8 @@ use App\Http\Controllers\Endeudamiento\MaeNormativaController;
 use App\Http\Controllers\Endeudamiento\MaeCuotasController;
 use App\Http\Controllers\Liquidaciones\LiquidacionCargaController;
 use App\Http\Controllers\Liquidaciones\MisLiquidacionesController;
+use App\Http\Controllers\Remuneraciones\DescuentoCgrController;
+use App\Http\Controllers\Remuneraciones\UtmValorController;
 use App\Http\Controllers\TramiteController;
 use App\Http\Controllers\CargaFamiliarController;
 use App\Http\Controllers\FuncionarioAcController;
@@ -1225,6 +1227,21 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::post('/cargas/paquete', [LiquidacionCargaController::class, 'storePaquete'])->name('cargas.paquete.store');
         Route::get('/cargas/{liquidacionCarga}', [LiquidacionCargaController::class, 'show'])->name('cargas.show');
         Route::get('/liquidaciones/{liquidacion}/descargar', [LiquidacionCargaController::class, 'descargar'])->name('cargas.liquidaciones.descargar');
+    });
+
+    Route::prefix('descuentos-cgr')->name('descuentos-cgr.')->middleware('ensure.role:admin|funcionario_slep')->group(function () {
+        Route::get('/utm', [UtmValorController::class, 'index'])->name('utm.index');
+        Route::post('/utm', [UtmValorController::class, 'store'])->name('utm.store');
+        Route::put('/utm/{utmValor}', [UtmValorController::class, 'update'])->name('utm.update');
+        Route::post('/utm/importar', [UtmValorController::class, 'importar'])->name('utm.importar');
+        Route::get('/utm/plantilla', [UtmValorController::class, 'plantilla'])->name('utm.plantilla');
+        Route::get('/', [DescuentoCgrController::class, 'index'])->name('index');
+        Route::get('/crear', [DescuentoCgrController::class, 'create'])->name('create');
+        Route::post('/', [DescuentoCgrController::class, 'store'])->name('store');
+        Route::get('/{descuentoCgr}', [DescuentoCgrController::class, 'show'])->whereNumber('descuentoCgr')->name('show');
+        Route::get('/{descuentoCgr}/editar', [DescuentoCgrController::class, 'edit'])->whereNumber('descuentoCgr')->name('edit');
+        Route::put('/{descuentoCgr}', [DescuentoCgrController::class, 'update'])->whereNumber('descuentoCgr')->name('update');
+        Route::get('/{descuentoCgr}/resolucion', [DescuentoCgrController::class, 'pdf'])->whereNumber('descuentoCgr')->name('pdf');
     });
 
     Route::prefix('mis-liquidaciones')->name('liquidaciones.mis.')->middleware('ensure.role:postulante|funcionario')->group(function () {

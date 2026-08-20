@@ -131,13 +131,17 @@ class SlepUiRegistry
                 self::entry('Restricciones RUT', 'admin.restricted-ruts.index', 'bi-shield-exclamation', ['admin'], 'admin.restricted-ruts'),
                 self::entry('Excepciones permiso sin goce', 'admin.permiso-sin-goce-excepciones.index', 'bi-unlock', ['admin', 'coordinador_gdp'], 'admin.permiso-sin-goce-excepciones'),
             ],
+            'Remuneraciones' => [
+                self::entry('Liquidaciones', 'liquidaciones.cargas.index', 'bi-receipt-cutoff', ['admin', 'funcionario_slep'], 'liquidaciones'),
+                self::entry('Descuentos CGR', 'descuentos-cgr.index', 'bi-bank', ['admin', 'funcionario_slep']),
+                self::entry('Valores UTM', 'descuentos-cgr.utm.index', 'bi-currency-exchange', ['admin', 'funcionario_slep']),
+            ],
             'Gestión y control' => [
                 self::entry('Estadísticas', 'gestion.estadisticas.index', 'bi-bar-chart-line', ['admin', 'coordinador_gdp', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani'], 'gestion.estadisticas'),
                 self::entry('Informes', 'gestion.informes.index', 'bi-file-earmark-spreadsheet', ['admin', 'coordinador_gdp', 'funcionario_slep', 'supervisor_plani'], 'gestion.informes'),
                 self::entry('Bolsa de Trabajo', 'gestion.bolsa-trabajo.index', 'bi-briefcase', ['admin', 'funcionario_slep'], 'gestion.bolsa-trabajo'),
                 self::entry('Agendamiento Proyector y Salas', 'gestion.agendamientos-recursos.index', 'bi-calendar-event', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac', 'secretaria_direccion_ejecutiva']),
                 self::entry('Endeudamiento', 'endeudamiento.cargas.index', 'bi-calculator', ['admin', 'funcionario_slep'], 'endeudamiento'),
-                self::entry('Liquidaciones', 'liquidaciones.cargas.index', 'bi-receipt-cutoff', ['admin', 'funcionario_slep'], 'liquidaciones'),
                 self::entry('Revisión documentos', 'admin.documents.index', 'bi-file-earmark-check', ['admin', 'funcionario_slep', 'coordinador_gdp'], 'admin.documents'),
             ],
             'Comunicación' => [
@@ -177,6 +181,7 @@ class SlepUiRegistry
             self::entry('Viáticos y reembolsos', 'admin.viaticos-reembolsos.index', 'bi-cash-coin', ['admin', 'supervisor_plani', 'coordinador_plani'], 'admin.viaticos-reembolsos'),
             self::entry('Funcionarios viático por anexo', 'admin.funcionarios-viatico-anexo.index', 'bi-person-check', ['admin', 'supervisor_plani', 'coordinador_plani'], 'admin.funcionarios-viatico-anexo'),
             self::entry('Valores hora AAEE', 'admin.aaee-valores-hora.index', 'bi-currency-dollar', ['admin']),
+            self::entry('Descuentos CGR', 'descuentos-cgr.index', 'bi-bank', ['admin', 'funcionario_slep']),
             self::entry('Mis Cargas Familiares', 'tramites.cargas-familiares.index', 'bi-people', ['postulante', 'funcionario', 'funcionario_ac']),
             self::entry('Mis Finiquitos', 'postulant.finiquitos.index', 'bi-file-earmark-pdf', ['postulante', 'funcionario'], 'postulant.reemplazos'),
             self::entry('Mi deuda de pensión', 'postulant.deudas-pension-alimentos.index', 'bi-file-earmark-lock', ['postulante', 'funcionario'], 'postulant.reemplazos'),

@@ -42,6 +42,7 @@ class ModuleRegistry
     public static function defaultMeta(string $key): array
     {
         $section = match (true) {
+            $key === 'descuentos-cgr' => 'Remuneraciones',
             in_array($key, ['centro-operaciones', 'reemplazos', 'reemplazos.personal', 'admin.permiso-sin-goce-excepciones', 'incumplimientos', 'endeudamiento', 'declaracion', 'funcionario.solicitudes-reemplazo', 'gestion.solicitudes-reemplazo', 'gestion.estadisticas', 'gestion.informes'], true) => 'Operación',
             Str::startsWith($key, 'admin.establecimientos') ||
                 Str::startsWith($key, 'admin.alumnos-prioritarios') ||
@@ -74,6 +75,7 @@ class ModuleRegistry
             'reemplazos.personal' => 'Carga Masiva Personal',
             'incumplimientos' => 'Incumplimiento Laboral',
             'endeudamiento' => 'Endeudamiento',
+            'descuentos-cgr' => 'Descuentos CGR',
             'declaracion' => 'Declaración de Sostenedores',
             'funcionario.solicitudes-reemplazo' => 'Solicitudes de Reemplazo',
             'gestion.solicitudes-reemplazo' => 'Gestión Solicitudes',
@@ -113,6 +115,7 @@ class ModuleRegistry
             'admin.permiso-sin-goce-excepciones' => 22,
             'incumplimientos' => 25,
             'endeudamiento' => 27,
+            'descuentos-cgr' => 30,
             'declaracion' => 28,
             'funcionario.solicitudes-reemplazo' => 30,
             'gestion.solicitudes-reemplazo' => 40,

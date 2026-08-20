@@ -30,6 +30,17 @@ class EnsureModuleAccess
             return $next($request);
         }
 
+        // Descuentos CGR tiene roles fijos en sus rutas. Se conserva el acceso de
+        // funcionario_slep aunque el catálogo de módulos aún no haya sincronizado
+        // su asignación visual después del despliegue.
+        if (
+            $moduleKey === 'descuentos-cgr'
+            && method_exists($user, 'hasAnyRole')
+            && $user->hasAnyRole(['admin', 'funcionario_slep'])
+        ) {
+            return $next($request);
+        }
+
         // Este módulo combina control por rol (acciones) y visibilidad por módulo.
         // En algunos entornos la asignación visual por módulo puede quedar desalineada
         // con el acceso real por rol; evitamos falsos 403 para los roles habilitados.
