@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\DescuentoCgr;
 use App\Models\UtmValor;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
+use App\Services\Remuneraciones\ReemplazoPersonalRutService;
 use App\Services\Remuneraciones\UtmImportService;
 use App\Support\ModuleRegistry;
 use App\Support\SlepUiRegistry;
@@ -31,10 +32,21 @@ class DescuentosCgrModuleTest extends TestCase
             $table->timestamps();
             $table->unique(['anio', 'mes']);
         });
+
+        Schema::dropIfExists('reemplazos_personal');
+        Schema::create('reemplazos_personal', function (Blueprint $table) {
+            $table->id();
+            $table->string('rut', 20);
+            $table->string('nombre');
+            $table->unsignedSmallInteger('anio');
+            $table->unsignedTinyInteger('mes');
+            $table->timestamps();
+        });
     }
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('reemplazos_personal');
         Schema::dropIfExists('utm_valores');
         parent::tearDown();
     }
@@ -99,9 +111,31 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertDatabaseMissing('utm_valores', ['anio' => 2026, 'mes' => 3]);
     }
 
+    public function test_busqueda_normaliza_rut_con_puntos_y_obtiene_nombre_del_periodo_mas_reciente(): void
+    {
+        \App\Models\ReemplazoPersonal::create([
+            'rut' => '12345678-5',
+            'nombre' => 'Persona Ejemplo Anterior',
+            'anio' => 2025,
+            'mes' => 12,
+        ]);
+        \App\Models\ReemplazoPersonal::create([
+            'rut' => '12345678-5',
+            'nombre' => '  Persona   Ejemplo   Vigente  ',
+            'anio' => 2026,
+            'mes' => 8,
+        ]);
+
+        $resultado = app(ReemplazoPersonalRutService::class)->buscar('12.345.678-5');
+
+        $this->assertSame('12345678-5', $resultado['rut']);
+        $this->assertSame('Persona Ejemplo Vigente', $resultado['nombre']);
+        $this->assertSame('2026-08', $resultado['periodo']);
+    }
+
     public function test_rutas_permisos_y_navegacion_del_modulo(): void
     {
-        foreach (['descuentos-cgr.index', 'descuentos-cgr.create', 'descuentos-cgr.utm.index', 'descuentos-cgr.utm.importar'] as $nombre) {
+        foreach (['descuentos-cgr.index', 'descuentos-cgr.create', 'descuentos-cgr.funcionario.buscar', 'descuentos-cgr.utm.index', 'descuentos-cgr.utm.importar'] as $nombre) {
             $ruta = app('router')->getRoutes()->getByName($nombre);
             $middlewares = implode('|', $ruta?->gatherMiddleware() ?? []);
             $this->assertNotNull($ruta, "No se encontró la ruta {$nombre}.");

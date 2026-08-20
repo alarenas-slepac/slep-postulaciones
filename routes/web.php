@@ -1237,6 +1237,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::get('/utm/plantilla', [UtmValorController::class, 'plantilla'])->name('utm.plantilla');
         Route::get('/', [DescuentoCgrController::class, 'index'])->name('index');
         Route::get('/crear', [DescuentoCgrController::class, 'create'])->name('create');
+        Route::get('/funcionario/buscar', [DescuentoCgrController::class, 'buscarFuncionario'])->name('funcionario.buscar');
         Route::post('/', [DescuentoCgrController::class, 'store'])->name('store');
         Route::get('/{descuentoCgr}', [DescuentoCgrController::class, 'show'])->whereNumber('descuentoCgr')->name('show');
         Route::get('/{descuentoCgr}/editar', [DescuentoCgrController::class, 'edit'])->whereNumber('descuentoCgr')->name('edit');
