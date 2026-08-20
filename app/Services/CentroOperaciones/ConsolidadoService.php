@@ -108,7 +108,8 @@ class ConsolidadoService
             $incidenciasPorContexto,
             $matriculas,
             $dotaciones,
-            $riesgos
+            $riesgos,
+            $fecha
         ) {
             /** @var Establecimiento $establecimiento */
             $establecimiento = $contexto['establecimiento'];
