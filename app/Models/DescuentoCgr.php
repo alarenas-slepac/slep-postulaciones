@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DescuentoCgr extends Model
 {
@@ -25,6 +26,9 @@ class DescuentoCgr extends Model
         'resolucion_pdf_nombre',
         'resolucion_pdf_tamano',
         'observaciones',
+        'codigo_verificacion',
+        'documento_hash',
+        'documento_emitido_en',
         'creado_por_id',
         'actualizado_por_id',
     ];
@@ -41,6 +45,7 @@ class DescuentoCgr extends Model
             'tasa_interes_anual' => 'decimal:4',
             'tasa_interes_mensual' => 'decimal:4',
             'resolucion_pdf_tamano' => 'integer',
+            'documento_emitido_en' => 'datetime',
         ];
     }
 
@@ -52,5 +57,10 @@ class DescuentoCgr extends Model
     public function actualizadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'actualizado_por_id');
+    }
+
+    public function documentosMensuales(): HasMany
+    {
+        return $this->hasMany(DescuentoCgrDocumentoMensual::class, 'descuento_cgr_id');
     }
 }

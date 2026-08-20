@@ -82,6 +82,8 @@ use App\Http\Controllers\Liquidaciones\LiquidacionCargaController;
 use App\Http\Controllers\Liquidaciones\MisLiquidacionesController;
 use App\Http\Controllers\Remuneraciones\DescuentoCgrController;
 use App\Http\Controllers\Remuneraciones\UtmValorController;
+use App\Http\Controllers\Remuneraciones\VerificarDescuentoCgrController;
+use App\Http\Controllers\Remuneraciones\VerificarDescuentoCgrMensualController;
 use App\Http\Controllers\TramiteController;
 use App\Http\Controllers\CargaFamiliarController;
 use App\Http\Controllers\FuncionarioAcController;
@@ -165,6 +167,16 @@ Route::get('/verificar-ticket/{codigo}', [CentroOperacionesTicketController::cla
     ->middleware('throttle:60,1')
     ->where('codigo', '[A-Za-z0-9-]{16,40}')
     ->name('centro-operaciones.tickets.verificar');
+
+Route::get('/descuentos-cgr/verificar/{codigo}', VerificarDescuentoCgrController::class)
+    ->middleware('throttle:60,1')
+    ->where('codigo', '[A-Za-z0-9-]{16,40}')
+    ->name('descuentos-cgr.verificar');
+
+Route::get('/descuentos-cgr/verificar-mensual/{codigo}', VerificarDescuentoCgrMensualController::class)
+    ->middleware('throttle:60,1')
+    ->where('codigo', '[A-Za-z0-9-]{16,40}')
+    ->name('descuentos-cgr.mensual.verificar');
 
 // =========================
 //  RUTAS PROTEGIDAS POR MÓDULO
@@ -1243,6 +1255,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::get('/{descuentoCgr}/editar', [DescuentoCgrController::class, 'edit'])->whereNumber('descuentoCgr')->name('edit');
         Route::put('/{descuentoCgr}', [DescuentoCgrController::class, 'update'])->whereNumber('descuentoCgr')->name('update');
         Route::get('/{descuentoCgr}/resolucion', [DescuentoCgrController::class, 'pdf'])->whereNumber('descuentoCgr')->name('pdf');
+        Route::get('/{descuentoCgr}/informe-pdf', [DescuentoCgrController::class, 'informePdf'])->whereNumber('descuentoCgr')->name('informe.pdf');
+        Route::get('/{descuentoCgr}/cronograma/{cuota}/pdf', [DescuentoCgrController::class, 'cronogramaPdf'])
+            ->whereNumber(['descuentoCgr', 'cuota'])
+            ->name('cronograma.pdf');
     });
 
     Route::prefix('mis-liquidaciones')->name('liquidaciones.mis.')->middleware('ensure.role:postulante|funcionario')->group(function () {

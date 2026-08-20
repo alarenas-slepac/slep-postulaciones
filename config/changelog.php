@@ -1,6 +1,57 @@
 <?php
 
 return [
+    '2026.8.20.407' => [
+        'date' => '2026-08-20',
+        'module' => 'Remuneraciones',
+        'title' => 'PDF individual por cuota del cronograma CGR',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Http/Controllers/Remuneraciones/VerificarDescuentoCgrMensualController.php',
+            'app/Models/DescuentoCgr.php',
+            'app/Models/DescuentoCgrDocumentoMensual.php',
+            'app/Services/Remuneraciones/DescuentoCgrPdfService.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_20_185000_create_descuentos_cgr_documentos_mensuales_table.php',
+            'resources/views/pdf/descuentos-cgr/mensual.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/verificar-mensual.blade.php',
+            'routes/web.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Añade un botón Ver PDF en cada fila del cronograma para consultar el detalle de la cuota mensual en una nueva pestaña.',
+            'El documento identifica a la persona, resolución, período, UTM, saldos, capital, interés y descuento total del mes.',
+            'Emite un código y una huella SHA-256 independientes por cuota, con QR para verificar públicamente su integridad documental.',
+            'Detecta cambios posteriores en el registro, la UTM del período o la resolución PDF asociada.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
+    '2026.8.20.406' => [
+        'date' => '2026-08-20',
+        'module' => 'Remuneraciones',
+        'title' => 'Informe PDF verificable para Descuentos CGR',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Http/Controllers/Remuneraciones/VerificarDescuentoCgrController.php',
+            'app/Models/DescuentoCgr.php',
+            'app/Services/Remuneraciones/DescuentoCgrPdfService.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_20_184000_add_document_verification_to_descuentos_cgr_table.php',
+            'resources/views/pdf/descuentos-cgr/informe.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/verificar.blade.php',
+            'routes/web.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Añade un exportador PDF por registro desde el detalle de Descuentos CGR, con identidad visual oficial SLEP Andalién Costa.',
+            'Incluye los valores dictaminados, antecedentes de la resolución, cronograma mensual, totales y alertas por UTM pendientes.',
+            'Incorpora código QR, folio y huella SHA-256 para verificar públicamente la integridad del registro, las UTM y el PDF de resolución.',
+            'Mantiene compatibilidad con registros históricos al generar los datos de verificación durante su primera exportación.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.8.20.405' => [
         'date' => '2026-08-20',
         'module' => 'Remuneraciones',

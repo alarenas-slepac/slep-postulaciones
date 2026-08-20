@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\DescuentoCgr;
 use App\Models\UtmValor;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
+use App\Services\Remuneraciones\DescuentoCgrPdfService;
 use App\Services\Remuneraciones\ReemplazoPersonalRutService;
 use App\Services\Remuneraciones\UtmImportService;
 use App\Support\ModuleRegistry;
@@ -12,6 +13,7 @@ use App\Support\SlepUiRegistry;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -20,6 +22,7 @@ class DescuentosCgrModuleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config(['app.key' => 'base64:'.base64_encode(str_repeat('a', 32))]);
 
         Schema::dropIfExists('utm_valores');
         Schema::create('utm_valores', function (Blueprint $table) {
@@ -42,10 +45,51 @@ class DescuentosCgrModuleTest extends TestCase
             $table->unsignedTinyInteger('mes');
             $table->timestamps();
         });
+
+        Schema::dropIfExists('descuentos_cgr_documentos_mensuales');
+        Schema::dropIfExists('descuentos_cgr');
+        Schema::create('descuentos_cgr', function (Blueprint $table) {
+            $table->id();
+            $table->string('rut', 12);
+            $table->string('nombre');
+            $table->string('numero_resolucion', 100);
+            $table->date('fecha_resolucion')->nullable();
+            $table->unsignedBigInteger('deuda_definitiva_pesos');
+            $table->decimal('deuda_equivalente_utm', 14, 4);
+            $table->decimal('cuota_utm', 14, 4);
+            $table->unsignedSmallInteger('numero_cuotas');
+            $table->decimal('tasa_interes_anual', 8, 4);
+            $table->decimal('tasa_interes_mensual', 8, 4);
+            $table->date('fecha_primer_descuento');
+            $table->string('resolucion_pdf_path')->nullable();
+            $table->string('resolucion_pdf_nombre')->nullable();
+            $table->unsignedBigInteger('resolucion_pdf_tamano')->nullable();
+            $table->text('observaciones')->nullable();
+            $table->string('codigo_verificacion', 40)->nullable()->unique();
+            $table->char('documento_hash', 64)->nullable();
+            $table->timestamp('documento_emitido_en')->nullable();
+            $table->unsignedBigInteger('creado_por_id')->nullable();
+            $table->unsignedBigInteger('actualizado_por_id')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('descuentos_cgr_documentos_mensuales', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('descuento_cgr_id');
+            $table->unsignedSmallInteger('numero_cuota');
+            $table->date('periodo');
+            $table->string('codigo_verificacion', 40)->unique();
+            $table->char('documento_hash', 64);
+            $table->timestamp('documento_emitido_en');
+            $table->timestamps();
+            $table->unique(['descuento_cgr_id', 'numero_cuota']);
+        });
     }
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('descuentos_cgr_documentos_mensuales');
+        Schema::dropIfExists('descuentos_cgr');
         Schema::dropIfExists('reemplazos_personal');
         Schema::dropIfExists('utm_valores');
         parent::tearDown();
@@ -135,7 +179,7 @@ class DescuentosCgrModuleTest extends TestCase
 
     public function test_rutas_permisos_y_navegacion_del_modulo(): void
     {
-        foreach (['descuentos-cgr.index', 'descuentos-cgr.create', 'descuentos-cgr.funcionario.buscar', 'descuentos-cgr.utm.index', 'descuentos-cgr.utm.importar'] as $nombre) {
+        foreach (['descuentos-cgr.index', 'descuentos-cgr.create', 'descuentos-cgr.funcionario.buscar', 'descuentos-cgr.informe.pdf', 'descuentos-cgr.cronograma.pdf', 'descuentos-cgr.utm.index', 'descuentos-cgr.utm.importar'] as $nombre) {
             $ruta = app('router')->getRoutes()->getByName($nombre);
             $middlewares = implode('|', $ruta?->gatherMiddleware() ?? []);
             $this->assertNotNull($ruta, "No se encontró la ruta {$nombre}.");
@@ -157,5 +201,91 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertArrayHasKey('Remuneraciones', $grupos);
         $this->assertContains('Descuentos CGR', $labels);
         $this->assertContains('Valores UTM', $labels);
+    }
+
+    public function test_informe_pdf_genera_verificacion_y_detecta_cambios_posteriores(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('descuentos-cgr/resoluciones/2026/resolucion.pdf', '%PDF-resolucion');
+        UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
+
+        $descuento = DescuentoCgr::create([
+            'rut' => '12345678-5',
+            'nombre' => 'Persona Ejemplo',
+            'numero_resolucion' => '4553-2026',
+            'fecha_resolucion' => '2026-01-15',
+            'deuda_definitiva_pesos' => 142000,
+            'deuda_equivalente_utm' => 2.0560,
+            'cuota_utm' => 2.0560,
+            'numero_cuotas' => 1,
+            'tasa_interes_anual' => 12,
+            'tasa_interes_mensual' => 1,
+            'fecha_primer_descuento' => '2026-02-01',
+            'resolucion_pdf_path' => 'descuentos-cgr/resoluciones/2026/resolucion.pdf',
+            'resolucion_pdf_nombre' => 'resolucion.pdf',
+            'resolucion_pdf_tamano' => 15,
+        ]);
+
+        $servicio = app(DescuentoCgrPdfService::class);
+        $pdf = $servicio->generar($descuento);
+        $descuento->refresh();
+
+        $this->assertStringStartsWith('%PDF', $pdf);
+        $this->assertMatchesRegularExpression('/^CGR-[A-F0-9]{20}$/', $descuento->codigo_verificacion);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $descuento->documento_hash);
+        $this->assertNotNull($descuento->documento_emitido_en);
+        $this->assertTrue($servicio->verificarIntegridad($descuento)['integro']);
+
+        $this->get(route('descuentos-cgr.verificar', $descuento->codigo_verificacion))
+            ->assertOk()
+            ->assertSee('Documento válido e íntegro.');
+
+        $descuento->update(['deuda_definitiva_pesos' => 143000]);
+        $this->assertFalse($servicio->verificarIntegridad($descuento->fresh())['integro']);
+    }
+
+    public function test_pdf_mensual_identifica_cuota_y_verifica_sus_valores(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('descuentos-cgr/resoluciones/2026/resolucion.pdf', '%PDF-resolucion');
+        UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
+
+        $descuento = DescuentoCgr::create([
+            'rut' => '12345678-5',
+            'nombre' => 'Persona Ejemplo',
+            'numero_resolucion' => '4553-2026',
+            'fecha_resolucion' => '2026-01-15',
+            'deuda_definitiva_pesos' => 142000,
+            'deuda_equivalente_utm' => 2.0560,
+            'cuota_utm' => 2.0560,
+            'numero_cuotas' => 1,
+            'tasa_interes_anual' => 12,
+            'tasa_interes_mensual' => 1,
+            'fecha_primer_descuento' => '2026-02-01',
+            'resolucion_pdf_path' => 'descuentos-cgr/resoluciones/2026/resolucion.pdf',
+            'resolucion_pdf_nombre' => 'resolucion.pdf',
+            'resolucion_pdf_tamano' => 15,
+        ]);
+
+        $servicio = app(DescuentoCgrPdfService::class);
+        $resultado = $servicio->generarMensual($descuento, 1);
+        $documento = $resultado['documento']->fresh();
+
+        $this->assertStringStartsWith('%PDF', $resultado['contenido']);
+        $this->assertSame('2026-02-01', $documento->periodo->toDateString());
+        $this->assertSame(1, $documento->numero_cuota);
+        $this->assertMatchesRegularExpression('/^CGR-M-[A-F0-9]{20}$/', $documento->codigo_verificacion);
+        $this->assertTrue($servicio->verificarIntegridadMensual($documento)['integro']);
+
+        $this->get(route('descuentos-cgr.mensual.verificar', $documento->codigo_verificacion))
+            ->assertOk()
+            ->assertSee('Documento mensual válido e íntegro.');
+
+        UtmValor::query()->where(['anio' => 2026, 'mes' => 2])->update(['valor' => 70000]);
+        $this->assertFalse($servicio->verificarIntegridadMensual($documento->fresh())['integro']);
+        $this->assertDatabaseHas('descuentos_cgr_documentos_mensuales', [
+            'descuento_cgr_id' => $descuento->id,
+            'numero_cuota' => 1,
+        ]);
     }
 }
