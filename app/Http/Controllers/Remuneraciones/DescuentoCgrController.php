@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
+use App\Services\Remuneraciones\DescuentoCgrPdfService;
 use App\Services\Remuneraciones\ReemplazoPersonalRutService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -128,6 +129,32 @@ class DescuentoCgrController extends Controller
             $descuentoCgr->resolucion_pdf_nombre,
             ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline']
         );
+    }
+
+    public function informePdf(DescuentoCgr $descuentoCgr, DescuentoCgrPdfService $documentos): mixed
+    {
+        $nombre = 'informe-descuento-cgr-'.Str::slug($descuentoCgr->numero_resolucion)
+            .'-'.Str::slug($descuentoCgr->rut).'.pdf';
+
+        return response($documentos->generar($descuentoCgr), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$nombre.'"',
+        ]);
+    }
+
+    public function cronogramaPdf(
+        DescuentoCgr $descuentoCgr,
+        int $cuota,
+        DescuentoCgrPdfService $documentos
+    ): mixed {
+        $resultado = $documentos->generarMensual($descuentoCgr, $cuota);
+        $periodo = $resultado['fila']['periodo']->format('Y-m');
+        $nombre = 'descuento-cgr-'.Str::slug($descuentoCgr->rut).'-'.$periodo.'.pdf';
+
+        return response($resultado['contenido'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$nombre.'"',
+        ]);
     }
 
     private function datosPersistencia(

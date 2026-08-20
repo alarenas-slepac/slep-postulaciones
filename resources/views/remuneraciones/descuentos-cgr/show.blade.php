@@ -13,6 +13,7 @@
                 <p class="text-muted mb-0">{{ \App\Support\Rut::format($descuentoCgr->rut) }} · Resolución {{ $descuentoCgr->numero_resolucion }}</p>
             </div>
             <div class="d-flex gap-2">
+                <a href="{{ route('descuentos-cgr.informe.pdf', $descuentoCgr) }}" class="btn btn-danger"><i class="bi bi-file-earmark-arrow-down me-1"></i>Exportar informe PDF</a>
                 <a href="{{ route('descuentos-cgr.pdf', $descuentoCgr) }}" target="_blank" rel="noopener" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>Ver resolución</a>
                 <a href="{{ route('descuentos-cgr.edit', $descuentoCgr) }}" class="btn btn-outline-primary"><i class="bi bi-pencil me-1"></i>Editar</a>
                 <a href="{{ route('descuentos-cgr.index') }}" class="btn btn-outline-secondary">Volver</a>
@@ -43,7 +44,7 @@
             <div class="table-responsive">
                 <table class="table table-sm table-bordered align-middle mb-0">
                     <thead class="table-light text-center align-middle">
-                        <tr><th>N°</th><th>Mes</th><th>Valor UTM</th><th>Saldo inicial UTM</th><th>Capital UTM</th><th>Saldo final UTM</th><th>Saldo inicial $</th><th>Capital $</th><th>Interés mes $</th><th>Descuento total $</th></tr>
+                        <tr><th>N°</th><th>Mes</th><th>Valor UTM</th><th>Saldo inicial UTM</th><th>Capital UTM</th><th>Saldo final UTM</th><th>Saldo inicial $</th><th>Capital $</th><th>Interés mes $</th><th>Descuento total $</th><th>Documento</th></tr>
                     </thead>
                     <tbody>
                         @foreach ($calculo['filas'] as $fila)
@@ -58,11 +59,12 @@
                                 <td class="text-end">{{ $pesos($fila['capital_pesos']) }}</td>
                                 <td class="text-end">{{ $pesos($fila['interes_pesos']) }}</td>
                                 <td class="text-end fw-semibold">{{ $pesos($fila['descuento_pesos']) }}</td>
+                                <td class="text-center"><a href="{{ route('descuentos-cgr.cronograma.pdf', [$descuentoCgr, $fila['numero']]) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger text-nowrap"><i class="bi bi-file-earmark-pdf me-1"></i>Ver PDF</a></td>
                             </tr>
                         @endforeach
                     </tbody>
                     <tfoot class="table-light fw-semibold">
-                        <tr><td colspan="7" class="text-end">Totales calculados</td><td class="text-end">{{ $pesos($calculo['totales']['capital_pesos']) }}</td><td class="text-end">{{ $pesos($calculo['totales']['interes_pesos']) }}</td><td class="text-end">{{ $pesos($calculo['totales']['descuento_pesos']) }}</td></tr>
+                        <tr><td colspan="7" class="text-end">Totales calculados</td><td class="text-end">{{ $pesos($calculo['totales']['capital_pesos']) }}</td><td class="text-end">{{ $pesos($calculo['totales']['interes_pesos']) }}</td><td class="text-end">{{ $pesos($calculo['totales']['descuento_pesos']) }}</td><td></td></tr>
                     </tfoot>
                 </table>
             </div>
