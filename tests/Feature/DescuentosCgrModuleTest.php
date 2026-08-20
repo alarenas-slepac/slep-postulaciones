@@ -288,4 +288,14 @@ class DescuentosCgrModuleTest extends TestCase
             'numero_cuota' => 1,
         ]);
     }
+
+    public function test_logos_de_informes_pdf_conservan_su_proporcion_original(): void
+    {
+        foreach (['informe', 'mensual'] as $vista) {
+            $contenido = file_get_contents(resource_path("views/pdf/descuentos-cgr/{$vista}.blade.php"));
+
+            $this->assertStringContainsString('.logo { height: auto; width: 80px; }', $contenido);
+            $this->assertStringNotContainsString('max-height:', $contenido);
+        }
+    }
 }

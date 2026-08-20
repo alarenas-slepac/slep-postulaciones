@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.8.20.408' => [
+        'date' => '2026-08-20',
+        'module' => 'Remuneraciones',
+        'title' => 'Proporción correcta del logo en informes CGR',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/pdf/descuentos-cgr/informe.blade.php',
+            'resources/views/pdf/descuentos-cgr/mensual.blade.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Corrige el achatamiento vertical del logo oficial SLEP en el informe general y en el detalle mensual.',
+            'Mantiene la proporción original de la imagen mediante altura automática y un ancho adecuado para el encabezado.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.8.20.407' => [
         'date' => '2026-08-20',
         'module' => 'Remuneraciones',
