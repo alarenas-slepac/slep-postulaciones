@@ -36,6 +36,9 @@
                 <a class="btn btn-outline-secondary" href="{{ route('centro-operaciones.reportes.history') }}">
                     <i class="bi bi-clock-history"></i> Historial
                 </a>
+                <a class="btn btn-outline-primary" href="{{ route('centro-operaciones.riesgos.index') }}">
+                    <i class="bi bi-shield-check"></i> Riesgo IRTE
+                </a>
             @endunless
         </div>
     </header>
@@ -73,6 +76,14 @@
             <i class="bi bi-shield-exclamation"></i>
             <div><span>Incidencias activas</span><strong data-metric="incidencias_activas">{{ $metricas['incidencias_activas'] }}</strong><small><b data-metric="incidencias_del_dia">{{ $metricas['incidencias_del_dia'] }}</b> reportadas en la fecha</small></div>
         </article>
+    </section>
+
+    <section class="co-risk-summary" aria-label="Resumen de riesgo institucional">
+        <div><span class="co-eyebrow">Riesgo institucional IRTE</span><strong><b data-metric="riesgo_evaluados">{{ $metricas['riesgo_evaluados'] }}</b> evaluados</strong></div>
+        <span class="co-risk-badge co-risk-badge--critico"><b data-metric="riesgo_criticos">{{ $metricas['riesgo_criticos'] }}</b> críticos</span>
+        <span class="co-risk-badge co-risk-badge--atencion_prioritaria"><b data-metric="riesgo_atencion">{{ $metricas['riesgo_atencion'] }}</b> atención prioritaria</span>
+        <span class="co-risk-badge co-risk-badge--sin_evaluacion"><b data-metric="riesgo_sin_evaluacion">{{ $metricas['riesgo_sin_evaluacion'] }}</b> sin evaluación</span>
+        <span class="co-risk-badge co-risk-badge--vencido"><b data-metric="riesgo_vencidos">{{ $metricas['riesgo_vencidos'] }}</b> vencidos</span>
     </section>
 
     <div class="co-grid co-grid--main">
@@ -114,6 +125,9 @@
             <div id="co-map" aria-label="Mapa de establecimientos"></div>
             <div class="co-map-legend">
                 @foreach($estadoLabels as $estado => $label)<span><i class="co-dot co-dot--{{ $estado }}"></i>{{ $label }}</span>@endforeach
+                <span class="co-map-legend-separator">Borde: riesgo IRTE</span>
+                <span><i class="co-risk-ring co-risk-ring--critico"></i>Crítico</span>
+                <span><i class="co-risk-ring co-risk-ring--atencion_prioritaria"></i>Atención</span>
             </div>
         </section>
     </div>
@@ -138,7 +152,7 @@
                 @forelse(array_slice($datos['alertas'], 0, 7) as $alerta)
                     <a href="{{ $alerta['reporte_id'] ? route('centro-operaciones.reportes.show', $alerta['reporte_id']) : '#' }}" class="co-list-item">
                         <span class="co-status-bar co-status-bar--{{ $alerta['estado'] }}"></span>
-                        <span><strong>{{ $alerta['nombre'] }}</strong><small>{{ $alerta['comuna'] }} · {{ $estadoLabels[$alerta['estado']] }}</small></span>
+                        <span><strong>{{ $alerta['nombre'] }}</strong><small>{{ $alerta['comuna'] }} · {{ $estadoLabels[$alerta['estado']] }}@if($alerta['riesgo']) · IRTE {{ $alerta['riesgo']['irte'] }}@endif</small></span>
                         <i class="bi bi-chevron-right"></i>
                     </a>
                 @empty
@@ -153,7 +167,7 @@
                 @forelse(array_slice($datos['incidencias_activas'], 0, 7) as $incidencia)
                     <div class="co-list-item">
                         <span class="co-status-bar co-status-bar--{{ $incidencia['severidad'] }}"></span>
-                        <span><strong>{{ $incidencia['label'] }}</strong><small>{{ $incidencia['establecimiento'] }} · {{ $incidencia['comuna'] }}</small></span>
+                        <span><strong>{{ $incidencia['label'] }} @if($incidencia['prioridad_nivel'])<b class="co-priority co-priority--{{ strtolower($incidencia['prioridad_nivel']) }}">{{ $incidencia['prioridad_nivel'] }}</b>@endif</strong><small>{{ $incidencia['establecimiento'] }} · {{ $incidencia['comuna'] }}</small></span>
                     </div>
                 @empty
                     <div class="co-empty"><i class="bi bi-shield-check"></i> No existen incidencias activas.</div>

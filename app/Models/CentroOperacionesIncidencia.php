@@ -19,6 +19,16 @@ class CentroOperacionesIncidencia extends Model
         'tipo',
         'modalidad',
         'severidad',
+        'familia',
+        'impacto',
+        'urgencia',
+        'prioridad_puntaje',
+        'prioridad_nivel',
+        'prioridad_motivo',
+        'irte_snapshot',
+        'riesgo_categoria_snapshot',
+        'matricula_snapshot',
+        'prioridad_calculada_en',
         'descripcion',
         'estado',
         'resuelta_en',
@@ -29,6 +39,12 @@ class CentroOperacionesIncidencia extends Model
     protected $casts = [
         'fecha_incidencia' => 'date',
         'resuelta_en' => 'datetime',
+        'impacto' => 'integer',
+        'urgencia' => 'integer',
+        'prioridad_puntaje' => 'float',
+        'irte_snapshot' => 'integer',
+        'matricula_snapshot' => 'integer',
+        'prioridad_calculada_en' => 'datetime',
     ];
 
     public function reporte(): BelongsTo

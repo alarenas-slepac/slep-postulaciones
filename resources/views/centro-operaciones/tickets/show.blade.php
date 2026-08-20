@@ -58,6 +58,7 @@
         <div><span>Vencimiento</span><strong class="{{ in_array($estadoTicket, ['vencido', 'escalado'], true) ? 'text-danger' : '' }}">{{ $ticket->vence_en ? $ticket->vence_en->format('d/m/Y H:i').' hrs.' : 'Se definirá al asignar' }}</strong></div>
         <div><span>Responsable</span><strong>{{ $ticket->responsable?->nombre_completo ?? 'Sin responsable' }}</strong></div>
         <div><span>Estado</span><strong>{{ $estadoLabel }}</strong></div>
+        <div><span>Prioridad operacional</span><strong>@if($ticket->incidencia->prioridad_nivel)<span class="co-priority co-priority--{{ strtolower($ticket->incidencia->prioridad_nivel) }}">{{ $ticket->incidencia->prioridad_nivel }}</span> {{ number_format($ticket->incidencia->prioridad_puntaje, 1, ',', '.') }} puntos @else Sin calcular @endif</strong></div>
     </div>
 
     <div class="co-grid co-grid--detail">
@@ -71,6 +72,18 @@
                 <div><span><i class="bi bi-card-text"></i> Detalle</span><p>{{ $ticket->incidencia->descripcion ?: 'Sin detalle informado.' }}</p></div>
                 <div><span><i class="bi bi-building"></i> Establecimiento</span><strong>{{ $ticket->incidencia->establecimiento?->nombre_establecimiento ?? 'Sin establecimiento' }}</strong></div>
                 <div><span><i class="bi bi-person-check"></i> Reportado por</span><strong>{{ $ticket->incidencia->reporte?->reportado_por_nombre_visible ?? 'Usuario registrado sin nombre disponible' }}</strong></div>
+                <div><span><i class="bi bi-diagram-3"></i> Familia</span><strong>{{ config("centro_operaciones.familias_incidencia.{$ticket->incidencia->familia}", $ticket->incidencia->familia ?: 'Sin clasificar') }}</strong></div>
+                <div><span><i class="bi bi-shield-check"></i> Contexto IRTE</span><strong>{{ $ticket->incidencia->irte_snapshot !== null ? 'IRTE '.$ticket->incidencia->irte_snapshot.' · '.str_replace('_', ' ', ucfirst($ticket->incidencia->riesgo_categoria_snapshot)) : 'Sin evaluación IRTE vigente al calcular' }}</strong></div>
+            </div>
+        </section>
+
+        <section class="co-card">
+            <div class="co-card-head"><div><span class="co-eyebrow">Explicabilidad</span><h2>Cálculo de prioridad</h2></div><span class="co-priority co-priority--{{ strtolower($ticket->incidencia->prioridad_nivel ?: 'p4') }}">{{ $ticket->incidencia->prioridad_nivel ?: '—' }}</span></div>
+            <div class="co-info-list">
+                <div><span><i class="bi bi-bullseye"></i> Impacto</span><strong>{{ $ticket->incidencia->impacto ? $ticket->incidencia->impacto.'/5' : 'Sin dato' }}</strong></div>
+                <div><span><i class="bi bi-lightning-charge"></i> Urgencia</span><strong>{{ $ticket->incidencia->urgencia ? $ticket->incidencia->urgencia.'/5' : 'Sin dato' }}</strong></div>
+                <div><span><i class="bi bi-people"></i> Matrícula considerada</span><strong>{{ number_format($ticket->incidencia->matricula_snapshot ?? 0, 0, ',', '.') }}</strong></div>
+                <div><span><i class="bi bi-info-circle"></i> Motivo</span><p>{{ $ticket->incidencia->prioridad_motivo ?: 'La prioridad aún no ha sido calculada.' }}</p></div>
             </div>
         </section>
 

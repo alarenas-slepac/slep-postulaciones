@@ -21,6 +21,7 @@ class ReporteService
         private readonly EstadoService $estadoService,
         private readonly IncidenciaCatalogo $incidencias,
         private readonly UnidadOperacionalService $unidades,
+        private readonly ?PrioridadIncidenciaService $prioridades = null,
     ) {
     }
 
@@ -66,6 +67,7 @@ class ReporteService
             return $reporte->fresh($this->relaciones());
         });
 
+        $this->recalcularPrioridades($reporte);
         $this->generarTickets($reporte, $usuario);
 
         return $reporte;
@@ -92,6 +94,7 @@ class ReporteService
             return $reporte->fresh($this->relaciones());
         });
 
+        $this->recalcularPrioridades($reporte);
         $this->generarTickets($reporte, $usuario);
 
         return $reporte;
@@ -419,6 +422,17 @@ class ReporteService
         $reporte->incidencias()->where('estado', 'activa')
             ->whereDoesntHave('ticket')->get()
             ->each(fn (CentroOperacionesIncidencia $incidencia) => $tickets->crearParaIncidencia($incidencia, $usuario));
+    }
+
+    private function recalcularPrioridades(CentroOperacionesReporte $reporte): void
+    {
+        if (! Schema::hasColumn('centro_operaciones_incidencias', 'prioridad_nivel')) {
+            return;
+        }
+
+        $servicio = $this->prioridades ?? app(PrioridadIncidenciaService::class);
+        $reporte->incidencias()->where('estado', 'activa')->get()
+            ->each(fn (CentroOperacionesIncidencia $incidencia) => $servicio->recalcular($incidencia));
     }
 
     /** @return array<int, string> */

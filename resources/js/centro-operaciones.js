@@ -27,12 +27,13 @@ const communeMapFallbacks = new Map([
 ]);
 const stateLabel = { operativo: 'Operativo', alerta: 'Alerta', critico: 'Crítico', sin_reporte: 'Sin reporte' };
 const statePriority = { sin_reporte: 0, operativo: 1, alerta: 2, critico: 3 };
+const riskLabel = { estable: 'Estable', monitoreo: 'Monitoreo', atencion_prioritaria: 'Atención prioritaria', critico: 'Crítico' };
 
-const markerIcon = (state) => {
+const markerIcon = (state, riskCategory) => {
     const size = state === 'critico' ? 20 : 17;
 
     return L.divIcon({
-        className: `co-map-marker co-map-marker--${state}`,
+        className: `co-map-marker co-map-marker--${state} co-map-risk--${riskCategory || 'sin_evaluacion'}`,
         html: '<span></span>',
         iconSize: L.point(size, size),
         iconAnchor: L.point(size / 2, size / 2),
@@ -164,11 +165,14 @@ function initPanel(root) {
             const logo = item.logo_url
                 ? `<div class="co-leaflet-popup-logo"><img src="${escapeHtml(item.logo_url)}" alt="Logo de ${escapeHtml(item.nombre)}"></div>`
                 : '<div class="co-leaflet-popup-logo co-leaflet-popup-logo--fallback"><i class="bi bi-building" aria-hidden="true"></i></div>';
+            const riskText = item.riesgo
+                ? `IRTE ${item.riesgo.irte} · ${riskLabel[item.riesgo.categoria] ?? item.riesgo.categoria}${item.riesgo.vencido ? ' · Evaluación vencida' : ''}`
+                : 'Sin evaluación IRTE';
             L.marker(point, {
-                icon: markerIcon(item.estado),
+                icon: markerIcon(item.estado, item.riesgo?.categoria),
                 coState: item.estado,
                 title: `${item.nombre} · ${stateLabel[item.estado]}`,
-            }).bindPopup(`<div class="co-leaflet-popup"><div class="co-leaflet-popup-header">${logo}<div class="co-leaflet-popup-copy"><strong>${escapeHtml(item.nombre)}</strong><span>${escapeHtml(item.comuna)} · ${escapeHtml(stateLabel[item.estado] ?? item.estado)}</span></div></div>${reportLink}</div>`).addTo(markerLayer);
+            }).bindPopup(`<div class="co-leaflet-popup"><div class="co-leaflet-popup-header">${logo}<div class="co-leaflet-popup-copy"><strong>${escapeHtml(item.nombre)}</strong><span>${escapeHtml(item.comuna)} · ${escapeHtml(stateLabel[item.estado] ?? item.estado)}</span><span>${escapeHtml(riskText)}</span></div></div>${reportLink}</div>`).addTo(markerLayer);
         });
         territoryMapPoints = bounds;
         if (activeMapCommune
@@ -205,14 +209,18 @@ function initPanel(root) {
         if (!target) return;
         target.innerHTML = payload.alertas.length ? payload.alertas.slice(0, 7).map((item) => {
             const href = item.reporte_id ? root.dataset.reportUrl.replace('__ID__', item.reporte_id) : '#';
-            return `<a href="${escapeHtml(href)}" class="co-list-item"><span class="co-status-bar co-status-bar--${item.estado}"></span><span><strong>${escapeHtml(item.nombre)}</strong><small>${escapeHtml(item.comuna)} · ${stateLabel[item.estado]}</small></span><i class="bi bi-chevron-right"></i></a>`;
+            const risk = item.riesgo ? ` · IRTE ${item.riesgo.irte}` : '';
+            return `<a href="${escapeHtml(href)}" class="co-list-item"><span class="co-status-bar co-status-bar--${item.estado}"></span><span><strong>${escapeHtml(item.nombre)}</strong><small>${escapeHtml(item.comuna)} · ${stateLabel[item.estado]}${risk}</small></span><i class="bi bi-chevron-right"></i></a>`;
         }).join('') : '<div class="co-empty"><i class="bi bi-check-circle"></i>No hay establecimientos en alerta o estado crítico.</div>';
     };
 
     const renderIncidents = (payload) => {
         const target = document.querySelector('[data-co-incidents]');
         if (!target) return;
-        target.innerHTML = payload.incidencias_activas.length ? payload.incidencias_activas.slice(0, 7).map((item) => `<div class="co-list-item"><span class="co-status-bar co-status-bar--${item.severidad}"></span><span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.establecimiento)} · ${escapeHtml(item.comuna)}</small></span></div>`).join('') : '<div class="co-empty"><i class="bi bi-shield-check"></i>No existen incidencias activas.</div>';
+        target.innerHTML = payload.incidencias_activas.length ? payload.incidencias_activas.slice(0, 7).map((item) => {
+            const priority = item.prioridad_nivel ? `<b class="co-priority co-priority--${item.prioridad_nivel.toLowerCase()}">${escapeHtml(item.prioridad_nivel)}</b>` : '';
+            return `<div class="co-list-item"><span class="co-status-bar co-status-bar--${item.severidad}"></span><span><strong>${escapeHtml(item.label)} ${priority}</strong><small>${escapeHtml(item.establecimiento)} · ${escapeHtml(item.comuna)}</small></span></div>`;
+        }).join('') : '<div class="co-empty"><i class="bi bi-shield-check"></i>No existen incidencias activas.</div>';
     };
 
     const render = (payload) => { data = payload; renderMetrics(payload); renderCommunes(payload); renderServices(payload); renderAlerts(payload); renderIncidents(payload); renderMap(payload); };

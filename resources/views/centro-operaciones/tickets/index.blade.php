@@ -55,6 +55,7 @@
                     <tr>
                         <th>Ticket</th>
                         <th>Incidencia</th>
+                        <th>Prioridad</th>
                         <th>Establecimiento</th>
                         <th>Responsable / unidad</th>
                         <th>Vencimiento</th>
@@ -85,6 +86,15 @@
                         <td>
                             <div class="co-table-primary">{{ $ticket->incidencia->tipo_label }}</div>
                             <small class="co-table-secondary">{{ ucfirst($ticket->incidencia->severidad ?? 'alerta') }}</small>
+                            @if($ticket->incidencia->familia)<small class="co-table-secondary">{{ config("centro_operaciones.familias_incidencia.{$ticket->incidencia->familia}", $ticket->incidencia->familia) }}</small>@endif
+                        </td>
+                        <td>
+                            @if($ticket->incidencia->prioridad_nivel)
+                                <span class="co-priority co-priority--{{ strtolower($ticket->incidencia->prioridad_nivel) }}">{{ $ticket->incidencia->prioridad_nivel }}</span>
+                                <small class="co-table-secondary">{{ number_format($ticket->incidencia->prioridad_puntaje, 1, ',', '.') }} puntos</small>
+                            @else
+                                <span class="text-muted">Sin calcular</span>
+                            @endif
                         </td>
                         <td>
                             <div class="co-table-primary">{{ $ticket->incidencia->establecimiento?->nombre_establecimiento ?? 'Sin establecimiento' }}</div>
@@ -114,7 +124,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7">
+                        <td colspan="8">
                             <div class="co-empty co-empty--large">
                                 <i class="bi bi-inbox" aria-hidden="true"></i>
                                 <div><strong>No hay tickets en este ámbito</strong><span>Los nuevos tickets asignados aparecerán en esta bandeja.</span></div>

@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -28,8 +29,21 @@ class TicketController extends Controller
     public function index(Request $request): View
     {
         $query = CentroOperacionesTicket::query()
-            ->with(['incidencia.establecimiento', 'responsable', 'segundoResponsable'])
-            ->latest();
+            ->with(['incidencia.establecimiento', 'responsable', 'segundoResponsable']);
+        if (Schema::hasColumn('centro_operaciones_incidencias', 'prioridad_nivel')) {
+            $query->select('centro_operaciones_tickets.*')
+                ->leftJoin(
+                    'centro_operaciones_incidencias as incidencia_prioridad',
+                    'incidencia_prioridad.id',
+                    '=',
+                    'centro_operaciones_tickets.incidencia_id'
+                )
+                ->orderByRaw("CASE incidencia_prioridad.prioridad_nivel WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 WHEN 'P4' THEN 4 ELSE 5 END")
+                ->orderByDesc('incidencia_prioridad.prioridad_puntaje')
+                ->orderBy('centro_operaciones_tickets.vence_en');
+        } else {
+            $query->latest();
+        }
         $this->aplicarAlcance($query, $request);
 
         return view('centro-operaciones.tickets.index', ['tickets' => $query->paginate(25)]);
