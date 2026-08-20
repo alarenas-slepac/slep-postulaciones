@@ -19,9 +19,9 @@
             </div>
         </div>
         <div class="co-hero-actions">
-            @role('admin')
+            @hasanyrole('admin|gabinete_slep')
                 <a class="btn btn-outline-primary" href="{{ route('centro-operaciones.riesgos.configuracion') }}"><i class="bi bi-sliders"></i> Mantenedor IRTE</a>
-            @endrole
+            @endhasanyrole
             <a class="btn btn-outline-secondary" href="{{ route('centro-operaciones.index') }}"><i class="bi bi-arrow-left"></i> Panel</a>
         </div>
     </header>

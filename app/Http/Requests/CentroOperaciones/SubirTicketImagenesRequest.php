@@ -19,8 +19,11 @@ class SubirTicketImagenesRequest extends FormRequest
 
         $ticket->loadMissing('incidencia');
 
-        return $usuario->hasRole('funcionario_directivo_estab')
-            && (int) $usuario->establecimiento_id === (int) $ticket->incidencia?->establecimiento_id;
+        return $usuario->hasRole('gabinete_slep')
+            || (
+                $usuario->hasRole('funcionario_directivo_estab')
+                && (int) $usuario->establecimiento_id === (int) $ticket->incidencia?->establecimiento_id
+            );
     }
 
     public function rules(): array

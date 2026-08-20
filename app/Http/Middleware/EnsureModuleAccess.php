@@ -46,7 +46,7 @@ class EnsureModuleAccess
         if (
             str_starts_with($routeName, 'centro-operaciones.tickets.')
             && method_exists($user, 'hasAnyRole')
-            && $user->hasAnyRole(['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab'])
+            && $user->hasAnyRole(['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'gabinete_slep', 'funcionario_ac', 'funcionario_directivo_estab'])
         ) {
             return $next($request);
         }

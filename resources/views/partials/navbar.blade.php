@@ -36,9 +36,9 @@
                         $canAccessBulkRoleMail = in_array($activeRole, ['admin', 'coordinador_gdp'], true) && Route::has('admin.bulk-role-mail.index');
                         $cargasSolicitanteRoles = (array) config('cargas_familiares.acceso_solicitantes.roles_habilitados', ['funcionario_ac']);
                         $isCargasApplicant = in_array($activeRole, $cargasSolicitanteRoles, true);
-                        $ticketsRoles = ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'funcionario_ac', 'funcionario_directivo_estab'];
+                        $ticketsRoles = ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'gabinete_slep', 'funcionario_ac', 'funcionario_directivo_estab'];
                         $canAccessCentroOperacionesTickets = $u->hasAnyRole($ticketsRoles);
-                        $canManageCentroOperacionesTickets = $u->hasRole('admin');
+                        $canManageCentroOperacionesTickets = $u->hasAnyRole(['admin', 'gabinete_slep']);
                     @endphp
 
                     <li class="nav-item">

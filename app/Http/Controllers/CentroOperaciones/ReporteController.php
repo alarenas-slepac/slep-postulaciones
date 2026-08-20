@@ -28,6 +28,15 @@ class ReporteController extends Controller
 
     public function create(Request $request): View
     {
+        if ($this->gestionaTerritorio($request) && ! $request->filled('establecimiento')) {
+            return view('centro-operaciones.reportes.seleccionar-establecimiento', [
+                'establecimientos' => Establecimiento::query()
+                    ->orderBy('comuna')
+                    ->orderBy('nombre_establecimiento')
+                    ->get(['id', 'rbd', 'nombre_establecimiento', 'comuna']),
+            ]);
+        }
+
         $establecimiento = $this->establecimientoDelUsuario($request);
         $unidadCodigo = $request->filled('unidad') ? (string) $request->string('unidad') : null;
         abort_unless($this->unidades->codigoPermitido($establecimiento, $unidadCodigo), 404);
@@ -168,6 +177,13 @@ class ReporteController extends Controller
 
     private function establecimientoDelUsuario(Request $request): Establecimiento
     {
+        if ($this->gestionaTerritorio($request)) {
+            $establecimientoId = $request->integer('establecimiento_id') ?: $request->integer('establecimiento');
+            abort_unless($establecimientoId > 0, 422, 'Selecciona un establecimiento para gestionar el reporte.');
+
+            return Establecimiento::query()->findOrFail($establecimientoId);
+        }
+
         abort_unless($request->user()?->hasRole(config('centro_operaciones.rol_reporte')), 403);
         abort_unless($request->user()->establecimiento_id, 422, 'El usuario no tiene un establecimiento asociado.');
 
@@ -196,8 +212,17 @@ class ReporteController extends Controller
     {
         $hoy = CarbonImmutable::now(config('centro_operaciones.timezone'))->toDateString();
 
+        if ($this->gestionaTerritorio($request)) {
+            return $reporte->fecha_reporte?->toDateString() === $hoy;
+        }
+
         return $request->user()?->hasRole(config('centro_operaciones.rol_reporte')) === true
             && (int) $request->user()->establecimiento_id === (int) $reporte->establecimiento_id
             && $reporte->fecha_reporte?->toDateString() === $hoy;
+    }
+
+    private function gestionaTerritorio(Request $request): bool
+    {
+        return $request->user()?->hasAnyRole(config('centro_operaciones.roles_gestion_total', [])) === true;
     }
 }

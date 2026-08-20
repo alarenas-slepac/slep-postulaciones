@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\CentroOperaciones;
 
+use App\Models\CentroOperacionesReporte;
 use App\Models\Establecimiento;
 use App\Services\CentroOperaciones\IncidenciaCatalogo;
 use App\Services\CentroOperaciones\UnidadOperacionalService;
@@ -12,7 +13,8 @@ class GuardarReporteRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasRole(config('centro_operaciones.rol_reporte')) === true;
+        return $this->user()?->hasRole(config('centro_operaciones.rol_reporte')) === true
+            || $this->user()?->hasAnyRole(config('centro_operaciones.roles_gestion_total', [])) === true;
     }
 
     /** @return array<string, mixed> */
@@ -30,14 +32,21 @@ class GuardarReporteRequest extends FormRequest
             ->filter(fn (array $incidencia) => (bool) ($incidencia['automatic'] ?? false))
             ->keys()
             ->all();
-        $establecimiento = $this->user()?->establecimiento_id
-            ? Establecimiento::query()->find($this->user()->establecimiento_id)
+        $establecimientoId = $this->establecimientoIdGestionado();
+        $establecimiento = $establecimientoId
+            ? Establecimiento::query()->find($establecimientoId)
             : null;
         $unidadesPermitidas = $establecimiento
             ? app(UnidadOperacionalService::class)->paraEstablecimiento($establecimiento)->keys()->all()
             : [];
 
         $reglas = [
+            'establecimiento_id' => [
+                Rule::requiredIf(fn () => $this->gestionaTerritorio() && ! $this->route('reporte')),
+                'nullable',
+                'integer',
+                Rule::exists('establecimientos', 'id'),
+            ],
             'unidad_codigo' => ['nullable', 'string', Rule::in($unidadesPermitidas)],
             'funcionamiento' => ['required', Rule::in(array_keys(config('centro_operaciones.funcionamientos', [])))],
             'fecha_control_plagas' => ['nullable', 'date_format:Y-m-d'],
@@ -60,7 +69,7 @@ class GuardarReporteRequest extends FormRequest
                 'integer',
                 'distinct',
                 Rule::exists('centro_operaciones_incidencias', 'id')->where(fn ($query) => $query
-                    ->where('establecimiento_id', $this->user()?->establecimiento_id)
+                    ->where('establecimiento_id', $establecimientoId)
                     ->where('unidad_codigo', $this->input('unidad_codigo') ?: null)
                     ->whereNotIn('tipo', $incidenciasAutomaticas)
                     ->where('estado', 'activa')),
@@ -108,5 +117,28 @@ class GuardarReporteRequest extends FormRequest
                 );
             }
         });
+    }
+
+    private function gestionaTerritorio(): bool
+    {
+        return $this->user()?->hasAnyRole(config('centro_operaciones.roles_gestion_total', [])) === true;
+    }
+
+    private function establecimientoIdGestionado(): ?int
+    {
+        $reporte = $this->route('reporte');
+        if ($reporte instanceof CentroOperacionesReporte) {
+            return (int) $reporte->establecimiento_id;
+        }
+
+        if ($this->gestionaTerritorio()) {
+            $establecimientoId = $this->integer('establecimiento_id');
+
+            return $establecimientoId > 0 ? $establecimientoId : null;
+        }
+
+        $establecimientoId = (int) ($this->user()?->establecimiento_id ?? 0);
+
+        return $establecimientoId > 0 ? $establecimientoId : null;
     }
 }

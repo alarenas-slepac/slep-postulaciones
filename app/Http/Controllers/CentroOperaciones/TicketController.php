@@ -20,7 +20,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TicketController extends Controller
 {
-    private const ROLES_TODOS = ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones'];
+    private const ROLES_TODOS = ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'gabinete_slep'];
 
     public function __construct(private readonly TicketDocumentoService $documentos)
     {
@@ -193,8 +193,11 @@ class TicketController extends Controller
         $usuario = $request->user();
         $ticket->loadMissing('incidencia');
 
-        return $usuario->hasRole('funcionario_directivo_estab')
-            && (int) $usuario->establecimiento_id === (int) $ticket->incidencia?->establecimiento_id;
+        return $usuario->hasRole('gabinete_slep')
+            || (
+                $usuario->hasRole('funcionario_directivo_estab')
+                && (int) $usuario->establecimiento_id === (int) $ticket->incidencia?->establecimiento_id
+            );
     }
 
     private function puedeResolver(Request $request, CentroOperacionesTicket $ticket): bool
