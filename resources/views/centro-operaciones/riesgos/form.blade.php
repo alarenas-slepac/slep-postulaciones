@@ -16,7 +16,7 @@
             <div>
                 <div class="co-eyebrow">Evaluación de riesgo institucional</div>
                 <h1>{{ $establecimiento->nombre_establecimiento }}</h1>
-                <p>{{ $establecimiento->comuna }} · RBD {{ $establecimiento->rbd }} · Matrícula {{ number_format($establecimiento->matricula_total ?? 0, 0, ',', '.') }}</p>
+                <p>{{ $establecimiento->comuna }} · RBD {{ $establecimiento->rbd }} · Matrícula {{ number_format($matricula['total'], 0, ',', '.') }}</p>
             </div>
         </div>
         <div class="co-hero-actions"><span class="co-date-chip">Modelo IRTE {{ $modelo->version }}</span><a class="btn btn-outline-secondary" href="{{ route('centro-operaciones.riesgos.index') }}"><i class="bi bi-arrow-left"></i> Volver</a></div>

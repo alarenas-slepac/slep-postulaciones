@@ -19,7 +19,7 @@ class DatosBaseService
     public function matriculasPara(Collection $establecimientos, int $anio): array
     {
         $ids = $establecimientos->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $cursos = empty($ids)
+        $cursos = empty($ids) || ! Schema::hasTable('establecimiento_cursos')
             ? collect()
             : EstablecimientoCurso::query()
                 ->whereIn('establecimiento_id', $ids)
@@ -30,7 +30,7 @@ class DatosBaseService
                 ->pluck('total', 'establecimiento_id');
 
         return $establecimientos->mapWithKeys(function (Establecimiento $establecimiento) use ($cursos) {
-            if ($establecimiento->matricula_total !== null) {
+            if ((int) ($establecimiento->matricula_total ?? 0) > 0) {
                 return [$establecimiento->id => [
                     'total' => (int) $establecimiento->matricula_total,
                     'fuente' => 'establecimientos.matricula_total',

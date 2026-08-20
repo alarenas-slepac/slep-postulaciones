@@ -51,7 +51,7 @@
                     <tr>
                         <td><strong>{{ $establecimiento->nombre_establecimiento }}</strong><small class="d-block text-muted">RBD {{ $establecimiento->rbd }}</small></td>
                         <td>{{ $establecimiento->comuna ?: 'Sin comuna' }}</td>
-                        <td>{{ number_format($establecimiento->matricula_total ?? 0, 0, ',', '.') }}</td>
+                        <td>{{ number_format($matriculas[$establecimiento->id]['total'] ?? 0, 0, ',', '.') }}</td>
                         <td><strong class="co-irte-value">{{ $evaluacion?->irte ?? '—' }}</strong></td>
                         <td>@if($evaluacion)<span class="co-risk-badge co-risk-badge--{{ $evaluacion->categoria }}">{{ $evaluacion->categoria_label }}</span>@else<span class="co-risk-badge co-risk-badge--sin_evaluacion">Sin evaluación</span>@endif</td>
                         <td>@if($evaluacion?->vigente_hasta)<span class="{{ $evaluacion->esta_vencida ? 'text-danger fw-semibold' : '' }}">{{ $evaluacion->vigente_hasta->format('d/m/Y') }}</span>@else—@endif</td>

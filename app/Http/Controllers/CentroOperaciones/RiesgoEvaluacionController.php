@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CentroOperacionesRiesgoEvaluacion;
 use App\Models\CentroOperacionesRiesgoModelo;
 use App\Models\Establecimiento;
+use App\Services\CentroOperaciones\DatosBaseService;
 use App\Services\CentroOperaciones\RiesgoService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,8 +15,10 @@ use Illuminate\View\View;
 
 class RiesgoEvaluacionController extends Controller
 {
-    public function __construct(private readonly RiesgoService $riesgos)
-    {
+    public function __construct(
+        private readonly RiesgoService $riesgos,
+        private readonly DatosBaseService $datosBase,
+    ) {
     }
 
     public function index(Request $request): View
@@ -38,6 +41,10 @@ class RiesgoEvaluacionController extends Controller
             ->paginate(25)
             ->withQueryString();
         $comunas = Establecimiento::query()->whereNotNull('comuna')->distinct()->orderBy('comuna')->pluck('comuna');
+        $matriculas = $this->datosBase->matriculasPara(
+            $establecimientos->getCollection(),
+            now(config('centro_operaciones.timezone'))->year
+        );
         $ultimas = CentroOperacionesRiesgoEvaluacion::query()
             ->where('estado', 'publicado')
             ->latest('fecha_evaluacion')
@@ -52,7 +59,12 @@ class RiesgoEvaluacionController extends Controller
             'sin_evaluacion' => max(0, Establecimiento::query()->count() - $ultimas->count()),
         ];
 
-        return view('centro-operaciones.riesgos.index', compact('establecimientos', 'comunas', 'metricas'));
+        return view('centro-operaciones.riesgos.index', compact(
+            'establecimientos',
+            'comunas',
+            'matriculas',
+            'metricas'
+        ));
     }
 
     public function create(Establecimiento $establecimiento): View
@@ -71,8 +83,18 @@ class RiesgoEvaluacionController extends Controller
             ->where('estado', 'borrador')
             ->latest('id')
             ->first();
+        $matricula = $this->datosBase->matriculasPara(
+            collect([$establecimiento]),
+            now(config('centro_operaciones.timezone'))->year
+        )[$establecimiento->id];
 
-        return view('centro-operaciones.riesgos.form', compact('establecimiento', 'modelo', 'historial', 'borrador'));
+        return view('centro-operaciones.riesgos.form', compact(
+            'establecimiento',
+            'modelo',
+            'historial',
+            'borrador',
+            'matricula'
+        ));
     }
 
     public function store(Request $request, Establecimiento $establecimiento): RedirectResponse
