@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.8.20.405' => [
+        'date' => '2026-08-20',
+        'module' => 'Remuneraciones',
+        'title' => 'Búsqueda de funcionarios por RUT en Descuentos CGR',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Http/Requests/Remuneraciones/GuardarDescuentoCgrRequest.php',
+            'app/Services/Remuneraciones/ReemplazoPersonalRutService.php',
+            'config/changelog.php',
+            'resources/views/remuneraciones/descuentos-cgr/form.blade.php',
+            'routes/web.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Permite buscar al funcionario por RUT con o sin puntos desde el formulario de un nuevo descuento CGR.',
+            'Normaliza el RUT al formato XXXXXXXX-X utilizado en reemplazos_personal y completa el nombre desde el registro más reciente de la persona.',
+            'Valida nuevamente el padrón al guardar para impedir que el nombre sea alterado desde el navegador.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.8.20.404' => [
         'date' => '2026-08-20',
         'module' => 'Remuneraciones',

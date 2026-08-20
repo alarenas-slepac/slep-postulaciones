@@ -30,7 +30,7 @@ class GuardarDescuentoCgrRequest extends FormRequest
 
         return [
             'rut' => ['required', 'string', 'max:12'],
-            'nombre' => ['required', 'string', 'max:255'],
+            'nombre' => ['nullable', 'string', 'max:255'],
             'numero_resolucion' => ['required', 'string', 'max:100'],
             'fecha_resolucion' => ['nullable', 'date'],
             'deuda_definitiva_pesos' => ['required', 'integer', 'min:1'],

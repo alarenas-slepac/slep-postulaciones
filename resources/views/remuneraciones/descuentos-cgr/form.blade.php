@@ -29,11 +29,18 @@
                 <div class="card-body row g-3">
                     <div class="col-md-4">
                         <label for="rut" class="form-label">RUT <span class="text-danger">*</span></label>
-                        <input id="rut" name="rut" class="form-control @error('rut') is-invalid @enderror" value="{{ $valor('rut') }}" required maxlength="12" placeholder="12.345.678-5">
+                        <div class="input-group">
+                            <input id="rut" name="rut" class="form-control @error('rut') is-invalid @enderror" value="{{ $valor('rut') }}" required maxlength="12" placeholder="12.345.678-5" autocomplete="off">
+                            <button id="buscar-funcionario" type="button" class="btn btn-outline-primary" data-url="{{ route('descuentos-cgr.funcionario.buscar') }}">
+                                <i class="bi bi-search me-1"></i>Buscar
+                            </button>
+                        </div>
+                        <div id="funcionario-feedback" class="form-text" aria-live="polite">Ingresa el RUT con o sin puntos y presiona Buscar.</div>
                     </div>
                     <div class="col-md-8">
                         <label for="nombre" class="form-label">Nombre completo <span class="text-danger">*</span></label>
-                        <input id="nombre" name="nombre" class="form-control @error('nombre') is-invalid @enderror" value="{{ $valor('nombre') }}" required maxlength="255">
+                        <input id="nombre" name="nombre" class="form-control @error('nombre') is-invalid @enderror" value="{{ $valor('nombre') }}" required maxlength="255" readonly>
+                        <div class="form-text">Se completa desde el registro más reciente del RUT en reemplazos personal.</div>
                     </div>
                     <div class="col-md-4">
                         <label for="numero_resolucion" class="form-label">N° dictamen o resolución <span class="text-danger">*</span></label>
@@ -96,3 +103,74 @@
         </form>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const rutInput = document.getElementById('rut');
+    const nombreInput = document.getElementById('nombre');
+    const buscarButton = document.getElementById('buscar-funcionario');
+    const feedback = document.getElementById('funcionario-feedback');
+
+    if (!rutInput || !nombreInput || !buscarButton || !feedback) return;
+
+    let rutResuelto = rutInput.value.trim();
+
+    const mostrarEstado = (mensaje, tipo = 'muted') => {
+        feedback.textContent = mensaje;
+        feedback.className = `form-text text-${tipo}`;
+    };
+
+    const buscar = async () => {
+        const rut = rutInput.value.trim();
+        if (!rut) {
+            nombreInput.value = '';
+            mostrarEstado('Ingresa un RUT antes de buscar.', 'danger');
+            rutInput.focus();
+            return;
+        }
+
+        buscarButton.disabled = true;
+        mostrarEstado('Buscando funcionario...', 'muted');
+
+        try {
+            const url = new URL(buscarButton.dataset.url, window.location.origin);
+            url.searchParams.set('rut', rut);
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(payload.message || 'No fue posible buscar el funcionario.');
+            }
+
+            rutInput.value = payload.rut;
+            nombreInput.value = payload.nombre;
+            rutResuelto = payload.rut;
+            mostrarEstado(`Funcionario encontrado en el padrón ${payload.periodo}.`, 'success');
+        } catch (error) {
+            nombreInput.value = '';
+            mostrarEstado(error.message || 'No fue posible buscar el funcionario.', 'danger');
+        } finally {
+            buscarButton.disabled = false;
+        }
+    };
+
+    rutInput.addEventListener('input', () => {
+        if (rutInput.value.trim() !== rutResuelto) {
+            nombreInput.value = '';
+            mostrarEstado('Presiona Buscar para validar el RUT y completar el nombre.', 'muted');
+        }
+    });
+    rutInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            buscar();
+        }
+    });
+    buscarButton.addEventListener('click', buscar);
+});
+</script>
+@endpush

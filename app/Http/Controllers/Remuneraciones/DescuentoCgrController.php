@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
+use App\Services\Remuneraciones\ReemplazoPersonalRutService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class DescuentoCgrController extends Controller
@@ -53,9 +56,9 @@ class DescuentoCgrController extends Controller
         return view('remuneraciones.descuentos-cgr.form', ['descuentoCgr' => new DescuentoCgr]);
     }
 
-    public function store(GuardarDescuentoCgrRequest $request): RedirectResponse
+    public function store(GuardarDescuentoCgrRequest $request, ReemplazoPersonalRutService $funcionarios): RedirectResponse
     {
-        $data = $this->datosPersistencia($request);
+        $data = $this->datosPersistencia($request, $funcionarios);
         $data += $this->guardarPdf($request);
         $data += ['creado_por_id' => $request->user()->id, 'actualizado_por_id' => $request->user()->id];
 
@@ -78,9 +81,32 @@ class DescuentoCgrController extends Controller
         return view('remuneraciones.descuentos-cgr.form', compact('descuentoCgr'));
     }
 
-    public function update(GuardarDescuentoCgrRequest $request, DescuentoCgr $descuentoCgr): RedirectResponse
+    public function buscarFuncionario(Request $request, ReemplazoPersonalRutService $funcionarios): JsonResponse
     {
-        $data = $this->datosPersistencia($request);
+        $data = $request->validate(['rut' => ['required', 'string', 'max:30']]);
+        $rutNormalizado = $funcionarios->normalizar($data['rut']);
+
+        if (! $rutNormalizado) {
+            return response()->json(['message' => 'El RUT ingresado no es válido.'], 422);
+        }
+
+        $funcionario = $funcionarios->buscar($rutNormalizado);
+        if (! $funcionario) {
+            return response()->json([
+                'message' => 'No se encontró el RUT en el padrón de reemplazos personal.',
+                'rut' => $rutNormalizado,
+            ], 404);
+        }
+
+        return response()->json($funcionario);
+    }
+
+    public function update(
+        GuardarDescuentoCgrRequest $request,
+        DescuentoCgr $descuentoCgr,
+        ReemplazoPersonalRutService $funcionarios
+    ): RedirectResponse {
+        $data = $this->datosPersistencia($request, $funcionarios, $descuentoCgr);
         $data['actualizado_por_id'] = $request->user()->id;
 
         if ($request->hasFile('resolucion_pdf')) {
@@ -104,9 +130,32 @@ class DescuentoCgrController extends Controller
         );
     }
 
-    private function datosPersistencia(GuardarDescuentoCgrRequest $request): array
-    {
-        return Arr::except($request->validated(), ['resolucion_pdf']);
+    private function datosPersistencia(
+        GuardarDescuentoCgrRequest $request,
+        ReemplazoPersonalRutService $funcionarios,
+        ?DescuentoCgr $existente = null
+    ): array {
+        $data = Arr::except($request->validated(), ['resolucion_pdf']);
+        $funcionario = $funcionarios->buscar($data['rut']);
+
+        if ($funcionario) {
+            $data['rut'] = $funcionario['rut'];
+            $data['nombre'] = $funcionario['nombre'];
+
+            return $data;
+        }
+
+        $rutNormalizado = $funcionarios->normalizar($data['rut']);
+        if ($existente && $rutNormalizado === $funcionarios->normalizar($existente->rut)) {
+            $data['rut'] = $rutNormalizado;
+            $data['nombre'] = $existente->nombre;
+
+            return $data;
+        }
+
+        throw ValidationException::withMessages([
+            'rut' => 'No se encontró el RUT en el padrón de reemplazos personal.',
+        ]);
     }
 
     private function guardarPdf(GuardarDescuentoCgrRequest $request): array
