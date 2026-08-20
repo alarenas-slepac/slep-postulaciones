@@ -9,7 +9,7 @@
         body { margin: 0; color: #202938; font-family: DejaVu Sans, sans-serif; font-size: 10px; line-height: 1.45; }
         .header { border-bottom: 2px solid #184a78; margin-bottom: 18px; padding-bottom: 10px; width: 100%; }
         .header td { vertical-align: middle; }
-        .logo { max-height: 72px; width: 215px; }
+        .logo { height: auto; width: 80px; }
         .header-title { text-align: right; }
         h1 { color: #184a78; font-size: 19px; margin: 0 0 4px; }
         h2 { color: #184a78; font-size: 11px; margin: 0 0 8px; text-transform: uppercase; }
