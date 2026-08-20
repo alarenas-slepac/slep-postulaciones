@@ -119,6 +119,8 @@ class ConsolidadoService
             $activas = $incidenciasPorContexto->get($contexto['clave'], collect());
             /** @var CentroOperacionesRiesgoEvaluacion|null $riesgo */
             $riesgo = $riesgos->get($establecimiento->id);
+            $riesgoVencido = $riesgo?->vigente_hasta?->isBefore($fecha) ?? false;
+            $riesgoActivo = $riesgo !== null && ! $riesgoVencido;
             $estado = $reporte ? $this->estadoService->paraReporte($reporte, $activas) : 'sin_reporte';
             $matriculaBase = $unidadCodigo
                 ? (int) ($unidad['matricula_total'] ?? 0)
@@ -154,11 +156,13 @@ class ConsolidadoService
                 'riesgo' => $riesgo ? [
                     'evaluacion_id' => $riesgo->id,
                     'irte' => $riesgo->irte,
+                    'puntaje' => $riesgoActivo ? (int) $riesgo->irte : 0,
+                    'activa' => $riesgoActivo,
                     'categoria' => $riesgo->categoria,
                     'categoria_label' => $riesgo->categoria_label,
                     'alerta' => $riesgo->alerta,
                     'vigente_hasta' => $riesgo->vigente_hasta?->toDateString(),
-                    'vencido' => $riesgo->vigente_hasta?->isBefore($fecha) ?? false,
+                    'vencido' => $riesgoVencido,
                 ] : null,
                 'unidad_codigo' => $unidadCodigo,
                 'servicios' => $reporte?->servicios->mapWithKeys(fn ($servicio) => [
