@@ -11,6 +11,13 @@ use Illuminate\Support\Facades\Schema;
 
 class PrioridadIncidenciaService
 {
+    /** @var array<int, array{total:int,fuente:string}>|null */
+    private ?array $matriculasTerritoriales = null;
+
+    public function __construct(private readonly DatosBaseService $datosBase)
+    {
+    }
+
     /** @return array<string, mixed> */
     public function recalcular(CentroOperacionesIncidencia $incidencia): array
     {
@@ -22,8 +29,9 @@ class PrioridadIncidenciaService
         $urgencia = (int) ($configuracion?->urgencia_base ?: ($incidencia->severidad === 'critico' ? 5 : 3));
         $evaluacion = $this->evaluacionVigente((int) $incidencia->establecimiento_id);
         $irteCalculo = (int) ($evaluacion?->irte ?? 50);
-        $matricula = (int) ($incidencia->establecimiento?->matricula_total ?? 0);
-        $exposicion = $this->percentilMatricula($matricula);
+        $matriculas = $this->matriculasTerritoriales();
+        $matricula = (int) ($matriculas[(int) $incidencia->establecimiento_id]['total'] ?? 0);
+        $exposicion = $this->percentilMatricula($matricula, $matriculas);
         $slaHoras = (int) ($configuracion?->sla_horas ?: (($configuracion?->plazo_dias ?: 4) * 24));
         $antiguedad = min(100, max(0, $this->horasTranscurridas($incidencia) / max(1, $slaHoras) * 100));
 
@@ -108,24 +116,40 @@ class PrioridadIncidenciaService
             ->first();
     }
 
-    private function percentilMatricula(int $matricula): float
+    /**
+     * @param  array<int, array{total:int,fuente:string}>  $matriculas
+     */
+    private function percentilMatricula(int $matricula, array $matriculas): float
     {
-        if ($matricula <= 0 || ! Schema::hasColumn('establecimientos', 'matricula_total')) {
+        if ($matricula <= 0) {
             return 0;
         }
 
-        $total = Establecimiento::query()->whereNotNull('matricula_total')->where('matricula_total', '>', 0)->count();
-        if ($total === 0) {
+        $totales = collect($matriculas)
+            ->pluck('total')
+            ->map(fn ($total) => (int) $total)
+            ->filter(fn (int $total) => $total > 0);
+        if ($totales->isEmpty()) {
             return 0;
         }
 
-        $hasta = Establecimiento::query()
-            ->whereNotNull('matricula_total')
-            ->where('matricula_total', '>', 0)
-            ->where('matricula_total', '<=', $matricula)
-            ->count();
+        $hasta = $totales->filter(fn (int $total) => $total <= $matricula)->count();
 
-        return round($hasta / $total * 100, 2);
+        return round($hasta / $totales->count() * 100, 2);
+    }
+
+    /** @return array<int, array{total:int,fuente:string}> */
+    private function matriculasTerritoriales(): array
+    {
+        if ($this->matriculasTerritoriales === null) {
+            $establecimientos = Establecimiento::query()->get(['id', 'matricula_total']);
+            $this->matriculasTerritoriales = $this->datosBase->matriculasPara(
+                $establecimientos,
+                now(config('centro_operaciones.timezone'))->year
+            );
+        }
+
+        return $this->matriculasTerritoriales;
     }
 
     private function horasTranscurridas(CentroOperacionesIncidencia $incidencia): float

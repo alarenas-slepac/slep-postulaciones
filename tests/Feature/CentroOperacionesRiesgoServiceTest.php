@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\CentroOperacionesIncidencia;
 use App\Models\CentroOperacionesRiesgoEvaluacion;
 use App\Models\CentroOperacionesRiesgoModelo;
+use App\Models\Establecimiento;
+use App\Services\CentroOperaciones\DatosBaseService;
 use App\Services\CentroOperaciones\PrioridadIncidenciaService;
 use App\Services\CentroOperaciones\RiesgoService;
 use Illuminate\Database\Schema\Blueprint;
@@ -33,6 +35,7 @@ class CentroOperacionesRiesgoServiceTest extends TestCase
             'centro_operaciones_incidencias',
             'centro_operaciones_incidente_configuraciones',
             'centro_operaciones_reportes',
+            'establecimiento_cursos',
             'establecimientos',
             'users',
         ] as $tabla) {
@@ -151,6 +154,61 @@ class CentroOperacionesRiesgoServiceTest extends TestCase
         $this->assertStringContainsString('regla crítica', $resultado['prioridad_motivo']);
     }
 
+    public function test_matricula_cero_usa_la_suma_de_cursos_activos_del_anio(): void
+    {
+        DB::table('establecimientos')->insert([
+            ['id' => 1, 'nombre_establecimiento' => 'Escuela con cursos', 'rbd' => 1, 'comuna' => 'Lota', 'matricula_total' => 0],
+            ['id' => 2, 'nombre_establecimiento' => 'Escuela con ficha', 'rbd' => 2, 'comuna' => 'Coronel', 'matricula_total' => 200],
+        ]);
+        DB::table('establecimiento_cursos')->insert([
+            ['establecimiento_id' => 1, 'anio' => now()->year, 'matricula' => 80, 'activo' => true],
+            ['establecimiento_id' => 1, 'anio' => now()->year, 'matricula' => 70, 'activo' => true],
+            ['establecimiento_id' => 1, 'anio' => now()->year, 'matricula' => 50, 'activo' => false],
+            ['establecimiento_id' => 1, 'anio' => now()->subYear()->year, 'matricula' => 100, 'activo' => true],
+        ]);
+
+        $establecimientos = Establecimiento::query()->whereIn('id', [1, 2])->get();
+        $matriculas = app(DatosBaseService::class)->matriculasPara($establecimientos, now()->year);
+
+        $this->assertSame(['total' => 150, 'fuente' => 'cursos_activos'], $matriculas[1]);
+        $this->assertSame(['total' => 200, 'fuente' => 'establecimientos.matricula_total'], $matriculas[2]);
+
+        DB::table('centro_operaciones_reportes')->insert(['id' => 1, 'establecimiento_id' => 1]);
+        DB::table('centro_operaciones_incidente_configuraciones')->insert([
+            'tipo' => 'otro',
+            'nombre' => 'Otra incidencia',
+            'severidad' => 'alerta',
+            'familia' => 'otra',
+            'impacto_base' => 3,
+            'urgencia_base' => 3,
+            'prioridad_minima' => 'P3',
+            'plazo_dias' => 4,
+            'sla_horas' => 96,
+            'forzar_p1' => false,
+            'activo' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('centro_operaciones_incidencias')->insert([
+            'id' => 1,
+            'reporte_id' => 1,
+            'establecimiento_id' => 1,
+            'fecha_incidencia' => now()->toDateString(),
+            'tipo' => 'otro',
+            'severidad' => 'alerta',
+            'estado' => 'activa',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $resultado = app(PrioridadIncidenciaService::class)->recalcular(
+            CentroOperacionesIncidencia::query()->findOrFail(1)
+        );
+
+        $this->assertSame(150, $resultado['matricula_snapshot']);
+        $this->assertStringContainsString('matrícula 150', $resultado['prioridad_motivo']);
+    }
+
     private function crearPrerequisitos(): void
     {
         Schema::create('users', function (Blueprint $table) {
@@ -167,6 +225,13 @@ class CentroOperacionesRiesgoServiceTest extends TestCase
         Schema::create('centro_operaciones_reportes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('establecimiento_id');
+        });
+        Schema::create('establecimiento_cursos', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('establecimiento_id');
+            $table->unsignedSmallInteger('anio');
+            $table->unsignedSmallInteger('matricula')->default(0);
+            $table->boolean('activo')->default(true);
         });
         Schema::create('centro_operaciones_incidente_configuraciones', function (Blueprint $table) {
             $table->id();

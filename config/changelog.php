@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.20.400' => [
+        'date' => '2026-08-20',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Matrícula de cursos como respaldo en riesgo IRTE',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/RiesgoEvaluacionController.php',
+            'app/Services/CentroOperaciones/DatosBaseService.php',
+            'app/Services/CentroOperaciones/PrioridadIncidenciaService.php',
+            'config/changelog.php',
+            'resources/views/centro-operaciones/riesgos/form.blade.php',
+            'resources/views/centro-operaciones/riesgos/index.blade.php',
+            'tests/Feature/CentroOperacionesRiesgoServiceTest.php',
+        ],
+        'changes' => [
+            'Usa la suma de matrícula de los cursos activos del año cuando la ficha del establecimiento no tiene matrícula o contiene cero.',
+            'Aplica la misma fuente de respaldo en el listado y formulario IRTE y en el cálculo territorial de prioridad de incidencias.',
+        ],
+        'roles' => ['Usuarios con acceso al Centro de Operaciones'],
+    ],
     '2026.8.20.399' => [
         'date' => '2026-08-20',
         'module' => 'Centro de Operaciones',
