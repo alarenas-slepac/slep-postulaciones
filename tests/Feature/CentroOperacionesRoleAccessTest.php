@@ -49,4 +49,19 @@ class CentroOperacionesRoleAccessTest extends TestCase
         $this->assertContains('Mensajes', $labels);
         $this->assertSame('Gabinete SLEP', User::roleContextLabels()['gabinete_slep']);
     }
+
+    public function test_risk_routes_separate_viewers_evaluators_and_maintainer(): void
+    {
+        $index = app('router')->getRoutes()->getByName('centro-operaciones.riesgos.index');
+        $evaluar = app('router')->getRoutes()->getByName('centro-operaciones.riesgos.evaluar');
+        $configurar = app('router')->getRoutes()->getByName('centro-operaciones.riesgos.configuracion');
+
+        $this->assertNotNull($index);
+        $this->assertNotNull($evaluar);
+        $this->assertNotNull($configurar);
+        $this->assertStringContainsString('comunicaciones', implode('|', $index->gatherMiddleware()));
+        $this->assertStringContainsString('gabinete_slep', implode('|', $evaluar->gatherMiddleware()));
+        $this->assertStringNotContainsString('comunicaciones', implode('|', $evaluar->gatherMiddleware()));
+        $this->assertStringContainsString('ensure.role:admin', implode('|', $configurar->gatherMiddleware()));
+    }
 }

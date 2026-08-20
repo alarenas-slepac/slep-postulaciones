@@ -13,18 +13,32 @@ class CentroOperacionesIncidenteConfiguracion extends Model
         'tipo',
         'nombre',
         'severidad',
+        'familia',
+        'riesgo_dimension_codigo',
+        'impacto_base',
+        'urgencia_base',
+        'prioridad_minima',
         'unidad_departamento',
         'subdireccion_dependencia',
         'responsable_funcionario_ac_id',
         'segunda_subdireccion_responsable',
         'segundo_responsable_funcionario_ac_id',
         'plazo_dias',
+        'sla_horas',
+        'forzar_p1',
         'activo',
     ];
 
     protected function casts(): array
     {
-        return ['activo' => 'boolean', 'plazo_dias' => 'integer'];
+        return [
+            'activo' => 'boolean',
+            'plazo_dias' => 'integer',
+            'sla_horas' => 'integer',
+            'impacto_base' => 'integer',
+            'urgencia_base' => 'integer',
+            'forzar_p1' => 'boolean',
+        ];
     }
 
     public function responsable(): BelongsTo

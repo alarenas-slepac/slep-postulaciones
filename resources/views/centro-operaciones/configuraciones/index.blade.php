@@ -31,6 +31,9 @@
             <a href="{{ route('centro-operaciones.tickets.index') }}" class="btn btn-outline-primary">
                 <i class="bi bi-ticket-detailed me-1"></i> Ver tickets
             </a>
+            <a href="{{ route('centro-operaciones.riesgos.configuracion') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-shield-check me-1"></i> Mantenedor IRTE
+            </a>
         </div>
     </header>
 
@@ -162,6 +165,18 @@
                         </div>
                     </div>
                 </div>
+                <div class="co-incident-classification mt-3">
+                    <div class="co-section-inline-title"><i class="bi bi-diagram-3"></i><div><strong>Clasificación y prioridad</strong><small>Estos valores determinan la prioridad operacional del ticket.</small></div></div>
+                    <div class="row g-3">
+                        <div class="col-lg-3"><label class="form-label fw-semibold">Familia</label><select name="familia" class="form-select" required>@foreach($familias as $codigo => $label)<option value="{{ $codigo }}" @selected(old('form_context') === 'create' && old('familia', 'otra') === $codigo)>{{ $label }}</option>@endforeach</select></div>
+                        <div class="col-lg-3"><label class="form-label fw-semibold">Dimensión IRTE relacionada</label><select name="riesgo_dimension_codigo" class="form-select"><option value="">Sin dimensión específica</option>@foreach($dimensionesRiesgo as $dimension)<option value="{{ $dimension->codigo }}" @selected(old('form_context') === 'create' && old('riesgo_dimension_codigo') === $dimension->codigo)>{{ $dimension->nombre }}</option>@endforeach</select></div>
+                        <div class="col-lg-1"><label class="form-label fw-semibold">Impacto</label><input name="impacto_base" type="number" min="1" max="5" class="form-control" value="{{ old('form_context') === 'create' ? old('impacto_base', 3) : 3 }}" required></div>
+                        <div class="col-lg-1"><label class="form-label fw-semibold">Urgencia</label><input name="urgencia_base" type="number" min="1" max="5" class="form-control" value="{{ old('form_context') === 'create' ? old('urgencia_base', 3) : 3 }}" required></div>
+                        <div class="col-lg-2"><label class="form-label fw-semibold">Prioridad mínima</label><select name="prioridad_minima" class="form-select" required>@foreach(config('centro_operaciones.prioridades_incidencia') as $codigo => $label)<option value="{{ $codigo }}" @selected(old('prioridad_minima', 'P3') === $codigo)>{{ $codigo }} · {{ $label }}</option>@endforeach</select></div>
+                        <div class="col-lg-2"><label class="form-label fw-semibold">SLA (horas)</label><input name="sla_horas" type="number" min="1" max="8760" class="form-control" value="{{ old('form_context') === 'create' ? old('sla_horas') : '' }}" placeholder="Usa plazo en días"></div>
+                        <div class="col-12"><input type="hidden" name="forzar_p1" value="0"><div class="form-check"><input id="nueva-incidencia-forzar-p1" class="form-check-input" type="checkbox" name="forzar_p1" value="1" @checked(old('form_context') === 'create' && old('forzar_p1'))><label class="form-check-label" for="nueva-incidencia-forzar-p1">Forzar P1 cuando la incidencia sea crítica</label></div></div>
+                    </div>
+                </div>
             </div>
         </form>
     </div>
@@ -290,6 +305,18 @@
                                         @endforeach
                                     </select>
                                 </div>
+                            </div>
+                        </div>
+                        <div class="co-incident-classification mt-3">
+                            <div class="co-section-inline-title"><i class="bi bi-diagram-3"></i><div><strong>Clasificación y prioridad</strong><small>Contexto usado para calcular P1–P4.</small></div></div>
+                            <div class="row g-3">
+                                <div class="col-lg-3"><label class="form-label fw-semibold">Familia</label><select name="familia" class="form-select" required>@foreach($familias as $codigo => $label)<option value="{{ $codigo }}" @selected(($reintentando ? old('familia') : $configuracion->familia) === $codigo)>{{ $label }}</option>@endforeach</select></div>
+                                <div class="col-lg-3"><label class="form-label fw-semibold">Dimensión IRTE</label><select name="riesgo_dimension_codigo" class="form-select"><option value="">Sin dimensión específica</option>@foreach($dimensionesRiesgo as $dimension)<option value="{{ $dimension->codigo }}" @selected(($reintentando ? old('riesgo_dimension_codigo') : $configuracion->riesgo_dimension_codigo) === $dimension->codigo)>{{ $dimension->nombre }}</option>@endforeach</select></div>
+                                <div class="col-lg-1"><label class="form-label fw-semibold">Impacto</label><input name="impacto_base" type="number" min="1" max="5" class="form-control" value="{{ $reintentando ? old('impacto_base') : $configuracion->impacto_base }}" required></div>
+                                <div class="col-lg-1"><label class="form-label fw-semibold">Urgencia</label><input name="urgencia_base" type="number" min="1" max="5" class="form-control" value="{{ $reintentando ? old('urgencia_base') : $configuracion->urgencia_base }}" required></div>
+                                <div class="col-lg-2"><label class="form-label fw-semibold">Prioridad mínima</label><select name="prioridad_minima" class="form-select" required>@foreach(config('centro_operaciones.prioridades_incidencia') as $codigo => $label)<option value="{{ $codigo }}" @selected(($reintentando ? old('prioridad_minima') : $configuracion->prioridad_minima) === $codigo)>{{ $codigo }} · {{ $label }}</option>@endforeach</select></div>
+                                <div class="col-lg-2"><label class="form-label fw-semibold">SLA (horas)</label><input name="sla_horas" type="number" min="1" max="8760" class="form-control" value="{{ $reintentando ? old('sla_horas') : $configuracion->sla_horas }}" placeholder="Usa plazo en días"></div>
+                                <div class="col-12"><input type="hidden" name="forzar_p1" value="0"><div class="form-check"><input id="forzar-p1-{{ $configuracion->id }}" class="form-check-input" type="checkbox" name="forzar_p1" value="1" @checked($reintentando ? old('forzar_p1') : $configuracion->forzar_p1)><label class="form-check-label" for="forzar-p1-{{ $configuracion->id }}">Forzar P1 cuando la incidencia sea crítica</label></div></div>
                             </div>
                         </div>
                     </div>

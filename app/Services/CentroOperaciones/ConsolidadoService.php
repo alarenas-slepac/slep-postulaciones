@@ -4,9 +4,11 @@ namespace App\Services\CentroOperaciones;
 
 use App\Models\CentroOperacionesIncidencia;
 use App\Models\CentroOperacionesReporte;
+use App\Models\CentroOperacionesRiesgoEvaluacion;
 use App\Models\Establecimiento;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class ConsolidadoService
 {
@@ -73,9 +75,30 @@ class ConsolidadoService
             ->with(['establecimiento', 'reporte'])
             ->orderByDesc('created_at')
             ->get();
+        $incidenciasActivas = $incidenciasActivas->sortBy(function (CentroOperacionesIncidencia $incidencia) {
+            $orden = ['P1' => 1, 'P2' => 2, 'P3' => 3, 'P4' => 4];
+
+            return sprintf(
+                '%d-%06.2f-%s',
+                $orden[$incidencia->prioridad_nivel] ?? 5,
+                100 - (float) ($incidencia->prioridad_puntaje ?? 0),
+                $incidencia->created_at?->format('YmdHis') ?? ''
+            );
+        })->values();
         $incidenciasPorContexto = $incidenciasActivas->groupBy(fn (CentroOperacionesIncidencia $incidencia) =>
             $this->unidades->clave((int) $incidencia->establecimiento_id, $incidencia->unidad_codigo)
         );
+        $riesgos = Schema::hasTable('centro_operaciones_riesgo_evaluaciones')
+            ? CentroOperacionesRiesgoEvaluacion::query()
+                ->where('estado', 'publicado')
+                ->whereDate('fecha_evaluacion', '<=', $fecha->toDateString())
+                ->where('publicado_en', '<=', $puntoCorte)
+                ->latest('fecha_evaluacion')
+                ->latest('id')
+                ->get()
+                ->unique('establecimiento_id')
+                ->keyBy('establecimiento_id')
+            : collect();
 
         $matriculas = $this->datosBase->matriculasPara($establecimientos, $fecha->year);
         $dotaciones = $this->datosBase->dotacionesPara($establecimientos);
@@ -84,7 +107,8 @@ class ConsolidadoService
             $ultimos,
             $incidenciasPorContexto,
             $matriculas,
-            $dotaciones
+            $dotaciones,
+            $riesgos
         ) {
             /** @var Establecimiento $establecimiento */
             $establecimiento = $contexto['establecimiento'];
@@ -93,6 +117,8 @@ class ConsolidadoService
             /** @var CentroOperacionesReporte|null $reporte */
             $reporte = $ultimos->get($contexto['clave']);
             $activas = $incidenciasPorContexto->get($contexto['clave'], collect());
+            /** @var CentroOperacionesRiesgoEvaluacion|null $riesgo */
+            $riesgo = $riesgos->get($establecimiento->id);
             $estado = $reporte ? $this->estadoService->paraReporte($reporte, $activas) : 'sin_reporte';
             $matriculaBase = $unidadCodigo
                 ? (int) ($unidad['matricula_total'] ?? 0)
@@ -122,6 +148,18 @@ class ConsolidadoService
                 'asistentes_total' => $reporte?->asistentes_total ?? $asistentesBase,
                 'asistentes_presentes' => $reporte?->asistentes_presentes,
                 'incidencias_activas' => $activas->count(),
+                'prioridad_maxima' => $activas->min(fn ($incidencia) =>
+                    ['P1' => 1, 'P2' => 2, 'P3' => 3, 'P4' => 4][$incidencia->prioridad_nivel] ?? 5
+                ),
+                'riesgo' => $riesgo ? [
+                    'evaluacion_id' => $riesgo->id,
+                    'irte' => $riesgo->irte,
+                    'categoria' => $riesgo->categoria,
+                    'categoria_label' => $riesgo->categoria_label,
+                    'alerta' => $riesgo->alerta,
+                    'vigente_hasta' => $riesgo->vigente_hasta?->toDateString(),
+                    'vencido' => $riesgo->vigente_hasta?->isBefore($fecha) ?? false,
+                ] : null,
                 'unidad_codigo' => $unidadCodigo,
                 'servicios' => $reporte?->servicios->mapWithKeys(fn ($servicio) => [
                     $servicio->servicio => $servicio->estado,
@@ -172,6 +210,13 @@ class ConsolidadoService
             ),
             'incidencias_activas' => $incidenciasActivas->count(),
             'incidencias_del_dia' => $reportes->sum(fn (CentroOperacionesReporte $reporte) => $reporte->incidencias->count()),
+            'riesgo_evaluados' => $riesgos->count(),
+            'riesgo_criticos' => $riesgos->where('categoria', 'critico')->count(),
+            'riesgo_atencion' => $riesgos->where('categoria', 'atencion_prioritaria')->count(),
+            'riesgo_sin_evaluacion' => max(0, $establecimientos->count() - $riesgos->count()),
+            'riesgo_vencidos' => $riesgos->filter(fn (CentroOperacionesRiesgoEvaluacion $riesgo) =>
+                $riesgo->vigente_hasta?->isBefore($fecha) ?? false
+            )->count(),
         ];
 
         $comunas = $filas->groupBy('comuna')->map(function (Collection $grupo, string $comuna) {
@@ -210,7 +255,10 @@ class ConsolidadoService
         })->values();
 
         $alertas = $filas->whereIn('estado', ['alerta', 'critico'])
-            ->sortByDesc(fn ($fila) => $this->estadoService->orden($fila['estado']))
+            ->sortByDesc(fn ($fila) =>
+                ($this->estadoService->orden($fila['estado']) * 1000)
+                + (int) data_get($fila, 'riesgo.irte', 0)
+            )
             ->values();
 
         return [
@@ -233,6 +281,10 @@ class ConsolidadoService
                 'tipo' => $incidencia->tipo,
                 'label' => $incidencia->tipo_label,
                 'severidad' => $incidencia->severidad,
+                'familia' => $incidencia->familia,
+                'prioridad_nivel' => $incidencia->prioridad_nivel,
+                'prioridad_puntaje' => $incidencia->prioridad_puntaje,
+                'prioridad_motivo' => $incidencia->prioridad_motivo,
                 'descripcion' => $incidencia->descripcion,
                 'creada_en' => $incidencia->created_at?->toIso8601String(),
             ])->values()->all(),

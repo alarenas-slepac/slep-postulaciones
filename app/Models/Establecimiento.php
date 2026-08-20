@@ -109,6 +109,18 @@ class Establecimiento extends Model
         return $this->hasMany(CentroOperacionesReporte::class, 'establecimiento_id');
     }
 
+    public function evaluacionesRiesgoCentroOperaciones(): HasMany
+    {
+        return $this->hasMany(CentroOperacionesRiesgoEvaluacion::class, 'establecimiento_id');
+    }
+
+    public function ultimaEvaluacionRiesgoCentroOperaciones(): HasOne
+    {
+        return $this->hasOne(CentroOperacionesRiesgoEvaluacion::class, 'establecimiento_id')
+            ->where('estado', 'publicado')
+            ->latestOfMany('publicado_en');
+    }
+
     /**
      * Configuración por establecimiento (1 fila por área).
      */

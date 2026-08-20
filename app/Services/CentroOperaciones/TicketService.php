@@ -49,7 +49,7 @@ class TicketService
                 'segundo_responsable_funcionario_ac_id' => $segundoResponsable?->id,
                 'creado_por_id' => $creador->id,
                 'vence_en' => $asignada
-                    ? now(config('centro_operaciones.timezone'))->addDays($configuracion->plazo_dias)
+                    ? $this->vencimiento($configuracion)
                     : null,
                 'estado' => $asignada ? 'asignado' : 'pendiente_asignacion',
             ]);
@@ -108,7 +108,7 @@ class TicketService
                     : null,
                 'segundo_responsable_funcionario_ac_id' => $segundoResponsable?->id,
                 'vence_en' => $ticket->vence_en
-                    ?: now(config('centro_operaciones.timezone'))->addDays($configuracion->plazo_dias),
+                    ?: $this->vencimiento($configuracion),
                 'estado' => $estabaPendiente ? 'asignado' : $ticket->estado,
             ];
             $cambioAsignacion = $estabaPendiente
@@ -191,5 +191,14 @@ class TicketService
             ? "subrogante_{$nivel}_funcionario_ac_id" : 'jefatura_funcionario_ac_id';
 
         return FuncionarioAcAutorizado::query()->find($matriz->{$campo} ?? null);
+    }
+
+    private function vencimiento(CentroOperacionesIncidenteConfiguracion $configuracion)
+    {
+        $ahora = now(config('centro_operaciones.timezone'));
+
+        return $configuracion->sla_horas
+            ? $ahora->addHours((int) $configuracion->sla_horas)
+            : $ahora->addDays((int) $configuracion->plazo_dias);
     }
 }

@@ -127,6 +127,24 @@ return [
         'inmediata' => ['label' => 'Atención inmediata', 'severity' => 'critico'],
     ],
 
+    'familias_incidencia' => [
+        'continuidad_operacional' => 'Continuidad operacional',
+        'infraestructura' => 'Infraestructura',
+        'convivencia_seguridad' => 'Convivencia y seguridad',
+        'seguridad' => 'Seguridad y emergencias',
+        'gobernanza_conflictividad' => 'Gobernanza y conflictividad',
+        'reputacional' => 'Reputacional',
+        'sanitaria' => 'Sanitaria',
+        'otra' => 'Otra',
+    ],
+
+    'prioridades_incidencia' => [
+        'P1' => 'Inmediata',
+        'P2' => 'Urgente',
+        'P3' => 'Durante el día',
+        'P4' => 'Programable',
+    ],
+
     'severidad_orden' => [
         'sin_reporte' => -1,
         'operativo' => 0,

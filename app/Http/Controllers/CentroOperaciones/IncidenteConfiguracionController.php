@@ -4,6 +4,7 @@ namespace App\Http\Controllers\CentroOperaciones;
 
 use App\Http\Controllers\Controller;
 use App\Models\CentroOperacionesIncidenteConfiguracion;
+use App\Models\CentroOperacionesRiesgoModelo;
 use App\Models\FuncionarioAcAutorizado;
 use App\Services\CentroOperaciones\TicketService;
 use Illuminate\Http\RedirectResponse;
@@ -33,10 +34,19 @@ class IncidenteConfiguracionController extends Controller
             ->values();
 
         $subdirecciones = $funcionarios->pluck('subdireccion_dependencia')->unique()->sort()->values();
+        $dimensionesRiesgo = CentroOperacionesRiesgoModelo::query()
+            ->where('estado', 'publicado')
+            ->latest('publicado_en')
+            ->first()?->dimensiones()
+            ->where('activo', true)
+            ->get() ?? collect();
+        $familias = config('centro_operaciones.familias_incidencia', []);
         return view('centro-operaciones.configuraciones.index', compact(
             'configuraciones',
             'funcionarios',
-            'subdirecciones'
+            'subdirecciones',
+            'dimensionesRiesgo',
+            'familias'
         ));
     }
 
@@ -80,6 +90,7 @@ class IncidenteConfiguracionController extends Controller
         $configuracion = CentroOperacionesIncidenteConfiguracion::query()->create($datos + [
             'tipo' => $tipo,
             'unidad_departamento' => $responsable->unidad_departamento,
+            'forzar_p1' => $request->boolean('forzar_p1'),
             'activo' => $request->boolean('activo'),
         ]);
         $this->tickets->sincronizarAsignaciones($configuracion);
@@ -95,6 +106,7 @@ class IncidenteConfiguracionController extends Controller
         $this->validarSegundoResponsable($datos);
         $configuracion->update($datos + [
             'unidad_departamento' => $responsable->unidad_departamento,
+            'forzar_p1' => $request->boolean('forzar_p1'),
             'activo' => $request->boolean('activo'),
         ]);
         $configuracion->refresh();
@@ -135,6 +147,18 @@ class IncidenteConfiguracionController extends Controller
                     ->where('estado_autorizacion', 'activo'),
             ],
             'plazo_dias' => ['required', 'integer', 'between:1,365'],
+            'familia' => ['required', Rule::in(array_keys(config('centro_operaciones.familias_incidencia', [])))],
+            'riesgo_dimension_codigo' => [
+                'nullable',
+                'string',
+                'max:80',
+                Rule::exists('centro_operaciones_riesgo_dimensiones', 'codigo')->where('activo', true),
+            ],
+            'impacto_base' => ['required', 'integer', 'between:1,5'],
+            'urgencia_base' => ['required', 'integer', 'between:1,5'],
+            'prioridad_minima' => ['required', Rule::in(array_keys(config('centro_operaciones.prioridades_incidencia', [])))],
+            'sla_horas' => ['nullable', 'integer', 'between:1,8760'],
+            'forzar_p1' => ['nullable', 'boolean'],
             'activo' => ['nullable', 'boolean'],
         ];
 

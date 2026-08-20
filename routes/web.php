@@ -10,6 +10,8 @@ use App\Http\Controllers\CentroOperaciones\PanelController as CentroOperacionesP
 use App\Http\Controllers\CentroOperaciones\ReporteController as CentroOperacionesReporteController;
 use App\Http\Controllers\CentroOperaciones\TicketController as CentroOperacionesTicketController;
 use App\Http\Controllers\CentroOperaciones\IncidenteConfiguracionController as CentroOperacionesIncidenteConfiguracionController;
+use App\Http\Controllers\CentroOperaciones\RiesgoConfiguracionController as CentroOperacionesRiesgoConfiguracionController;
+use App\Http\Controllers\CentroOperaciones\RiesgoEvaluacionController as CentroOperacionesRiesgoEvaluacionController;
 
 use App\Http\Controllers\ReemplazosController;
 use App\Http\Controllers\Reemplazos\PersonalImportController;
@@ -182,12 +184,27 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::get('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'index'])->name('configuraciones.index');
             Route::post('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'store'])->name('configuraciones.store');
             Route::put('/mantenedor-incidencias/{configuracion}', [CentroOperacionesIncidenteConfiguracionController::class, 'update'])->whereNumber('configuracion')->name('configuraciones.update');
+            Route::get('/riesgos/configuracion', [CentroOperacionesRiesgoConfiguracionController::class, 'index'])->name('riesgos.configuracion');
+            Route::post('/riesgos/configuracion/versiones', [CentroOperacionesRiesgoConfiguracionController::class, 'crearVersion'])->name('riesgos.configuracion.versiones.store');
+            Route::put('/riesgos/configuracion/{modelo}', [CentroOperacionesRiesgoConfiguracionController::class, 'update'])->whereNumber('modelo')->name('riesgos.configuracion.update');
+            Route::patch('/riesgos/configuracion/{modelo}/publicar', [CentroOperacionesRiesgoConfiguracionController::class, 'publicar'])->whereNumber('modelo')->name('riesgos.configuracion.publicar');
         });
         Route::middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|secretaria_direccion_ejecutiva')
             ->group(function () {
                 Route::get('/', [CentroOperacionesPanelController::class, 'index'])->name('index');
                 Route::get('/datos', [CentroOperacionesPanelController::class, 'datos'])->name('datos');
                 Route::get('/tv', [CentroOperacionesPanelController::class, 'tv'])->name('tv');
+                Route::get('/riesgos', [CentroOperacionesRiesgoEvaluacionController::class, 'index'])->name('riesgos.index');
+            });
+
+        Route::middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|gabinete_slep')
+            ->group(function () {
+                Route::get('/riesgos/{establecimiento}/evaluar', [CentroOperacionesRiesgoEvaluacionController::class, 'create'])
+                    ->whereNumber('establecimiento')
+                    ->name('riesgos.evaluar');
+                Route::post('/riesgos/{establecimiento}/evaluaciones', [CentroOperacionesRiesgoEvaluacionController::class, 'store'])
+                    ->whereNumber('establecimiento')
+                    ->name('riesgos.evaluaciones.store');
             });
 
         Route::get('/reporte-diario', [CentroOperacionesReporteController::class, 'create'])
