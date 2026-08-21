@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.8.21.409' => [
+        'date' => '2026-08-21',
+        'module' => 'Endeudamiento',
+        'title' => 'Endeudamiento agrupado en Remuneraciones',
+        'files' => [
+            'app/Support/ModuleRegistry.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_21_090000_move_endeudamiento_module_to_remuneraciones.php',
+            'resources/views/dashboard/admin.blade.php',
+            'tests/Feature/EndeudamientoMenuSectionTest.php',
+        ],
+        'changes' => [
+            'Mueve Endeudamiento desde Gestión y control hacia la sección Remuneraciones del menú lateral.',
+            'Integra los accesos MAE y cálculo de topes dentro de Remuneraciones en el dashboard administrativo.',
+            'Actualiza el catálogo persistido del módulo para conservar la nueva sección después de sincronizaciones y despliegues.',
+            'Mantiene intactas las rutas, roles y permisos existentes del módulo.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.8.20.408' => [
         'date' => '2026-08-20',
         'module' => 'Remuneraciones',
