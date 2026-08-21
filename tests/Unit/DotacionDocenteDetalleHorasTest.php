@@ -54,7 +54,25 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         ], $resultado);
     }
 
-    public function test_vista_omite_calidades_en_cero_y_muestra_detalle_de_otras_horas(): void
+    public function test_detalla_y_agrupa_funciones_tecnico_pedagogicas_con_horas_positivas(): void
+    {
+        $asignaciones = collect([
+            $this->asignacion('funcion_tecnico_pedagogica', 'Coordinación PIE', 3),
+            $this->asignacion('funcion_tecnico_pedagogica', 'Coordinación PIE', 2),
+            $this->asignacion('funcion_tecnico_pedagogica', 'Orientación', 4),
+            $this->asignacion('funcion_tecnico_pedagogica', 'Sin horas', 0),
+            $this->asignacion('otra_funcion', 'Apoyo biblioteca', 6),
+        ]);
+
+        $resultado = $this->invokePrivate('detalleFuncionesTecnicoPedagogicas', [$asignaciones]);
+
+        $this->assertSame([
+            ['nombre' => 'Coordinación PIE', 'horas' => 5.0],
+            ['nombre' => 'Orientación', 'horas' => 4.0],
+        ], $resultado);
+    }
+
+    public function test_vista_omite_calidades_en_cero_y_muestra_detalles_de_funciones(): void
     {
         $html = view('admin.dotacion-establecimiento.partials._docentes', [
             'docentes' => collect([$this->docenteVista()]),
@@ -63,6 +81,8 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         $this->assertStringContainsString('Planta 44 h', $html);
         $this->assertStringNotContainsString('Contrata 0 h', $html);
         $this->assertStringNotContainsString('Contrata: 0 h', $html);
+        $this->assertStringContainsString('Detalle de funciones técnico-pedagógicas', $html);
+        $this->assertStringContainsString('Coordinación PIE', $html);
         $this->assertStringContainsString('Detalle de otras horas', $html);
         $this->assertStringContainsString('Coordinación medioambiental', $html);
     }
@@ -112,17 +132,20 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             'horas_contrato_65_35' => 44.0,
             'horas_contrato_60_40' => 0.0,
             'horas_contrato_especial' => 0.0,
-            'horas_funciones_total' => 5.0,
+            'horas_funciones_total' => 13.0,
             'horas_directivas' => 0.0,
-            'horas_tecnico_pedagogicas' => 0.0,
+            'horas_tecnico_pedagogicas' => 8.0,
             'horas_pie' => 0.0,
             'horas_planes' => 0.0,
             'horas_otras_funciones' => 5.0,
+            'funciones_tecnico_pedagogicas_detalle' => [
+                ['nombre' => 'Coordinación PIE', 'horas' => 8.0],
+            ],
             'otras_funciones_detalle' => [
                 ['nombre' => 'Coordinación medioambiental', 'horas' => 5.0],
             ],
-            'horas_asignadas_total' => 49.0,
-            'diferencia' => -5.0,
+            'horas_asignadas_total' => 57.0,
+            'diferencia' => -13.0,
             'estado_cuadratura' => [
                 'key' => 'sobrecarga',
                 'label' => 'Sobrecarga',

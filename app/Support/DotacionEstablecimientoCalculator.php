@@ -592,6 +592,7 @@ class DotacionEstablecimientoCalculator
                 'otras' => 0.0,
                 'subvenciones' => collect(),
             ];
+            $funcionesTecnicoPedagogicasDetalle = self::detalleFuncionesTecnicoPedagogicas($asignacionesDocente['items'] ?? collect());
             $otrasFuncionesDetalle = self::detalleOtrasFunciones($asignacionesDocente['items'] ?? collect());
             $horasBasica = 0.0;
             $horasMedia = 0.0;
@@ -631,6 +632,7 @@ class DotacionEstablecimientoCalculator
                 'horas_pie' => (float) ($asignacionesDocente['pie'] ?? 0),
                 'horas_planes' => (float) ($asignacionesDocente['planes'] ?? 0),
                 'horas_otras_funciones' => (float) ($asignacionesDocente['otras'] ?? 0),
+                'funciones_tecnico_pedagogicas_detalle' => $funcionesTecnicoPedagogicasDetalle,
                 'otras_funciones_detalle' => $otrasFuncionesDetalle,
                 'asignacion_funciones' => $asignacionFunciones,
                 'asignaciones' => $asignacionesDocente['items'] ?? collect(),
@@ -883,21 +885,45 @@ class DotacionEstablecimientoCalculator
      */
     private static function detalleOtrasFunciones(iterable $asignaciones): array
     {
+        return self::detalleFuncionesPorTipo($asignaciones, 'otra_funcion', 'Otra función');
+    }
+
+    /**
+     * @return array<int, array{nombre: string, horas: float}>
+     */
+    private static function detalleFuncionesTecnicoPedagogicas(iterable $asignaciones): array
+    {
+        return self::detalleFuncionesPorTipo(
+            $asignaciones,
+            'funcion_tecnico_pedagogica',
+            'Función técnico-pedagógica'
+        );
+    }
+
+    /**
+     * @return array<int, array{nombre: string, horas: float}>
+     */
+    private static function detalleFuncionesPorTipo(
+        iterable $asignaciones,
+        string $tipoAsignacion,
+        string $nombreFallback
+    ): array
+    {
         return collect($asignaciones)
-            ->filter(fn ($row) => ($row->tipo_asignacion ?? null) === 'otra_funcion'
+            ->filter(fn ($row) => ($row->tipo_asignacion ?? null) === $tipoAsignacion
                 && is_numeric($row->horas_contrato ?? null)
                 && (float) $row->horas_contrato > 0.01)
-            ->groupBy(function ($row) {
+            ->groupBy(function ($row) use ($nombreFallback) {
                 $nombre = trim((string) ($row->asignatura_nombre ?? ''));
 
-                return self::normalizeText($nombre !== '' ? $nombre : 'Otra función');
+                return self::normalizeText($nombre !== '' ? $nombre : $nombreFallback);
             })
-            ->map(function (Collection $rows) {
+            ->map(function (Collection $rows) use ($nombreFallback) {
                 $representante = $rows->first();
                 $nombre = trim((string) ($representante->asignatura_nombre ?? ''));
 
                 return [
-                    'nombre' => $nombre !== '' ? $nombre : 'Otra función',
+                    'nombre' => $nombre !== '' ? $nombre : $nombreFallback,
                     'horas' => round((float) $rows->sum(fn ($row) => (float) ($row->horas_contrato ?? 0)), 2),
                 ];
             })
