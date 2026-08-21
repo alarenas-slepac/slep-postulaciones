@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\MaeCarga;
+use App\Models\MaeCargaClasificacion;
 use App\Models\MaeHomologacionColumna;
 use App\Support\MaeChunkReadFilter;
 use App\Support\MaeColumnNormalizer;
+use App\Support\MaeDiscountCategoryCatalog;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -72,7 +74,7 @@ class MaeImportService
             ->latest('version')
             ->first();
 
-        return MaeCarga::query()->create([
+        $carga = MaeCarga::query()->create([
             'anio' => $anio,
             'mes' => $mes,
             'dominio' => $dominio,
@@ -84,7 +86,7 @@ class MaeImportService
             'nombre_archivo' => $file->getClientOriginalName(),
             'ruta_archivo' => $storedPath,
             'hash_archivo' => $hash,
-            'estado' => 'pendiente',
+            'estado' => 'pendiente_revision',
             'total_filas' => 0,
             'filas_validas' => 0,
             'filas_omitidas' => 0,
@@ -92,6 +94,265 @@ class MaeImportService
             'observaciones' => null,
             'subido_por' => $userId,
         ]);
+
+        try {
+            $this->prepareDiscountClassifications($carga);
+        } catch (\Throwable $e) {
+            $carga->delete();
+            Storage::disk($disk)->delete($storedPath);
+
+            throw $e;
+        }
+
+        return $carga->fresh('clasificaciones');
+    }
+
+    public function prepareDiscountClassifications(MaeCarga $carga): void
+    {
+        $fullPath = Storage::disk('local')->path($carga->ruta_archivo);
+
+        if (!is_file($fullPath)) {
+            throw ValidationException::withMessages([
+                'excel' => 'No se encontró el archivo MAE guardado en storage para revisar sus clasificaciones.',
+            ]);
+        }
+
+        $reader = IOFactory::createReaderForFile($fullPath);
+        if (method_exists($reader, 'setReadDataOnly')) {
+            $reader->setReadDataOnly(true);
+        }
+        if (method_exists($reader, 'setReadEmptyCells')) {
+            $reader->setReadEmptyCells(false);
+        }
+
+        $worksheetInfo = $reader->listWorksheetInfo($fullPath);
+        if (empty($worksheetInfo)) {
+            throw ValidationException::withMessages([
+                'excel' => 'No fue posible leer la Hoja1 del archivo MAE.',
+            ]);
+        }
+
+        $sheetName = $worksheetInfo[0]['worksheetName'] ?? 'Worksheet';
+        $highestColumn = (string) ($worksheetInfo[0]['lastColumnLetter'] ?? 'A');
+        $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
+
+        $reader->setLoadSheetsOnly([$sheetName]);
+        $reader->setReadFilter(new MaeChunkReadFilter(1, 1));
+
+        $spreadsheet = $reader->load($fullPath);
+        $sheet = $spreadsheet->getActiveSheet();
+        $headers = $sheet->rangeToArray('A1:' . $highestColumn . '1', null, true, false)[0] ?? [];
+        $headers = array_pad($headers, $highestColumnIndex, '');
+        $normalizedHeaders = array_map(static fn ($header) => MaeColumnNormalizer::normalizeHeader((string) $header), $headers);
+
+        $required = ['RUT', 'NOMBRE', 'COMUNA', 'DIAS TRAB', 'TOTAL HABERES', 'MONTO IMPONIBLE', 'MONTO TRIBUTABLE'];
+        $missing = [];
+        foreach ($required as $requiredHeader) {
+            if ($this->firstIndex($normalizedHeaders, $requiredHeader) === null) {
+                $missing[] = $requiredHeader;
+            }
+        }
+
+        if (!empty($missing)) {
+            $spreadsheet->disconnectWorksheets();
+
+            throw ValidationException::withMessages([
+                'excel' => 'El archivo no trae la estructura mínima esperada en Hoja1. Faltan encabezados: ' . implode(', ', $missing),
+            ]);
+        }
+
+        $idxMontoTributable = $this->firstIndex($normalizedHeaders, 'MONTO TRIBUTABLE');
+        $detailStartIndex = $idxMontoTributable !== null ? ($idxMontoTributable + 1) : 0;
+        $detailEndIndex = max($detailStartIndex, $highestColumnIndex - 2);
+        $homologations = MaeHomologacionColumna::query()
+            ->where('activo', true)
+            ->orderByDesc('prioridad')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('columna_normalizada')
+            ->map(fn ($items) => $items->first());
+        $rows = [];
+        $now = now();
+
+        for ($index = $detailStartIndex; $index < $highestColumnIndex; $index++) {
+            if ($index > $detailEndIndex) {
+                continue;
+            }
+
+            $headerOriginal = trim((string) ($headers[$index] ?? ''));
+            $headerNormalized = $normalizedHeaders[$index] ?? MaeColumnNormalizer::normalizeHeader($headerOriginal);
+
+            if (in_array($headerNormalized, ['IMPOSICIONES', 'SALUD', 'IMPUESTO', 'APORTE ADICIONAL AFP'], true)) {
+                continue;
+            }
+
+            $homologation = $homologations->get($headerNormalized);
+            if ($homologation && !$homologation->es_guardable) {
+                continue;
+            }
+
+            if ($homologation) {
+                $tipoMovimiento = $homologation->tipo_movimiento ?: 'descuento';
+                $esPatronal = (bool) $homologation->es_aporte_patronal;
+                if ($esPatronal) {
+                    $tipoMovimiento = 'aporte_patronal';
+                }
+
+                $metadata = [
+                    'campo_canonico' => $homologation->campo_canonico ?: MaeColumnNormalizer::canonicalFieldName($headerNormalized),
+                    'grupo' => $homologation->grupo ?: 'descuento',
+                    'subgrupo' => $homologation->subgrupo ?: 'otros',
+                    'tipo_movimiento' => $tipoMovimiento,
+                    'es_aporte_patronal' => $tipoMovimiento === 'aporte_patronal',
+                ];
+                $source = 'homologacion';
+            } else {
+                $metadata = MaeColumnNormalizer::inferDiscountMetadata($headerOriginal, $headerNormalized);
+                $source = 'automatica';
+            }
+
+            $category = MaeDiscountCategoryCatalog::categoryFromMetadata(
+                $metadata['grupo'],
+                $metadata['subgrupo'],
+                $metadata['tipo_movimiento'],
+                (bool) $metadata['es_aporte_patronal'],
+                $headerOriginal
+            );
+
+            $rows[] = [
+                'mae_carga_id' => $carga->id,
+                'orden_columna' => $index + 1,
+                'columna_origen' => $headerOriginal !== '' ? $headerOriginal : '(sin encabezado)',
+                'columna_normalizada' => $headerNormalized,
+                'campo_canonico' => $metadata['campo_canonico'],
+                'categoria_detectada' => $category,
+                'categoria_seleccionada' => $category,
+                'fuente_deteccion' => $source,
+                'grupo' => $metadata['grupo'],
+                'subgrupo' => $metadata['subgrupo'],
+                'tipo_movimiento' => $metadata['tipo_movimiento'],
+                'es_aporte_patronal' => (bool) $metadata['es_aporte_patronal'],
+                'homologacion_id' => $homologation?->id,
+                'confirmado_por' => null,
+                'confirmado_at' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        $spreadsheet->disconnectWorksheets();
+
+        DB::transaction(function () use ($carga, $rows) {
+            MaeCargaClasificacion::query()->where('mae_carga_id', $carga->id)->delete();
+            if (!empty($rows)) {
+                MaeCargaClasificacion::query()->insert($rows);
+            }
+        });
+    }
+
+    public function confirmDiscountClassifications(MaeCarga $carga, array $selections, int $userId): bool
+    {
+        $validCategories = array_keys(MaeDiscountCategoryCatalog::options());
+
+        return DB::transaction(function () use ($carga, $selections, $userId, $validCategories) {
+            $lockedCarga = MaeCarga::query()->lockForUpdate()->findOrFail($carga->id);
+
+            if ($lockedCarga->estado !== 'pendiente_revision') {
+                return false;
+            }
+
+            $classifications = MaeCargaClasificacion::query()
+                ->where('mae_carga_id', $lockedCarga->id)
+                ->lockForUpdate()
+                ->orderBy('orden_columna')
+                ->get();
+            $normalizedSelections = collect($selections)->mapWithKeys(
+                fn ($value, $key) => [(int) $key => trim((string) $value)]
+            );
+
+            if ($classifications->count() !== $normalizedSelections->count()
+                || $classifications->pluck('id')->diff($normalizedSelections->keys())->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'clasificaciones' => 'Debes confirmar una categoría válida para cada descuento detectado.',
+                ]);
+            }
+
+            foreach ($classifications as $classification) {
+                $selectedCategory = $normalizedSelections->get($classification->id);
+                if (!in_array($selectedCategory, $validCategories, true)) {
+                    throw ValidationException::withMessages([
+                        'clasificaciones' => 'Se recibió una categoría de descuento no válida.',
+                    ]);
+                }
+
+                $changed = $selectedCategory !== $classification->categoria_detectada;
+                $metadata = $changed
+                    ? MaeDiscountCategoryCatalog::metadata($selectedCategory)
+                    : [
+                        'grupo' => $classification->grupo,
+                        'subgrupo' => $classification->subgrupo,
+                        'tipo_movimiento' => $classification->tipo_movimiento,
+                        'es_aporte_patronal' => (bool) $classification->es_aporte_patronal,
+                    ];
+                $homologation = $classification->homologacion_id
+                    ? MaeHomologacionColumna::query()->lockForUpdate()->find($classification->homologacion_id)
+                    : null;
+
+                if ($changed || !$homologation) {
+                    $homologation ??= MaeHomologacionColumna::query()
+                        ->where('columna_normalizada', $classification->columna_normalizada)
+                        ->where('activo', true)
+                        ->orderByDesc('prioridad')
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->first();
+                    $auditNote = 'Clasificación confirmada manualmente en carga MAE #' . $lockedCarga->id . '.';
+
+                    $homologationData = [
+                        'columna_origen' => $classification->columna_origen,
+                        'campo_canonico' => $classification->campo_canonico ?: MaeColumnNormalizer::canonicalFieldName($classification->columna_normalizada),
+                        'grupo' => $metadata['grupo'],
+                        'subgrupo' => $metadata['subgrupo'],
+                        'tipo_movimiento' => $metadata['tipo_movimiento'],
+                        'es_aporte_patronal' => $metadata['es_aporte_patronal'],
+                        'observaciones' => $this->appendObservation($homologation?->observaciones, $auditNote),
+                    ];
+
+                    if ($homologation) {
+                        $homologation->update($homologationData);
+                    } else {
+                        $homologation = MaeHomologacionColumna::query()->create(array_merge($homologationData, [
+                            'columna_normalizada' => $classification->columna_normalizada,
+                            'seccion_archivo' => 'descuentos',
+                            'es_guardable' => true,
+                            'guardar_en_resumen' => false,
+                            'guardar_en_detalle' => true,
+                            'prioridad' => 1000,
+                            'activo' => true,
+                        ]));
+                    }
+                }
+
+                $classification->update([
+                    'categoria_seleccionada' => $selectedCategory,
+                    'grupo' => $metadata['grupo'],
+                    'subgrupo' => $metadata['subgrupo'],
+                    'tipo_movimiento' => $metadata['tipo_movimiento'],
+                    'es_aporte_patronal' => $metadata['es_aporte_patronal'],
+                    'homologacion_id' => $homologation?->id,
+                    'confirmado_por' => $userId,
+                    'confirmado_at' => now(),
+                ]);
+            }
+
+            $lockedCarga->update([
+                'estado' => 'pendiente',
+                'observaciones' => null,
+                'updated_at' => now(),
+            ]);
+
+            return true;
+        });
     }
 
     public function processMaeCarga(int $cargaId): MaeCarga
@@ -110,6 +371,12 @@ class MaeImportService
         $dominio = trim((string) $carga->dominio);
         $normalizedDomain = MaeColumnNormalizer::normalizeDomain($dominio);
         $vigenteAnterior = $carga->reemplazaCarga()->first();
+
+        if ($carga->estado === 'pendiente_revision') {
+            throw ValidationException::withMessages([
+                'clasificaciones' => 'Debes confirmar las categorías de descuento antes de procesar esta carga MAE.',
+            ]);
+        }
 
         $carga->update([
             'estado' => 'procesando',
@@ -184,6 +451,10 @@ class MaeImportService
             ->get()
             ->groupBy('columna_normalizada')
             ->map(fn($items) => $items->first());
+        $confirmedClassifications = $carga->clasificaciones()
+            ->whereNotNull('confirmado_at')
+            ->get()
+            ->keyBy('orden_columna');
 
         $distinctCommunes = [];
         $totalRows = 0;
@@ -288,6 +559,33 @@ class MaeImportService
                         }
 
                         if (in_array($headerNormalized, ['IMPOSICIONES', 'SALUD', 'IMPUESTO', 'APORTE ADICIONAL AFP'], true)) {
+                            continue;
+                        }
+
+                        $confirmedClassification = $confirmedClassifications->get($index + 1);
+                        if ($confirmedClassification) {
+                            $tipoMovimiento = $confirmedClassification->tipo_movimiento ?: 'descuento';
+                            $detailBuffer[] = [
+                                'mae_registro_id' => $registroId,
+                                'orden_columna' => $index + 1,
+                                'columna_origen' => $headerOriginal !== '' ? $headerOriginal : '(sin encabezado)',
+                                'columna_normalizada' => $headerNormalized,
+                                'campo_canonico' => $confirmedClassification->campo_canonico,
+                                'grupo' => $confirmedClassification->grupo,
+                                'subgrupo' => $confirmedClassification->subgrupo,
+                                'tipo_movimiento' => $tipoMovimiento,
+                                'es_aporte_patronal' => (bool) $confirmedClassification->es_aporte_patronal,
+                                'valor' => $value,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ];
+
+                            if ($tipoMovimiento === 'aporte_patronal') {
+                                $sumPatronales += (float) $value;
+                            } else {
+                                $sumHomologados += (float) $value;
+                            }
+
                             continue;
                         }
 
@@ -577,5 +875,19 @@ class MaeImportService
             $data[$label] = $value;
         }
         return $data;
+    }
+
+    private function appendObservation(?string $current, string $observation): string
+    {
+        $current = trim((string) $current);
+        if ($current === '') {
+            return $observation;
+        }
+
+        if (str_contains($current, $observation)) {
+            return $current;
+        }
+
+        return $current . ' | ' . $observation;
     }
 }

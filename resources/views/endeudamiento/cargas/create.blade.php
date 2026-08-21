@@ -64,10 +64,10 @@
                             <label class="form-label">Archivo MAE (.xlsx o .xls)</label>
                             <input type="file" name="excel" class="form-control @error('excel') is-invalid @enderror" accept=".xlsx,.xls" required>
                             @error('excel')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            <div class="form-text">La carga se encola para procesamiento en segundo plano. Debes tener el worker de Laravel activo para que el archivo avance desde pendiente a procesado.</div>
+                            <div class="form-text">Primero se analizarán las columnas de descuento. La carga se encolará sólo después de revisar y confirmar sus categorías.</div>
                         </div>
                         <div class="col-12 d-flex gap-2">
-                            <button class="btn btn-primary"><i class="bi bi-upload"></i> Subir y encolar MAE</button>
+                            <button class="btn btn-primary"><i class="bi bi-upload"></i> Subir y revisar categorías</button>
                             <a href="{{ route('endeudamiento.cargas.index') }}" class="btn btn-outline-secondary">Cancelar</a>
                         </div>
                     </form>

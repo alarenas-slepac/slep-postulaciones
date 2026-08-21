@@ -50,6 +50,11 @@ class MaeCarga extends Model
         return $this->hasMany(MaeCuotasImportacion::class, 'mae_carga_id');
     }
 
+    public function clasificaciones(): HasMany
+    {
+        return $this->hasMany(MaeCargaClasificacion::class, 'mae_carga_id');
+    }
+
     public function subidaPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'subido_por');

@@ -186,6 +186,8 @@ class MaeColumnNormalizer
         } elseif ($contains('cesantia')) {
             $grupo = 'descuentos_legales';
             $subgrupo = 'cesantia';
+        } elseif ($contains('salud complementaria', 'emerg medicas', 'odontologia')) {
+            $subgrupo = 'salud_complementaria';
         } elseif ($contains('apv')) {
             $subgrupo = 'apv';
         } elseif ($contains('bienestar')) {

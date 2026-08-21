@@ -8,10 +8,13 @@
             <p class="text-muted mb-0">Versión v{{ $maeCarga->version }} {{ $maeCarga->es_vigente ? 'vigente' : 'histórica' }}.</p>
         </div>
         <div class="d-flex gap-2">
+            @if ($maeCarga->estado === 'pendiente_revision')
+                <a href="{{ route('endeudamiento.cargas.clasificaciones', $maeCarga) }}" class="btn btn-warning"><i class="bi bi-tags"></i> Revisar categorías</a>
+            @endif
             @if (in_array($maeCarga->estado, ['procesado', 'procesado_con_observaciones']))
                 <a href="{{ route('endeudamiento.cuotas.create', ['carga_id' => $maeCarga->id]) }}" class="btn btn-outline-success"><i class="bi bi-list-ol"></i> Complementar cuotas</a>
             @endif
-            <a href="{{ route('endeudamiento.registros.index', ['anio' => $maeCarga->anio, 'mes' => $maeCarga->mes, 'dominio' => $maeCarga->dominio]) }}" class="btn btn-outline-primary {{ in_array($maeCarga->estado, ['pendiente','procesando']) ? 'disabled' : '' }}" {{ in_array($maeCarga->estado, ['pendiente','procesando']) ? 'aria-disabled=true tabindex=-1' : '' }}>Ver registros</a>
+            <a href="{{ route('endeudamiento.registros.index', ['anio' => $maeCarga->anio, 'mes' => $maeCarga->mes, 'dominio' => $maeCarga->dominio]) }}" class="btn btn-outline-primary {{ in_array($maeCarga->estado, ['pendiente_revision','pendiente','procesando']) ? 'disabled' : '' }}" {{ in_array($maeCarga->estado, ['pendiente_revision','pendiente','procesando']) ? 'aria-disabled=true tabindex=-1' : '' }}>Ver registros</a>
             <a href="{{ route('endeudamiento.cargas.index') }}" class="btn btn-outline-secondary">Volver</a>
         </div>
     </div>
@@ -21,12 +24,15 @@
     @endif
 
 
-    @if (in_array($maeCarga->estado, ['pendiente', 'procesando']))
+    @if (in_array($maeCarga->estado, ['pendiente_revision', 'pendiente', 'procesando']))
         <div class="alert alert-info">
-            Esta carga se está procesando en segundo plano.
-            @if ($maeCarga->estado === 'pendiente')
+            @if ($maeCarga->estado === 'pendiente_revision')
+                El archivo está almacenado, pero todavía debes revisar y confirmar sus categorías de descuento.
+            @elseif ($maeCarga->estado === 'pendiente')
+                Esta carga se está procesando en segundo plano.
                 Está en cola esperando al worker de Laravel.
             @else
+                Esta carga se está procesando en segundo plano.
                 El archivo ya está siendo leído e importado.
             @endif
         </div>
@@ -81,7 +87,7 @@
                     @else
                         <div class="small text-muted">Sin observaciones globales registradas en la carga.</div>
                     @endif
-                    @if (!$maeCarga->es_vigente)
+                    @if (!$maeCarga->es_vigente && in_array($maeCarga->estado, ['procesado', 'procesado_con_observaciones']))
                         <hr>
                         <form method="POST" action="{{ route('endeudamiento.cargas.activar', $maeCarga) }}">
                             @csrf
