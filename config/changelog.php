@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.8.21.411' => [
+        'date' => '2026-08-21',
+        'module' => 'Dotación',
+        'title' => 'Acceso integral de Dotación para Coordinación UATP',
+        'files' => [
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_21_150000_grant_dotacion_access_to_coordinador_uatp.php',
+            'routes/web.php',
+            'tests/Feature/CoordinadorUatpDotacionAccessTest.php',
+        ],
+        'changes' => [
+            'Habilita a coordinador_uatp en el mantenimiento completo de cursos, asignaturas, planes de estudio y cursos por establecimiento.',
+            'Permite configurar planes por establecimiento con alcance territorial, conservando la restricción propia de los directivos a su establecimiento.',
+            'Consolida el acceso a Estudiantes PIE, asignaturas personalizadas, funciones, asignaciones, cursos combinados, proporción 60/40 e informes de Dotación.',
+            'Publica todos los accesos relacionados en el menú principal y en los accesos rápidos del rol.',
+            'Registra de forma idempotente los nueve módulos de Dotación en module_role para evitar accesos parciales o errores 403.',
+        ],
+        'roles' => ['Coordinador UATP'],
+    ],
     '2026.8.21.410' => [
         'date' => '2026-08-21',
         'module' => 'Endeudamiento',
