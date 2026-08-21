@@ -26,7 +26,7 @@
             <div>
                 <div class="dotacion-eyebrow">Base docente contractual</div>
                 <h2 class="h5 fw-bold mb-1">Docentes vigentes del establecimiento</h2>
-                <div class="text-muted small">Las horas aula corresponden al valor real asignado por asignatura. Las horas de contrato se calculan de forma consolidada por docente usando las proporciones 65/35 y 60/40, más las funciones contractuales asignadas.</div>
+                <div class="text-muted small">La nómina considera todos los registros vigentes del último mes cargado para el establecimiento y año. Las horas de contrato se separan por Planta y Contrata, y las horas aula se calculan de forma consolidada usando las proporciones 65/35 y 60/40.</div>
             </div>
         </div>
     </div>
@@ -108,6 +108,9 @@
                         $diferencia = $docente['diferencia'];
                         $estado = $docente['estado_cuadratura'] ?? ['label' => 'Sin estado', 'class' => 'text-bg-secondary', 'detalle' => ''];
                         $funcionesDocente = (float) ($docente['horas_funciones_total'] ?? 0);
+                        $horasPlanta = (float) ($docente['horas_planta'] ?? 0);
+                        $horasContrata = (float) ($docente['horas_contrata'] ?? 0);
+                        $otrasFuncionesDetalle = collect($docente['otras_funciones_detalle'] ?? []);
                     @endphp
                     <tr>
                         <td><button class="btn btn-sm btn-outline-primary rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="false" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down"></i></button></td>
@@ -116,8 +119,18 @@
                         <td><div class="fw-semibold">{{ $docente['funcion'] }}</div><div class="text-muted small">{{ $docente['titulo'] }}</div></td>
                         <td class="text-end">
                             <div class="fw-bold">{{ $fmt($docente['horas_contrato']) }}</div>
-                            @if (!empty($docente['horas_contrato_detalle']))
+                            @if (($docente['registros_contrato'] ?? 1) > 1)
                                 <div class="small text-muted text-nowrap">{{ $docente['registros_contrato'] ?? 1 }} registros</div>
+                            @endif
+                            @if ($horasPlanta > 0.01 || $horasContrata > 0.01)
+                                <div class="d-flex flex-wrap justify-content-end gap-1 mt-1">
+                                    @if ($horasPlanta > 0.01)
+                                        <span class="badge text-bg-primary">Planta {{ $fmt($horasPlanta) }} h</span>
+                                    @endif
+                                    @if ($horasContrata > 0.01)
+                                        <span class="badge text-bg-info">Contrata {{ $fmt($horasContrata) }} h</span>
+                                    @endif
+                                </div>
                             @endif
                         </td>
                         <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_aula']) }}</td>
@@ -142,6 +155,17 @@
                                                     <div class="small text-primary mb-2">{{ $docente['horas_contrato_detalle'] }}</div>
                                                 @else
                                                     <div class="mb-2"></div>
+                                                @endif
+                                                @if ($horasPlanta > 0.01 || $horasContrata > 0.01)
+                                                    <div class="small text-muted">Horas por calidad jurídica</div>
+                                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                                        @if ($horasPlanta > 0.01)
+                                                            <span class="badge text-bg-primary">Planta: {{ $fmt($horasPlanta) }} h</span>
+                                                        @endif
+                                                        @if ($horasContrata > 0.01)
+                                                            <span class="badge text-bg-info">Contrata: {{ $fmt($horasContrata) }} h</span>
+                                                        @endif
+                                                    </div>
                                                 @endif
                                                 <div class="small text-muted">Tipo contrato</div><div class="mb-2">{{ $docente['tipo_contrato'] }}</div>
                                                 <div class="small text-muted">Financiamiento</div><div class="mb-2">{{ $docente['financiamiento'] }}</div>
@@ -181,6 +205,17 @@
                                                 <hr class="my-2">
                                                 <div class="small text-muted">Desglose de funciones asignadas</div>
                                                 <div class="small">Directivas: {{ $fmt($docente['horas_directivas'] ?? 0) }} · Téc. ped.: {{ $fmt($docente['horas_tecnico_pedagogicas'] ?? 0) }} · PIE: {{ $fmt($docente['horas_pie'] ?? 0) }} · Planes: {{ $fmt($docente['horas_planes'] ?? 0) }} · Otras: {{ $fmt($docente['horas_otras_funciones'] ?? 0) }}</div>
+                                                @if ($otrasFuncionesDetalle->isNotEmpty())
+                                                    <div class="small text-muted mt-3">Detalle de otras horas</div>
+                                                    <div class="vstack gap-1 mt-1">
+                                                        @foreach ($otrasFuncionesDetalle as $otraFuncion)
+                                                            <div class="d-flex justify-content-between gap-3 small border-bottom pb-1">
+                                                                <span>{{ $otraFuncion['nombre'] }}</span>
+                                                                <strong class="text-nowrap">{{ $fmt($otraFuncion['horas']) }} h</strong>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
