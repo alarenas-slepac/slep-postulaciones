@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.21.412' => [
+        'date' => '2026-08-21',
+        'module' => 'Dotación',
+        'title' => 'Detalle contractual y de otras funciones por docente',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Construye la nómina docente exclusivamente con los registros vigentes del último mes cargado para el establecimiento y año seleccionados.',
+            'Consolida todas las líneas contractuales del RUT en ese período y separa las jornadas correspondientes a Planta y Contrata.',
+            'Muestra únicamente las calidades jurídicas que tienen horas positivas, evitando etiquetas Planta o Contrata en cero.',
+            'Desglosa por nombre y cantidad de horas cada asignación clasificada como Otra función.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.21.411' => [
         'date' => '2026-08-21',
         'module' => 'Dotación',

@@ -592,6 +592,7 @@ class DotacionEstablecimientoCalculator
                 'otras' => 0.0,
                 'subvenciones' => collect(),
             ];
+            $otrasFuncionesDetalle = self::detalleOtrasFunciones($asignacionesDocente['items'] ?? collect());
             $horasBasica = 0.0;
             $horasMedia = 0.0;
             $horasAula = (float) ($asignacionesDocente['aula'] ?? 0);
@@ -613,6 +614,8 @@ class DotacionEstablecimientoCalculator
                 'estamento' => $declaracion?->estamento ?: ($row->estatuto ?: 'Docente'),
                 'estamento_cobertura' => 'docente',
                 'horas_contrato' => $horasContrato,
+                'horas_planta' => (float) ($grupo['jornada_planta_total'] ?? 0),
+                'horas_contrata' => (float) ($grupo['jornada_contrata_total'] ?? 0),
                 'horas_aula' => $horasAula,
                 'horas_aula_65_35' => (float) ($asignacionesDocente['aula_65_35'] ?? 0),
                 'horas_aula_60_40' => (float) ($asignacionesDocente['aula_60_40'] ?? 0),
@@ -628,6 +631,7 @@ class DotacionEstablecimientoCalculator
                 'horas_pie' => (float) ($asignacionesDocente['pie'] ?? 0),
                 'horas_planes' => (float) ($asignacionesDocente['planes'] ?? 0),
                 'horas_otras_funciones' => (float) ($asignacionesDocente['otras'] ?? 0),
+                'otras_funciones_detalle' => $otrasFuncionesDetalle,
                 'asignacion_funciones' => $asignacionFunciones,
                 'asignaciones' => $asignacionesDocente['items'] ?? collect(),
                 'subvenciones' => $asignacionesDocente['subvenciones'] ?? collect(),
@@ -644,7 +648,7 @@ class DotacionEstablecimientoCalculator
                 'mes' => (int) ($grupo['mes'] ?? $row->mes ?? 0),
                 'anio' => (int) ($grupo['anio'] ?? $row->anio ?? 0),
                 'fuente_contrato' => $declaracion ? 'declaracion_sostenedor' : 'reemplazos_personal',
-                'registros_contrato' => $declaracion ? 1 : (int) ($grupo['registros'] ?? 1),
+                'registros_contrato' => (int) ($grupo['registros'] ?? 1),
                 'horas_contrato_componentes' => $declaracion
                     ? [(float) $horasContrato]
                     : collect($grupo['componentes_jornada'] ?? [])->values()->all(),
@@ -747,25 +751,31 @@ class DotacionEstablecimientoCalculator
 
 
     /**
-     * Consolida todas las líneas contractuales vigentes del período más reciente
-     * de cada RUT. No mezcla meses históricos y evita perder jornadas
-     * complementarias registradas en filas separadas del padrón mensual.
+     * Consolida todas las líneas contractuales vigentes del último período
+     * disponible para el establecimiento y año. No conserva RUT de meses
+     * anteriores y evita perder jornadas complementarias registradas en filas
+     * separadas del mismo padrón mensual.
      *
      * @return Collection<int, array<string, mixed>>
      */
     private static function consolidarPersonalUltimoPeriodo(Collection $personal): Collection
     {
-        return $personal
-            ->groupBy(fn ($row) => self::normalizeRut($row->rut))
-            ->map(function (Collection $items) {
-                $periodo = $items->max(
-                    fn ($row) => ((int) ($row->anio ?? 0) * 100) + (int) ($row->mes ?? 0)
-                );
+        $periodo = (int) $personal->max(
+            fn ($row) => ((int) ($row->anio ?? 0) * 100) + (int) ($row->mes ?? 0)
+        );
 
-                $anio = intdiv((int) $periodo, 100);
-                $mes = (int) $periodo % 100;
+        if ($periodo <= 0) {
+            return collect();
+        }
+
+        $anio = intdiv($periodo, 100);
+        $mes = $periodo % 100;
+
+        return $personal
+            ->filter(fn ($row) => (int) ($row->anio ?? 0) === $anio && (int) ($row->mes ?? 0) === $mes)
+            ->groupBy(fn ($row) => self::normalizeRut($row->rut))
+            ->map(function (Collection $items) use ($anio, $mes) {
                 $rowsPeriodo = $items
-                    ->filter(fn ($row) => (int) ($row->anio ?? 0) === $anio && (int) ($row->mes ?? 0) === $mes)
                     ->unique(fn ($row) => self::claveLineaContractual($row))
                     ->sortByDesc(fn ($row) => (int) ($row->id ?? 0))
                     ->values();
@@ -777,6 +787,12 @@ class DotacionEstablecimientoCalculator
                     ->filter(fn ($horas) => $horas > 0)
                     ->sortDesc()
                     ->values();
+                $jornadaPlanta = (float) $rowsPeriodo
+                    ->filter(fn ($row) => self::calidadJuridicaContrato($row->tipocontrato) === 'planta')
+                    ->sum(fn ($row) => is_numeric($row->jornada) ? (float) $row->jornada : 0.0);
+                $jornadaContrata = (float) $rowsPeriodo
+                    ->filter(fn ($row) => self::calidadJuridicaContrato($row->tipocontrato) === 'contrata')
+                    ->sum(fn ($row) => is_numeric($row->jornada) ? (float) $row->jornada : 0.0);
 
                 return [
                     'representante' => $representante,
@@ -785,6 +801,8 @@ class DotacionEstablecimientoCalculator
                     'mes' => $mes,
                     'registros' => $rowsPeriodo->count(),
                     'jornada_total' => round((float) $componentes->sum(), 2),
+                    'jornada_planta_total' => round($jornadaPlanta, 2),
+                    'jornada_contrata_total' => round($jornadaContrata, 2),
                     'jornada_basica_total' => round((float) $rowsPeriodo->sum(fn ($row) => is_numeric($row->jornada_basica) ? (float) $row->jornada_basica : 0.0), 2),
                     'jornada_media_total' => round((float) $rowsPeriodo->sum(fn ($row) => is_numeric($row->jornada_media) ? (float) $row->jornada_media : 0.0), 2),
                     'componentes_jornada' => $componentes,
@@ -794,6 +812,21 @@ class DotacionEstablecimientoCalculator
             })
             ->filter(fn ($grupo) => $grupo['representante'] instanceof ReemplazoPersonal)
             ->values();
+    }
+
+    private static function calidadJuridicaContrato(?string $tipoContrato): ?string
+    {
+        $tipo = self::normalizeText((string) $tipoContrato);
+
+        if (str_contains($tipo, 'CONTRATA')) {
+            return 'contrata';
+        }
+
+        if (str_contains($tipo, 'PLANTA') || str_contains($tipo, 'TITULAR')) {
+            return 'planta';
+        }
+
+        return null;
     }
 
     private static function claveLineaContractual(ReemplazoPersonal $row): string
@@ -843,6 +876,35 @@ class DotacionEstablecimientoCalculator
         return $horas
             ->map(fn ($valor) => self::formatHoras($valor))
             ->implode(' + ').' = '.self::formatHoras($total).' h';
+    }
+
+    /**
+     * @return array<int, array{nombre: string, horas: float}>
+     */
+    private static function detalleOtrasFunciones(iterable $asignaciones): array
+    {
+        return collect($asignaciones)
+            ->filter(fn ($row) => ($row->tipo_asignacion ?? null) === 'otra_funcion'
+                && is_numeric($row->horas_contrato ?? null)
+                && (float) $row->horas_contrato > 0.01)
+            ->groupBy(function ($row) {
+                $nombre = trim((string) ($row->asignatura_nombre ?? ''));
+
+                return self::normalizeText($nombre !== '' ? $nombre : 'Otra función');
+            })
+            ->map(function (Collection $rows) {
+                $representante = $rows->first();
+                $nombre = trim((string) ($representante->asignatura_nombre ?? ''));
+
+                return [
+                    'nombre' => $nombre !== '' ? $nombre : 'Otra función',
+                    'horas' => round((float) $rows->sum(fn ($row) => (float) ($row->horas_contrato ?? 0)), 2),
+                ];
+            })
+            ->filter(fn (array $item) => $item['horas'] > 0.01)
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
     }
 
     private static function categoriaFuncionDocente(?string $funcion, ?string $estamento = null): string
