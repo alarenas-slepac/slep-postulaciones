@@ -18,7 +18,7 @@
         <div class="alert alert-success">{{ session('status') }}</div>
     @endif
 
-    <div class="alert alert-info">Las cargas MAE ahora se procesan en segundo plano. Revisa el estado de cada carga y asegúrate de mantener activo el worker de cola.</div>
+    <div class="alert alert-info">Cada archivo MAE requiere confirmar las categorías de descuento antes de entrar a la cola de procesamiento. Luego, asegúrate de mantener activo el worker de Laravel.</div>
 
     <div class="card shadow-sm mb-4">
         <div class="card-body">
@@ -110,6 +110,9 @@
                             <td>{{ $item->subidaPor?->display_name ?? $item->subidaPor?->nombre_completo ?? '—' }}</td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
+                                    @if ($item->estado === 'pendiente_revision')
+                                        <a href="{{ route('endeudamiento.cargas.clasificaciones', $item) }}" class="btn btn-sm btn-warning">Revisar categorías</a>
+                                    @endif
                                     @if (in_array($item->estado, ['procesado', 'procesado_con_observaciones']))
                                         <a href="{{ route('endeudamiento.cuotas.create', ['carga_id' => $item->id]) }}" class="btn btn-sm btn-outline-success">Cuotas</a>
                                     @endif

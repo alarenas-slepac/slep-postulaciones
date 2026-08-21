@@ -1183,6 +1183,12 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     Route::post('/endeudamiento/cargas', [MaeCargaController::class, 'store'])
         ->name('endeudamiento.cargas.store');
 
+    Route::get('/endeudamiento/cargas/{maeCarga}/clasificaciones', [MaeCargaController::class, 'reviewClassifications'])
+        ->name('endeudamiento.cargas.clasificaciones');
+
+    Route::post('/endeudamiento/cargas/{maeCarga}/clasificaciones', [MaeCargaController::class, 'confirmClassifications'])
+        ->name('endeudamiento.cargas.clasificaciones.confirmar');
+
     Route::get('/endeudamiento/cargas/{maeCarga}', [MaeCargaController::class, 'show'])
         ->name('endeudamiento.cargas.show');
 

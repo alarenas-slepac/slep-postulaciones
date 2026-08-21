@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessMaeCargaImport;
 use App\Models\MaeCarga;
 use App\Services\MaeImportService;
+use App\Support\MaeDiscountCategoryCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Illuminate\Validation\ValidationException;
 
@@ -42,7 +44,7 @@ class MaeCargaController extends Controller
 
         $dominios = MaeCarga::query()->distinct()->orderBy('dominio')->pluck('dominio');
         $anios = MaeCarga::query()->distinct()->orderByDesc('anio')->pluck('anio');
-        $estados = collect(['pendiente', 'procesando', 'procesado', 'procesado_con_observaciones', 'fallido']);
+        $estados = collect(['pendiente_revision', 'pendiente', 'procesando', 'procesado', 'procesado_con_observaciones', 'fallido']);
 
         return view('endeudamiento.cargas.index', compact('items', 'dominios', 'anios', 'anio', 'mes', 'dominio', 'estado', 'estados'));
     }
@@ -69,11 +71,10 @@ class MaeCargaController extends Controller
 
         try {
             $carga = $this->importService->enqueueImport($request->file('excel'), $data, (int) $request->user()->id);
-            ProcessMaeCargaImport::dispatch($carga->id);
 
             return redirect()
-                ->route('endeudamiento.cargas.show', $carga)
-                ->with('status', 'Carga MAE recibida correctamente. La importación quedó en cola para procesarse en segundo plano.');
+                ->route('endeudamiento.cargas.clasificaciones', $carga)
+                ->with('status', 'Archivo MAE analizado. Revisa y confirma las categorías antes de iniciar la importación.');
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
@@ -87,6 +88,61 @@ class MaeCargaController extends Controller
                 ->withErrors([
                     'excel' => 'No fue posible importar el archivo MAE. Revisa la estructura del archivo y vuelve a intentar.',
                 ]);
+        }
+    }
+
+    public function reviewClassifications(MaeCarga $maeCarga): View|RedirectResponse
+    {
+        if ($maeCarga->estado !== 'pendiente_revision') {
+            return redirect()
+                ->route('endeudamiento.cargas.show', $maeCarga)
+                ->with('status', 'Las clasificaciones de esta carga ya fueron confirmadas.');
+        }
+
+        $classifications = $maeCarga->clasificaciones()->orderBy('orden_columna')->get();
+        $categoryOptions = MaeDiscountCategoryCatalog::options();
+
+        return view('endeudamiento.cargas.review-classifications', compact('maeCarga', 'classifications', 'categoryOptions'));
+    }
+
+    public function confirmClassifications(Request $request, MaeCarga $maeCarga): RedirectResponse
+    {
+        $data = $request->validate([
+            'clasificaciones' => ['sometimes', 'array'],
+            'clasificaciones.*' => ['required', 'string', Rule::in(array_keys(MaeDiscountCategoryCatalog::options()))],
+        ], [
+            'clasificaciones.*.required' => 'Todas las columnas deben tener una categoría.',
+            'clasificaciones.*.in' => 'Una de las categorías seleccionadas no es válida.',
+        ]);
+
+        try {
+            $shouldDispatch = $this->importService->confirmDiscountClassifications(
+                $maeCarga,
+                $data['clasificaciones'] ?? [],
+                (int) $request->user()->id
+            );
+
+            if ($shouldDispatch) {
+                ProcessMaeCargaImport::dispatch($maeCarga->id);
+            }
+
+            return redirect()
+                ->route('endeudamiento.cargas.show', $maeCarga)
+                ->with('status', $shouldDispatch
+                    ? 'Clasificaciones confirmadas. La importación quedó en cola para procesarse en segundo plano.'
+                    : 'La carga ya había sido confirmada y no se volvió a encolar.');
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Error confirmando clasificaciones de carga MAE', [
+                'mae_carga_id' => $maeCarga->id,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return back()->withInput()->withErrors([
+                'clasificaciones' => 'No fue posible confirmar las categorías. Intenta nuevamente.',
+            ]);
         }
     }
 

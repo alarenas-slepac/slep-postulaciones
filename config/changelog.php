@@ -1,6 +1,36 @@
 <?php
 
 return [
+    '2026.8.21.410' => [
+        'date' => '2026-08-21',
+        'module' => 'Endeudamiento',
+        'title' => 'Revisión de categorías antes de importar un MAE',
+        'files' => [
+            'app/Http/Controllers/Endeudamiento/MaeCargaController.php',
+            'app/Models/MaeCarga.php',
+            'app/Models/MaeCargaClasificacion.php',
+            'app/Services/MaeImportService.php',
+            'app/Support/MaeColumnNormalizer.php',
+            'app/Support/MaeDiscountCategoryCatalog.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_21_120000_create_mae_carga_clasificaciones_table.php',
+            'resources/views/endeudamiento/cargas/create.blade.php',
+            'resources/views/endeudamiento/cargas/index.blade.php',
+            'resources/views/endeudamiento/cargas/review-classifications.blade.php',
+            'resources/views/endeudamiento/cargas/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/MaeClassificationReviewTest.php',
+            'tests/Unit/MaeDiscountCategoryCatalogTest.php',
+        ],
+        'changes' => [
+            'Detiene cada nueva carga MAE después de analizar sus encabezados y abre una revisión modal antes de encolarla.',
+            'Muestra todas las columnas de descuento con su categoría detectada, origen de detección y un selector de corrección.',
+            'Conserva una instantánea auditable de la clasificación confirmada por carga y hace que ésta prevalezca durante la importación.',
+            'Actualiza la homologación general al confirmar columnas nuevas o corregidas, sin alterar las reglas normativas existentes.',
+            'Evita encolados duplicados y permite retomar desde el listado las cargas pendientes de revisión.',
+        ],
+        'roles' => ['Administrador'],
+    ],
     '2026.8.21.409' => [
         'date' => '2026-08-21',
         'module' => 'Endeudamiento',
