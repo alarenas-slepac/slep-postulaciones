@@ -42,8 +42,8 @@ class ModuleRegistry
     public static function defaultMeta(string $key): array
     {
         $section = match (true) {
-            $key === 'descuentos-cgr' => 'Remuneraciones',
-            in_array($key, ['centro-operaciones', 'reemplazos', 'reemplazos.personal', 'admin.permiso-sin-goce-excepciones', 'incumplimientos', 'endeudamiento', 'declaracion', 'funcionario.solicitudes-reemplazo', 'gestion.solicitudes-reemplazo', 'gestion.estadisticas', 'gestion.informes'], true) => 'Operación',
+            in_array($key, ['descuentos-cgr', 'endeudamiento'], true) => 'Remuneraciones',
+            in_array($key, ['centro-operaciones', 'reemplazos', 'reemplazos.personal', 'admin.permiso-sin-goce-excepciones', 'incumplimientos', 'declaracion', 'funcionario.solicitudes-reemplazo', 'gestion.solicitudes-reemplazo', 'gestion.estadisticas', 'gestion.informes'], true) => 'Operación',
             Str::startsWith($key, 'admin.establecimientos') ||
                 Str::startsWith($key, 'admin.alumnos-prioritarios') ||
                 Str::startsWith($key, 'admin.cursos') ||

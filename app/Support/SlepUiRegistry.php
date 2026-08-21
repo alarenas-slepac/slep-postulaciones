@@ -133,6 +133,7 @@ class SlepUiRegistry
             ],
             'Remuneraciones' => [
                 self::entry('Liquidaciones', 'liquidaciones.cargas.index', 'bi-receipt-cutoff', ['admin', 'funcionario_slep'], 'liquidaciones'),
+                self::entry('Endeudamiento', 'endeudamiento.cargas.index', 'bi-calculator', ['admin', 'funcionario_slep'], 'endeudamiento'),
                 self::entry('Descuentos CGR', 'descuentos-cgr.index', 'bi-bank', ['admin', 'funcionario_slep']),
                 self::entry('Valores UTM', 'descuentos-cgr.utm.index', 'bi-currency-exchange', ['admin', 'funcionario_slep']),
             ],
@@ -141,7 +142,6 @@ class SlepUiRegistry
                 self::entry('Informes', 'gestion.informes.index', 'bi-file-earmark-spreadsheet', ['admin', 'coordinador_gdp', 'funcionario_slep', 'supervisor_plani'], 'gestion.informes'),
                 self::entry('Bolsa de Trabajo', 'gestion.bolsa-trabajo.index', 'bi-briefcase', ['admin', 'funcionario_slep'], 'gestion.bolsa-trabajo'),
                 self::entry('Agendamiento Proyector y Salas', 'gestion.agendamientos-recursos.index', 'bi-calendar-event', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac', 'secretaria_direccion_ejecutiva']),
-                self::entry('Endeudamiento', 'endeudamiento.cargas.index', 'bi-calculator', ['admin', 'funcionario_slep'], 'endeudamiento'),
                 self::entry('Revisión documentos', 'admin.documents.index', 'bi-file-earmark-check', ['admin', 'funcionario_slep', 'coordinador_gdp'], 'admin.documents'),
             ],
             'Comunicación' => [

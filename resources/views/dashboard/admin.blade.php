@@ -45,28 +45,27 @@
 
 
 
-        @if (in_array($activeRole, ['admin', 'funcionario_slep'], true) && Route::has('descuentos-cgr.index'))
+        @if (
+            (in_array($activeRole, ['admin', 'funcionario_slep'], true) && Route::has('descuentos-cgr.index')) ||
+            ($u->canModule('endeudamiento', $activeRole) && Route::has('endeudamiento.cargas.index'))
+        )
             <div class="dashboard-section mb-4">
                 <h3 class="h6 text-uppercase text-muted mb-2">Remuneraciones</h3>
                 <div class="dashboard-grid">
-                    <a href="{{ route('descuentos-cgr.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-bank tile-icon"></i><div><h3 class="h6 m-0 text-dark">Descuentos CGR</h3><p class="text-muted small m-0">Resoluciones, cronogramas y valores UTM</p></div></div></div></a>
-                </div>
-            </div>
-        @endif
-
-        @if ($u->canModule('endeudamiento', $activeRole) && Route::has('endeudamiento.cargas.index'))
-            <div class="dashboard-section mb-4">
-                <h3 class="h6 text-uppercase text-muted mb-2">Endeudamiento</h3>
-                <div class="dashboard-grid">
-                    <a href="{{ route('endeudamiento.cargas.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-cash-coin tile-icon"></i><div><h3 class="h6 m-0 text-dark">Cargas MAE</h3><p class="text-muted small m-0">Importación versionada por mes, año y dominio</p></div></div></div></a>
-                    @if (Route::has('endeudamiento.registros.index'))
-                        <a href="{{ route('endeudamiento.registros.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-table tile-icon"></i><div><h3 class="h6 m-0 text-dark">Registros MAE</h3><p class="text-muted small m-0">Consulta de descuentos, aportes y otros descuentos</p></div></div></div></a>
+                    @if (in_array($activeRole, ['admin', 'funcionario_slep'], true) && Route::has('descuentos-cgr.index'))
+                        <a href="{{ route('descuentos-cgr.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-bank tile-icon"></i><div><h3 class="h6 m-0 text-dark">Descuentos CGR</h3><p class="text-muted small m-0">Resoluciones, cronogramas y valores UTM</p></div></div></div></a>
                     @endif
-                    @if (Route::has('endeudamiento.topes.index'))
-                        <a href="{{ route('endeudamiento.topes.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-calculator tile-icon"></i><div><h3 class="h6 m-0 text-dark">Cálculo de topes</h3><p class="text-muted small m-0">Análisis individual, detalle y exportaciones del cálculo</p></div></div></div></a>
-                    @endif
-                    @if (Route::has('endeudamiento.normativa.index'))
-                        <a href="{{ route('endeudamiento.normativa.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-sliders tile-icon"></i><div><h3 class="h6 m-0 text-dark">Topes normativos</h3><p class="text-muted small m-0">Parámetros, prioridad y reglas para descuentos homologados</p></div></div></div></a>
+                    @if ($u->canModule('endeudamiento', $activeRole) && Route::has('endeudamiento.cargas.index'))
+                        <a href="{{ route('endeudamiento.cargas.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-cash-coin tile-icon"></i><div><h3 class="h6 m-0 text-dark">Cargas MAE</h3><p class="text-muted small m-0">Importación versionada por mes, año y dominio</p></div></div></div></a>
+                        @if (Route::has('endeudamiento.registros.index'))
+                            <a href="{{ route('endeudamiento.registros.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-table tile-icon"></i><div><h3 class="h6 m-0 text-dark">Registros MAE</h3><p class="text-muted small m-0">Consulta de descuentos, aportes y otros descuentos</p></div></div></div></a>
+                        @endif
+                        @if (Route::has('endeudamiento.topes.index'))
+                            <a href="{{ route('endeudamiento.topes.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-calculator tile-icon"></i><div><h3 class="h6 m-0 text-dark">Cálculo de topes</h3><p class="text-muted small m-0">Análisis individual, detalle y exportaciones del cálculo</p></div></div></div></a>
+                        @endif
+                        @if (Route::has('endeudamiento.normativa.index'))
+                            <a href="{{ route('endeudamiento.normativa.index') }}" class="text-decoration-none"><div class="tile tile-role"><div class="d-flex align-items-center gap-3"><i class="bi bi-sliders tile-icon"></i><div><h3 class="h6 m-0 text-dark">Topes normativos</h3><p class="text-muted small m-0">Parámetros, prioridad y reglas para descuentos homologados</p></div></div></div></a>
+                        @endif
                     @endif
                 </div>
             </div>
