@@ -110,6 +110,7 @@
                         $funcionesDocente = (float) ($docente['horas_funciones_total'] ?? 0);
                         $horasPlanta = (float) ($docente['horas_planta'] ?? 0);
                         $horasContrata = (float) ($docente['horas_contrata'] ?? 0);
+                        $funcionesTecnicoPedagogicasDetalle = collect($docente['funciones_tecnico_pedagogicas_detalle'] ?? []);
                         $otrasFuncionesDetalle = collect($docente['otras_funciones_detalle'] ?? []);
                     @endphp
                     <tr>
@@ -205,6 +206,17 @@
                                                 <hr class="my-2">
                                                 <div class="small text-muted">Desglose de funciones asignadas</div>
                                                 <div class="small">Directivas: {{ $fmt($docente['horas_directivas'] ?? 0) }} · Téc. ped.: {{ $fmt($docente['horas_tecnico_pedagogicas'] ?? 0) }} · PIE: {{ $fmt($docente['horas_pie'] ?? 0) }} · Planes: {{ $fmt($docente['horas_planes'] ?? 0) }} · Otras: {{ $fmt($docente['horas_otras_funciones'] ?? 0) }}</div>
+                                                @if ($funcionesTecnicoPedagogicasDetalle->isNotEmpty())
+                                                    <div class="small text-muted mt-3">Detalle de funciones técnico-pedagógicas</div>
+                                                    <div class="vstack gap-1 mt-1">
+                                                        @foreach ($funcionesTecnicoPedagogicasDetalle as $funcionTecnicoPedagogica)
+                                                            <div class="d-flex justify-content-between gap-3 small border-bottom pb-1">
+                                                                <span>{{ $funcionTecnicoPedagogica['nombre'] }}</span>
+                                                                <strong class="text-success text-nowrap">{{ $fmt($funcionTecnicoPedagogica['horas']) }} h</strong>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
                                                 @if ($otrasFuncionesDetalle->isNotEmpty())
                                                     <div class="small text-muted mt-3">Detalle de otras horas</div>
                                                     <div class="vstack gap-1 mt-1">

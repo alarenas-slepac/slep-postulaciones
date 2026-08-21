@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.8.21.413' => [
+        'date' => '2026-08-21',
+        'module' => 'Dotación',
+        'title' => 'Detalle de funciones técnico-pedagógicas por docente',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Desglosa por nombre y cantidad de horas las funciones técnico-pedagógicas activas asignadas a cada docente.',
+            'Agrupa asignaciones repetidas de una misma función y omite registros sin horas positivas.',
+            'Mantiene separado el detalle de funciones técnico-pedagógicas del desglose de otras funciones docentes.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.21.412' => [
         'date' => '2026-08-21',
         'module' => 'Dotación',
