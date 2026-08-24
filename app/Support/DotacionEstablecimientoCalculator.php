@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\AlumnoPrioritarioPorcentaje;
 use App\Models\DeclaracionSostenedor;
+use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
@@ -107,6 +108,8 @@ class DotacionEstablecimientoCalculator
 
         $horasDotacionFunciones = collect($bloques)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
         $contratoPlanMasTrabajoColaborativoPie = (float) ($horasContratoPlanAjustadas + ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0));
+        $horasContratoDocentesBase = $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0));
+        $horasContratoDocentesExcluidas = $docentes->sum(fn ($docente) => (float) ($docente['horas_excluidas'] ?? 0));
         $horasContratoDocentes = $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0));
         $horasContratoRequeridas = $contratoPlanMasTrabajoColaborativoPie + $horasDotacionFunciones;
         $brechaContrato = round($horasContratoRequeridas - $horasContratoDocentes, 2);
@@ -136,6 +139,8 @@ class DotacionEstablecimientoCalculator
             'trabajo_colaborativo_pie' => (float) ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0),
             'contrato_plan_mas_trabajo_colaborativo_pie' => $contratoPlanMasTrabajoColaborativoPie,
             'horas_dotacion_funciones' => $horasDotacionFunciones,
+            'horas_contrato_docentes_base' => $horasContratoDocentesBase,
+            'horas_contrato_docentes_excluidas' => $horasContratoDocentesExcluidas,
             'horas_contrato_docentes' => $horasContratoDocentes,
             'horas_contrato_requeridas' => $horasContratoRequeridas,
             'horas_por_contratar' => $brechaContrato > 0 ? $brechaContrato : 0.0,
@@ -540,6 +545,7 @@ class DotacionEstablecimientoCalculator
             ->get();
 
         $personalConsolidado = self::consolidarPersonalUltimoPeriodo($personal);
+        $exclusionesPorRut = self::exclusionesDocentesPorRut($establecimiento, $anio);
 
         $declaraciones = self::declaracionesPorRut(
             $establecimiento,
@@ -563,15 +569,21 @@ class DotacionEstablecimientoCalculator
         })->values();
         $asignacionesPorRut = DotacionAsignacionCalculator::assignmentsByRut($establecimiento, $anio);
 
-        return $personalConsolidado->map(function (array $grupo) use ($declaraciones, $asignacionesPorRut) {
+        return $personalConsolidado->map(function (array $grupo) use ($declaraciones, $asignacionesPorRut, $exclusionesPorRut) {
             /** @var ReemplazoPersonal $row */
             $row = $grupo['representante'];
             $rut = self::normalizeRut($row->rut);
             $declaracion = $declaraciones[$rut] ?? null;
-            $horasContrato = self::firstPositive([
+            $horasContratoBase = self::firstPositive([
                 $declaracion?->horas_contratadas ?? null,
                 $grupo['jornada_total'] ?? null,
             ]);
+            $exclusionDocente = $exclusionesPorRut[$rut] ?? null;
+            $ajusteContrato = self::ajustarHorasContratoPorExclusion(
+                $horasContratoBase,
+                $exclusionDocente?->horas
+            );
+            $horasContrato = $ajusteContrato['horas_consideradas'];
             $horasBasicaDeclarada = (float) ($grupo['jornada_basica_total'] ?? 0);
             $horasMediaDeclarada = (float) ($grupo['jornada_media_total'] ?? 0);
             $asignacionesDocente = $asignacionesPorRut[$rut] ?? [
@@ -614,7 +626,15 @@ class DotacionEstablecimientoCalculator
                 'categoria_funcion' => $categoriaFuncion,
                 'estamento' => $declaracion?->estamento ?: ($row->estatuto ?: 'Docente'),
                 'estamento_cobertura' => 'docente',
+                'horas_contrato_base' => $ajusteContrato['horas_base'],
+                'horas_excluidas' => $ajusteContrato['horas_excluidas'],
                 'horas_contrato' => $horasContrato,
+                'exclusion_docente' => $exclusionDocente ? [
+                    'id' => (int) $exclusionDocente->id,
+                    'motivo' => (string) $exclusionDocente->motivo,
+                    'motivo_label' => $exclusionDocente->motivo_label,
+                    'horas' => $ajusteContrato['horas_excluidas'],
+                ] : null,
                 'horas_planta' => (float) ($grupo['jornada_planta_total'] ?? 0),
                 'horas_contrata' => (float) ($grupo['jornada_contrata_total'] ?? 0),
                 'horas_aula' => $horasAula,
@@ -652,11 +672,11 @@ class DotacionEstablecimientoCalculator
                 'fuente_contrato' => $declaracion ? 'declaracion_sostenedor' : 'reemplazos_personal',
                 'registros_contrato' => (int) ($grupo['registros'] ?? 1),
                 'horas_contrato_componentes' => $declaracion
-                    ? [(float) $horasContrato]
+                    ? [(float) $horasContratoBase]
                     : collect($grupo['componentes_jornada'] ?? [])->values()->all(),
                 'horas_contrato_detalle' => $declaracion
                     ? null
-                    : self::detalleComposicionContrato($grupo['componentes_jornada'] ?? [], $horasContrato),
+                    : self::detalleComposicionContrato($grupo['componentes_jornada'] ?? [], $horasContratoBase),
                 'niveles_declarados' => self::nivelesDeclarados($declaracion),
                 'tiene_declaracion' => (bool) $declaracion,
                 'declaracion' => $declaracion,
@@ -664,6 +684,50 @@ class DotacionEstablecimientoCalculator
         })->sortBy('nombre')->values();
     }
 
+    /**
+     * @return array<string, DotacionDocenteExclusion>
+     */
+    private static function exclusionesDocentesPorRut(Establecimiento $establecimiento, int $anio): array
+    {
+        if (! self::schemaHasTable('dotacion_docente_exclusiones')) {
+            return [];
+        }
+
+        return DotacionDocenteExclusion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->get()
+            ->keyBy(fn (DotacionDocenteExclusion $exclusion) => self::normalizeRut(
+                $exclusion->docente_rut_normalizado ?: $exclusion->docente_rut
+            ))
+            ->all();
+    }
+
+    /**
+     * @return array{horas_base: ?float, horas_excluidas: float, horas_consideradas: ?float}
+     */
+    private static function ajustarHorasContratoPorExclusion(
+        float|int|null $horasContratoBase,
+        float|int|string|null $horasExcluidas
+    ): array
+    {
+        if ($horasContratoBase === null) {
+            return [
+                'horas_base' => null,
+                'horas_excluidas' => 0.0,
+                'horas_consideradas' => null,
+            ];
+        }
+
+        $base = max(0.0, round((float) $horasContratoBase, 2));
+        $excluidas = min($base, max(0.0, round((float) ($horasExcluidas ?? 0), 2)));
+
+        return [
+            'horas_base' => $base,
+            'horas_excluidas' => $excluidas,
+            'horas_consideradas' => max(0.0, round($base - $excluidas, 2)),
+        ];
+    }
 
     public static function asistentes(Establecimiento $establecimiento, int $anio): Collection
     {

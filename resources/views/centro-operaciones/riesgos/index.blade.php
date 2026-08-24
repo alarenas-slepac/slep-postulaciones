@@ -6,7 +6,7 @@
 
 @section('content')
 @php
-    $puedeEvaluar = auth()->user()->hasAnyRole(['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'gabinete_slep']);
+    $puedeEvaluar = auth()->user()->hasAnyRole(['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep']);
 @endphp
 <div class="co-shell co-risk-shell">
     <header class="co-hero">
@@ -19,7 +19,7 @@
             </div>
         </div>
         <div class="co-hero-actions">
-            @hasanyrole('admin|gabinete_slep')
+            @hasanyrole('admin|comunicaciones|gabinete_slep')
                 <a class="btn btn-outline-primary" href="{{ route('centro-operaciones.riesgos.configuracion') }}"><i class="bi bi-sliders"></i> Mantenedor IRTE</a>
             @endhasanyrole
             <a class="btn btn-outline-secondary" href="{{ route('centro-operaciones.index') }}"><i class="bi bi-arrow-left"></i> Panel</a>

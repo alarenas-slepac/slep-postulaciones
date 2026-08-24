@@ -3,6 +3,8 @@
 namespace Tests\Unit;
 
 use App\Models\DotacionDocenteAsignacion;
+use App\Models\DotacionDocenteExclusion;
+use App\Models\Establecimiento;
 use App\Models\ReemplazoPersonal;
 use App\Support\DotacionEstablecimientoCalculator;
 use Illuminate\Support\Collection;
@@ -87,6 +89,51 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         $this->assertStringContainsString('Coordinación medioambiental', $html);
     }
 
+    public function test_exclusion_descuenta_solo_las_horas_indicadas_del_contrato_original(): void
+    {
+        $resultado = $this->invokePrivate('ajustarHorasContratoPorExclusion', [44, 14]);
+
+        $this->assertSame(44.0, $resultado['horas_base']);
+        $this->assertSame(14.0, $resultado['horas_excluidas']);
+        $this->assertSame(30.0, $resultado['horas_consideradas']);
+    }
+
+    public function test_vista_ofrece_todos_los_motivos_y_limita_horas_al_saldo_sin_asignar(): void
+    {
+        $establecimiento = new Establecimiento(['nombre_establecimiento' => 'Establecimiento de prueba']);
+        $establecimiento->id = 10;
+        $docente = array_merge($this->docenteVista(), [
+            'horas_contrato_base' => 44.0,
+            'horas_excluidas' => 0.0,
+            'exclusion_docente' => null,
+            'horas_asignadas_total' => 30.0,
+            'diferencia' => 14.0,
+            'estado_cuadratura' => [
+                'key' => 'faltan_horas',
+                'label' => 'Faltan horas',
+                'class' => 'text-bg-info',
+                'detalle' => 'Existen horas contratadas sin asignación clasificada.',
+            ],
+        ]);
+
+        $html = view('admin.dotacion-establecimiento.partials._docentes', [
+            'docentes' => collect([$docente]),
+            'establecimiento' => $establecimiento,
+            'anio' => 2026,
+            'canManageDocenteExclusiones' => true,
+            'docenteExclusionesTableReady' => true,
+            'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS,
+        ])->render();
+
+        foreach (DotacionDocenteExclusion::MOTIVOS as $motivo) {
+            $this->assertStringContainsString($motivo, $html);
+        }
+
+        $this->assertStringContainsString('name="horas"', $html);
+        $this->assertStringContainsString('max="14"', $html);
+        $this->assertStringContainsString('Máximo sin asignar: 14 h.', $html);
+    }
+
     private function personal(int $id, string $rut, int $anio, int $mes, string $tipo, int $jornada, string $hash): ReemplazoPersonal
     {
         $personal = new ReemplazoPersonal([
@@ -123,7 +170,10 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             'funcion' => 'Docente aula',
             'titulo' => 'Profesor(a)',
             'estamento' => 'DOCENTE',
+            'horas_contrato_base' => 44.0,
+            'horas_excluidas' => 0.0,
             'horas_contrato' => 44.0,
+            'exclusion_docente' => null,
             'horas_planta' => 44.0,
             'horas_contrata' => 0.0,
             'horas_aula' => 30.0,

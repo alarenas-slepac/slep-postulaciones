@@ -38,7 +38,7 @@
                         $isCargasApplicant = in_array($activeRole, $cargasSolicitanteRoles, true);
                         $ticketsRoles = ['admin', 'director_ejecutivo', 'secretaria_direccion_ejecutiva', 'comunicaciones', 'gabinete_slep', 'funcionario_ac', 'funcionario_directivo_estab'];
                         $canAccessCentroOperacionesTickets = $u->hasAnyRole($ticketsRoles);
-                        $canManageCentroOperacionesTickets = $u->hasAnyRole(['admin', 'gabinete_slep']);
+                        $canManageCentroOperacionesTickets = $u->hasAnyRole(['admin', 'comunicaciones', 'gabinete_slep']);
                     @endphp
 
                     <li class="nav-item">

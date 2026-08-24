@@ -1,6 +1,57 @@
 <?php
 
 return [
+    '2026.8.24.415' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Situaciones docentes con horas no consideradas',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionDocenteExclusionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Models/DotacionDocenteExclusion.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_24_090000_create_dotacion_docente_exclusiones_table.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'routes/web.php',
+            'tests/Feature/DotacionDocenteExclusionTest.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Permite registrar por docente una situación administrativa y la cantidad de horas contractuales que no deben considerarse en la dotación del establecimiento.',
+            'Incluye sumario administrativo, trabajo en SLEP, fuero maternal, desvinculación, traslado, renuncia voluntaria, proceso BIR, lactancia y horas gremiales.',
+            'Limita el descuento al saldo contractual que aún no tiene asignaciones, conservando intactas las horas ya asignadas.',
+            'Mantiene visible el contrato original, las horas no consideradas y el contrato efectivo utilizado en la cuadratura.',
+            'Permite actualizar o eliminar la situación y conserva el registro separado por establecimiento, año y RUT.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
+    '2026.8.21.414' => [
+        'date' => '2026-08-21',
+        'module' => 'Centro de Operaciones',
+        'title' => 'Acceso integral para Comunicaciones',
+        'files' => [
+            'app/Http/Controllers/CentroOperaciones/TicketController.php',
+            'app/Http/Requests/CentroOperaciones/SubirTicketImagenesRequest.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/centro_operaciones.php',
+            'config/changelog.php',
+            'resources/views/centro-operaciones/reportes/history.blade.php',
+            'resources/views/centro-operaciones/riesgos/index.blade.php',
+            'resources/views/centro-operaciones/tickets/index.blade.php',
+            'resources/views/partials/navbar.blade.php',
+            'routes/web.php',
+            'tests/Feature/CentroOperacionesRoleAccessTest.php',
+            'tests/Feature/CentroOperacionesTicketsModuleTest.php',
+        ],
+        'changes' => [
+            'Equipara el alcance de Comunicaciones con la gestión territorial integral del Centro de Operaciones.',
+            'Permite crear y editar reportes diarios para cualquier establecimiento, evaluar riesgos y administrar el modelo IRTE.',
+            'Habilita los mantenedores de incidencias y el registro fotográfico de tickets, conservando la validación documental existente.',
+            'Expone todos los accesos correspondientes en el menú principal, accesos rápidos y vistas internas del módulo.',
+        ],
+        'roles' => ['Comunicaciones'],
+    ],
     '2026.8.21.413' => [
         'date' => '2026-08-21',
         'module' => 'Dotación',

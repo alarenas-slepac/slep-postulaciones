@@ -22,7 +22,7 @@
                 <i class="bi bi-inbox" aria-hidden="true"></i>
                 <span><strong>{{ number_format($tickets->total(), 0, ',', '.') }}</strong> visibles</span>
             </span>
-            @if(auth()->user()->hasAnyRole(['admin', 'gabinete_slep']))
+            @if(auth()->user()->hasAnyRole(['admin', 'comunicaciones', 'gabinete_slep']))
                 <a class="btn btn-outline-primary" href="{{ route('centro-operaciones.configuraciones.index') }}">
                     <i class="bi bi-sliders"></i> Mantenedor
                 </a>

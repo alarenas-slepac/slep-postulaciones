@@ -193,7 +193,7 @@ class TicketController extends Controller
         $usuario = $request->user();
         $ticket->loadMissing('incidencia');
 
-        return $usuario->hasRole('gabinete_slep')
+        return $usuario->hasAnyRole(config('centro_operaciones.roles_gestion_total', []))
             || (
                 $usuario->hasRole('funcionario_directivo_estab')
                 && (int) $usuario->establecimiento_id === (int) $ticket->incidencia?->establecimiento_id
