@@ -78,7 +78,7 @@
     $horasContratoCoordinacionPie = (float) ($resumen['horas_contrato_docente_pie_coordinacion'] ?? 0);
     $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
     $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0) + $horasContratoPieNecesarias));
-    $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas) - ($horasContratoAula + $horasBloqueDeclaradas)));
+    $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas + $horasBloqueDeclaradas) - $horasContratoAula));
     $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));
     $brechaContratoFinal = (float) ($resumen['brecha_contrato_final'] ?? ($horasContratoRequeridas - $horasContratoActuales));
     $resultadoBrecha = static function (float $valor) use ($fmt): array {
@@ -231,7 +231,7 @@
     <tbody>
         <tr>
             <td><strong>Dotación general</strong></td>
-            <td>(Contrato plan + trabajo colaborativo PIE + bloque normativo) − (contrato aula + bloque declarado).<br><span class="muted">({{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }} + {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }} + {{ $fmt($horasBloqueNormativas) }}) − ({{ $fmt($horasContratoAula) }} + {{ $fmt($horasBloqueDeclaradas) }})</span></td>
+            <td>(Contrato plan + trabajo colaborativo PIE + bloque normativo + bloque declarado) − contrato aula.<br><span class="muted">({{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }} + {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }} + {{ $fmt($horasBloqueNormativas) }} + {{ $fmt($horasBloqueDeclaradas) }}) − {{ $fmt($horasContratoAula) }}</span></td>
             <td class="text-right {{ $resultadoGeneral['text'] }}">{{ $resultadoGeneral['value'] }} - {{ $resultadoGeneral['label'] }}</td>
         </tr>
         <tr>

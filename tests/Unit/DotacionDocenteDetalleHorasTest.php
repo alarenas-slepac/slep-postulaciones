@@ -222,7 +222,7 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         ]);
 
         $this->assertSame([
-            'general' => -45.0,
+            'general' => 7.0,
             'pie' => 31.0,
         ], $resultado);
     }

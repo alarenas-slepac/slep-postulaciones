@@ -38,8 +38,8 @@
         <div class="alert {{ $resultadoEsSobredotacion ? 'alert-danger' : ($resultadoEsNecesidad ? 'alert-success' : 'alert-primary') }} border-0 rounded-4">
             <div class="fw-bold mb-1">{{ $esAula ? 'Dotación General' : 'Dotación PIE' }}</div>
             @if ($esAula)
-                <div>(Contrato plan + trabajo colaborativo PIE + bloque normativo) − (contrato Aula + bloque declarado).</div>
-                <div class="fw-semibold mt-1">({{ $fmt($formula['contrato_plan_pie'] ?? 0) }} + {{ $fmt($formula['bloque_normativo'] ?? 0) }}) − ({{ $fmt($formula['contrato_aula'] ?? 0) }} + {{ $fmt($formula['bloque_declarado'] ?? 0) }})</div>
+                <div>(Contrato plan + trabajo colaborativo PIE + bloque normativo + bloque declarado) − contrato Aula.</div>
+                <div class="fw-semibold mt-1">({{ $fmt($formula['contrato_plan_pie'] ?? 0) }} + {{ $fmt($formula['bloque_normativo'] ?? 0) }} + {{ $fmt($formula['bloque_declarado'] ?? 0) }}) − {{ $fmt($formula['contrato_aula'] ?? 0) }}</div>
             @else
                 <div>Horas de contrato PIE necesarias − horas contrato docente PIE.</div>
                 <div class="fw-semibold mt-1">{{ $fmt($formula['contrato_pie_necesario'] ?? 0) }} − {{ $fmt($formula['contrato_docente_pie'] ?? 0) }}</div>
@@ -58,7 +58,7 @@
         <div class="row g-3">
             <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Docentes analizados</div><div class="h4 fw-bold mb-0">{{ number_format((int) ($sobredotacionResumen['docentes_analizados'] ?? 0), 0, ',', '.') }}</div><div class="small text-muted">Con horas en este bloque</div></div></div>
             <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-danger-subtle h-100"><div class="small text-muted">Con sobredotación</div><div class="h4 fw-bold text-danger mb-0">{{ number_format((int) ($sobredotacionResumen['docentes_sobredotacion'] ?? 0), 0, ',', '.') }}</div><div class="small text-muted">Docentes identificados</div></div></div>
-            <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Dotación considerada</div><div class="h4 fw-bold mb-0">{{ $fmt($sobredotacionResumen['horas_dotacion_total'] ?? 0) }}</div><div class="small text-muted">{{ $esAula ? 'Contrato Aula + bloque declarado' : 'Contrato docente PIE' }}</div></div></div>
+            <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Dotación considerada</div><div class="h4 fw-bold mb-0">{{ $fmt($sobredotacionResumen['horas_dotacion_total'] ?? 0) }}</div><div class="small text-muted">{{ $esAula ? 'Sólo contrato Aula' : 'Contrato docente PIE' }}</div></div></div>
             <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Horas necesarias</div><div class="h4 fw-bold mb-0">{{ $fmt($sobredotacionResumen['horas_necesarias_total'] ?? 0) }}</div><div class="small text-muted">Necesidad del bloque</div></div></div>
             <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Asignadas registradas</div><div class="h4 fw-bold text-success mb-0">{{ $fmt($sobredotacionResumen['horas_asignadas_registradas'] ?? 0) }}</div><div class="small text-muted">Usadas para ordenar docentes</div></div></div>
             <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-danger-subtle h-100"><div class="small text-muted">Sobredotación total</div><div class="h4 fw-bold text-danger mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_total'] ?? 0) }}</div><div class="small text-muted">Conciliada con el resumen</div></div></div>
@@ -82,7 +82,7 @@
 <div class="card dotacion-section">
     <div class="dotacion-section-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-            <div class="dotacion-eyebrow">{{ $esAula ? 'Contrato Aula y bloque declarado' : 'Contrato docente PIE' }}</div>
+            <div class="dotacion-eyebrow">{{ $esAula ? 'Contrato Aula' : 'Contrato docente PIE' }}</div>
             <h2 class="h5 fw-bold mb-1">Nómina de sobredotación</h2>
             <div class="text-muted small">El listado contiene sólo los docentes con horas remanentes después de distribuir la necesidad del bloque.</div>
         </div>
@@ -96,7 +96,6 @@
                     <th>Docente</th>
                     <th>Función</th>
                     <th class="text-end">{{ $esAula ? 'Contrato Aula' : 'Contrato docente PIE' }}</th>
-                    @if ($esAula)<th class="text-end">Bloque declarado</th>@endif
                     <th class="text-end">Dotación considerada</th>
                     <th class="text-end">Asignadas registradas</th>
                     <th class="text-end">Necesidad cubierta</th>
@@ -112,7 +111,6 @@
                         <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
                         <td>{{ $docente['funcion'] }}</td>
                         <td class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td>
-                        @if ($esAula)<td class="text-end text-secondary">{{ $fmt($docente['horas_bloque_declarado']) }}</td>@endif
                         <td class="text-end fw-semibold">{{ $fmt($docente['horas_dotacion_total']) }}</td>
                         <td class="text-end text-success">{{ $fmt($docente['horas_asignadas_relevantes']) }}</td>
                         <td class="text-end">{{ $fmt($docente['horas_necesidad_cubierta']) }}</td>
@@ -121,13 +119,13 @@
                         <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="{{ $esAula ? 11 : 10 }}" class="text-center text-muted py-5"><i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>No se identificaron docentes con sobredotación en este bloque.</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted py-5"><i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>No se identificaron docentes con sobredotación en este bloque.</td></tr>
                 @endforelse
             </tbody>
             @if ($sobredotacionItems->isNotEmpty())
                 <tfoot class="table-light fw-bold">
                     <tr>
-                        <td colspan="{{ $esAula ? 8 : 7 }}">Total sobredotación {{ $esAula ? 'Aula' : 'PIE' }}</td>
+                        <td colspan="7">Total sobredotación {{ $esAula ? 'Aula' : 'PIE' }}</td>
                         <td class="text-end text-danger">{{ $fmt($sobredotacionResumen['horas_sobredotacion_total'] ?? 0) }}</td>
                         <td class="text-end text-primary">{{ $fmt($sobredotacionResumen['horas_sobredotacion_planta'] ?? 0) }}</td>
                         <td class="text-end text-info">{{ $fmt($sobredotacionResumen['horas_sobredotacion_contrata'] ?? 0) }}</td>

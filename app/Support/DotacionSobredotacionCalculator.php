@@ -37,15 +37,13 @@ class DotacionSobredotacionCalculator
             ->values();
 
         $declaradasObjetivo = self::numero($resumen, 'horas_dotacion_funciones_declaradas');
-        $aula = self::itemsAula($base, $declaradasObjetivo);
-        $aulaObjetivo = round(
-            self::numero($resumen, 'horas_contrato_docentes_aula') + $declaradasObjetivo,
-            2
-        );
+        $aula = self::itemsAula($base);
+        $aulaObjetivo = self::numero($resumen, 'horas_contrato_docentes_aula');
         $aula = self::conciliarDotacion($aula, $aulaObjetivo, 'Horas de dotación general no asociadas a docente');
         $necesidadAula = round(
             self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie')
-            + self::numero($resumen, 'horas_dotacion_funciones_normativas'),
+            + self::numero($resumen, 'horas_dotacion_funciones_normativas')
+            + $declaradasObjetivo,
             2
         );
 
@@ -93,11 +91,6 @@ class DotacionSobredotacionCalculator
             }
         }
 
-        $declaradasAsignadas = array_key_exists('horas_bloque_declarado', $docente)
-            ? max(0.0, (float) $docente['horas_bloque_declarado'])
-            : (float) $asignaciones
-                ->filter(fn ($asignacion) => (int) data_get($asignacion, 'dotacion_funcion_id', 0) > 0)
-                ->sum(fn ($asignacion) => self::horasAsignacion($asignacion));
         $asignadasGeneral = array_key_exists('horas_asignadas_general', $docente)
             ? max(0.0, (float) $docente['horas_asignadas_general'])
             : (float) $asignaciones
@@ -114,65 +107,25 @@ class DotacionSobredotacionCalculator
             'aula_contrata' => round(max(0.0, $contrata - $pieContrata), 2),
             'pie_planta' => round($piePlanta, 2),
             'pie_contrata' => round($pieContrata, 2),
-            'declaradas_asignadas' => round($declaradasAsignadas, 2),
             'asignadas_general' => round($asignadasGeneral, 2),
             'asignadas_pie' => round($contratoPie, 2),
         ];
     }
 
-    private static function itemsAula(Collection $base, float $declaradasObjetivo): Collection
+    private static function itemsAula(Collection $base): Collection
     {
-        $declaradasIndividualizadas = round(
-            (float) $base->sum(fn (array $docente) => (float) $docente['declaradas_asignadas']),
-            2
-        );
-        $distribucionDeclaradas = self::distribuirProporcionalmente(
-            $base->map(fn (array $docente) => (float) $docente['declaradas_asignadas']),
-            min($declaradasObjetivo, $declaradasIndividualizadas)
-        );
-
-        $items = $base->map(function (array $docente, int $index) use ($distribucionDeclaradas) {
-            $declaradas = (float) ($distribucionDeclaradas[$index] ?? 0);
-            $declaradasPlanta = $docente['es_titular'] ? $declaradas : 0.0;
-            $declaradasContrata = $docente['es_titular'] ? 0.0 : $declaradas;
-
-            return self::itemBase($docente, [
-                'horas_contrato_categoria' => round($docente['aula_planta'] + $docente['aula_contrata'], 2),
-                'horas_bloque_declarado' => round($declaradas, 2),
-                'horas_dotacion_planta' => round($docente['aula_planta'] + $declaradasPlanta, 2),
-                'horas_dotacion_contrata' => round($docente['aula_contrata'] + $declaradasContrata, 2),
-                'horas_asignadas_relevantes' => $docente['asignadas_general'],
-            ]);
-        })->values();
-
-        $declaradasNoAsociadas = round(
-            max(0.0, $declaradasObjetivo - self::sumar($items, 'horas_bloque_declarado')),
-            2
-        );
-        if ($declaradasNoAsociadas > 0.01) {
-            $items->push([
-                'rut' => '—',
-                'nombre' => 'Horas declaradas no asociadas a docente',
-                'funcion' => 'Revisar asignación individual',
-                'tipo_contrato' => 'Sin clasificación individual',
-                'es_ajuste' => true,
-                'horas_contrato_categoria' => 0.0,
-                'horas_bloque_declarado' => $declaradasNoAsociadas,
-                'horas_dotacion_planta' => 0.0,
-                'horas_dotacion_contrata' => $declaradasNoAsociadas,
-                'horas_dotacion_total' => $declaradasNoAsociadas,
-                'horas_asignadas_relevantes' => 0.0,
-            ]);
-        }
-
-        return $items;
+        return $base->map(fn (array $docente) => self::itemBase($docente, [
+            'horas_contrato_categoria' => round($docente['aula_planta'] + $docente['aula_contrata'], 2),
+            'horas_dotacion_planta' => $docente['aula_planta'],
+            'horas_dotacion_contrata' => $docente['aula_contrata'],
+            'horas_asignadas_relevantes' => $docente['asignadas_general'],
+        ]))->values();
     }
 
     private static function itemsPie(Collection $base): Collection
     {
         return $base->map(fn (array $docente) => self::itemBase($docente, [
             'horas_contrato_categoria' => round($docente['pie_planta'] + $docente['pie_contrata'], 2),
-            'horas_bloque_declarado' => 0.0,
             'horas_dotacion_planta' => $docente['pie_planta'],
             'horas_dotacion_contrata' => $docente['pie_contrata'],
             'horas_asignadas_relevantes' => $docente['asignadas_pie'],
@@ -209,7 +162,6 @@ class DotacionSobredotacionCalculator
                 'tipo_contrato' => 'Sin clasificación individual',
                 'es_ajuste' => true,
                 'horas_contrato_categoria' => $diferencia,
-                'horas_bloque_declarado' => 0.0,
                 'horas_dotacion_planta' => 0.0,
                 'horas_dotacion_contrata' => $diferencia,
                 'horas_dotacion_total' => $diferencia,
@@ -228,11 +180,6 @@ class DotacionSobredotacionCalculator
                     $reduccionContrato = min((float) $item['horas_contrato_categoria'], $reduccion);
                     $item['horas_contrato_categoria'] = round(
                         (float) $item['horas_contrato_categoria'] - $reduccionContrato,
-                        2
-                    );
-                    $reduccionDeclarada = round($reduccion - $reduccionContrato, 2);
-                    $item['horas_bloque_declarado'] = round(
-                        max(0.0, (float) $item['horas_bloque_declarado'] - $reduccionDeclarada),
                         2
                     );
                     $item['horas_dotacion_total'] = round(
@@ -341,8 +288,7 @@ class DotacionSobredotacionCalculator
             return true;
         }
 
-        return in_array($tipo, ['funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion'], true)
-            && (int) data_get($asignacion, 'dotacion_funcion_id', 0) === 0;
+        return in_array($tipo, ['funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion'], true);
     }
 
     private static function esContratoPie(object|array $asignacion): bool
@@ -370,29 +316,6 @@ class DotacionSobredotacionCalculator
     private static function horasAsignacion(object|array $asignacion): float
     {
         return max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
-    }
-
-    /** @return Collection<int, float> */
-    private static function distribuirProporcionalmente(Collection $pesos, float $objetivo): Collection
-    {
-        $resultado = $pesos->map(fn () => 0.0);
-        $totalPesos = round((float) $pesos->sum(), 2);
-        if ($objetivo <= 0.0 || $totalPesos <= 0.0) {
-            return $resultado;
-        }
-
-        $restante = round($objetivo, 2);
-        $indices = $pesos->filter(fn ($peso) => (float) $peso > 0.0)->keys()->values();
-        foreach ($indices as $posicion => $index) {
-            $esUltimo = $posicion === $indices->count() - 1;
-            $horas = $esUltimo
-                ? $restante
-                : round($objetivo * ((float) $pesos[$index] / $totalPesos), 2);
-            $resultado[$index] = $horas;
-            $restante = round($restante - $horas, 2);
-        }
-
-        return $resultado;
     }
 
     /** @return array{0: float, 1: float} */
