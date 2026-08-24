@@ -106,8 +106,11 @@ class DotacionEstablecimientoCalculator
         $cursos['totales']['reduccion_cursos_combinados'] = $reduccionCursosCombinados;
         $cursos['totales']['reduccion_contrato_cursos_combinados'] = $reduccionContratoCursosCombinados;
 
-        $horasDotacionFunciones = collect($bloques)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
-        $desgloseHorasDotacion = self::desgloseContratoBloqueDotacion($bloques);
+        $desgloseContratoPieNecesario = self::desgloseContratoPieNecesario($bloques);
+        $bloquesContratoDotacion = self::bloquesSinContratoPieNecesario($bloques);
+        $horasContratoPieNecesarias = (float) ($desgloseContratoPieNecesario['total'] ?? 0);
+        $horasDotacionFunciones = collect($bloquesContratoDotacion)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
+        $desgloseHorasDotacion = self::desgloseContratoBloqueDotacion($bloquesContratoDotacion);
         $contratoPlanMasTrabajoColaborativoPie = (float) ($horasContratoPlanAjustadas + ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0));
         $horasContratoDocentesBase = $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0));
         $horasContratoDocentesExcluidas = $docentes->sum(fn ($docente) => (float) ($docente['horas_excluidas'] ?? 0));
@@ -117,7 +120,7 @@ class DotacionEstablecimientoCalculator
         $horasContratoDocentePie = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie', 0);
         $horasContratoDocentesAula = max(0.0, round($horasContratoDocentes - $horasContratoDocentePie, 2));
         $horasContratoDocentePieExceso = max(0.0, round($horasContratoDocentePie - $horasContratoDocentes, 2));
-        $horasContratoRequeridas = $contratoPlanMasTrabajoColaborativoPie + $horasDotacionFunciones;
+        $horasContratoRequeridas = $contratoPlanMasTrabajoColaborativoPie + $horasDotacionFunciones + $horasContratoPieNecesarias;
         $brechaContrato = round($horasContratoRequeridas - $horasContratoDocentes, 2);
         $horasAulaAsignadas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_aula'] ?? 0));
         $horasContrato6535 = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_65_35'] ?? 0));
@@ -146,6 +149,8 @@ class DotacionEstablecimientoCalculator
             'contrato_plan_mas_trabajo_colaborativo_pie' => $contratoPlanMasTrabajoColaborativoPie,
             'horas_dotacion_funciones' => $horasDotacionFunciones,
             'horas_dotacion_desglose' => $desgloseHorasDotacion,
+            'horas_contrato_pie_necesarias' => $horasContratoPieNecesarias,
+            'horas_contrato_pie_necesarias_desglose' => $desgloseContratoPieNecesario,
             'horas_contrato_docentes_base' => $horasContratoDocentesBase,
             'horas_contrato_docentes_excluidas' => $horasContratoDocentesExcluidas,
             'horas_contrato_docentes' => $horasContratoDocentes,
@@ -197,6 +202,7 @@ class DotacionEstablecimientoCalculator
             'resumen' => $resumen,
             'cursos' => $cursos,
             'bloques' => $bloques,
+            'bloques_contrato_dotacion' => $bloquesContratoDotacion,
             'docentes' => $docentes,
             'asistentes' => $asistentes,
             'asignacion' => $asignacion,
@@ -338,6 +344,9 @@ class DotacionEstablecimientoCalculator
         foreach ($sugerencias as $item) {
             $key = self::grupoConsolidadoFor($item['categoria'] ?? null, $item['codigo'] ?? null);
             $horas = (float) ($item['horas_sugeridas'] ?? 0);
+            $tipoContratoPieNecesario = ($item['codigo'] ?? null) === 'coordinador_pie'
+                ? 'coordinacion_pie'
+                : null;
             $bloques[$key]['automaticas'] += $horas;
             $bloques[$key]['total'] += $horas;
             $bloques[$key]['items'][] = [
@@ -347,6 +356,7 @@ class DotacionEstablecimientoCalculator
                 'detalle' => $item['detalle'] ?? null,
                 'dotacion_funcion_id' => null,
                 'dotacion_funcion_regla_id' => $item['regla']?->id,
+                'tipo_contrato_pie_necesario' => $tipoContratoPieNecesario,
             ];
         }
 
@@ -383,6 +393,7 @@ class DotacionEstablecimientoCalculator
                 'prof_educ_dif_label' => $pieContrato['prof_educ_dif_label'] ?? '00:00',
                 'horas_contrato_exactas_label' => $pieContrato['educadoras_diferenciales_label_exactas'] ?? '00:00',
                 'detalle_proporciones' => $pieContrato['detalle_proporciones'] ?? [],
+                'tipo_contrato_pie_necesario' => 'educadoras_diferenciales',
                 'detalle' => 'PROF EDUC. DIF: '.($pieContrato['prof_educ_dif_label'] ?? '00:00')
                     .'. Horas contrato asociadas: '.($pieContrato['educadoras_diferenciales_label_exactas'] ?? '00:00')
                     .'. Bolsa contractual redondeada: '.$pieContrato['educadoras_diferenciales_label'].' h.'
@@ -1499,31 +1510,60 @@ class DotacionEstablecimientoCalculator
         ];
     }
 
-    /**
-     * Separa los componentes que forman el contrato del bloque de dotación.
-     * Coordinación PIE corresponde al saldo del bloque PIE después de extraer
-     * la bolsa contractual de Educadoras Diferenciales.
-     *
-     * @return array<string, float>
-     */
+    /** @return array<string, float> */
     private static function desgloseContratoBloqueDotacion(array $bloques): array
     {
-        $horasPie = (float) data_get($bloques, 'pie.total', 0);
-        $horasEducadorasDiferenciales = min(
-            $horasPie,
-            max(0.0, (float) data_get($bloques, 'pie.educadoras_diferenciales', 0))
-        );
-
         return [
             'funciones_directivas' => (float) data_get($bloques, 'directiva.total', 0),
             'funciones_tecnico_pedagogicas' => (float) data_get($bloques, 'tecnico_pedagogica.total', 0),
             'funciones_tecnico_pedagogicas_normativas' => (float) data_get($bloques, 'tecnico_pedagogica.automaticas', 0),
             'funciones_tecnico_pedagogicas_declaradas' => (float) data_get($bloques, 'tecnico_pedagogica.declaradas', 0),
-            'coordinacion_pie' => max(0.0, round($horasPie - $horasEducadorasDiferenciales, 2)),
-            'educadoras_diferenciales' => $horasEducadorasDiferenciales,
+            'otras_funciones_pie' => (float) data_get($bloques, 'pie.total', 0),
             'planes_normativos' => (float) data_get($bloques, 'planes_programas.total', 0),
             'otras_funciones_declaradas' => (float) data_get($bloques, 'otras_funciones_docentes.total', 0),
         ];
+    }
+
+    /**
+     * @return array{coordinacion_pie: float, educadoras_diferenciales: float, total: float}
+     */
+    private static function desgloseContratoPieNecesario(array $bloques): array
+    {
+        $items = collect(data_get($bloques, 'pie.items', []));
+        $coordinacionPie = (float) $items
+            ->where('tipo_contrato_pie_necesario', 'coordinacion_pie')
+            ->sum(fn ($item) => (float) ($item['horas'] ?? 0));
+        $educadorasDiferenciales = (float) $items
+            ->where('tipo_contrato_pie_necesario', 'educadoras_diferenciales')
+            ->sum(fn ($item) => (float) ($item['horas'] ?? 0));
+
+        return [
+            'coordinacion_pie' => round($coordinacionPie, 2),
+            'educadoras_diferenciales' => round($educadorasDiferenciales, 2),
+            'total' => round($coordinacionPie + $educadorasDiferenciales, 2),
+        ];
+    }
+
+    private static function bloquesSinContratoPieNecesario(array $bloques): array
+    {
+        $itemsPie = collect(data_get($bloques, 'pie.items', []));
+        $horasRemovidas = (float) $itemsPie
+            ->whereNotNull('tipo_contrato_pie_necesario')
+            ->sum(fn ($item) => (float) ($item['horas'] ?? 0));
+
+        if ($horasRemovidas <= 0 || ! isset($bloques['pie'])) {
+            return $bloques;
+        }
+
+        $bloques['pie']['automaticas'] = max(0.0, round((float) ($bloques['pie']['automaticas'] ?? 0) - $horasRemovidas, 2));
+        $bloques['pie']['total'] = max(0.0, round((float) ($bloques['pie']['total'] ?? 0) - $horasRemovidas, 2));
+        $bloques['pie']['educadoras_diferenciales'] = 0.0;
+        $bloques['pie']['items'] = $itemsPie
+            ->whereNull('tipo_contrato_pie_necesario')
+            ->values()
+            ->all();
+
+        return $bloques;
     }
 
     private static function grupoConsolidadoFor(?string $categoria, ?string $codigo = null): string

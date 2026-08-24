@@ -259,6 +259,7 @@ class DotacionEstablecimientoController extends Controller
             'resumen' => $data['resumen'],
             'cursos' => $data['cursos'],
             'bloques' => $data['bloques'],
+            'bloquesContratoDotacion' => $data['bloques_contrato_dotacion'] ?? $data['bloques'],
             'docentes' => $data['docentes'],
             'asignacion' => $data['asignacion'] ?? [],
             'asignaturas' => $asignaturas,
@@ -301,6 +302,7 @@ class DotacionEstablecimientoController extends Controller
             'resumen' => $data['resumen'],
             'cursos' => $data['cursos'],
             'bloques' => $data['bloques'],
+            'bloquesContratoDotacion' => $data['bloques_contrato_dotacion'] ?? $data['bloques'],
             'docentes' => $data['docentes'],
             // El PDF utiliza solamente las necesidades del plan; no se conserva
             // el árbol completo de asignación, que puede ser considerablemente mayor.

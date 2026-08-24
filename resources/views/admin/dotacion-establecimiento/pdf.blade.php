@@ -57,16 +57,19 @@
         }
     }
     $platformName = config('brand.platform_name', 'Plataforma SLEP Andalién Costa');
-    $totalBloquesDotacion = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
-    $totalAutomaticas = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['automaticas'] ?? 0));
-    $totalDeclaradas = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
+    $bloquesInformeDotacion = $bloquesContratoDotacion ?? $bloques ?? [];
+    $totalBloquesDotacion = collect($bloquesInformeDotacion)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
+    $totalAutomaticas = collect($bloquesInformeDotacion)->sum(fn ($bloque) => (float) ($bloque['automaticas'] ?? 0));
+    $totalDeclaradas = collect($bloquesInformeDotacion)->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
     $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
+    $horasContratoPieNecesarias = (float) ($resumen['horas_contrato_pie_necesarias'] ?? 0);
+    $desgloseContratoPieNecesario = $resumen['horas_contrato_pie_necesarias_desglose'] ?? [];
     $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
     $horasContratoAula = (float) ($resumen['horas_contrato_docentes_aula'] ?? $horasContratoActuales);
     $horasContratoDocentePie = (float) ($resumen['horas_contrato_docente_pie'] ?? 0);
     $horasContratoCoordinacionPie = (float) ($resumen['horas_contrato_docente_pie_coordinacion'] ?? 0);
     $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
-    $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0)));
+    $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0) + $horasContratoPieNecesarias));
     $sobredotacion = max(0, $horasContratoActuales - $horasContratoRequeridas);
     $horasPorContratar = max(0, $horasContratoRequeridas - $horasContratoActuales);
     $brechaTexto = $sobredotacion > 0.01 ? 'Sobredotación' : ($horasPorContratar > 0.01 ? 'Horas por contratar' : 'Dotación cuadrada');
@@ -172,6 +175,7 @@
             <th>Trabajo colab. PIE</th>
             <th>Contrato plan + colab.</th>
             <th>Contrato bloque dotación</th>
+            <th>Contrato PIE necesario</th>
             <th>Horas contrato docentes</th>
             <th>Brecha</th>
         </tr>
@@ -186,6 +190,7 @@
             <td class="text-right success">{{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }}</td>
             <td class="text-right primary">{{ $fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) }}</td>
             <td class="text-right primary">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($horasContratoPieNecesarias) }}</td>
             <td class="text-right">{{ $fmt($resumen['horas_contrato_docentes'] ?? 0) }}</td>
             <td class="text-right"><span class="badge {{ $brechaClass }}">{{ $fmt($brechaValor) }} - {{ $brechaTexto }}</span></td>
         </tr>
@@ -221,8 +226,7 @@
             <th>Funciones directivas</th>
             <th>Téc.-pedagógicas normativas</th>
             <th>Téc.-pedagógicas declaradas</th>
-            <th>Coordinación PIE</th>
-            <th>Educadoras diferenciales</th>
+            <th>Otras funciones PIE declaradas</th>
             <th>Planes normativos</th>
             <th>Otras funciones declaradas</th>
             <th>Total bloque</th>
@@ -233,11 +237,28 @@
             <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0) }}</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['coordinacion_pie'] ?? 0) }}</td>
-            <td class="text-right primary">{{ $fmt($desgloseContratoBloque['educadoras_diferenciales'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['otras_funciones_pie'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_normativos'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['otras_funciones_declaradas'] ?? 0) }}</td>
             <td class="text-right primary">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="section-title">Horas de contrato PIE necesarias</div>
+<table class="summary avoid-break">
+    <thead>
+        <tr>
+            <th>Coordinador(a) PIE</th>
+            <th>Educadoras diferenciales PIE</th>
+            <th>Total contrato PIE necesario</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($horasContratoPieNecesarias) }}</td>
         </tr>
     </tbody>
 </table>
@@ -306,14 +327,19 @@
             <td>Horas informadas por el establecimiento y aprobadas cuando corresponde.</td>
         </tr>
         <tr>
-            <td>Coordinación PIE</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['coordinacion_pie'] ?? 0) }}</td>
-            <td>Horas de coordinación del Programa de Integración Escolar.</td>
+            <td>Coordinador(a) PIE necesario</td>
+            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</td>
+            <td>Horas automáticas normativas de coordinación del Programa de Integración Escolar.</td>
         </tr>
         <tr>
-            <td>Educadoras diferenciales</td>
-            <td class="text-right primary">{{ $fmt($desgloseContratoBloque['educadoras_diferenciales'] ?? 0) }}</td>
-            <td>Bolsa contractual PIE separada de las horas de Coordinación PIE.</td>
+            <td>Educadoras diferenciales PIE necesarias</td>
+            <td class="text-right primary">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</td>
+            <td>Bolsa contractual automática normativa de Educadoras Diferenciales PIE.</td>
+        </tr>
+        <tr class="total-row">
+            <td>Horas de contrato PIE necesarias</td>
+            <td class="text-right primary">{{ $fmt($horasContratoPieNecesarias) }}</td>
+            <td>Suma de Coordinador(a) PIE y Educadoras Diferenciales PIE normativas.</td>
         </tr>
         <tr>
             <td>Planes normativos</td>
@@ -328,12 +354,12 @@
         <tr class="total-row">
             <td>Contrato bloque dotación</td>
             <td class="text-right">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</td>
-            <td>Suma de directivos, técnico-pedagógicas normativas y declaradas, Coordinación PIE, Educadoras Diferenciales, planes normativos y otras funciones declaradas.</td>
+            <td>Suma de directivos, técnico-pedagógicas normativas y declaradas, planes, otras funciones y eventuales horas PIE declaradas; excluye las horas PIE automáticas normativas.</td>
         </tr>
         <tr class="total-row">
             <td>Horas que debiesen contratarse</td>
             <td class="text-right">{{ $fmt($horasContratoRequeridas) }}</td>
-            <td>Contrato equivalente plan + trabajo colaborativo PIE + contrato bloque dotación.</td>
+            <td>Contrato equivalente plan + trabajo colaborativo PIE + contrato bloque dotación + horas de contrato PIE necesarias.</td>
         </tr>
         <tr>
             <td>Horas contrato aula</td>
@@ -443,7 +469,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach ($bloques as $bloque)
+        @foreach ($bloquesInformeDotacion as $bloque)
             <tr>
                 <td><strong>{{ $bloque['label'] }}</strong></td>
                 <td class="text-right">{{ $fmt($bloque['automaticas'] ?? 0) }}</td>
@@ -464,7 +490,7 @@
             <td class="text-right">{{ $fmt($totalAutomaticas) }}</td>
             <td class="text-right">{{ $fmt($totalDeclaradas) }}</td>
             <td class="text-right primary">{{ $fmt($totalBloquesDotacion) }}</td>
-            <td>Total de contrato considerado en funciones directivas, técnico-pedagógicas, PIE, planes y otras funciones.</td>
+            <td>Total de contrato considerado en funciones directivas, técnico-pedagógicas, planes, otras funciones y eventuales horas PIE declaradas. Las horas PIE automáticas normativas se informan por separado.</td>
         </tr>
     </tbody>
 </table>

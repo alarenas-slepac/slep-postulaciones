@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.8.24.419' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Bloque independiente de horas contrato PIE necesarias',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Retira las horas automáticas normativas de Coordinador(a) PIE y Educadoras Diferenciales PIE del contrato bloque dotación.',
+            'Crea el bloque Horas de contrato PIE necesarias con el desglose de Coordinación PIE y Educadoras Diferenciales.',
+            'Mantiene eventuales horas PIE declaradas por el establecimiento dentro del contrato bloque dotación.',
+            'Conserva sin cambios la necesidad contractual total y la brecha final al reclasificar las horas PIE normativas.',
+            'Replica la nueva clasificación en el resumen web, el detalle por bloques y el informe PDF.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.418' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

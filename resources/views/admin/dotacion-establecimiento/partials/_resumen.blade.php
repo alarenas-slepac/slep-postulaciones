@@ -1,9 +1,10 @@
 @php
     $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
     $toneClass = ['primary' => 'primary', 'success' => 'success', 'info' => 'info', 'warning' => 'warning', 'secondary' => 'secondary'];
-    $totalBloquesDotacion = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
-    $totalAutomaticas = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['automaticas'] ?? 0));
-    $totalDeclaradas = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
+    $bloquesResumenDotacion = $bloquesContratoDotacion ?? $bloques ?? [];
+    $totalBloquesDotacion = collect($bloquesResumenDotacion)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
+    $totalAutomaticas = collect($bloquesResumenDotacion)->sum(fn ($bloque) => (float) ($bloque['automaticas'] ?? 0));
+    $totalDeclaradas = collect($bloquesResumenDotacion)->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
     $estadoSteps = [
         ['label' => 'Cursos', 'detail' => ((int) ($resumen['cursos_total'] ?? 0) > 0) ? 'Cursos con matrícula' : 'Sin cursos', 'ok' => (int) ($resumen['cursos_total'] ?? 0) > 0, 'icon' => 'bi-grid-3x3-gap'],
         ['label' => 'Planes', 'detail' => ((float) ($resumen['horas_plan_total'] ?? 0) > 0) ? 'Plan asociado' : 'Sin horas plan', 'ok' => (float) ($resumen['horas_plan_total'] ?? 0) > 0, 'icon' => 'bi-journal-check'],
@@ -75,7 +76,7 @@
     </div>
     <div class="card-body">
         <div class="row g-3 mb-3">
-            @foreach ($bloques as $bloque)
+            @foreach ($bloquesResumenDotacion as $bloque)
                 <div class="col-xl col-md-4 col-sm-6">
                     <div class="p-3 rounded-4 border h-100 bg-white shadow-sm">
                         <div class="d-flex justify-content-between align-items-start gap-2">
@@ -102,7 +103,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($bloques as $bloque)
+                    @foreach ($bloquesResumenDotacion as $bloque)
                         <tr>
                             <td class="fw-semibold"><i class="bi {{ $bloque['icon'] }} text-{{ $toneClass[$bloque['tone']] ?? 'secondary' }}"></i> {{ $bloque['label'] }}</td>
                             <td class="text-end">{{ $fmt($bloque['automaticas'] ?? 0) }}</td>
@@ -124,7 +125,7 @@
                         <td class="text-end">{{ $fmt($totalAutomaticas) }}</td>
                         <td class="text-end">{{ $fmt($totalDeclaradas) }}</td>
                         <td class="text-end text-primary">{{ $fmt($totalBloquesDotacion) }}</td>
-                        <td class="small text-muted">Total de contrato considerado en funciones directivas, técnico-pedagógicas, PIE, planes y otras funciones.</td>
+                        <td class="small text-muted">Total de contrato considerado en funciones directivas, técnico-pedagógicas, planes, otras funciones y eventuales horas PIE declaradas. Coordinación PIE y Educadoras Diferenciales normativas se informan en un bloque independiente.</td>
                     </tr>
                 </tfoot>
             </table>
