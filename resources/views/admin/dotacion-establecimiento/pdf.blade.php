@@ -193,7 +193,8 @@
     <thead>
         <tr>
             <th>Funciones directivas</th>
-            <th>Funciones técnico-pedagógicas</th>
+            <th>Téc.-pedagógicas normativas</th>
+            <th>Téc.-pedagógicas declaradas</th>
             <th>Coordinación PIE</th>
             <th>Educadoras diferenciales</th>
             <th>Planes normativos</th>
@@ -204,7 +205,8 @@
     <tbody>
         <tr>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas'] ?? 0) }}</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['coordinacion_pie'] ?? 0) }}</td>
             <td class="text-right primary">{{ $fmt($desgloseContratoBloque['educadoras_diferenciales'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_normativos'] ?? 0) }}</td>
@@ -268,9 +270,14 @@
             <td>Componente del contrato del bloque de dotación.</td>
         </tr>
         <tr>
-            <td>Funciones técnico-pedagógicas</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas'] ?? 0) }}</td>
-            <td>Funciones técnico-pedagógicas distintas de Coordinación PIE.</td>
+            <td>Funciones técnico-pedagógicas normativas</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0) }}</td>
+            <td>Horas automáticas calculadas desde las reglas normativas.</td>
+        </tr>
+        <tr>
+            <td>Funciones técnico-pedagógicas declaradas</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0) }}</td>
+            <td>Horas informadas por el establecimiento y aprobadas cuando corresponde.</td>
         </tr>
         <tr>
             <td>Coordinación PIE</td>
@@ -295,7 +302,7 @@
         <tr class="total-row">
             <td>Contrato bloque dotación</td>
             <td class="text-right">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</td>
-            <td>Suma de directivos, técnico-pedagógicas, Coordinación PIE, Educadoras Diferenciales, planes normativos y otras funciones declaradas.</td>
+            <td>Suma de directivos, técnico-pedagógicas normativas y declaradas, Coordinación PIE, Educadoras Diferenciales, planes normativos y otras funciones declaradas.</td>
         </tr>
         <tr class="total-row">
             <td>Horas que debiesen contratarse</td>

@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.24.417' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Separación de horas técnico-pedagógicas',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Separa las horas técnico-pedagógicas normativas, calculadas automáticamente, de las horas declaradas por el establecimiento.',
+            'Incorpora ambos valores en el desglose superior del contrato del bloque de dotación y en el informe PDF.',
+            'Mantiene intactos el subtotal técnico-pedagógico, el contrato total del bloque de dotación y la brecha final.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.416' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

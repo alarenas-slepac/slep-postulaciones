@@ -1504,6 +1504,8 @@ class DotacionEstablecimientoCalculator
         return [
             'funciones_directivas' => (float) data_get($bloques, 'directiva.total', 0),
             'funciones_tecnico_pedagogicas' => (float) data_get($bloques, 'tecnico_pedagogica.total', 0),
+            'funciones_tecnico_pedagogicas_normativas' => (float) data_get($bloques, 'tecnico_pedagogica.automaticas', 0),
+            'funciones_tecnico_pedagogicas_declaradas' => (float) data_get($bloques, 'tecnico_pedagogica.declaradas', 0),
             'coordinacion_pie' => max(0.0, round($horasPie - $horasEducadorasDiferenciales, 2)),
             'educadoras_diferenciales' => $horasEducadorasDiferenciales,
             'planes_normativos' => (float) data_get($bloques, 'planes_programas.total', 0),
