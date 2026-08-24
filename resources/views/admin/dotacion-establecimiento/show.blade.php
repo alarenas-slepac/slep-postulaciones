@@ -101,7 +101,7 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
-                @if (Route::has('admin.dotacion-funciones.show'))
+                @if (Route::has('admin.dotacion-funciones.show') && $activeRole !== 'supervisor_plani')
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Funciones y planes
                     </a>
@@ -303,6 +303,13 @@
                     <i class="bi bi-person-workspace"></i> Docentes
                 </a>
             </li>
+            @if ($canViewSobredotacion ?? false)
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link {{ $activeTab === 'sobredotacion' ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion']) }}">
+                        <i class="bi bi-person-exclamation"></i> Detalle sobredotación
+                    </a>
+                </li>
+            @endif
             <li class="nav-item" role="presentation">
                 <a class="nav-link {{ $activeTab === 'asignacion' ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion']) }}">
                     <i class="bi bi-clipboard-plus"></i> Asignación de horas
@@ -318,7 +325,7 @@
                     <i class="bi bi-intersect"></i> Cursos combinados
                 </a>
             </li>
-            @if (Route::has('admin.dotacion-funciones.show'))
+            @if (Route::has('admin.dotacion-funciones.show') && $activeRole !== 'supervisor_plani')
                 <li class="nav-item" role="presentation">
                     <a class="nav-link" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Funciones y planes
@@ -328,7 +335,9 @@
         </ul>
     </div>
 
-    @if ($activeTab === 'docentes')
+    @if ($activeTab === 'sobredotacion')
+        @include('admin.dotacion-establecimiento.partials._sobredotacion')
+    @elseif ($activeTab === 'docentes')
         @include('admin.dotacion-establecimiento.partials._docentes')
     @elseif ($activeTab === 'asignacion')
         @include('admin.dotacion-establecimiento.partials._asignacion')

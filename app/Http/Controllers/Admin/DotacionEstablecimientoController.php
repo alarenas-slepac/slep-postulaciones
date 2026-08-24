@@ -10,6 +10,7 @@ use App\Models\Establecimiento;
 use App\Support\DotacionAsignaturaResumenCalculator;
 use App\Support\DotacionEstablecimientoAvanceCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionSobredotacionCalculator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ use Illuminate\Support\Str;
 
 class DotacionEstablecimientoController extends Controller
 {
-    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp'];
+    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
 
     public function index(Request $request)
     {
@@ -84,7 +85,7 @@ class DotacionEstablecimientoController extends Controller
 
     private function informeAvance(Request $request, string $activeRole)
     {
-        abort_unless(in_array($activeRole, ['admin', 'coordinador_uatp'], true), 403);
+        abort_unless(in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true), 403);
 
         $anio = max(2020, min(2100, (int) $request->query('anio', now()->year)));
         $establecimientoId = (int) $request->query('establecimiento_id', 0);
@@ -222,8 +223,20 @@ class DotacionEstablecimientoController extends Controller
         $activeRole = $this->authorizeDotacionAccess($request);
         $this->authorizeEstablecimientoScope($request, $establecimiento);
         $anio = (int) $request->query('anio', now()->year);
-        $tab = in_array($request->query('tab'), ['docentes', 'asignacion', 'asignaturas', 'cursos-combinados'], true) ? $request->query('tab') : 'resumen';
+        $requestedTab = (string) $request->query('tab', 'resumen');
+        $canViewSobredotacion = DotacionSobredotacionCalculator::canView($activeRole);
+        if ($requestedTab === 'sobredotacion') {
+            abort_unless($canViewSobredotacion, 403);
+        }
+        $allowedTabs = ['resumen', 'docentes', 'asignacion', 'asignaturas', 'cursos-combinados'];
+        if ($canViewSobredotacion) {
+            $allowedTabs[] = 'sobredotacion';
+        }
+        $tab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'resumen';
         $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
+        $sobredotacion = $tab === 'sobredotacion'
+            ? DotacionSobredotacionCalculator::build($data['docentes'])
+            : ['items' => collect(), 'resumen' => []];
         $proporcionExcepcionTableReady = Schema::hasTable('dotacion_proporcion_excepciones');
         $proporcionExcepcion = $proporcionExcepcionTableReady
             ? DotacionProporcionExcepcion::query()
@@ -231,7 +244,7 @@ class DotacionEstablecimientoController extends Controller
                 ->where('anio', $anio)
                 ->first()
             : null;
-        $canManageProporcionExcepcion = in_array($activeRole, ['admin', 'coordinador_uatp'], true);
+        $canManageProporcionExcepcion = in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true);
         $docenteExclusionesTableReady = Schema::hasTable('dotacion_docente_exclusiones');
 
         $asignaturasFiltros = [
@@ -261,11 +274,13 @@ class DotacionEstablecimientoController extends Controller
             'bloques' => $data['bloques'],
             'bloquesContratoDotacion' => $data['bloques_contrato_dotacion'] ?? $data['bloques'],
             'docentes' => $data['docentes'],
+            'sobredotacion' => $sobredotacion,
+            'canViewSobredotacion' => $canViewSobredotacion,
             'asignacion' => $data['asignacion'] ?? [],
             'asignaturas' => $asignaturas,
             'asignaturasFiltros' => $asignaturasFiltros,
             'cursosCombinados' => $data['cursos_combinados'] ?? [],
-            'canManageCursosCombinados' => in_array($activeRole, ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp'], true),
+            'canManageCursosCombinados' => in_array($activeRole, $this->allowedRoles, true),
             'proporcionExcepcion' => $proporcionExcepcion,
             'proporcionExcepcionTableReady' => $proporcionExcepcionTableReady,
             'canManageProporcionExcepcion' => $canManageProporcionExcepcion,

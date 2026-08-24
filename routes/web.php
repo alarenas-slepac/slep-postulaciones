@@ -610,64 +610,64 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
 
         Route::get('dotacion-establecimiento', [DotacionEstablecimientoController::class, 'index'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->name('dotacion-establecimiento.index');
         Route::get('dotacion-establecimiento/{establecimiento}/pdf', [DotacionEstablecimientoController::class, 'pdf'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.pdf');
         Route::post('dotacion-establecimiento/{establecimiento}/asignaciones', [DotacionAsignacionController::class, 'store'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.asignaciones.store');
         Route::put('dotacion-establecimiento/{establecimiento}/asignaciones/{asignacion}', [DotacionAsignacionController::class, 'update'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->whereNumber('asignacion')
             ->name('dotacion-establecimiento.asignaciones.update');
         Route::delete('dotacion-establecimiento/{establecimiento}/asignaciones/{asignacion}', [DotacionAsignacionController::class, 'destroy'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->whereNumber('asignacion')
             ->name('dotacion-establecimiento.asignaciones.destroy');
         Route::post('dotacion-establecimiento/{establecimiento}/docentes/exclusiones', [DotacionDocenteExclusionController::class, 'store'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.docentes.exclusiones.store');
         Route::delete('dotacion-establecimiento/{establecimiento}/docentes/exclusiones/{exclusion}', [DotacionDocenteExclusionController::class, 'destroy'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->whereNumber('exclusion')
             ->name('dotacion-establecimiento.docentes.exclusiones.destroy');
         Route::post('dotacion-establecimiento/{establecimiento}/cursos-combinados', [DotacionCursoCombinadoController::class, 'store'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.cursos-combinados.store');
         Route::put('dotacion-establecimiento/{establecimiento}/cursos-combinados/{cursoCombinado}', [DotacionCursoCombinadoController::class, 'update'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->whereNumber('cursoCombinado')
             ->name('dotacion-establecimiento.cursos-combinados.update');
         Route::delete('dotacion-establecimiento/{establecimiento}/cursos-combinados/{cursoCombinado}', [DotacionCursoCombinadoController::class, 'destroy'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->whereNumber('cursoCombinado')
             ->name('dotacion-establecimiento.cursos-combinados.destroy');
 
         Route::post('dotacion-establecimiento/{establecimiento}/proporcion-excepcion', [DotacionProporcionExcepcionController::class, 'store'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.proporcion-excepcion.store');
         Route::post('dotacion-establecimiento/{establecimiento}/proporcion-excepcion/recalcular', [DotacionProporcionExcepcionController::class, 'recalculate'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.proporcion-excepcion.recalculate');
         Route::delete('dotacion-establecimiento/{establecimiento}/proporcion-excepcion', [DotacionProporcionExcepcionController::class, 'destroy'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.proporcion-excepcion.destroy');
         Route::get('dotacion-establecimiento/{establecimiento}', [DotacionEstablecimientoController::class, 'show'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.show');
 

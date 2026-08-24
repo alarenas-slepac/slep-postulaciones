@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
 
 class DotacionProporcionExcepcionController extends Controller
 {
-    private array $allowedRoles = ['admin', 'coordinador_uatp'];
+    private array $allowedRoles = ['admin', 'coordinador_uatp', 'supervisor_plani'];
 
     public function store(
         Request $request,
