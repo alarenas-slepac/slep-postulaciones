@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.24.422' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Cobertura asignada de plan y contrato PIE necesario',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Muestra horas asignadas sobre requeridas para Horas plan, Contrato plan, Trabajo colaborativo PIE y su total combinado.',
+            'Incorpora la cobertura asignada sobre necesaria del bloque Horas de contrato PIE necesarias.',
+            'Separa la cobertura normativa de Coordinador(a) PIE y Educadoras Diferenciales PIE, sin mezclar otras funciones PIE declaradas.',
+            'Replica las relaciones asignadas/requeridas en el resumen web y en el informe PDF sin alterar la brecha final.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.421' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

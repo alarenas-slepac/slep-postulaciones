@@ -11,6 +11,11 @@
         $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
         $horasContratoPieNecesarias = (float) ($resumen['horas_contrato_pie_necesarias'] ?? 0);
         $desgloseContratoPieNecesario = $resumen['horas_contrato_pie_necesarias_desglose'] ?? [];
+        $horasContratoPieNecesariasAsignadas = (float) ($desgloseContratoPieNecesario['total_asignadas'] ?? 0);
+        $horasPlanAsignadas = (float) ($resumen['horas_plan_asignadas'] ?? $resumen['horas_aula_asignadas'] ?? 0);
+        $horasContratoPlanAsignadas = (float) ($resumen['horas_plan_contrato_asignadas'] ?? 0);
+        $trabajoColaborativoPieAsignadas = (float) ($resumen['trabajo_colaborativo_pie_asignadas'] ?? 0);
+        $contratoPlanMasPieAsignadas = (float) ($resumen['contrato_plan_mas_trabajo_colaborativo_pie_asignadas'] ?? ($horasContratoPlanAsignadas + $trabajoColaborativoPieAsignadas));
         $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0) + $horasContratoPieNecesarias));
         $sobredotacion = max(0, $horasContratoActuales - $horasContratoRequeridas);
         $horasPorContratar = max(0, $horasContratoRequeridas - $horasContratoActuales);
@@ -43,13 +48,13 @@
             ['label' => 'Matrícula', 'value' => number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.'), 'hint' => 'Estudiantes con matrícula vigente.', 'tone' => 'dark', 'icon' => 'bi-people'],
             ['label' => 'Cursos', 'value' => number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.'), 'hint' => 'Cursos con matrícula.', 'tone' => 'primary', 'icon' => 'bi-grid-3x3-gap'],
             ['label' => 'Docentes', 'value' => number_format((int) ($resumen['docentes_total'] ?? 0), 0, ',', '.'), 'hint' => 'Base contractual vigente.', 'tone' => 'success', 'icon' => 'bi-person-workspace'],
-            ['label' => 'Horas plan', 'value' => $fmt($resumen['horas_plan_total'] ?? 0), 'hint' => ((float) ($resumen['horas_plan_reduccion_cursos_combinados'] ?? 0) > 0 ? 'Necesidad ajustada por cursos combinados.' : 'Horas pedagógicas/aula.'), 'tone' => 'primary', 'icon' => 'bi-journal-text'],
-            ['label' => 'Contrato plan', 'value' => $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0), 'hint' => ((float) ($resumen['horas_plan_contrato_reduccion_cursos_combinados'] ?? 0) > 0 ? 'Equivalente ajustado después de consolidar cursos combinados.' : 'Equivalente contractual redondeado por curso.'), 'tone' => 'info', 'icon' => 'bi-calculator'],
-            ['label' => 'Trabajo colab. PIE', 'value' => $fmt($resumen['trabajo_colaborativo_pie'] ?? 0), 'hint' => '3 horas por curso con NEE.', 'tone' => 'success', 'icon' => 'bi-universal-access'],
-            ['label' => 'Contrato plan + PIE', 'value' => $fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0), 'hint' => 'Plan más trabajo colaborativo.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
+            ['label' => 'Horas plan', 'value' => $fmt($horasPlanAsignadas).' / '.$fmt($resumen['horas_plan_total'] ?? 0), 'hint' => 'Horas aula asignadas / requeridas.', 'tone' => 'primary', 'icon' => 'bi-journal-text'],
+            ['label' => 'Contrato plan', 'value' => $fmt($horasContratoPlanAsignadas).' / '.$fmt($resumen['horas_plan_contrato_equivalente'] ?? 0), 'hint' => 'Contrato asignado / requerido para el plan.', 'tone' => 'info', 'icon' => 'bi-calculator'],
+            ['label' => 'Trabajo colab. PIE', 'value' => $fmt($trabajoColaborativoPieAsignadas).' / '.$fmt($resumen['trabajo_colaborativo_pie'] ?? 0), 'hint' => 'Horas asignadas / requeridas.', 'tone' => 'success', 'icon' => 'bi-universal-access'],
+            ['label' => 'Contrato plan + PIE', 'value' => $fmt($contratoPlanMasPieAsignadas).' / '.$fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0), 'hint' => 'Contrato asignado / requerido.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
             ['label' => 'Contrato bloque normativo', 'value' => $fmt($horasBloqueNormativas), 'hint' => 'Funciones y planes calculados por normativa.', 'tone' => 'warning', 'icon' => 'bi-shield-check'],
             ['label' => 'Contrato bloque declarado', 'value' => $fmt($horasBloqueDeclaradasAsignadas).' / '.$fmt($horasBloqueDeclaradas), 'hint' => 'Asignadas / declaradas por el establecimiento.', 'tone' => 'secondary', 'icon' => 'bi-building-add'],
-            ['label' => 'Horas contrato PIE necesarias', 'value' => $fmt($horasContratoPieNecesarias), 'hint' => 'Coordinación PIE y Educadoras Diferenciales normativas.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
+            ['label' => 'Horas contrato PIE necesarias', 'value' => $fmt($horasContratoPieNecesariasAsignadas).' / '.$fmt($horasContratoPieNecesarias), 'hint' => 'Asignadas / necesarias para Coordinación PIE y Educadoras Diferenciales.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
             ['label' => 'Horas contrato docentes', 'value' => $fmt($horasContratoActuales), 'hint' => 'Horas contratadas vigentes.', 'tone' => 'dark', 'icon' => 'bi-briefcase'],
             ['label' => 'Horas contrato aula', 'value' => $fmt($horasContratoAula), 'hint' => 'Contrato vigente descontando las asignaciones docentes PIE.', 'tone' => 'primary', 'icon' => 'bi-easel2'],
             ['label' => 'Horas contrato docente PIE', 'value' => $fmt($horasContratoDocentePie), 'hint' => 'Coordinación PIE: '.$fmt($horasContratoCoordinacionPie).' · Bolsa Educ. Diferenciales: '.$fmt($horasContratoEducadorasDiferenciales).'.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
@@ -209,21 +214,23 @@
                             <div class="small text-muted">Horas automáticas normativas separadas del contrato bloque dotación.</div>
                         </div>
                         <div class="text-end">
-                            <div class="small text-muted">Total PIE necesario</div>
-                            <div class="fs-4 fw-bold text-info">{{ $fmt($horasContratoPieNecesarias) }}</div>
+                            <div class="small text-muted">Asignadas / necesarias</div>
+                            <div class="fs-4 fw-bold text-info">{{ $fmt($horasContratoPieNecesariasAsignadas) }} / {{ $fmt($horasContratoPieNecesarias) }}</div>
                         </div>
                     </div>
                     <div class="row g-2">
                         <div class="col-md-6">
                             <div class="dotacion-breakdown-item p-3">
                                 <div class="small text-muted fw-semibold">Coordinador(a) PIE</div>
-                                <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</div>
+                                <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</div>
+                                <div class="small text-muted">Asignadas / necesarias</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="dotacion-breakdown-item p-3">
                                 <div class="small text-muted fw-semibold">Educadoras diferenciales PIE</div>
-                                <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</div>
+                                <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</div>
+                                <div class="small text-muted">Asignadas / necesarias</div>
                             </div>
                         </div>
                     </div>
