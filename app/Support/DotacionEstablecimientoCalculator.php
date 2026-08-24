@@ -107,6 +107,7 @@ class DotacionEstablecimientoCalculator
         $cursos['totales']['reduccion_contrato_cursos_combinados'] = $reduccionContratoCursosCombinados;
 
         $horasDotacionFunciones = collect($bloques)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
+        $desgloseHorasDotacion = self::desgloseContratoBloqueDotacion($bloques);
         $contratoPlanMasTrabajoColaborativoPie = (float) ($horasContratoPlanAjustadas + ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0));
         $horasContratoDocentesBase = $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0));
         $horasContratoDocentesExcluidas = $docentes->sum(fn ($docente) => (float) ($docente['horas_excluidas'] ?? 0));
@@ -139,6 +140,7 @@ class DotacionEstablecimientoCalculator
             'trabajo_colaborativo_pie' => (float) ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0),
             'contrato_plan_mas_trabajo_colaborativo_pie' => $contratoPlanMasTrabajoColaborativoPie,
             'horas_dotacion_funciones' => $horasDotacionFunciones,
+            'horas_dotacion_desglose' => $desgloseHorasDotacion,
             'horas_contrato_docentes_base' => $horasContratoDocentesBase,
             'horas_contrato_docentes_excluidas' => $horasContratoDocentesExcluidas,
             'horas_contrato_docentes' => $horasContratoDocentes,
@@ -356,6 +358,7 @@ class DotacionEstablecimientoCalculator
             $horas = (float) $pieContrato['educadoras_diferenciales_horas'];
             $bloques['pie']['automaticas'] += $horas;
             $bloques['pie']['total'] += $horas;
+            $bloques['pie']['educadoras_diferenciales'] = $horas;
             $detalleProporciones = collect($pieContrato['detalle_proporciones'] ?? [])
                 ->map(fn ($detalle, $label) => $label.': '.($detalle['prof_educ_dif_label'] ?? '00:00').' PROF EDUC. DIF / '.($detalle['contrato_label'] ?? '00:00').' contrato')
                 ->values()
@@ -1477,9 +1480,34 @@ class DotacionEstablecimientoCalculator
         return [
             'directiva' => ['label' => 'Directivos', 'icon' => 'bi-person-badge', 'tone' => 'primary', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
             'tecnico_pedagogica' => ['label' => 'Técnico-pedagógicas', 'icon' => 'bi-diagram-3', 'tone' => 'success', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
-            'pie' => ['label' => 'PIE', 'icon' => 'bi-universal-access', 'tone' => 'info', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
+            'pie' => ['label' => 'PIE', 'icon' => 'bi-universal-access', 'tone' => 'info', 'automaticas' => 0, 'declaradas' => 0, 'educadoras_diferenciales' => 0, 'total' => 0, 'items' => []],
             'planes_programas' => ['label' => 'Planes', 'icon' => 'bi-journal-check', 'tone' => 'warning', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
             'otras_funciones_docentes' => ['label' => 'Otras funciones declaradas', 'icon' => 'bi-plus-square-dotted', 'tone' => 'secondary', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
+        ];
+    }
+
+    /**
+     * Separa los componentes que forman el contrato del bloque de dotación.
+     * Coordinación PIE corresponde al saldo del bloque PIE después de extraer
+     * la bolsa contractual de Educadoras Diferenciales.
+     *
+     * @return array<string, float>
+     */
+    private static function desgloseContratoBloqueDotacion(array $bloques): array
+    {
+        $horasPie = (float) data_get($bloques, 'pie.total', 0);
+        $horasEducadorasDiferenciales = min(
+            $horasPie,
+            max(0.0, (float) data_get($bloques, 'pie.educadoras_diferenciales', 0))
+        );
+
+        return [
+            'funciones_directivas' => (float) data_get($bloques, 'directiva.total', 0),
+            'funciones_tecnico_pedagogicas' => (float) data_get($bloques, 'tecnico_pedagogica.total', 0),
+            'coordinacion_pie' => max(0.0, round($horasPie - $horasEducadorasDiferenciales, 2)),
+            'educadoras_diferenciales' => $horasEducadorasDiferenciales,
+            'planes_normativos' => (float) data_get($bloques, 'planes_programas.total', 0),
+            'otras_funciones_declaradas' => (float) data_get($bloques, 'otras_funciones_docentes.total', 0),
         ];
     }
 
