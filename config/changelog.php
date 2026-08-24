@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.24.421' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Cobertura de horas declaradas por el establecimiento',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Muestra para cada categoría declarada por el establecimiento la relación de horas asignadas sobre horas declaradas.',
+            'Incluye funciones directivas, técnico-pedagógicas, planes, otras funciones PIE y otras funciones docentes declaradas.',
+            'Incorpora un total de cobertura asignada/declarada en el resumen superior y en el informe PDF.',
+            'Mantiene sin cambios la necesidad contractual, el total del bloque declarado y la brecha final.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.420' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',
