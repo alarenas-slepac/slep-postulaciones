@@ -48,6 +48,7 @@ use App\Http\Controllers\Admin\EstablecimientoCursoController;
 use App\Http\Controllers\Admin\EstablecimientoCursoPieController;
 use App\Http\Controllers\Admin\DotacionFuncionesController;
 use App\Http\Controllers\Admin\DotacionCursoCombinadoController;
+use App\Http\Controllers\Admin\DotacionDocenteExclusionController;
 use App\Http\Controllers\Admin\DotacionEstablecimientoController;
 use App\Http\Controllers\Admin\DotacionProporcionExcepcionController;
 use App\Http\Controllers\Admin\DotacionAsignacionController;
@@ -194,7 +195,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
                 ->name('tickets.imagenes.show');
             Route::patch('/tickets/{ticket}/resolver', [CentroOperacionesTicketController::class, 'resolver'])->whereNumber('ticket')->name('tickets.resolver');
         });
-        Route::middleware('ensure.role:admin|gabinete_slep')->group(function () {
+        Route::middleware('ensure.role:admin|comunicaciones|gabinete_slep')->group(function () {
             Route::get('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'index'])->name('configuraciones.index');
             Route::post('/mantenedor-incidencias', [CentroOperacionesIncidenteConfiguracionController::class, 'store'])->name('configuraciones.store');
             Route::put('/mantenedor-incidencias/{configuracion}', [CentroOperacionesIncidenteConfiguracionController::class, 'update'])->whereNumber('configuracion')->name('configuraciones.update');
@@ -211,7 +212,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
                 Route::get('/riesgos', [CentroOperacionesRiesgoEvaluacionController::class, 'index'])->name('riesgos.index');
             });
 
-        Route::middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|gabinete_slep')
+        Route::middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep')
             ->group(function () {
                 Route::get('/riesgos/{establecimiento}/evaluar', [CentroOperacionesRiesgoEvaluacionController::class, 'create'])
                     ->whereNumber('establecimiento')
@@ -222,10 +223,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             });
 
         Route::get('/reporte-diario', [CentroOperacionesReporteController::class, 'create'])
-            ->middleware('ensure.role:funcionario_directivo_estab|gabinete_slep')
+            ->middleware('ensure.role:funcionario_directivo_estab|comunicaciones|gabinete_slep')
             ->name('reportes.create');
         Route::post('/reportes', [CentroOperacionesReporteController::class, 'store'])
-            ->middleware('ensure.role:funcionario_directivo_estab|gabinete_slep')
+            ->middleware('ensure.role:funcionario_directivo_estab|comunicaciones|gabinete_slep')
             ->name('reportes.store');
         Route::get('/historial', [CentroOperacionesReporteController::class, 'history'])
             ->middleware('ensure.role:admin|director_ejecutivo|funcionario_slep|coordinador_gdp|coordinador_uatp|comunicaciones|gabinete_slep|secretaria_direccion_ejecutiva|funcionario_directivo_estab')
@@ -235,11 +236,11 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->whereNumber('reporte')
             ->name('reportes.show');
         Route::get('/reportes/{reporte}/editar', [CentroOperacionesReporteController::class, 'edit'])
-            ->middleware('ensure.role:funcionario_directivo_estab|gabinete_slep')
+            ->middleware('ensure.role:funcionario_directivo_estab|comunicaciones|gabinete_slep')
             ->whereNumber('reporte')
             ->name('reportes.edit');
         Route::put('/reportes/{reporte}', [CentroOperacionesReporteController::class, 'update'])
-            ->middleware('ensure.role:funcionario_directivo_estab|gabinete_slep')
+            ->middleware('ensure.role:funcionario_directivo_estab|comunicaciones|gabinete_slep')
             ->whereNumber('reporte')
             ->name('reportes.update');
     });
@@ -629,6 +630,15 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->whereNumber('establecimiento')
             ->whereNumber('asignacion')
             ->name('dotacion-establecimiento.asignaciones.destroy');
+        Route::post('dotacion-establecimiento/{establecimiento}/docentes/exclusiones', [DotacionDocenteExclusionController::class, 'store'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->whereNumber('establecimiento')
+            ->name('dotacion-establecimiento.docentes.exclusiones.store');
+        Route::delete('dotacion-establecimiento/{establecimiento}/docentes/exclusiones/{exclusion}', [DotacionDocenteExclusionController::class, 'destroy'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->whereNumber('establecimiento')
+            ->whereNumber('exclusion')
+            ->name('dotacion-establecimiento.docentes.exclusiones.destroy');
         Route::post('dotacion-establecimiento/{establecimiento}/cursos-combinados', [DotacionCursoCombinadoController::class, 'store'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
             ->whereNumber('establecimiento')

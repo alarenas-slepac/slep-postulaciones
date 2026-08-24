@@ -8,12 +8,13 @@ use Tests\TestCase;
 
 class CentroOperacionesRoleAccessTest extends TestCase
 {
-    public function test_comunicaciones_is_viewer_and_gabinete_has_total_management(): void
+    public function test_comunicaciones_and_gabinete_have_total_management(): void
     {
         $roles = config('centro_operaciones.roles_visualizacion');
 
         $this->assertContains('comunicaciones', $roles);
         $this->assertContains('gabinete_slep', $roles);
+        $this->assertContains('comunicaciones', config('centro_operaciones.roles_gestion_total'));
         $this->assertContains('gabinete_slep', config('centro_operaciones.roles_gestion_total'));
     }
 
@@ -31,7 +32,7 @@ class CentroOperacionesRoleAccessTest extends TestCase
         }
     }
 
-    public function test_navigation_exposes_requested_modules_for_gabinete(): void
+    public function test_navigation_exposes_every_centro_operaciones_module_for_total_management_roles(): void
     {
         $user = new class
         {
@@ -41,22 +42,25 @@ class CentroOperacionesRoleAccessTest extends TestCase
             }
         };
 
-        $labels = collect(SlepUiRegistry::menuGroups($user, 'gabinete_slep'))
-            ->flatten(1)
-            ->pluck('label');
+        foreach (['comunicaciones', 'gabinete_slep'] as $rol) {
+            $labels = collect(SlepUiRegistry::menuGroups($user, $rol))
+                ->flatten(1)
+                ->pluck('label');
 
-        $this->assertContains('Panel territorial', $labels);
-        $this->assertContains('Reporte diario', $labels);
-        $this->assertContains('Historial de reportes', $labels);
-        $this->assertContains('Riesgo por establecimiento', $labels);
-        $this->assertContains('Tickets de incidencias', $labels);
-        $this->assertContains('Mantenedor de incidencias', $labels);
-        $this->assertContains('Mantenedor de riesgo IRTE', $labels);
-        $this->assertContains('Mensajes', $labels);
+            $this->assertContains('Panel territorial', $labels);
+            $this->assertContains('Reporte diario', $labels);
+            $this->assertContains('Historial de reportes', $labels);
+            $this->assertContains('Riesgo por establecimiento', $labels);
+            $this->assertContains('Tickets de incidencias', $labels);
+            $this->assertContains('Mantenedor de incidencias', $labels);
+            $this->assertContains('Mantenedor de riesgo IRTE', $labels);
+        }
+
         $this->assertSame('Gabinete SLEP', User::roleContextLabels()['gabinete_slep']);
+        $this->assertSame('Comunicaciones', User::roleContextLabels()['comunicaciones']);
     }
 
-    public function test_gabinete_can_access_every_centro_operaciones_route(): void
+    public function test_total_management_roles_can_access_every_centro_operaciones_route(): void
     {
         $routeNames = [
             'centro-operaciones.index',
@@ -93,7 +97,9 @@ class CentroOperacionesRoleAccessTest extends TestCase
 
             $this->assertNotNull($route, "No se encontrÃ³ la ruta {$routeName}.");
             $this->assertNotNull($roleMiddleware, "La ruta {$routeName} no tiene middleware de rol.");
-            $this->assertStringContainsString('gabinete_slep', $roleMiddleware, "Gabinete no accede a {$routeName}.");
+            foreach (['comunicaciones', 'gabinete_slep'] as $rol) {
+                $this->assertStringContainsString($rol, $roleMiddleware, "{$rol} no accede a {$routeName}.");
+            }
         }
     }
 
@@ -108,7 +114,7 @@ class CentroOperacionesRoleAccessTest extends TestCase
         $this->assertNotNull($configurar);
         $this->assertStringContainsString('comunicaciones', implode('|', $index->gatherMiddleware()));
         $this->assertStringContainsString('gabinete_slep', implode('|', $evaluar->gatherMiddleware()));
-        $this->assertStringNotContainsString('comunicaciones', implode('|', $evaluar->gatherMiddleware()));
-        $this->assertStringContainsString('ensure.role:admin|gabinete_slep', implode('|', $configurar->gatherMiddleware()));
+        $this->assertStringContainsString('comunicaciones', implode('|', $evaluar->gatherMiddleware()));
+        $this->assertStringContainsString('ensure.role:admin|comunicaciones|gabinete_slep', implode('|', $configurar->gatherMiddleware()));
     }
 }

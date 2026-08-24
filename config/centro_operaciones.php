@@ -16,6 +16,7 @@ return [
     'rol_reporte' => 'funcionario_directivo_estab',
 
     'roles_gestion_total' => [
+        'comunicaciones',
         'gabinete_slep',
     ],
 

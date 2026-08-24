@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\DotacionEstablecimientoAvanceExport;
 use App\Http\Controllers\Controller;
+use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionProporcionExcepcion;
 use App\Models\Establecimiento;
 use App\Support\DotacionAsignaturaResumenCalculator;
@@ -231,6 +232,7 @@ class DotacionEstablecimientoController extends Controller
                 ->first()
             : null;
         $canManageProporcionExcepcion = in_array($activeRole, ['admin', 'coordinador_uatp'], true);
+        $docenteExclusionesTableReady = Schema::hasTable('dotacion_docente_exclusiones');
 
         $asignaturasFiltros = [
             'q' => trim((string) $request->query('asignatura_q', '')),
@@ -266,6 +268,9 @@ class DotacionEstablecimientoController extends Controller
             'proporcionExcepcion' => $proporcionExcepcion,
             'proporcionExcepcionTableReady' => $proporcionExcepcionTableReady,
             'canManageProporcionExcepcion' => $canManageProporcionExcepcion,
+            'docenteExclusionesTableReady' => $docenteExclusionesTableReady,
+            'canManageDocenteExclusiones' => in_array($activeRole, $this->allowedRoles, true),
+            'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS,
             'alertas' => $data['alertas'],
         ]);
     }
