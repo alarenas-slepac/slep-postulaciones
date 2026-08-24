@@ -101,7 +101,7 @@ class DotacionDocenteDetalleHorasTest extends TestCase
     public function test_extrae_horas_pie_normativas_del_contrato_bloque_sin_alterar_la_necesidad_total(): void
     {
         $bloques = [
-            'directiva' => ['total' => 44],
+            'directiva' => ['automaticas' => 44, 'declaradas' => 0, 'total' => 44],
             'tecnico_pedagogica' => ['automaticas' => 38, 'declaradas' => 14, 'total' => 52],
             'pie' => [
                 'automaticas' => 83,
@@ -114,13 +114,20 @@ class DotacionDocenteDetalleHorasTest extends TestCase
                     ['nombre' => 'Apoyo PIE declarado', 'origen' => 'Declarada', 'horas' => 5],
                 ],
             ],
-            'planes_programas' => ['total' => 19],
-            'otras_funciones_docentes' => ['total' => 7],
+            'planes_programas' => ['automaticas' => 19, 'declaradas' => 0, 'total' => 19],
+            'otras_funciones_docentes' => ['automaticas' => 0, 'declaradas' => 7, 'total' => 7],
+        ];
+
+        $necesidadesFunciones = [
+            ['subtipo_asignacion' => 'directiva', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 32],
+            ['subtipo_asignacion' => 'tecnico_pedagogica', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 24],
+            ['subtipo_asignacion' => 'tecnico_pedagogica', 'dotacion_funcion_id' => 10, 'horas_contrato_asignadas' => 8],
+            ['subtipo_asignacion' => 'planes_programas', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 12],
         ];
 
         $desglosePie = $this->invokePrivate('desgloseContratoPieNecesario', [$bloques]);
         $bloquesContratoDotacion = $this->invokePrivate('bloquesSinContratoPieNecesario', [$bloques]);
-        $resultado = $this->invokePrivate('desgloseContratoBloqueDotacion', [$bloquesContratoDotacion]);
+        $resultado = $this->invokePrivate('desgloseContratoBloqueDotacion', [$bloquesContratoDotacion, $necesidadesFunciones]);
 
         $this->assertSame([
             'coordinacion_pie' => 18.0,
@@ -133,12 +140,20 @@ class DotacionDocenteDetalleHorasTest extends TestCase
 
         $this->assertSame([
             'funciones_directivas' => 44.0,
+            'funciones_directivas_normativas' => 44.0,
+            'funciones_directivas_declaradas' => 0.0,
+            'funciones_directivas_normativas_asignadas' => 32.0,
             'funciones_tecnico_pedagogicas' => 52.0,
             'funciones_tecnico_pedagogicas_normativas' => 38.0,
             'funciones_tecnico_pedagogicas_declaradas' => 14.0,
+            'funciones_tecnico_pedagogicas_normativas_asignadas' => 24.0,
             'otras_funciones_pie' => 5.0,
             'planes_normativos' => 19.0,
+            'planes_normativos_asignadas' => 12.0,
+            'planes_declarados' => 0.0,
             'otras_funciones_declaradas' => 7.0,
+            'total_normativas' => 101.0,
+            'total_declaradas' => 26.0,
         ], $resultado);
         $this->assertSame(
             $resultado['funciones_tecnico_pedagogicas'],

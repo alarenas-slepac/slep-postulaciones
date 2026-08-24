@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.8.24.420' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Cobertura y separación del contrato bloque dotación',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Separa el contrato bloque dotación en horas normativas y horas declaradas por el establecimiento.',
+            'Muestra en funciones directivas, funciones técnico-pedagógicas normativas y planes normativos la relación de horas asignadas sobre horas requeridas.',
+            'Replica la separación y la cobertura normativa en el resumen web, el detalle por bloques y el informe PDF.',
+            'Mantiene sin cambios el total requerido y la brecha final, utilizando la suma de los componentes normativo y declarado.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.419' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',
