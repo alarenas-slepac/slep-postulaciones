@@ -30,7 +30,7 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
-                @if (in_array($activeRole, ['admin', 'coordinador_uatp'], true))
+                @if (in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true))
                     <a class="btn btn-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_avance' => 1, 'anio' => $anio]) }}">
                         <i class="bi bi-bar-chart-line"></i> Informe de avance
                     </a>
@@ -38,7 +38,7 @@
                         <i class="bi bi-file-earmark-excel"></i> Excel de avance
                     </a>
                 @endif
-                @if (Route::has('admin.dotacion-funciones.index'))
+                @if (Route::has('admin.dotacion-funciones.index') && $activeRole !== 'supervisor_plani')
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.index', ['anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Dotación funciones y planes
                     </a>

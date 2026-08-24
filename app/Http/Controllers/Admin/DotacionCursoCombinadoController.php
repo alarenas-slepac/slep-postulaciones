@@ -16,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class DotacionCursoCombinadoController extends Controller
 {
-    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp'];
+    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
 
     public function store(Request $request, Establecimiento $establecimiento): RedirectResponse
     {

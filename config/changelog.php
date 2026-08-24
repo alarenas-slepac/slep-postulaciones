@@ -1,6 +1,36 @@
 <?php
 
 return [
+    '2026.8.24.424' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Detalle de sobredotación docente y acceso de Planificación',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Http/Controllers/Admin/DotacionCursoCombinadoController.php',
+            'app/Http/Controllers/Admin/DotacionDocenteExclusionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Http/Controllers/Admin/DotacionProporcionExcepcionController.php',
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_24_210000_grant_dotacion_establecimiento_access_to_supervisor_plani.php',
+            'resources/views/admin/dotacion-establecimiento/index.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/SupervisorPlaniDotacionAccessTest.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+        ],
+        'changes' => [
+            'Crea la pestaña Detalle sobredotación, visible sólo para administrador, coordinador GDP, supervisor de Planificación y coordinador UATP.',
+            'Identifica docentes cuyo contrato considerado supera sus horas asignadas y presenta contrato total, horas asignadas y sobredotación individual.',
+            'Desglosa las horas de sobredotación entre Planta y Contrata, imputando las asignaciones primero a Planta para priorizar las horas titulares.',
+            'Incorpora totales del establecimiento para horas contratadas, asignadas, sobredotación total, sobredotación Planta y sobredotación Contrata.',
+            'Otorga a supervisor_plani acceso completo al módulo Dotación establecimiento, sus acciones, navegación y permiso modular.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.24.423' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',
