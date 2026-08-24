@@ -130,6 +130,14 @@ class DotacionEstablecimientoCalculator
         $horasContratoDocentePie = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie', 0);
         $horasContratoDocentesAula = max(0.0, round($horasContratoDocentes - $horasContratoDocentePie, 2));
         $horasContratoDocentePieExceso = max(0.0, round($horasContratoDocentePie - $horasContratoDocentes, 2));
+        $brechasDotacion = self::brechasDotacionSeparadas(
+            $contratoPlanMasTrabajoColaborativoPie,
+            $horasDotacionFuncionesNormativas,
+            $horasContratoDocentesAula,
+            $horasDotacionFuncionesDeclaradas,
+            $horasContratoPieNecesarias,
+            $horasContratoDocentePie
+        );
         $horasContratoRequeridas = $contratoPlanMasTrabajoColaborativoPie + $horasDotacionFunciones + $horasContratoPieNecesarias;
         $brechaContrato = round($horasContratoRequeridas - $horasContratoDocentes, 2);
         $horasAulaAsignadas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_aula'] ?? 0));
@@ -176,6 +184,9 @@ class DotacionEstablecimientoCalculator
             'horas_contrato_docente_pie' => $horasContratoDocentePie,
             'horas_contrato_docente_pie_exceso' => $horasContratoDocentePieExceso,
             'horas_contrato_requeridas' => $horasContratoRequeridas,
+            'brecha_dotacion_general' => $brechasDotacion['general'],
+            'brecha_dotacion_pie' => $brechasDotacion['pie'],
+            'brecha_contrato_final' => $brechaContrato,
             'horas_por_contratar' => $brechaContrato > 0 ? $brechaContrato : 0.0,
             'sobredotacion_horas' => $brechaContrato < 0 ? abs($brechaContrato) : 0.0,
             'horas_aula_docentes' => $horasAulaAsignadas,
@@ -1588,6 +1599,27 @@ class DotacionEstablecimientoCalculator
             'horas_contrato_plan_asignadas' => $horasContratoPlanAsignadas,
             'trabajo_colaborativo_pie_asignadas' => $trabajoColaborativoPieAsignadas,
             'contrato_plan_mas_trabajo_colaborativo_pie_asignadas' => round($horasContratoPlanAsignadas + $trabajoColaborativoPieAsignadas, 2),
+        ];
+    }
+
+    /**
+     * @return array{general: float, pie: float}
+     */
+    private static function brechasDotacionSeparadas(
+        float $contratoPlanMasTrabajoColaborativoPie,
+        float $horasDotacionFuncionesNormativas,
+        float $horasContratoDocentesAula,
+        float $horasDotacionFuncionesDeclaradas,
+        float $horasContratoPieNecesarias,
+        float $horasContratoDocentePie
+    ): array {
+        return [
+            'general' => round(
+                ($contratoPlanMasTrabajoColaborativoPie + $horasDotacionFuncionesNormativas)
+                - ($horasContratoDocentesAula + $horasDotacionFuncionesDeclaradas),
+                2
+            ),
+            'pie' => round($horasContratoPieNecesarias - $horasContratoDocentePie, 2),
         ];
     }
 

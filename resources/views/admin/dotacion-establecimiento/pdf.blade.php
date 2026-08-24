@@ -78,11 +78,23 @@
     $horasContratoCoordinacionPie = (float) ($resumen['horas_contrato_docente_pie_coordinacion'] ?? 0);
     $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
     $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0) + $horasContratoPieNecesarias));
-    $sobredotacion = max(0, $horasContratoActuales - $horasContratoRequeridas);
-    $horasPorContratar = max(0, $horasContratoRequeridas - $horasContratoActuales);
-    $brechaTexto = $sobredotacion > 0.01 ? 'Sobredotación' : ($horasPorContratar > 0.01 ? 'Horas por contratar' : 'Dotación cuadrada');
-    $brechaValor = $sobredotacion > 0.01 ? $sobredotacion : ($horasPorContratar > 0.01 ? $horasPorContratar : 0);
-    $brechaClass = $sobredotacion > 0.01 ? 'badge-red' : ($horasPorContratar > 0.01 ? 'badge-green' : 'badge-blue');
+    $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas) - ($horasContratoAula + $horasBloqueDeclaradas)));
+    $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));
+    $brechaContratoFinal = (float) ($resumen['brecha_contrato_final'] ?? ($horasContratoRequeridas - $horasContratoActuales));
+    $resultadoBrecha = static function (float $valor) use ($fmt): array {
+        if ($valor < -0.01) {
+            return ['label' => 'Horas de sobredotación', 'value' => $fmt(abs($valor)), 'badge' => 'badge-red', 'text' => 'danger'];
+        }
+
+        if ($valor > 0.01) {
+            return ['label' => 'Horas necesarias', 'value' => '+'.$fmt($valor), 'badge' => 'badge-green', 'text' => 'success'];
+        }
+
+        return ['label' => 'Dotación cuadrada', 'value' => '0', 'badge' => 'badge-blue', 'text' => 'primary'];
+    };
+    $resultadoGeneral = $resultadoBrecha($brechaDotacionGeneral);
+    $resultadoPie = $resultadoBrecha($brechaDotacionPie);
+    $resultadoFinal = $resultadoBrecha($brechaContratoFinal);
     $horasAulaAsignadas = (float) ($resumen['horas_aula_asignadas'] ?? $resumen['horas_aula_docentes'] ?? 0);
     $horasContrato6535 = (float) ($resumen['horas_contrato_65_35'] ?? 0);
     $horasContrato6040 = (float) ($resumen['horas_contrato_60_40'] ?? 0);
@@ -122,7 +134,7 @@
         <td colspan="2"><div class="label">Establecimiento</div><div class="value">{{ $establecimiento->nombre_establecimiento }}</div></td>
         <td><div class="label">Comuna</div><div class="value">{{ $establecimiento->comuna ?: 'Sin comuna' }}</div></td>
         <td><div class="label">Año</div><div class="value">{{ $anio }}</div></td>
-        <td><div class="label">Estado brecha</div><div class="value"><span class="badge {{ $brechaClass }}">{{ $brechaTexto }}</span></div></td>
+        <td><div class="label">Resultado final</div><div class="value"><span class="badge {{ $resultadoFinal['badge'] }}">{{ $resultadoFinal['label'] }}</span></div></td>
     </tr>
 </table>
 
@@ -186,7 +198,7 @@
             <th>Bloque declarado<br><span class="small">Asig. / decl.</span></th>
             <th>Contrato PIE necesario<br><span class="small">Asig. / req.</span></th>
             <th>Horas contrato docentes</th>
-            <th>Brecha</th>
+            <th>Resultado final</th>
         </tr>
     </thead>
     <tbody>
@@ -202,7 +214,35 @@
             <td class="text-right">{{ $fmt($horasBloqueDeclaradasAsignadas) }} / {{ $fmt($horasBloqueDeclaradas) }}</td>
             <td class="text-right primary">{{ $fmt($horasContratoPieNecesariasAsignadas) }} / {{ $fmt($horasContratoPieNecesarias) }}</td>
             <td class="text-right">{{ $fmt($resumen['horas_contrato_docentes'] ?? 0) }}</td>
-            <td class="text-right"><span class="badge {{ $brechaClass }}">{{ $fmt($brechaValor) }} - {{ $brechaTexto }}</span></td>
+            <td class="text-right"><span class="badge {{ $resultadoFinal['badge'] }}">{{ $resultadoFinal['value'] }} - {{ $resultadoFinal['label'] }}</span></td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="section-title">Brechas separadas de dotación</div>
+<table class="avoid-break">
+    <thead>
+        <tr>
+            <th style="width: 22%;">Bloque</th>
+            <th style="width: 55%;">Cálculo</th>
+            <th style="width: 23%;" class="text-right">Resultado</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Dotación general</strong></td>
+            <td>(Contrato plan + trabajo colaborativo PIE + bloque normativo) − (contrato aula + bloque declarado).<br><span class="muted">({{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }} + {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }} + {{ $fmt($horasBloqueNormativas) }}) − ({{ $fmt($horasContratoAula) }} + {{ $fmt($horasBloqueDeclaradas) }})</span></td>
+            <td class="text-right {{ $resultadoGeneral['text'] }}">{{ $resultadoGeneral['value'] }} - {{ $resultadoGeneral['label'] }}</td>
+        </tr>
+        <tr>
+            <td><strong>Dotación PIE</strong></td>
+            <td>Horas de contrato PIE necesarias − horas contrato docente PIE.<br><span class="muted">{{ $fmt($horasContratoPieNecesarias) }} − {{ $fmt($horasContratoDocentePie) }}</span></td>
+            <td class="text-right {{ $resultadoPie['text'] }}">{{ $resultadoPie['value'] }} - {{ $resultadoPie['label'] }}</td>
+        </tr>
+        <tr class="total-row">
+            <td>Resultado contractual final</td>
+            <td>Se mantiene como referencia para comparar con las dos brechas separadas.</td>
+            <td class="text-right {{ $resultadoFinal['text'] }}">{{ $resultadoFinal['value'] }} - {{ $resultadoFinal['label'] }}</td>
         </tr>
     </tbody>
 </table>
@@ -425,9 +465,9 @@
             <td>Base contractual docente vigente del establecimiento.</td>
         </tr>
         <tr class="total-row">
-            <td>Diferencia</td>
-            <td class="text-right {{ $sobredotacion > 0.01 ? 'danger' : ($horasPorContratar > 0.01 ? 'success' : 'primary') }}">{{ $fmt($brechaValor) }}</td>
-            <td>{{ $brechaTexto }}</td>
+            <td>{{ $resultadoFinal['label'] }}</td>
+            <td class="text-right {{ $resultadoFinal['text'] }}">{{ $resultadoFinal['value'] }}</td>
+            <td>Resultado contractual final para comparación.</td>
         </tr>
     </tbody>
 </table>
