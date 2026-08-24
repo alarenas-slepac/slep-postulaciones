@@ -21,7 +21,7 @@
         $horasBloqueNormativas = (float) ($resumen['horas_dotacion_funciones_normativas'] ?? $desgloseContratoBloque['total_normativas'] ?? 0);
         $horasBloqueDeclaradas = (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? $desgloseContratoBloque['total_declaradas'] ?? 0);
         $horasBloqueDeclaradasAsignadas = (float) ($desgloseContratoBloque['total_declaradas_asignadas'] ?? 0);
-        $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas) - ($horasContratoAula + $horasBloqueDeclaradas)));
+        $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas + $horasBloqueDeclaradas) - $horasContratoAula));
         $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));
         $brechaContratoFinal = (float) ($resumen['brecha_contrato_final'] ?? ($horasContratoRequeridas - $horasContratoActuales));
         $resultadoBrecha = static function (float $valor) use ($fmt): array {
@@ -160,8 +160,8 @@
                             </div>
                             <div class="fs-2 fw-bold text-{{ $resultadoGeneral['tone'] }}">{{ $resultadoGeneral['value'] }}</div>
                             <div class="small text-muted mt-1">
-                                (Contrato plan + trabajo colaborativo PIE + bloque normativo) − (contrato aula + bloque declarado).<br>
-                                <span class="fw-semibold">({{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }} + {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }} + {{ $fmt($horasBloqueNormativas) }}) − ({{ $fmt($horasContratoAula) }} + {{ $fmt($horasBloqueDeclaradas) }})</span>
+                                (Contrato plan + trabajo colaborativo PIE + bloque normativo + bloque declarado) − contrato aula.<br>
+                                <span class="fw-semibold">({{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }} + {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }} + {{ $fmt($horasBloqueNormativas) }} + {{ $fmt($horasBloqueDeclaradas) }}) − {{ $fmt($horasContratoAula) }}</span>
                             </div>
                         </div>
                     </div>

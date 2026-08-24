@@ -1615,8 +1615,8 @@ class DotacionEstablecimientoCalculator
     ): array {
         return [
             'general' => round(
-                ($contratoPlanMasTrabajoColaborativoPie + $horasDotacionFuncionesNormativas)
-                - ($horasContratoDocentesAula + $horasDotacionFuncionesDeclaradas),
+                ($contratoPlanMasTrabajoColaborativoPie + $horasDotacionFuncionesNormativas + $horasDotacionFuncionesDeclaradas)
+                - $horasContratoDocentesAula,
                 2
             ),
             'pie' => round($horasContratoPieNecesarias - $horasContratoDocentePie, 2),

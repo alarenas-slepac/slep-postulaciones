@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.8.24.426' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Corrección de sobredotación general sin duplicar horas declaradas',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+        ],
+        'changes' => [
+            'Mueve el bloque declarado al lado de las necesidades en la fórmula de Dotación General.',
+            'Calcula Dotación General como contrato plan más trabajo colaborativo PIE, bloque normativo y bloque declarado, menos contrato Aula.',
+            'Evita sumar horas declaradas al contrato individual y garantiza que la dotación considerada de cada docente no supere su contrato Aula.',
+            'Actualiza el resumen web, el informe PDF y Detalle sobredotación con la misma fórmula.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.425' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',
