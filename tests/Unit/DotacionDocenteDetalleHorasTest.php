@@ -102,7 +102,7 @@ class DotacionDocenteDetalleHorasTest extends TestCase
     {
         $resultado = $this->invokePrivate('desgloseContratoBloqueDotacion', [[
             'directiva' => ['total' => 44],
-            'tecnico_pedagogica' => ['total' => 52],
+            'tecnico_pedagogica' => ['automaticas' => 38, 'declaradas' => 14, 'total' => 52],
             'pie' => ['total' => 83, 'educadoras_diferenciales' => 65],
             'planes_programas' => ['total' => 19],
             'otras_funciones_docentes' => ['total' => 7],
@@ -111,12 +111,21 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         $this->assertSame([
             'funciones_directivas' => 44.0,
             'funciones_tecnico_pedagogicas' => 52.0,
+            'funciones_tecnico_pedagogicas_normativas' => 38.0,
+            'funciones_tecnico_pedagogicas_declaradas' => 14.0,
             'coordinacion_pie' => 18.0,
             'educadoras_diferenciales' => 65.0,
             'planes_normativos' => 19.0,
             'otras_funciones_declaradas' => 7.0,
         ], $resultado);
-        $this->assertSame(205.0, array_sum($resultado));
+        $this->assertSame(
+            $resultado['funciones_tecnico_pedagogicas'],
+            $resultado['funciones_tecnico_pedagogicas_normativas'] + $resultado['funciones_tecnico_pedagogicas_declaradas']
+        );
+        $this->assertSame(205.0, collect($resultado)->except([
+            'funciones_tecnico_pedagogicas_normativas',
+            'funciones_tecnico_pedagogicas_declaradas',
+        ])->sum());
     }
 
     public function test_vista_ofrece_todos_los_motivos_y_limita_horas_al_saldo_sin_asignar(): void

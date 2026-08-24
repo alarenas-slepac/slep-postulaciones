@@ -14,7 +14,8 @@
         $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
         $desgloseContratoItems = [
             ['label' => 'Funciones directivas', 'value' => $desgloseContratoBloque['funciones_directivas'] ?? 0, 'tone' => 'primary', 'icon' => 'bi-person-badge'],
-            ['label' => 'Técnico-pedagógicas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas'] ?? 0, 'tone' => 'success', 'icon' => 'bi-diagram-3'],
+            ['label' => 'Téc.-pedagógicas normativas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0, 'hint' => 'Horas automáticas.', 'tone' => 'success', 'icon' => 'bi-shield-check'],
+            ['label' => 'Téc.-pedagógicas declaradas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0, 'hint' => 'Informadas por el establecimiento.', 'tone' => 'success', 'icon' => 'bi-building-add'],
             ['label' => 'Coordinación PIE', 'value' => $desgloseContratoBloque['coordinacion_pie'] ?? 0, 'tone' => 'info', 'icon' => 'bi-people-fill'],
             ['label' => 'Educadoras diferenciales', 'value' => $desgloseContratoBloque['educadoras_diferenciales'] ?? 0, 'tone' => 'info', 'icon' => 'bi-universal-access'],
             ['label' => 'Planes normativos', 'value' => $desgloseContratoBloque['planes_normativos'] ?? 0, 'tone' => 'warning', 'icon' => 'bi-journal-check'],
@@ -125,7 +126,7 @@
                     <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
                         <div>
                             <div class="text-muted small fw-semibold">Desglose contrato bloque dotación</div>
-                            <div class="small text-muted">Las horas de Educadoras Diferenciales se muestran separadas de Coordinación PIE.</div>
+                            <div class="small text-muted">Las horas técnico-pedagógicas normativas se separan de las declaradas por el establecimiento; Educadoras Diferenciales se mantiene separada de Coordinación PIE.</div>
                         </div>
                         <div class="text-end">
                             <div class="small text-muted">Total bloque</div>
@@ -134,12 +135,15 @@
                     </div>
                     <div class="row g-2">
                         @foreach ($desgloseContratoItems as $item)
-                            <div class="col-xl-2 col-md-4 col-sm-6">
+                            <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
                                 <div class="dotacion-breakdown-item p-3">
                                     <div class="d-flex align-items-start justify-content-between gap-2">
                                         <div>
                                             <div class="small text-muted fw-semibold">{{ $item['label'] }}</div>
                                             <div class="fs-5 fw-bold text-{{ $item['tone'] }}">{{ $fmt($item['value']) }}</div>
+                                            @if (!empty($item['hint']))
+                                                <div class="small text-muted">{{ $item['hint'] }}</div>
+                                            @endif
                                         </div>
                                         <span class="kpi-icon text-{{ $item['tone'] }}"><i class="bi {{ $item['icon'] }}"></i></span>
                                     </div>
