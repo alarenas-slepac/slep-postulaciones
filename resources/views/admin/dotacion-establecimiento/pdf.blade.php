@@ -60,6 +60,7 @@
     $totalBloquesDotacion = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
     $totalAutomaticas = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['automaticas'] ?? 0));
     $totalDeclaradas = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
+    $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
     $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
     $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0)));
     $sobredotacion = max(0, $horasContratoActuales - $horasContratoRequeridas);
@@ -187,6 +188,32 @@
     </tbody>
 </table>
 
+<div class="section-title">Desglose contrato bloque dotación</div>
+<table class="summary avoid-break">
+    <thead>
+        <tr>
+            <th>Funciones directivas</th>
+            <th>Funciones técnico-pedagógicas</th>
+            <th>Coordinación PIE</th>
+            <th>Educadoras diferenciales</th>
+            <th>Planes normativos</th>
+            <th>Otras funciones declaradas</th>
+            <th>Total bloque</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['coordinacion_pie'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($desgloseContratoBloque['educadoras_diferenciales'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_normativos'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['otras_funciones_declaradas'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</td>
+        </tr>
+    </tbody>
+</table>
+
 <div class="section-title">Asignación real y conversión contractual</div>
 <table class="summary avoid-break">
     <thead>
@@ -236,9 +263,39 @@
             <td>3 horas por curso con estudiantes NEE.</td>
         </tr>
         <tr>
+            <td>Funciones directivas</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas'] ?? 0) }}</td>
+            <td>Componente del contrato del bloque de dotación.</td>
+        </tr>
+        <tr>
+            <td>Funciones técnico-pedagógicas</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas'] ?? 0) }}</td>
+            <td>Funciones técnico-pedagógicas distintas de Coordinación PIE.</td>
+        </tr>
+        <tr>
+            <td>Coordinación PIE</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['coordinacion_pie'] ?? 0) }}</td>
+            <td>Horas de coordinación del Programa de Integración Escolar.</td>
+        </tr>
+        <tr>
+            <td>Educadoras diferenciales</td>
+            <td class="text-right primary">{{ $fmt($desgloseContratoBloque['educadoras_diferenciales'] ?? 0) }}</td>
+            <td>Bolsa contractual PIE separada de las horas de Coordinación PIE.</td>
+        </tr>
+        <tr>
+            <td>Planes normativos</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_normativos'] ?? 0) }}</td>
+            <td>Planes normativos y programas considerados en dotación.</td>
+        </tr>
+        <tr>
+            <td>Otras funciones declaradas</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['otras_funciones_declaradas'] ?? 0) }}</td>
+            <td>Horas declaradas o aprobadas fuera de los bloques normativos.</td>
+        </tr>
+        <tr class="total-row">
             <td>Contrato bloque dotación</td>
             <td class="text-right">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</td>
-            <td>Directivos, técnico-pedagógicas, PIE, planes y otras funciones.</td>
+            <td>Suma de directivos, técnico-pedagógicas, Coordinación PIE, Educadoras Diferenciales, planes normativos y otras funciones declaradas.</td>
         </tr>
         <tr class="total-row">
             <td>Horas que debiesen contratarse</td>

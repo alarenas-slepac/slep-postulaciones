@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.24.416' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Desglose del contrato del bloque de dotación',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Desglosa en el resumen superior las horas de funciones directivas, técnico-pedagógicas, Coordinación PIE, Educadoras Diferenciales, planes normativos y otras funciones declaradas.',
+            'Separa la bolsa contractual de Educadoras Diferenciales de las horas de Coordinación PIE, manteniendo ambas dentro del total del contrato del bloque de dotación.',
+            'Incorpora el mismo desglose en el informe PDF y en el cálculo detallado de la necesidad contractual.',
+            'Mantiene sin cambios el total requerido, las horas contrato docentes y la fórmula de la brecha final.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.415' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

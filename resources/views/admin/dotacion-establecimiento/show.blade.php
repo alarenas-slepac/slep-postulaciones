@@ -11,6 +11,15 @@
         $brechaLabel = $sobredotacion > 0.01 ? 'Horas de sobredotación' : ($horasPorContratar > 0.01 ? 'Horas por contratar' : 'Dotación cuadrada');
         $brechaValue = $sobredotacion > 0.01 ? $sobredotacion : ($horasPorContratar > 0.01 ? $horasPorContratar : 0);
         $brechaTone = $sobredotacion > 0.01 ? 'danger' : ($horasPorContratar > 0.01 ? 'success' : 'primary');
+        $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
+        $desgloseContratoItems = [
+            ['label' => 'Funciones directivas', 'value' => $desgloseContratoBloque['funciones_directivas'] ?? 0, 'tone' => 'primary', 'icon' => 'bi-person-badge'],
+            ['label' => 'Técnico-pedagógicas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas'] ?? 0, 'tone' => 'success', 'icon' => 'bi-diagram-3'],
+            ['label' => 'Coordinación PIE', 'value' => $desgloseContratoBloque['coordinacion_pie'] ?? 0, 'tone' => 'info', 'icon' => 'bi-people-fill'],
+            ['label' => 'Educadoras diferenciales', 'value' => $desgloseContratoBloque['educadoras_diferenciales'] ?? 0, 'tone' => 'info', 'icon' => 'bi-universal-access'],
+            ['label' => 'Planes normativos', 'value' => $desgloseContratoBloque['planes_normativos'] ?? 0, 'tone' => 'warning', 'icon' => 'bi-journal-check'],
+            ['label' => 'Otras funciones declaradas', 'value' => $desgloseContratoBloque['otras_funciones_declaradas'] ?? 0, 'tone' => 'secondary', 'icon' => 'bi-plus-square-dotted'],
+        ];
         $kpis = [
             ['label' => 'Matrícula', 'value' => number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.'), 'hint' => 'Estudiantes con matrícula vigente.', 'tone' => 'dark', 'icon' => 'bi-people'],
             ['label' => 'Cursos', 'value' => number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.'), 'hint' => 'Cursos con matrícula.', 'tone' => 'primary', 'icon' => 'bi-grid-3x3-gap'],
@@ -19,7 +28,7 @@
             ['label' => 'Contrato plan', 'value' => $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0), 'hint' => ((float) ($resumen['horas_plan_contrato_reduccion_cursos_combinados'] ?? 0) > 0 ? 'Equivalente ajustado después de consolidar cursos combinados.' : 'Equivalente contractual redondeado por curso.'), 'tone' => 'info', 'icon' => 'bi-calculator'],
             ['label' => 'Trabajo colab. PIE', 'value' => $fmt($resumen['trabajo_colaborativo_pie'] ?? 0), 'hint' => '3 horas por curso con NEE.', 'tone' => 'success', 'icon' => 'bi-universal-access'],
             ['label' => 'Contrato plan + PIE', 'value' => $fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0), 'hint' => 'Plan más trabajo colaborativo.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
-            ['label' => 'Contrato bloque dotación', 'value' => $fmt($resumen['horas_dotacion_funciones'] ?? 0), 'hint' => 'Directivos, funciones, PIE y planes.', 'tone' => 'warning', 'icon' => 'bi-diagram-3'],
+            ['label' => 'Contrato bloque dotación', 'value' => $fmt($resumen['horas_dotacion_funciones'] ?? 0), 'hint' => 'Total de los componentes desglosados abajo.', 'tone' => 'warning', 'icon' => 'bi-diagram-3'],
             ['label' => 'Horas contrato docentes', 'value' => $fmt($horasContratoActuales), 'hint' => 'Horas contratadas vigentes.', 'tone' => 'dark', 'icon' => 'bi-briefcase'],
         ];
     @endphp
@@ -29,6 +38,8 @@
         .dotacion-icon { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: #0d6efd; color: #fff; box-shadow: 0 10px 20px rgba(13, 110, 253, .22); }
         .dotacion-kpi { border: 1px solid #e5ecf6; border-radius: 1rem; box-shadow: 0 8px 20px rgba(15, 23, 42, .045); height: 100%; }
         .dotacion-kpi .kpi-icon { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: .85rem; background: #f2f6ff; }
+        .dotacion-breakdown { background: linear-gradient(135deg, #fffaf0 0%, #ffffff 55%, #f8fbff 100%); }
+        .dotacion-breakdown-item { border: 1px solid #e5ecf6; border-radius: .85rem; background: rgba(255, 255, 255, .9); height: 100%; }
         .dotacion-section { border: 1px solid #dce7f5; border-radius: 1rem; box-shadow: 0 8px 20px rgba(15, 23, 42, .045); overflow: hidden; }
         .dotacion-section-header { background: #fff; border-bottom: 1px solid #e6edf6; padding: 1rem 1.25rem; }
         .dotacion-eyebrow { color: #64748b; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
@@ -105,6 +116,37 @@
                     <div class="fs-3 fw-bold text-{{ $brechaTone }}">{{ $fmt($brechaValue) }}</div>
                     <div class="small text-muted">{{ $brechaLabel }}</div>
                     <div class="small text-muted mt-1">Requeridas: <span class="fw-semibold">{{ $fmt($horasContratoRequeridas) }}</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="card dotacion-kpi dotacion-breakdown border-0">
+                <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+                        <div>
+                            <div class="text-muted small fw-semibold">Desglose contrato bloque dotación</div>
+                            <div class="small text-muted">Las horas de Educadoras Diferenciales se muestran separadas de Coordinación PIE.</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="small text-muted">Total bloque</div>
+                            <div class="fs-4 fw-bold text-warning">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</div>
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        @foreach ($desgloseContratoItems as $item)
+                            <div class="col-xl-2 col-md-4 col-sm-6">
+                                <div class="dotacion-breakdown-item p-3">
+                                    <div class="d-flex align-items-start justify-content-between gap-2">
+                                        <div>
+                                            <div class="small text-muted fw-semibold">{{ $item['label'] }}</div>
+                                            <div class="fs-5 fw-bold text-{{ $item['tone'] }}">{{ $fmt($item['value']) }}</div>
+                                        </div>
+                                        <span class="kpi-icon text-{{ $item['tone'] }}"><i class="bi {{ $item['icon'] }}"></i></span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
             </div>
         </div>
