@@ -17,15 +17,27 @@
         $trabajoColaborativoPieAsignadas = (float) ($resumen['trabajo_colaborativo_pie_asignadas'] ?? 0);
         $contratoPlanMasPieAsignadas = (float) ($resumen['contrato_plan_mas_trabajo_colaborativo_pie_asignadas'] ?? ($horasContratoPlanAsignadas + $trabajoColaborativoPieAsignadas));
         $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0) + $horasContratoPieNecesarias));
-        $sobredotacion = max(0, $horasContratoActuales - $horasContratoRequeridas);
-        $horasPorContratar = max(0, $horasContratoRequeridas - $horasContratoActuales);
-        $brechaLabel = $sobredotacion > 0.01 ? 'Horas de sobredotación' : ($horasPorContratar > 0.01 ? 'Horas por contratar' : 'Dotación cuadrada');
-        $brechaValue = $sobredotacion > 0.01 ? $sobredotacion : ($horasPorContratar > 0.01 ? $horasPorContratar : 0);
-        $brechaTone = $sobredotacion > 0.01 ? 'danger' : ($horasPorContratar > 0.01 ? 'success' : 'primary');
         $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
         $horasBloqueNormativas = (float) ($resumen['horas_dotacion_funciones_normativas'] ?? $desgloseContratoBloque['total_normativas'] ?? 0);
         $horasBloqueDeclaradas = (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? $desgloseContratoBloque['total_declaradas'] ?? 0);
         $horasBloqueDeclaradasAsignadas = (float) ($desgloseContratoBloque['total_declaradas_asignadas'] ?? 0);
+        $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas) - ($horasContratoAula + $horasBloqueDeclaradas)));
+        $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));
+        $brechaContratoFinal = (float) ($resumen['brecha_contrato_final'] ?? ($horasContratoRequeridas - $horasContratoActuales));
+        $resultadoBrecha = static function (float $valor) use ($fmt): array {
+            if ($valor < -0.01) {
+                return ['label' => 'Horas de sobredotación', 'value' => $fmt(abs($valor)), 'tone' => 'danger', 'icon' => 'bi-exclamation-triangle'];
+            }
+
+            if ($valor > 0.01) {
+                return ['label' => 'Horas necesarias', 'value' => '+'.$fmt($valor), 'tone' => 'success', 'icon' => 'bi-plus-circle'];
+            }
+
+            return ['label' => 'Dotación cuadrada', 'value' => '0', 'tone' => 'primary', 'icon' => 'bi-check-circle'];
+        };
+        $resultadoGeneral = $resultadoBrecha($brechaDotacionGeneral);
+        $resultadoPie = $resultadoBrecha($brechaDotacionPie);
+        $resultadoFinal = $resultadoBrecha($brechaContratoFinal);
         $desgloseNormativoItems = [
             ['label' => 'Funciones directivas', 'assigned' => $desgloseContratoBloque['funciones_directivas_normativas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['funciones_directivas_normativas'] ?? 0, 'tone' => 'primary', 'icon' => 'bi-person-badge'],
             ['label' => 'Téc.-pedagógicas normativas', 'assigned' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0, 'tone' => 'success', 'icon' => 'bi-shield-check'],
@@ -134,15 +146,55 @@
                 </div>
             </div>
         @endforeach
+        <div class="col-12">
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="card dotacion-kpi border-0 border-{{ $resultadoGeneral['tone'] }}">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                                <div>
+                                    <div class="text-muted small fw-semibold">Dotación general</div>
+                                    <div class="small text-muted">{{ $resultadoGeneral['label'] }}</div>
+                                </div>
+                                <span class="kpi-icon text-{{ $resultadoGeneral['tone'] }}"><i class="bi {{ $resultadoGeneral['icon'] }}"></i></span>
+                            </div>
+                            <div class="fs-2 fw-bold text-{{ $resultadoGeneral['tone'] }}">{{ $resultadoGeneral['value'] }}</div>
+                            <div class="small text-muted mt-1">
+                                (Contrato plan + trabajo colaborativo PIE + bloque normativo) − (contrato aula + bloque declarado).<br>
+                                <span class="fw-semibold">({{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }} + {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }} + {{ $fmt($horasBloqueNormativas) }}) − ({{ $fmt($horasContratoAula) }} + {{ $fmt($horasBloqueDeclaradas) }})</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card dotacion-kpi border-0 border-{{ $resultadoPie['tone'] }}">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                                <div>
+                                    <div class="text-muted small fw-semibold">Dotación PIE</div>
+                                    <div class="small text-muted">{{ $resultadoPie['label'] }}</div>
+                                </div>
+                                <span class="kpi-icon text-{{ $resultadoPie['tone'] }}"><i class="bi {{ $resultadoPie['icon'] }}"></i></span>
+                            </div>
+                            <div class="fs-2 fw-bold text-{{ $resultadoPie['tone'] }}">{{ $resultadoPie['value'] }}</div>
+                            <div class="small text-muted mt-1">
+                                Horas de contrato PIE necesarias − horas contrato docente PIE.<br>
+                                <span class="fw-semibold">{{ $fmt($horasContratoPieNecesarias) }} − {{ $fmt($horasContratoDocentePie) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
-            <div class="card dotacion-kpi border-0 border-{{ $brechaTone }}">
+            <div class="card dotacion-kpi border-0 border-{{ $resultadoFinal['tone'] }}">
                 <div class="card-body">
                     <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
-                        <div class="text-muted small fw-semibold">Brecha final</div>
-                        <span class="kpi-icon text-{{ $brechaTone }}"><i class="bi {{ $brechaTone === 'danger' ? 'bi-exclamation-triangle' : ($brechaTone === 'success' ? 'bi-plus-circle' : 'bi-check-circle') }}"></i></span>
+                        <div class="text-muted small fw-semibold">{{ $resultadoFinal['label'] }}</div>
+                        <span class="kpi-icon text-{{ $resultadoFinal['tone'] }}"><i class="bi {{ $resultadoFinal['icon'] }}"></i></span>
                     </div>
-                    <div class="fs-3 fw-bold text-{{ $brechaTone }}">{{ $fmt($brechaValue) }}</div>
-                    <div class="small text-muted">{{ $brechaLabel }}</div>
+                    <div class="fs-3 fw-bold text-{{ $resultadoFinal['tone'] }}">{{ $resultadoFinal['value'] }}</div>
+                    <div class="small text-muted">Resultado contractual final para comparación.</div>
                     <div class="small text-muted mt-1">Requeridas: <span class="fw-semibold">{{ $fmt($horasContratoRequeridas) }}</span></div>
                 </div>
             </div>

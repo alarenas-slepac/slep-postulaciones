@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.8.24.423' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Brechas separadas de dotación general y PIE',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Calcula la brecha de dotación general como contrato plan más trabajo colaborativo PIE y bloque normativo, menos contrato aula y bloque declarado.',
+            'Calcula por separado la brecha PIE entre las horas de contrato PIE necesarias y las horas de contrato docente PIE asignadas.',
+            'Muestra los resultados negativos como Horas de sobredotación, en valor absoluto y color rojo, y los positivos como Horas necesarias, con signo más y color verde.',
+            'Conserva el resultado contractual final como referencia comparativa, reemplazando la etiqueta fija Brecha final por su estado dinámico.',
+            'Replica ambos bloques y el resultado contractual final en pantalla y en el informe PDF.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.422' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

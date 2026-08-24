@@ -210,6 +210,23 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         ], $resultado);
     }
 
+    public function test_calcula_brechas_separadas_de_dotacion_general_y_pie(): void
+    {
+        $resultado = $this->invokePrivate('brechasDotacionSeparadas', [
+            500,
+            101,
+            620,
+            26,
+            83,
+            52,
+        ]);
+
+        $this->assertSame([
+            'general' => -45.0,
+            'pie' => 31.0,
+        ], $resultado);
+    }
+
     public function test_vista_ofrece_todos_los_motivos_y_limita_horas_al_saldo_sin_asignar(): void
     {
         $establecimiento = new Establecimiento(['nombre_establecimiento' => 'Establecimiento de prueba']);
