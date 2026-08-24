@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.24.425' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Sobredotación separada entre Aula y PIE',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+        ],
+        'changes' => [
+            'Divide Detalle sobredotación en las subpestañas Horas contrato Aula y Horas contrato docente PIE.',
+            'Concilia la nómina Aula con la fórmula de Dotación General y la nómina PIE con la fórmula de Dotación PIE del resumen superior.',
+            'Distribuye las necesidades por docente priorizando globalmente horas Planta antes que Contrata y, dentro de cada calidad, las asignaciones registradas.',
+            'Muestra por separado dotación considerada, necesidad, asignaciones, sobredotación total y su desglose Planta/Contrata.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.24.424' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

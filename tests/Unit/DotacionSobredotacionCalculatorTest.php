@@ -2,59 +2,183 @@
 
 namespace Tests\Unit;
 
+use App\Models\Establecimiento;
 use App\Support\DotacionSobredotacionCalculator;
 use Tests\TestCase;
 
 class DotacionSobredotacionCalculatorTest extends TestCase
 {
-    public function test_detecta_sobredotacion_y_prioriza_horas_planta_sobre_contrata(): void
+    public function test_separa_aula_y_pie_y_concilia_ambas_brechas_del_resumen(): void
     {
         $resultado = DotacionSobredotacionCalculator::build([
-            $this->docente('11111111-1', 'Docente mixto', 44, 30, 14, 35, true),
-            $this->docente('22222222-2', 'Docente planta', 30, 30, 0, 20, true),
-            $this->docente('33333333-3', 'Docente con sobrecarga', 22, 0, 22, 25, false),
-            $this->docente('44444444-4', 'Docente contrata', 10, 0, 0, 4, false),
-        ]);
+            $this->docente('11111111-1', 'Docente planta Aula', 44, 44, 0, 35, 0, 12, true),
+            $this->docente('22222222-2', 'Docente contrata Aula', 44, 0, 44, 20, 0, 0, false),
+            $this->docente('33333333-3', 'Educadora diferencial', 30, 0, 30, 0, 30, 0, false),
+            $this->docente('44444444-4', 'Coordinador PIE', 20, 20, 0, 0, 20, 0, true),
+        ], $this->resumen());
 
-        $this->assertSame([
-            'docentes_analizados' => 4,
-            'docentes_sobredotacion' => 3,
-            'horas_contrato_total' => 106.0,
-            'horas_asignadas_total' => 84.0,
-            'horas_sobredotacion_total' => 25.0,
-            'horas_sobredotacion_planta' => 10.0,
-            'horas_sobredotacion_contrata' => 15.0,
-        ], $resultado['resumen']);
+        $this->assertSame(100.0, $resultado['aula']['resumen']['horas_dotacion_total']);
+        $this->assertSame(60.0, $resultado['aula']['resumen']['horas_necesarias_total']);
+        $this->assertSame(40.0, $resultado['aula']['resumen']['horas_sobredotacion_total']);
+        $this->assertSame(0.0, $resultado['aula']['resumen']['horas_sobredotacion_planta']);
+        $this->assertSame(40.0, $resultado['aula']['resumen']['horas_sobredotacion_contrata']);
+        $this->assertSame('Docente contrata Aula', $resultado['aula']['items']->first()['nombre']);
 
-        $mixto = $resultado['items']->firstWhere('rut', '11111111-1');
-        $this->assertSame(30.0, $mixto['horas_asignadas_planta']);
-        $this->assertSame(5.0, $mixto['horas_asignadas_contrata']);
-        $this->assertSame(0.0, $mixto['horas_sobredotacion_planta']);
-        $this->assertSame(9.0, $mixto['horas_sobredotacion_contrata']);
-
-        $this->assertNull($resultado['items']->firstWhere('rut', '33333333-3'));
-
-        $html = view('admin.dotacion-establecimiento.partials._sobredotacion', [
-            'sobredotacion' => $resultado,
-        ])->render();
-        $this->assertStringContainsString('Detalle sobredotación', $html);
-        $this->assertStringContainsString('Docente mixto', $html);
-        $this->assertStringContainsString('Sobredotación Planta', $html);
-        $this->assertStringContainsString('Sobredotación Contrata', $html);
-        $this->assertStringNotContainsString('Docente con sobrecarga', $html);
+        $this->assertSame(50.0, $resultado['pie']['resumen']['horas_dotacion_total']);
+        $this->assertSame(25.0, $resultado['pie']['resumen']['horas_necesarias_total']);
+        $this->assertSame(25.0, $resultado['pie']['resumen']['horas_sobredotacion_total']);
+        $this->assertSame(0.0, $resultado['pie']['resumen']['horas_sobredotacion_planta']);
+        $this->assertSame(25.0, $resultado['pie']['resumen']['horas_sobredotacion_contrata']);
+        $this->assertSame('Educadora diferencial', $resultado['pie']['items']->first()['nombre']);
     }
 
-    public function test_reduccion_del_contrato_considerado_preserva_primero_planta(): void
+    public function test_reserva_pie_desde_contrata_y_prioriza_planta_al_cubrir_necesidades(): void
     {
         $resultado = DotacionSobredotacionCalculator::build([
-            $this->docente('11111111-1', 'Docente con exclusión', 34, 30, 14, 30, true),
+            $this->docente('11111111-1', 'Docente mixto', 44, 30, 14, 30, 10, 0, true),
+        ], [
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 30,
+            'horas_dotacion_funciones_normativas' => 0,
+            'horas_contrato_docentes_aula' => 34,
+            'horas_dotacion_funciones_declaradas' => 0,
+            'horas_contrato_pie_necesarias' => 0,
+            'horas_contrato_docente_pie' => 10,
         ]);
 
-        $docente = $resultado['items']->first();
-        $this->assertSame(30.0, $docente['horas_contrato_planta']);
-        $this->assertSame(4.0, $docente['horas_contrato_contrata']);
-        $this->assertSame(0.0, $docente['horas_sobredotacion_planta']);
-        $this->assertSame(4.0, $docente['horas_sobredotacion_contrata']);
+        $aula = $resultado['aula']['items']->first();
+        $this->assertSame(4.0, $aula['horas_sobredotacion_total']);
+        $this->assertSame(0.0, $aula['horas_sobredotacion_planta']);
+        $this->assertSame(4.0, $aula['horas_sobredotacion_contrata']);
+
+        $pie = $resultado['pie']['items']->first();
+        $this->assertSame(10.0, $pie['horas_sobredotacion_contrata']);
+        $this->assertSame(0.0, $pie['horas_sobredotacion_planta']);
+    }
+
+    public function test_vista_muestra_subpestanas_formulas_y_nominas_separadas(): void
+    {
+        $resultado = DotacionSobredotacionCalculator::build([
+            $this->docente('11111111-1', 'Docente planta Aula', 44, 44, 0, 35, 0, 12, true),
+            $this->docente('22222222-2', 'Docente contrata Aula', 44, 0, 44, 20, 0, 0, false),
+            $this->docente('33333333-3', 'Educadora diferencial', 30, 0, 30, 0, 30, 0, false),
+            $this->docente('44444444-4', 'Coordinador PIE', 20, 20, 0, 0, 20, 0, true),
+        ], $this->resumen());
+        $establecimiento = new Establecimiento(['nombre_establecimiento' => 'Prueba']);
+        $establecimiento->id = 1;
+
+        $htmlAula = view('admin.dotacion-establecimiento.partials._sobredotacion', [
+            'sobredotacion' => $resultado,
+            'sobredotacionTipo' => 'aula',
+            'establecimiento' => $establecimiento,
+            'anio' => 2026,
+        ])->render();
+        $this->assertStringContainsString('Horas contrato Aula', $htmlAula);
+        $this->assertStringContainsString('Horas contrato docente PIE', $htmlAula);
+        $this->assertStringContainsString('Dotación General', $htmlAula);
+        $this->assertStringContainsString('Docente contrata Aula', $htmlAula);
+        $this->assertStringNotContainsString('Educadora diferencial</div>', $htmlAula);
+
+        $htmlPie = view('admin.dotacion-establecimiento.partials._sobredotacion', [
+            'sobredotacion' => $resultado,
+            'sobredotacionTipo' => 'pie',
+            'establecimiento' => $establecimiento,
+            'anio' => 2026,
+        ])->render();
+        $this->assertStringContainsString('Dotación PIE', $htmlPie);
+        $this->assertStringContainsString('Educadora diferencial', $htmlPie);
+        $this->assertStringNotContainsString('Docente contrata Aula</div>', $htmlPie);
+    }
+
+    public function test_clasifica_asignaciones_reales_en_general_declaradas_y_contrato_pie(): void
+    {
+        $docente = $this->docente('11111111-1', 'Docente con funciones', 44, 44, 0, 0, 0, 0, true);
+        unset(
+            $docente['horas_asignadas_general'],
+            $docente['horas_contrato_pie'],
+            $docente['horas_bloque_declarado']
+        );
+        $docente['asignaciones'] = [
+            ['tipo_asignacion' => 'plan_estudio', 'horas_contrato' => 10],
+            ['tipo_asignacion' => 'otra_funcion', 'dotacion_funcion_id' => 5, 'horas_contrato' => 4],
+            [
+                'tipo_asignacion' => 'funcion_tecnico_pedagogica',
+                'subtipo_asignacion' => 'pie',
+                'asignatura_nombre' => 'Coordinador(a) PIE',
+                'horas_contrato' => 6,
+            ],
+        ];
+
+        $resultado = DotacionSobredotacionCalculator::build([$docente], [
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 10,
+            'horas_dotacion_funciones_normativas' => 0,
+            'horas_contrato_docentes_aula' => 38,
+            'horas_dotacion_funciones_declaradas' => 4,
+            'horas_contrato_pie_necesarias' => 2,
+            'horas_contrato_docente_pie' => 6,
+        ]);
+
+        $this->assertSame(10.0, $resultado['aula']['resumen']['horas_asignadas_registradas']);
+        $this->assertSame(42.0, $resultado['aula']['resumen']['horas_dotacion_total']);
+        $this->assertSame(6.0, $resultado['pie']['resumen']['horas_asignadas_registradas']);
+        $this->assertSame(4.0, $resultado['pie']['resumen']['horas_sobredotacion_total']);
+    }
+
+    public function test_no_inflaciona_horas_declaradas_individuales_si_falta_asociarlas(): void
+    {
+        $resultado = DotacionSobredotacionCalculator::build([
+            $this->docente('11111111-1', 'Docente planta', 44, 44, 0, 10, 0, 4, true),
+        ], [
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 10,
+            'horas_dotacion_funciones_normativas' => 0,
+            'horas_contrato_docentes_aula' => 44,
+            'horas_dotacion_funciones_declaradas' => 12,
+            'horas_contrato_pie_necesarias' => 0,
+            'horas_contrato_docente_pie' => 0,
+        ]);
+
+        $docente = $resultado['aula']['items']->firstWhere('rut', '11111111-1');
+        $ajuste = $resultado['aula']['items']->firstWhere('es_ajuste', true);
+
+        $this->assertSame(4.0, $docente['horas_bloque_declarado']);
+        $this->assertSame(8.0, $ajuste['horas_bloque_declarado']);
+        $this->assertTrue($resultado['aula']['resumen']['tiene_ajuste_no_asociado']);
+        $this->assertSame(56.0, $resultado['aula']['resumen']['horas_dotacion_total']);
+    }
+
+    public function test_reproduce_los_totales_del_ejemplo_reportado(): void
+    {
+        $resultado = DotacionSobredotacionCalculator::build([
+            $this->docente('11111111-1', 'Bolsa Planta Aula', 1150, 1150, 0, 1150, 0, 348, true),
+            $this->docente('22222222-2', 'Bolsa Contrata Aula', 660, 0, 660, 0, 0, 0, false),
+            $this->docente('33333333-3', 'Bolsa Contrata PIE', 676, 0, 676, 0, 676, 0, false),
+        ], [
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 919,
+            'horas_dotacion_funciones_normativas' => 231,
+            'horas_contrato_docentes_aula' => 1810,
+            'horas_dotacion_funciones_declaradas' => 348,
+            'horas_contrato_pie_necesarias' => 336,
+            'horas_contrato_docente_pie' => 676,
+        ]);
+
+        $this->assertSame(2158.0, $resultado['aula']['resumen']['horas_dotacion_total']);
+        $this->assertSame(1150.0, $resultado['aula']['resumen']['horas_necesarias_total']);
+        $this->assertSame(1008.0, $resultado['aula']['resumen']['horas_sobredotacion_total']);
+        $this->assertSame(676.0, $resultado['pie']['resumen']['horas_dotacion_total']);
+        $this->assertSame(336.0, $resultado['pie']['resumen']['horas_necesarias_total']);
+        $this->assertSame(340.0, $resultado['pie']['resumen']['horas_sobredotacion_total']);
+    }
+
+    /** @return array<string, float> */
+    private function resumen(): array
+    {
+        return [
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 50.0,
+            'horas_dotacion_funciones_normativas' => 10.0,
+            'horas_contrato_docentes_aula' => 88.0,
+            'horas_dotacion_funciones_declaradas' => 12.0,
+            'horas_contrato_pie_necesarias' => 25.0,
+            'horas_contrato_docente_pie' => 50.0,
+        ];
     }
 
     private function docente(
@@ -63,19 +187,23 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         float $contrato,
         float $planta,
         float $contrata,
-        float $asignadas,
+        float $asignadasGeneral,
+        float $contratoPie,
+        float $bloqueDeclarado,
         bool $titular
     ): array {
         return [
             'rut' => $rut,
             'nombre' => $nombre,
-            'funcion' => 'Docente aula',
+            'funcion' => $contratoPie > 0 ? 'PIE' : 'Docente Aula',
             'tipo_contrato' => $titular ? 'PLANTA' : 'CONTRATA',
             'es_titular' => $titular,
             'horas_contrato' => $contrato,
             'horas_planta' => $planta,
             'horas_contrata' => $contrata,
-            'horas_asignadas_total' => $asignadas,
+            'horas_asignadas_general' => $asignadasGeneral,
+            'horas_contrato_pie' => $contratoPie,
+            'horas_bloque_declarado' => $bloqueDeclarado,
         ];
     }
 }

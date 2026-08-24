@@ -234,9 +234,13 @@ class DotacionEstablecimientoController extends Controller
         }
         $tab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'resumen';
         $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
+        $sobredotacionTipo = (string) $request->query('sobredotacion_tipo', 'aula');
+        if (! in_array($sobredotacionTipo, DotacionSobredotacionCalculator::TIPOS, true)) {
+            $sobredotacionTipo = 'aula';
+        }
         $sobredotacion = $tab === 'sobredotacion'
-            ? DotacionSobredotacionCalculator::build($data['docentes'])
-            : ['items' => collect(), 'resumen' => []];
+            ? DotacionSobredotacionCalculator::build($data['docentes'], $data['resumen'])
+            : ['aula' => ['items' => collect(), 'resumen' => []], 'pie' => ['items' => collect(), 'resumen' => []]];
         $proporcionExcepcionTableReady = Schema::hasTable('dotacion_proporcion_excepciones');
         $proporcionExcepcion = $proporcionExcepcionTableReady
             ? DotacionProporcionExcepcion::query()
@@ -275,6 +279,7 @@ class DotacionEstablecimientoController extends Controller
             'bloquesContratoDotacion' => $data['bloques_contrato_dotacion'] ?? $data['bloques'],
             'docentes' => $data['docentes'],
             'sobredotacion' => $sobredotacion,
+            'sobredotacionTipo' => $sobredotacionTipo,
             'canViewSobredotacion' => $canViewSobredotacion,
             'asignacion' => $data['asignacion'] ?? [],
             'asignaturas' => $asignaturas,
