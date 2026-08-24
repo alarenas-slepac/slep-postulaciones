@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\DotacionDocenteAsignacion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -97,6 +98,9 @@ class DotacionSobredotacionCalculator
             : (float) $asignaciones
                 ->filter(fn ($asignacion) => self::esAsignacionDeclarada($asignacion))
                 ->sum(fn ($asignacion) => self::horasAsignacion($asignacion));
+        $declaradasDetalle = array_key_exists('horas_declaradas_detalle', $docente)
+            ? array_values((array) $docente['horas_declaradas_detalle'])
+            : self::detalleAsignacionesDeclaradas($asignaciones);
 
         return [
             'rut' => (string) ($docente['rut'] ?? ''),
@@ -110,6 +114,7 @@ class DotacionSobredotacionCalculator
             'pie_contrata' => round($pieContrata, 2),
             'asignadas_protegidas' => round($asignadasProtegidas, 2),
             'declaradas_ajustables' => round($declaradasAjustables, 2),
+            'declaradas_detalle' => $declaradasDetalle,
             'asignadas_pie' => round($contratoPie, 2),
         ];
     }
@@ -129,12 +134,21 @@ class DotacionSobredotacionCalculator
             $protegidas = round(max(0.0, (float) $docente['asignadas_protegidas']), 2);
             $declaradas = round(max(0.0, (float) $docente['declaradas_ajustables']), 2);
             $asignadas = round($protegidas + $declaradas, 2);
-            $asignadasConsideradas = min($contratoAula, $asignadas);
-            $asignadasPlanta = min($contratoPlanta, $asignadasConsideradas);
-            $asignadasContrata = min(
-                $contratoContrata,
-                max(0.0, round($asignadasConsideradas - $asignadasPlanta, 2))
+            $protegidasConsideradas = min($contratoAula, $protegidas);
+            $protegidasPlanta = min($contratoPlanta, $protegidasConsideradas);
+            $protegidasContrata = min($contratoContrata, max(0.0, $protegidasConsideradas - $protegidasPlanta));
+            $plantaDisponible = max(0.0, round($contratoPlanta - $protegidasPlanta, 2));
+            $contrataDisponible = max(0.0, round($contratoContrata - $protegidasContrata, 2));
+            $declaradasConsideradas = min($plantaDisponible + $contrataDisponible, $declaradas);
+            $declaradasPlanta = min($plantaDisponible, $declaradasConsideradas);
+            $declaradasContrata = min(
+                $contrataDisponible,
+                max(0.0, round($declaradasConsideradas - $declaradasPlanta, 2))
             );
+            $declaradasSinCobertura = max(0.0, round($declaradas - $declaradasConsideradas, 2));
+            $asignadasConsideradas = round($protegidasConsideradas + $declaradasConsideradas, 2);
+            $asignadasPlanta = round($protegidasPlanta + $declaradasPlanta, 2);
+            $asignadasContrata = round($protegidasContrata + $declaradasContrata, 2);
             $sinAsignacionPlanta = round(max(0.0, $contratoPlanta - $asignadasPlanta), 2);
             $sinAsignacionContrata = round(max(0.0, $contratoContrata - $asignadasContrata), 2);
 
@@ -148,6 +162,10 @@ class DotacionSobredotacionCalculator
                 'horas_dotacion_total' => $contratoAula,
                 'horas_asignadas_protegidas' => $protegidas,
                 'horas_declaradas_ajustables' => $declaradas,
+                'horas_declaradas_titulares' => round($declaradasPlanta, 2),
+                'horas_declaradas_contrata' => round($declaradasContrata, 2),
+                'horas_declaradas_sin_cobertura' => $declaradasSinCobertura,
+                'horas_declaradas_detalle' => $docente['declaradas_detalle'],
                 'horas_asignadas_total' => $asignadas,
                 'horas_asignadas_consideradas' => round($asignadasConsideradas, 2),
                 'horas_sobreasignadas' => round(max(0.0, $asignadas - $contratoAula), 2),
@@ -193,6 +211,9 @@ class DotacionSobredotacionCalculator
                 'horas_necesarias_estructurales' => max(0.0, $brechaEstructural),
                 'horas_asignadas_protegidas' => self::sumar($analizados, 'horas_asignadas_protegidas'),
                 'horas_declaradas_ajustables' => $declaradasAjustables,
+                'horas_declaradas_titulares' => self::sumar($ajustes, 'horas_declaradas_titulares'),
+                'horas_declaradas_contrata' => self::sumar($ajustes, 'horas_declaradas_contrata'),
+                'horas_declaradas_sin_cobertura' => self::sumar($ajustes, 'horas_declaradas_sin_cobertura'),
                 'horas_asignadas_total' => self::sumar($analizados, 'horas_asignadas_total'),
                 'horas_sobreasignadas' => self::sumar($analizados, 'horas_sobreasignadas'),
                 'horas_sobredotacion_total' => $sobredotacionReal,
@@ -358,6 +379,50 @@ class DotacionSobredotacionCalculator
             ],
             'formula' => $formula,
         ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private static function detalleAsignacionesDeclaradas(Collection $asignaciones): array
+    {
+        return $asignaciones
+            ->filter(fn ($asignacion) => self::esAsignacionDeclarada($asignacion)
+                && self::horasAsignacion($asignacion) > 0.01)
+            ->map(function ($asignacion) {
+                $tipo = (string) data_get($asignacion, 'tipo_asignacion', 'otra_funcion');
+                $tipoLabel = DotacionDocenteAsignacion::TIPOS[$tipo]
+                    ?? Str::headline($tipo);
+                $nombre = trim((string) data_get($asignacion, 'asignatura_nombre', ''));
+                $subtipo = trim((string) data_get($asignacion, 'subtipo_asignacion', ''));
+                $subvencion = trim((string) data_get($asignacion, 'subvencion', ''));
+
+                return [
+                    'tipo' => $tipo,
+                    'tipo_label' => $tipoLabel,
+                    'nombre' => $nombre !== '' ? $nombre : $tipoLabel,
+                    'subtipo' => $subtipo,
+                    'subtipo_label' => $subtipo !== '' ? Str::headline($subtipo) : '',
+                    'subvencion' => $subvencion,
+                    'horas' => self::horasAsignacion($asignacion),
+                ];
+            })
+            ->groupBy(fn (array $item) => implode('|', [
+                $item['tipo'],
+                $item['subtipo'],
+                Str::of($item['nombre'])->ascii()->lower()->trim()->toString(),
+                Str::of($item['subvencion'])->ascii()->lower()->trim()->toString(),
+            ]))
+            ->map(function (Collection $items) {
+                $detalle = $items->first();
+                $detalle['horas'] = round((float) $items->sum('horas'), 2);
+
+                return $detalle;
+            })
+            ->sortBy([
+                ['tipo_label', 'asc'],
+                ['nombre', 'asc'],
+            ], SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
     }
 
     private static function horasAsignadasProtegidas(array $docente, Collection $asignaciones): float

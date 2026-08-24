@@ -145,32 +145,66 @@
             <div>
                 <div class="dotacion-eyebrow">Funciones no normativas asignadas</div>
                 <h2 class="h5 fw-bold mb-1">Horas de posible ajuste</h2>
-                <div class="text-muted small">Son horas del bloque declarado que actualmente tienen asignación. No forman parte de la sobredotación sin asignación, pero pueden revisarse.</div>
+                <div class="text-muted small">Son horas del bloque declarado que actualmente tienen asignación. No forman parte de la sobredotación sin asignación, pero pueden revisarse. Abre cada docente para conocer las funciones que componen sus horas.</div>
             </div>
             <span class="badge rounded-pill text-bg-warning">{{ $ajusteItems->count() }} docente(s)</span>
         </div>
+        <div class="card-body border-bottom">
+            <div class="row g-3">
+                <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-warning-subtle h-100"><div class="small text-muted">Total posible ajuste</div><div class="h4 fw-bold text-warning-emphasis mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_ajustables'] ?? 0) }}</div><div class="small text-muted">Funciones declaradas asignadas</div></div></div>
+                <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-primary-subtle h-100"><div class="small text-muted">Horas titulares</div><div class="h4 fw-bold text-primary mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_titulares'] ?? 0) }}</div><div class="small text-muted">Imputadas a contrato Planta</div></div></div>
+                <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-info-subtle h-100"><div class="small text-muted">Horas Contrata</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_contrata'] ?? 0) }}</div><div class="small text-muted">Imputadas a contrato Contrata</div></div></div>
+                <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-danger-subtle h-100"><div class="small text-muted">Sin cobertura contractual</div><div class="h4 fw-bold text-danger mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_sin_cobertura'] ?? 0) }}</div><div class="small text-muted">Declaradas sobre el contrato disponible</div></div></div>
+            </div>
+            <div class="small text-muted mt-3"><i class="bi bi-info-circle"></i> Para clasificar las horas declaradas se imputan primero las asignaciones protegidas y se conserva primero el contrato Titular/Planta; luego se utiliza Contrata.</div>
+        </div>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
-                <thead class="table-light"><tr><th>RUT</th><th>Docente</th><th>Función</th><th class="text-end">Contrato Aula</th><th class="text-end">Protegidas</th><th class="text-end">Declaradas ajustables</th><th class="text-end">Total asignado</th><th class="text-end">Sin asignación</th><th class="text-end">Sobreasignadas</th></tr></thead>
+                <thead class="table-light"><tr><th><span class="visually-hidden">Detalle</span></th><th>Docente</th><th>Función</th><th class="text-end">Contrato Aula</th><th class="text-end">Protegidas</th><th class="text-end">Ajustables</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Sin cobertura</th><th class="text-end">Sin asignación</th><th class="text-end">Sobreasignadas</th></tr></thead>
                 <tbody>
                     @forelse ($ajusteItems as $docente)
+                        @php($detalleId = 'detalle-ajuste-docente-'.$loop->index)
                         <tr>
-                            <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
-                            <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" data-bs-toggle="collapse" data-bs-target="#{{ $detalleId }}" aria-expanded="false" aria-controls="{{ $detalleId }}" title="Ver desglose de horas"><i class="bi bi-chevron-down"></i><span class="visually-hidden">Ver detalle de {{ $docente['nombre'] }}</span></button></td>
+                            <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['rut'] }} · {{ $docente['tipo_contrato'] }}</div></td>
                             <td>{{ $docente['funcion'] }}</td>
                             <td class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td>
                             <td class="text-end text-success">{{ $fmt($docente['horas_asignadas_protegidas']) }}</td>
                             <td class="text-end text-warning-emphasis fw-bold">{{ $fmt($docente['horas_declaradas_ajustables']) }}</td>
-                            <td class="text-end fw-semibold">{{ $fmt($docente['horas_asignadas_total']) }}</td>
+                            <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_declaradas_titulares']) }}</td>
+                            <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_declaradas_contrata']) }}</td>
+                            <td class="text-end {{ $docente['horas_declaradas_sin_cobertura'] > 0 ? 'text-danger fw-bold' : 'text-muted' }}">{{ $fmt($docente['horas_declaradas_sin_cobertura']) }}</td>
                             <td class="text-end text-danger">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
                             <td class="text-end {{ $docente['horas_sobreasignadas'] > 0 ? 'text-danger fw-bold' : 'text-muted' }}">{{ $fmt($docente['horas_sobreasignadas']) }}</td>
                         </tr>
+                        <tr>
+                            <td colspan="11" class="p-0 border-0">
+                                <div class="collapse" id="{{ $detalleId }}">
+                                    <div class="p-3 bg-light border-top border-bottom">
+                                        <div class="fw-semibold mb-2"><i class="bi bi-list-ul"></i> Desglose de horas de posible ajuste</div>
+                                        <div class="table-responsive rounded-3 border bg-white">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead class="table-light"><tr><th>Tipo</th><th>Función o actividad</th><th>Subtipo</th><th>Subvención</th><th class="text-end">Horas</th></tr></thead>
+                                                <tbody>
+                                                    @forelse (($docente['horas_declaradas_detalle'] ?? []) as $detalle)
+                                                        <tr><td><span class="badge text-bg-light border">{{ $detalle['tipo_label'] }}</span></td><td class="fw-semibold">{{ $detalle['nombre'] }}</td><td>{{ $detalle['subtipo_label'] ?: '—' }}</td><td>{{ $detalle['subvencion'] ?: '—' }}</td><td class="text-end fw-bold text-warning-emphasis">{{ $fmt($detalle['horas']) }}</td></tr>
+                                                    @empty
+                                                        <tr><td colspan="5" class="text-center text-muted py-3">No existe un desglose individual disponible para estas horas declaradas.</td></tr>
+                                                    @endforelse
+                                                </tbody>
+                                                <tfoot class="table-light fw-bold"><tr><td colspan="4">Total docente</td><td class="text-end text-warning-emphasis">{{ $fmt($docente['horas_declaradas_ajustables']) }}</td></tr></tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                     @empty
-                        <tr><td colspan="9" class="text-center text-muted py-5">No existen horas declaradas asignadas susceptibles de ajuste.</td></tr>
+                        <tr><td colspan="11" class="text-center text-muted py-5">No existen horas declaradas asignadas susceptibles de ajuste.</td></tr>
                     @endforelse
                 </tbody>
                 @if ($ajusteItems->isNotEmpty())
-                    <tfoot class="table-light fw-bold"><tr><td colspan="5">Total horas declaradas de posible ajuste</td><td class="text-end text-warning-emphasis">{{ $fmt($sobredotacionResumen['horas_declaradas_ajustables'] ?? 0) }}</td><td colspan="3"></td></tr></tfoot>
+                    <tfoot class="table-light fw-bold"><tr><td colspan="5">Total horas declaradas de posible ajuste</td><td class="text-end text-warning-emphasis">{{ $fmt($sobredotacionResumen['horas_declaradas_ajustables'] ?? 0) }}</td><td class="text-end text-primary">{{ $fmt($sobredotacionResumen['horas_declaradas_titulares'] ?? 0) }}</td><td class="text-end text-info">{{ $fmt($sobredotacionResumen['horas_declaradas_contrata'] ?? 0) }}</td><td class="text-end text-danger">{{ $fmt($sobredotacionResumen['horas_declaradas_sin_cobertura'] ?? 0) }}</td><td colspan="2"></td></tr></tfoot>
                 @endif
             </table>
         </div>
