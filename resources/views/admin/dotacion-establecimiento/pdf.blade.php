@@ -62,6 +62,10 @@
     $totalDeclaradas = collect($bloques ?? [])->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
     $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
     $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
+    $horasContratoAula = (float) ($resumen['horas_contrato_docentes_aula'] ?? $horasContratoActuales);
+    $horasContratoDocentePie = (float) ($resumen['horas_contrato_docente_pie'] ?? 0);
+    $horasContratoCoordinacionPie = (float) ($resumen['horas_contrato_docente_pie_coordinacion'] ?? 0);
+    $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
     $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0)));
     $sobredotacion = max(0, $horasContratoActuales - $horasContratoRequeridas);
     $horasPorContratar = max(0, $horasContratoRequeridas - $horasContratoActuales);
@@ -188,6 +192,28 @@
     </tbody>
 </table>
 
+<div class="section-title">Desglose horas contrato docentes</div>
+<table class="summary avoid-break">
+    <thead>
+        <tr>
+            <th>Contrato aula</th>
+            <th>Coordinación PIE asignada</th>
+            <th>Bolsa Educadoras Diferenciales asignada</th>
+            <th>Contrato docente PIE</th>
+            <th>Total contrato docentes vigente</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="text-right">{{ $fmt($horasContratoAula) }}</td>
+            <td class="text-right">{{ $fmt($horasContratoCoordinacionPie) }}</td>
+            <td class="text-right">{{ $fmt($horasContratoEducadorasDiferenciales) }}</td>
+            <td class="text-right primary">{{ $fmt($horasContratoDocentePie) }}</td>
+            <td class="text-right">{{ $fmt($horasContratoActuales) }}</td>
+        </tr>
+    </tbody>
+</table>
+
 <div class="section-title">Desglose contrato bloque dotación</div>
 <table class="summary avoid-break">
     <thead>
@@ -310,6 +336,16 @@
             <td>Contrato equivalente plan + trabajo colaborativo PIE + contrato bloque dotación.</td>
         </tr>
         <tr>
+            <td>Horas contrato aula</td>
+            <td class="text-right">{{ $fmt($horasContratoAula) }}</td>
+            <td>Base contractual docente vigente menos las horas asignadas a Coordinación PIE y Bolsa Educadoras Diferenciales PIE.</td>
+        </tr>
+        <tr>
+            <td>Horas contrato docente PIE</td>
+            <td class="text-right primary">{{ $fmt($horasContratoDocentePie) }}</td>
+            <td>Coordinación PIE: {{ $fmt($horasContratoCoordinacionPie) }} h + Bolsa Educadoras Diferenciales PIE: {{ $fmt($horasContratoEducadorasDiferenciales) }} h.</td>
+        </tr>
+        <tr class="total-row">
             <td>Horas contrato docentes vigentes</td>
             <td class="text-right">{{ $fmt($horasContratoActuales) }}</td>
             <td>Base contractual docente vigente del establecimiento.</td>

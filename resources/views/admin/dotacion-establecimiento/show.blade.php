@@ -5,6 +5,10 @@
         $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
         $activeTab = $tab ?? 'resumen';
         $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
+        $horasContratoAula = (float) ($resumen['horas_contrato_docentes_aula'] ?? $horasContratoActuales);
+        $horasContratoDocentePie = (float) ($resumen['horas_contrato_docente_pie'] ?? 0);
+        $horasContratoCoordinacionPie = (float) ($resumen['horas_contrato_docente_pie_coordinacion'] ?? 0);
+        $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
         $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0)));
         $sobredotacion = max(0, $horasContratoActuales - $horasContratoRequeridas);
         $horasPorContratar = max(0, $horasContratoRequeridas - $horasContratoActuales);
@@ -31,6 +35,8 @@
             ['label' => 'Contrato plan + PIE', 'value' => $fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0), 'hint' => 'Plan más trabajo colaborativo.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
             ['label' => 'Contrato bloque dotación', 'value' => $fmt($resumen['horas_dotacion_funciones'] ?? 0), 'hint' => 'Total de los componentes desglosados abajo.', 'tone' => 'warning', 'icon' => 'bi-diagram-3'],
             ['label' => 'Horas contrato docentes', 'value' => $fmt($horasContratoActuales), 'hint' => 'Horas contratadas vigentes.', 'tone' => 'dark', 'icon' => 'bi-briefcase'],
+            ['label' => 'Horas contrato aula', 'value' => $fmt($horasContratoAula), 'hint' => 'Contrato vigente descontando las asignaciones docentes PIE.', 'tone' => 'primary', 'icon' => 'bi-easel2'],
+            ['label' => 'Horas contrato docente PIE', 'value' => $fmt($horasContratoDocentePie), 'hint' => 'Coordinación PIE: '.$fmt($horasContratoCoordinacionPie).' · Bolsa Educ. Diferenciales: '.$fmt($horasContratoEducadorasDiferenciales).'.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
         ];
     @endphp
 

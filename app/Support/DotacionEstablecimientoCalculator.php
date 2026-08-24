@@ -112,6 +112,11 @@ class DotacionEstablecimientoCalculator
         $horasContratoDocentesBase = $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0));
         $horasContratoDocentesExcluidas = $docentes->sum(fn ($docente) => (float) ($docente['horas_excluidas'] ?? 0));
         $horasContratoDocentes = $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0));
+        $horasContratoDocentePieCoordinacion = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie_coordinacion', 0);
+        $horasContratoDocentePieEducadoras = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie_educadoras_diferenciales', 0);
+        $horasContratoDocentePie = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie', 0);
+        $horasContratoDocentesAula = max(0.0, round($horasContratoDocentes - $horasContratoDocentePie, 2));
+        $horasContratoDocentePieExceso = max(0.0, round($horasContratoDocentePie - $horasContratoDocentes, 2));
         $horasContratoRequeridas = $contratoPlanMasTrabajoColaborativoPie + $horasDotacionFunciones;
         $brechaContrato = round($horasContratoRequeridas - $horasContratoDocentes, 2);
         $horasAulaAsignadas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_aula'] ?? 0));
@@ -144,6 +149,11 @@ class DotacionEstablecimientoCalculator
             'horas_contrato_docentes_base' => $horasContratoDocentesBase,
             'horas_contrato_docentes_excluidas' => $horasContratoDocentesExcluidas,
             'horas_contrato_docentes' => $horasContratoDocentes,
+            'horas_contrato_docentes_aula' => $horasContratoDocentesAula,
+            'horas_contrato_docente_pie_coordinacion' => $horasContratoDocentePieCoordinacion,
+            'horas_contrato_docente_pie_educadoras_diferenciales' => $horasContratoDocentePieEducadoras,
+            'horas_contrato_docente_pie' => $horasContratoDocentePie,
+            'horas_contrato_docente_pie_exceso' => $horasContratoDocentePieExceso,
             'horas_contrato_requeridas' => $horasContratoRequeridas,
             'horas_por_contratar' => $brechaContrato > 0 ? $brechaContrato : 0.0,
             'sobredotacion_horas' => $brechaContrato < 0 ? abs($brechaContrato) : 0.0,
@@ -172,6 +182,9 @@ class DotacionEstablecimientoCalculator
         }
         if ($docentes->where('tiene_declaracion', false)->count() > 0) {
             $alertas[] = 'Existen docentes sin registro asociado en declaración sostenedor.';
+        }
+        if ($horasContratoDocentePieExceso > 0.01) {
+            $alertas[] = 'Las horas de contrato asignadas a docentes PIE superan en '.self::formatHoras($horasContratoDocentePieExceso).' hora(s) la base contractual docente vigente.';
         }
         if ((int) data_get($cursosCombinados, 'resumen.grupos_activos', 0) > 0) {
             $alertas[] = 'La necesidad de horas aula considera '.data_get($cursosCombinados, 'resumen.grupos_activos', 0).' grupo(s) de cursos combinados y una reducción de '.self::formatHoras($reduccionCursosCombinados).' hora(s) aula respecto de la suma individual.';
