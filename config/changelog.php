@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.24.428' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Desglose contractual de horas declaradas ajustables',
+        'files' => [
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+        ],
+        'changes' => [
+            'Separa las horas de posible ajuste entre contrato Titular/Planta y Contrata, respetando la prioridad de las horas titulares.',
+            'Identifica por separado las horas declaradas asignadas que exceden la cobertura contractual disponible.',
+            'Permite desplegar cada docente para revisar el tipo, función o actividad, subtipo, subvención y horas que componen el posible ajuste.',
+            'Incorpora totales del establecimiento y por docente para cada calidad contractual de las funciones no normativas asignadas.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.24.427' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

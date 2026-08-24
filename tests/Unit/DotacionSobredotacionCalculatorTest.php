@@ -74,7 +74,14 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $docente['asignaciones'] = [
             ['tipo_asignacion' => 'plan_estudio', 'horas_contrato' => 10],
             ['tipo_asignacion' => 'funcion_directiva', 'dotacion_funcion_id' => null, 'horas_contrato' => 20],
-            ['tipo_asignacion' => 'otra_funcion', 'dotacion_funcion_id' => 5, 'horas_contrato' => 4],
+            [
+                'tipo_asignacion' => 'otra_funcion',
+                'subtipo_asignacion' => 'otras_funciones_docentes',
+                'asignatura_nombre' => 'Encargado de convivencia',
+                'subvencion' => 'General',
+                'dotacion_funcion_id' => 5,
+                'horas_contrato' => 4,
+            ],
             [
                 'tipo_asignacion' => 'funcion_tecnico_pedagogica',
                 'subtipo_asignacion' => 'pie',
@@ -96,9 +103,60 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertSame(30.0, $aula['horas_asignadas_protegidas']);
         $this->assertSame(4.0, $aula['horas_declaradas_ajustables']);
         $this->assertSame(4.0, $aula['horas_sobredotacion_total']);
-        $this->assertSame(4.0, $resultado['aula']['ajustes']->sole()['horas_declaradas_ajustables']);
+        $ajuste = $resultado['aula']['ajustes']->sole();
+        $this->assertSame(4.0, $ajuste['horas_declaradas_ajustables']);
+        $this->assertSame(4.0, $ajuste['horas_declaradas_titulares']);
+        $this->assertSame(0.0, $ajuste['horas_declaradas_contrata']);
+        $this->assertSame(0.0, $ajuste['horas_declaradas_sin_cobertura']);
+        $this->assertSame('Encargado de convivencia', $ajuste['horas_declaradas_detalle'][0]['nombre']);
+        $this->assertSame('Otra función', $ajuste['horas_declaradas_detalle'][0]['tipo_label']);
         $this->assertSame(6.0, $resultado['pie']['resumen']['horas_asignadas_registradas']);
         $this->assertSame(4.0, $resultado['pie']['resumen']['horas_sobredotacion_total']);
+    }
+
+    public function test_desglosa_horas_declaradas_entre_titulares_contrata_y_conceptos(): void
+    {
+        $docente = $this->docente('11111111-1', 'Docente mixto ajustable', 44, 30, 14, 26, 0, 0, true);
+        unset($docente['horas_declaradas_ajustables']);
+        $docente['asignaciones'] = [
+            [
+                'tipo_asignacion' => 'funcion_directiva',
+                'subtipo_asignacion' => 'directiva',
+                'asignatura_nombre' => 'Apoyo a dirección',
+                'dotacion_funcion_id' => 10,
+                'horas_contrato' => 6,
+            ],
+            [
+                'tipo_asignacion' => 'otra_funcion',
+                'subtipo_asignacion' => 'otras_funciones_docentes',
+                'asignatura_nombre' => 'Coordinación de convivencia',
+                'dotacion_funcion_id' => 11,
+                'horas_contrato' => 8,
+            ],
+        ];
+
+        $resultado = DotacionSobredotacionCalculator::build([$docente], [
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 26,
+            'horas_dotacion_funciones_normativas' => 0,
+            'horas_contrato_docentes_aula' => 44,
+            'horas_dotacion_funciones_declaradas' => 14,
+            'horas_contrato_pie_necesarias' => 0,
+            'horas_contrato_docente_pie' => 0,
+        ]);
+
+        $ajuste = $resultado['aula']['ajustes']->sole();
+        $this->assertSame(14.0, $ajuste['horas_declaradas_ajustables']);
+        $this->assertSame(4.0, $ajuste['horas_declaradas_titulares']);
+        $this->assertSame(10.0, $ajuste['horas_declaradas_contrata']);
+        $this->assertSame(0.0, $ajuste['horas_declaradas_sin_cobertura']);
+        $this->assertSame(4.0, $ajuste['horas_sobredotacion_contrata']);
+        $this->assertSame(14.0, collect($ajuste['horas_declaradas_detalle'])->sum('horas'));
+        $this->assertSame(
+            ['Apoyo a dirección', 'Coordinación de convivencia'],
+            collect($ajuste['horas_declaradas_detalle'])->pluck('nombre')->sort()->values()->all()
+        );
+        $this->assertSame(4.0, $resultado['aula']['resumen']['horas_declaradas_titulares']);
+        $this->assertSame(10.0, $resultado['aula']['resumen']['horas_declaradas_contrata']);
     }
 
     public function test_reserva_pie_desde_contrata_y_deja_primero_el_saldo_contrata_sin_asignacion(): void
@@ -149,8 +207,17 @@ class DotacionSobredotacionCalculatorTest extends TestCase
 
     public function test_vista_muestra_nominas_separadas_de_sobredotacion_y_posible_ajuste(): void
     {
+        $docenteAjustable = $this->docente('11111111-1', 'Docente planta Aula', 44, 44, 0, 35, 0, 0, true);
+        unset($docenteAjustable['horas_declaradas_ajustables']);
+        $docenteAjustable['asignaciones'] = [[
+            'tipo_asignacion' => 'otra_funcion',
+            'subtipo_asignacion' => 'otras_funciones_docentes',
+            'asignatura_nombre' => 'Encargado de convivencia',
+            'dotacion_funcion_id' => 5,
+            'horas_contrato' => 9,
+        ]];
         $resultado = DotacionSobredotacionCalculator::build([
-            $this->docente('11111111-1', 'Docente planta Aula', 44, 44, 0, 35, 9, 0, true),
+            $docenteAjustable,
             $this->docente('22222222-2', 'Docente contrata Aula', 44, 0, 44, 20, 0, 0, false),
             $this->docente('33333333-3', 'Educadora diferencial', 30, 0, 30, 0, 0, 30, false),
             $this->docente('44444444-4', 'Coordinador PIE', 20, 20, 0, 0, 0, 20, true),
@@ -168,6 +235,11 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertStringContainsString('Sobredotaci', $htmlAula);
         $this->assertStringContainsString('Horas de posible ajuste', $htmlAula);
         $this->assertStringContainsString('Asignaciones protegidas', $htmlAula);
+        $this->assertStringContainsString('Horas titulares', $htmlAula);
+        $this->assertStringContainsString('Horas Contrata', $htmlAula);
+        $this->assertStringContainsString('data-bs-toggle="collapse"', $htmlAula);
+        $this->assertStringContainsString('Desglose de horas de posible ajuste', $htmlAula);
+        $this->assertStringContainsString('Encargado de convivencia', $htmlAula);
         $this->assertStringContainsString('Docente contrata Aula', $htmlAula);
         $this->assertStringContainsString('Docente planta Aula', $htmlAula);
         $this->assertStringNotContainsString('Necesidad cubierta', $htmlAula);
