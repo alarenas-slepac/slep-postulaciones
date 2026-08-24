@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.8.24.418' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Desglose de horas contrato docentes aula y PIE',
+        'files' => [
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionAsignacionContratoPieTest.php',
+        ],
+        'changes' => [
+            'Separa la base de horas contrato docentes entre contrato aula y contrato docente PIE en el resumen del establecimiento.',
+            'El contrato docente PIE suma todas las horas activas asignadas a Coordinador(a) PIE y a la Bolsa Educadoras Diferenciales PIE con cobertura docente.',
+            'Muestra por separado los componentes de Coordinación PIE y Bolsa Educadoras Diferenciales tanto en pantalla como en el informe PDF.',
+            'Mantiene sin cambios el total de horas contrato docentes vigente y la fórmula de la brecha final.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.417' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

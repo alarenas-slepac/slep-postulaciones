@@ -76,6 +76,7 @@ class DotacionAsignacionCalculator
         $totalAulaAsignadas = (float) $necesidadesPlan->sum(fn ($item) => (float) ($item['horas_plan_asignadas'] ?? 0));
         $aulaPendientes = max(0.0, round($totalAulaRequeridas - $totalAulaAsignadas, 2));
         $aulaExcedidas = max(0.0, round($totalAulaAsignadas - $totalAulaRequeridas, 2));
+        $contratoDocentePie = self::resumenContratoDocentePie($asignaciones);
 
         return [
             'necesidades' => $necesidades,
@@ -92,6 +93,9 @@ class DotacionAsignacionCalculator
                 'horas_aula_asignadas' => $totalAulaAsignadas,
                 'horas_aula_pendientes' => $aulaPendientes,
                 'horas_aula_excedidas' => $aulaExcedidas,
+                'horas_contrato_docente_pie_coordinacion' => $contratoDocentePie['coordinacion_pie'],
+                'horas_contrato_docente_pie_educadoras_diferenciales' => $contratoDocentePie['educadoras_diferenciales'],
+                'horas_contrato_docente_pie' => $contratoDocentePie['total'],
                 'docentes_sobrecarga' => $docentes->filter(fn ($d) => ($d['estado_cuadratura']['key'] ?? null) === 'sobrecarga')->count(),
                 'asistentes_asignados' => $asignaciones
                     ->filter(fn ($row) => self::coverageEstamento($row) === 'asistente')
@@ -147,6 +151,50 @@ class DotacionAsignacionCalculator
             ->orderBy('asignatura_nombre')
             ->orderBy('docente_nombre')
             ->get();
+    }
+
+    /**
+     * @return array{coordinacion_pie: float, educadoras_diferenciales: float, total: float}
+     */
+    private static function resumenContratoDocentePie(Collection $asignaciones): array
+    {
+        $asignacionesDocentes = $asignaciones
+            ->filter(fn ($row) => self::coverageEstamento($row) === 'docente');
+        $coordinacionPie = (float) $asignacionesDocentes
+            ->filter(fn ($row) => self::esAsignacionCoordinacionPie($row))
+            ->sum(fn ($row) => (float) data_get($row, 'horas_contrato', 0));
+        $educadorasDiferenciales = (float) $asignacionesDocentes
+            ->filter(fn ($row) => data_get($row, 'tipo_asignacion') === 'pie_educadora_diferencial')
+            ->sum(fn ($row) => (float) data_get($row, 'horas_contrato', 0));
+
+        return [
+            'coordinacion_pie' => round($coordinacionPie, 2),
+            'educadoras_diferenciales' => round($educadorasDiferenciales, 2),
+            'total' => round($coordinacionPie + $educadorasDiferenciales, 2),
+        ];
+    }
+
+    private static function esAsignacionCoordinacionPie(object|array $asignacion): bool
+    {
+        if (data_get($asignacion, 'tipo_asignacion') !== 'funcion_tecnico_pedagogica') {
+            return false;
+        }
+
+        $subtipo = Str::of((string) data_get($asignacion, 'subtipo_asignacion'))
+            ->ascii()
+            ->lower()
+            ->trim()
+            ->toString();
+        if ($subtipo === 'pie') {
+            return true;
+        }
+
+        $nombre = Str::of((string) data_get($asignacion, 'asignatura_nombre'))
+            ->ascii()
+            ->upper()
+            ->toString();
+
+        return str_contains($nombre, 'PIE') && str_contains($nombre, 'COORDIN');
     }
 
     public static function assignmentsByRut(Establecimiento $establecimiento, int $anio): array
