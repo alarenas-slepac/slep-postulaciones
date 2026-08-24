@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.24.429' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Excel territorial de sobredotación por establecimiento',
+        'files' => [
+            'app/Exports/DotacionSobredotacionEstablecimientosExport.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/index.blade.php',
+            'tests/Unit/DotacionSobredotacionEstablecimientosExportTest.php',
+        ],
+        'changes' => [
+            'Agrega en la vista general el botón Excel sobredotación junto al Excel de avance, conservando año, búsqueda y comuna.',
+            'Genera un único libro con una hoja independiente por cada establecimiento incluido en los filtros.',
+            'Incluye brecha estructural, sobredotación Aula sin asignación, funciones no normativas ajustables con desglose y sobredotación PIE.',
+            'Protege la descarga con los mismos roles autorizados para visualizar Detalle sobredotación.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.24.428' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

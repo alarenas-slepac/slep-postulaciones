@@ -38,6 +38,11 @@
                         <i class="bi bi-file-earmark-excel"></i> Excel de avance
                     </a>
                 @endif
+                @if (\App\Support\DotacionSobredotacionCalculator::canView($activeRole))
+                    <a class="btn btn-outline-success rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['export_sobredotacion' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Excel sobredotación
+                    </a>
+                @endif
                 @if (Route::has('admin.dotacion-funciones.index') && $activeRole !== 'supervisor_plani')
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.index', ['anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Dotación funciones y planes
