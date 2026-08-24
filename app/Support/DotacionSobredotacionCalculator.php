@@ -22,9 +22,9 @@ class DotacionSobredotacionCalculator
     }
 
     /**
-     * Distribuye las necesidades institucionales entre las horas disponibles,
-     * conservando primero Planta y luego Contrata. Así, el detalle por docente
-     * concilia con las mismas fórmulas utilizadas en el resumen superior.
+     * Separa el saldo factual de Aula por docente de la brecha estructural del
+     * establecimiento. Para PIE distribuye la necesidad institucional entre
+     * las horas disponibles, conservando primero Planta y luego Contrata.
      *
      * @param  iterable<int, array<string, mixed>>  $docentes
      * @param  array<string, mixed>  $resumen
@@ -37,9 +37,7 @@ class DotacionSobredotacionCalculator
             ->values();
 
         $declaradasObjetivo = self::numero($resumen, 'horas_dotacion_funciones_declaradas');
-        $aula = self::itemsAula($base);
         $aulaObjetivo = self::numero($resumen, 'horas_contrato_docentes_aula');
-        $aula = self::conciliarDotacion($aula, $aulaObjetivo, 'Horas de dotación general no asociadas a docente');
         $necesidadAula = round(
             self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie')
             + self::numero($resumen, 'horas_dotacion_funciones_normativas')
@@ -53,7 +51,7 @@ class DotacionSobredotacionCalculator
         $necesidadPie = self::numero($resumen, 'horas_contrato_pie_necesarias');
 
         return [
-            'aula' => self::distribuirNecesidad($aula, $necesidadAula, [
+            'aula' => self::analizarAula($base, $necesidadAula, $aulaObjetivo, [
                 'contrato_plan_pie' => self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie'),
                 'bloque_normativo' => self::numero($resumen, 'horas_dotacion_funciones_normativas'),
                 'contrato_aula' => self::numero($resumen, 'horas_contrato_docentes_aula'),
@@ -91,10 +89,13 @@ class DotacionSobredotacionCalculator
             }
         }
 
-        $asignadasGeneral = array_key_exists('horas_asignadas_general', $docente)
-            ? max(0.0, (float) $docente['horas_asignadas_general'])
+        $asignadasProtegidas = array_key_exists('horas_asignadas_protegidas', $docente)
+            ? max(0.0, (float) $docente['horas_asignadas_protegidas'])
+            : self::horasAsignadasProtegidas($docente, $asignaciones);
+        $declaradasAjustables = array_key_exists('horas_declaradas_ajustables', $docente)
+            ? max(0.0, (float) $docente['horas_declaradas_ajustables'])
             : (float) $asignaciones
-                ->filter(fn ($asignacion) => self::esAsignacionGeneral($asignacion))
+                ->filter(fn ($asignacion) => self::esAsignacionDeclarada($asignacion))
                 ->sum(fn ($asignacion) => self::horasAsignacion($asignacion));
 
         return [
@@ -107,19 +108,101 @@ class DotacionSobredotacionCalculator
             'aula_contrata' => round(max(0.0, $contrata - $pieContrata), 2),
             'pie_planta' => round($piePlanta, 2),
             'pie_contrata' => round($pieContrata, 2),
-            'asignadas_general' => round($asignadasGeneral, 2),
+            'asignadas_protegidas' => round($asignadasProtegidas, 2),
+            'declaradas_ajustables' => round($declaradasAjustables, 2),
             'asignadas_pie' => round($contratoPie, 2),
         ];
     }
 
-    private static function itemsAula(Collection $base): Collection
+    /** @return array<string, mixed> */
+    private static function analizarAula(
+        Collection $base,
+        float $horasNecesarias,
+        float $contratoAulaResumen,
+        array $formula
+    ): array
     {
-        return $base->map(fn (array $docente) => self::itemBase($docente, [
-            'horas_contrato_categoria' => round($docente['aula_planta'] + $docente['aula_contrata'], 2),
-            'horas_dotacion_planta' => $docente['aula_planta'],
-            'horas_dotacion_contrata' => $docente['aula_contrata'],
-            'horas_asignadas_relevantes' => $docente['asignadas_general'],
-        ]))->values();
+        $analizados = $base->map(function (array $docente) {
+            $contratoPlanta = (float) $docente['aula_planta'];
+            $contratoContrata = (float) $docente['aula_contrata'];
+            $contratoAula = round($contratoPlanta + $contratoContrata, 2);
+            $protegidas = round(max(0.0, (float) $docente['asignadas_protegidas']), 2);
+            $declaradas = round(max(0.0, (float) $docente['declaradas_ajustables']), 2);
+            $asignadas = round($protegidas + $declaradas, 2);
+            $asignadasConsideradas = min($contratoAula, $asignadas);
+            $asignadasPlanta = min($contratoPlanta, $asignadasConsideradas);
+            $asignadasContrata = min(
+                $contratoContrata,
+                max(0.0, round($asignadasConsideradas - $asignadasPlanta, 2))
+            );
+            $sinAsignacionPlanta = round(max(0.0, $contratoPlanta - $asignadasPlanta), 2);
+            $sinAsignacionContrata = round(max(0.0, $contratoContrata - $asignadasContrata), 2);
+
+            return [
+                'rut' => $docente['rut'],
+                'nombre' => $docente['nombre'],
+                'funcion' => $docente['funcion'],
+                'tipo_contrato' => $docente['tipo_contrato'],
+                'es_ajuste' => false,
+                'horas_contrato_categoria' => $contratoAula,
+                'horas_dotacion_total' => $contratoAula,
+                'horas_asignadas_protegidas' => $protegidas,
+                'horas_declaradas_ajustables' => $declaradas,
+                'horas_asignadas_total' => $asignadas,
+                'horas_asignadas_consideradas' => round($asignadasConsideradas, 2),
+                'horas_sobreasignadas' => round(max(0.0, $asignadas - $contratoAula), 2),
+                'horas_sobredotacion_total' => round($sinAsignacionPlanta + $sinAsignacionContrata, 2),
+                'horas_sobredotacion_planta' => $sinAsignacionPlanta,
+                'horas_sobredotacion_contrata' => $sinAsignacionContrata,
+            ];
+        })->filter(fn (array $item) => $item['horas_contrato_categoria'] > 0.01
+            || $item['horas_asignadas_total'] > 0.01)
+            ->values();
+
+        $sobredotados = $analizados
+            ->filter(fn (array $item) => $item['horas_sobredotacion_total'] > 0.01)
+            ->sortBy([
+                ['horas_sobredotacion_total', 'desc'],
+                ['nombre', 'asc'],
+            ])
+            ->values();
+        $ajustes = $analizados
+            ->filter(fn (array $item) => $item['horas_declaradas_ajustables'] > 0.01)
+            ->sortBy([
+                ['horas_declaradas_ajustables', 'desc'],
+                ['nombre', 'asc'],
+            ])
+            ->values();
+        $contratoAulaIndividualizado = self::sumar($analizados, 'horas_contrato_categoria');
+        $brechaEstructural = round($horasNecesarias - $contratoAulaResumen, 2);
+        $sobredotacionReal = self::sumar($sobredotados, 'horas_sobredotacion_total');
+        $declaradasAjustables = self::sumar($ajustes, 'horas_declaradas_ajustables');
+
+        return [
+            'items' => $sobredotados,
+            'ajustes' => $ajustes,
+            'resumen' => [
+                'docentes_analizados' => $analizados->count(),
+                'docentes_sobredotacion' => $sobredotados->count(),
+                'docentes_ajuste' => $ajustes->count(),
+                'horas_dotacion_total' => $contratoAulaIndividualizado,
+                'horas_dotacion_resumen' => round($contratoAulaResumen, 2),
+                'horas_necesarias_total' => round($horasNecesarias, 2),
+                'brecha_estructural' => $brechaEstructural,
+                'horas_sobredotacion_estructural' => max(0.0, round(-$brechaEstructural, 2)),
+                'horas_necesarias_estructurales' => max(0.0, $brechaEstructural),
+                'horas_asignadas_protegidas' => self::sumar($analizados, 'horas_asignadas_protegidas'),
+                'horas_declaradas_ajustables' => $declaradasAjustables,
+                'horas_asignadas_total' => self::sumar($analizados, 'horas_asignadas_total'),
+                'horas_sobreasignadas' => self::sumar($analizados, 'horas_sobreasignadas'),
+                'horas_sobredotacion_total' => $sobredotacionReal,
+                'horas_sobredotacion_planta' => self::sumar($sobredotados, 'horas_sobredotacion_planta'),
+                'horas_sobredotacion_contrata' => self::sumar($sobredotados, 'horas_sobredotacion_contrata'),
+                'horas_potencial_ajuste' => round($sobredotacionReal + $declaradasAjustables, 2),
+                'tiene_ajuste_no_asociado' => abs($contratoAulaIndividualizado - $contratoAulaResumen) > 0.01,
+            ],
+            'formula' => $formula,
+        ];
     }
 
     private static function itemsPie(Collection $base): Collection
@@ -277,18 +360,47 @@ class DotacionSobredotacionCalculator
         ];
     }
 
-    private static function esAsignacionGeneral(object|array $asignacion): bool
+    private static function horasAsignadasProtegidas(array $docente, Collection $asignaciones): float
     {
-        if (self::esContratoPie($asignacion)) {
-            return false;
-        }
+        $camposContratoPlan = [
+            'horas_contrato_65_35',
+            'horas_contrato_60_40',
+            'horas_contrato_especial',
+        ];
+        $tieneContratoPlanConsolidado = collect($camposContratoPlan)
+            ->contains(fn (string $campo) => array_key_exists($campo, $docente));
+        $contratoPlan = $tieneContratoPlanConsolidado
+            ? (float) collect($camposContratoPlan)->sum(fn (string $campo) => (float) ($docente[$campo] ?? 0))
+            : (float) $asignaciones
+                ->where('tipo_asignacion', 'plan_estudio')
+                ->sum(fn ($asignacion) => self::horasAsignacion($asignacion));
+        $trabajoColaborativo = (float) $asignaciones
+            ->where('tipo_asignacion', 'pie_colaborativo')
+            ->sum(fn ($asignacion) => self::horasAsignacion($asignacion));
+        $funcionesNormativas = (float) $asignaciones
+            ->filter(fn ($asignacion) => self::esFuncionGeneral($asignacion)
+                && ! self::esContratoPie($asignacion)
+                && (int) data_get($asignacion, 'dotacion_funcion_id', 0) === 0)
+            ->sum(fn ($asignacion) => self::horasAsignacion($asignacion));
 
-        $tipo = (string) data_get($asignacion, 'tipo_asignacion', '');
-        if (in_array($tipo, ['plan_estudio', 'pie_colaborativo'], true)) {
-            return true;
-        }
+        return round($contratoPlan + $trabajoColaborativo + $funcionesNormativas, 2);
+    }
 
-        return in_array($tipo, ['funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion'], true);
+    private static function esAsignacionDeclarada(object|array $asignacion): bool
+    {
+        return self::esFuncionGeneral($asignacion)
+            && ! self::esContratoPie($asignacion)
+            && (int) data_get($asignacion, 'dotacion_funcion_id', 0) > 0;
+    }
+
+    private static function esFuncionGeneral(object|array $asignacion): bool
+    {
+        return in_array((string) data_get($asignacion, 'tipo_asignacion', ''), [
+            'funcion_directiva',
+            'funcion_tecnico_pedagogica',
+            'plan_normativo',
+            'otra_funcion',
+        ], true);
     }
 
     private static function esContratoPie(object|array $asignacion): bool

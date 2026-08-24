@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.24.427' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Sobredotación factual y horas declaradas ajustables',
+        'files' => [
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+        ],
+        'changes' => [
+            'Calcula la sobredotación individual como las horas de contrato Aula que no tienen asignaciones registradas en el mismo docente.',
+            'Protege contrato plan, trabajo colaborativo PIE y funciones normativas, incluidas las funciones directivas, técnico-pedagógicas y planes normativos.',
+            'Separa las horas asignadas del bloque declarado como posibles ajustes, sin clasificarlas como sobredotación real sin asignación.',
+            'Mantiene la brecha estructural institucional como referencia y muestra por separado sobredotación factual, Planta, Contrata y potencial total de ajuste.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.24.426' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',
