@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exports\DotacionEstablecimientoAvanceExport;
+use App\Exports\DotacionSobredotacionEstablecimientosExport;
 use App\Http\Controllers\Controller;
 use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionProporcionExcepcion;
@@ -34,7 +35,7 @@ class DotacionEstablecimientoController extends Controller
         $q = trim((string) $request->query('q', ''));
         $comuna = trim((string) $request->query('comuna', ''));
 
-        $establecimientos = Establecimiento::query()
+        $establecimientosQuery = Establecimiento::query()
             ->where(function ($query) {
                 $query->whereNull('sala_cuna')
                     ->orWhere('sala_cuna', false);
@@ -49,7 +50,20 @@ class DotacionEstablecimientoController extends Controller
             })
             ->when($comuna !== '', fn ($query) => $query->where('comuna', $comuna))
             ->orderBy('comuna')
-            ->orderBy('nombre_establecimiento')
+            ->orderBy('nombre_establecimiento');
+
+        if ($request->boolean('export_sobredotacion')) {
+            abort_unless(DotacionSobredotacionCalculator::canView($activeRole), 403);
+
+            return (new DotacionSobredotacionEstablecimientosExport)->download(
+                (clone $establecimientosQuery)->get(),
+                $anio,
+                ['q' => $q, 'comuna' => $comuna],
+                $user
+            );
+        }
+
+        $establecimientos = (clone $establecimientosQuery)
             ->paginate(20)
             ->withQueryString();
 
