@@ -123,6 +123,8 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             ['subtipo_asignacion' => 'tecnico_pedagogica', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 24],
             ['subtipo_asignacion' => 'tecnico_pedagogica', 'dotacion_funcion_id' => 10, 'horas_contrato_asignadas' => 8],
             ['subtipo_asignacion' => 'planes_programas', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 12],
+            ['subtipo_asignacion' => 'pie', 'dotacion_funcion_id' => 11, 'horas_contrato_asignadas' => 3],
+            ['subtipo_asignacion' => 'otras_funciones_docentes', 'dotacion_funcion_id' => 12, 'horas_contrato_asignadas' => 4],
         ];
 
         $desglosePie = $this->invokePrivate('desgloseContratoPieNecesario', [$bloques]);
@@ -143,17 +145,23 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             'funciones_directivas_normativas' => 44.0,
             'funciones_directivas_declaradas' => 0.0,
             'funciones_directivas_normativas_asignadas' => 32.0,
+            'funciones_directivas_declaradas_asignadas' => 0.0,
             'funciones_tecnico_pedagogicas' => 52.0,
             'funciones_tecnico_pedagogicas_normativas' => 38.0,
             'funciones_tecnico_pedagogicas_declaradas' => 14.0,
             'funciones_tecnico_pedagogicas_normativas_asignadas' => 24.0,
+            'funciones_tecnico_pedagogicas_declaradas_asignadas' => 8.0,
             'otras_funciones_pie' => 5.0,
+            'otras_funciones_pie_asignadas' => 3.0,
             'planes_normativos' => 19.0,
             'planes_normativos_asignadas' => 12.0,
             'planes_declarados' => 0.0,
+            'planes_declarados_asignadas' => 0.0,
             'otras_funciones_declaradas' => 7.0,
+            'otras_funciones_declaradas_asignadas' => 4.0,
             'total_normativas' => 101.0,
             'total_declaradas' => 26.0,
+            'total_declaradas_asignadas' => 15.0,
         ], $resultado);
         $this->assertSame(
             $resultado['funciones_tecnico_pedagogicas'],

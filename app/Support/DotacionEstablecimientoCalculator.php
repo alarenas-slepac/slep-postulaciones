@@ -1527,23 +1527,37 @@ class DotacionEstablecimientoCalculator
                     && (int) data_get($item, 'dotacion_funcion_id', 0) <= 0)
                 ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2);
         };
+        $asignadasDeclaradas = function (string $subtipo) use ($necesidades): float {
+            return round((float) $necesidades
+                ->filter(fn ($item) => data_get($item, 'subtipo_asignacion') === $subtipo
+                    && (int) data_get($item, 'dotacion_funcion_id', 0) > 0)
+                ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2);
+        };
 
         return [
             'funciones_directivas' => (float) data_get($bloques, 'directiva.total', 0),
             'funciones_directivas_normativas' => (float) data_get($bloques, 'directiva.automaticas', 0),
             'funciones_directivas_declaradas' => (float) data_get($bloques, 'directiva.declaradas', 0),
             'funciones_directivas_normativas_asignadas' => $asignadasNormativas('directiva'),
+            'funciones_directivas_declaradas_asignadas' => $asignadasDeclaradas('directiva'),
             'funciones_tecnico_pedagogicas' => (float) data_get($bloques, 'tecnico_pedagogica.total', 0),
             'funciones_tecnico_pedagogicas_normativas' => (float) data_get($bloques, 'tecnico_pedagogica.automaticas', 0),
             'funciones_tecnico_pedagogicas_declaradas' => (float) data_get($bloques, 'tecnico_pedagogica.declaradas', 0),
             'funciones_tecnico_pedagogicas_normativas_asignadas' => $asignadasNormativas('tecnico_pedagogica'),
+            'funciones_tecnico_pedagogicas_declaradas_asignadas' => $asignadasDeclaradas('tecnico_pedagogica'),
             'otras_funciones_pie' => (float) data_get($bloques, 'pie.total', 0),
+            'otras_funciones_pie_asignadas' => $asignadasDeclaradas('pie'),
             'planes_normativos' => (float) data_get($bloques, 'planes_programas.automaticas', 0),
             'planes_normativos_asignadas' => $asignadasNormativas('planes_programas'),
             'planes_declarados' => (float) data_get($bloques, 'planes_programas.declaradas', 0),
+            'planes_declarados_asignadas' => $asignadasDeclaradas('planes_programas'),
             'otras_funciones_declaradas' => (float) data_get($bloques, 'otras_funciones_docentes.total', 0),
+            'otras_funciones_declaradas_asignadas' => $asignadasDeclaradas('otras_funciones_docentes'),
             'total_normativas' => (float) collect($bloques)->sum(fn ($bloque) => (float) ($bloque['automaticas'] ?? 0)),
             'total_declaradas' => (float) collect($bloques)->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0)),
+            'total_declaradas_asignadas' => round((float) $necesidades
+                ->filter(fn ($item) => (int) data_get($item, 'dotacion_funcion_id', 0) > 0)
+                ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2),
         ];
     }
 
