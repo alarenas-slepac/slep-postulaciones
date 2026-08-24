@@ -127,14 +127,28 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             ['subtipo_asignacion' => 'otras_funciones_docentes', 'dotacion_funcion_id' => 12, 'horas_contrato_asignadas' => 4],
         ];
 
-        $desglosePie = $this->invokePrivate('desgloseContratoPieNecesario', [$bloques]);
+        $necesidadesEducadorasDiferenciales = [
+            ['horas_contrato_asignadas' => 40],
+        ];
+
+        $desglosePie = $this->invokePrivate('desgloseContratoPieNecesario', [
+            $bloques,
+            [
+                ['subtipo_asignacion' => 'pie', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 12],
+                ['subtipo_asignacion' => 'pie', 'dotacion_funcion_id' => 11, 'horas_contrato_asignadas' => 3],
+            ],
+            $necesidadesEducadorasDiferenciales,
+        ]);
         $bloquesContratoDotacion = $this->invokePrivate('bloquesSinContratoPieNecesario', [$bloques]);
         $resultado = $this->invokePrivate('desgloseContratoBloqueDotacion', [$bloquesContratoDotacion, $necesidadesFunciones]);
 
         $this->assertSame([
             'coordinacion_pie' => 18.0,
+            'coordinacion_pie_asignadas' => 12.0,
             'educadoras_diferenciales' => 65.0,
+            'educadoras_diferenciales_asignadas' => 40.0,
             'total' => 83.0,
+            'total_asignadas' => 52.0,
         ], $desglosePie);
         $this->assertSame(0.0, $bloquesContratoDotacion['pie']['automaticas']);
         $this->assertSame(5.0, $bloquesContratoDotacion['pie']['total']);
@@ -171,6 +185,29 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             210.0,
             (float) collect($bloquesContratoDotacion)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0)) + $desglosePie['total']
         );
+    }
+
+    public function test_resume_cobertura_asignada_de_plan_y_trabajo_colaborativo_pie(): void
+    {
+        $resultado = $this->invokePrivate('coberturaPlanYTrabajoColaborativo', [[
+            'necesidades' => [
+                'plan_estudio' => [
+                    ['horas_plan_asignadas' => 30, 'horas_contrato_asignadas' => 44],
+                    ['horas_plan_asignadas' => 20, 'horas_contrato_asignadas' => 31],
+                ],
+                'pie_colaborativo' => [
+                    ['horas_contrato_asignadas' => 3],
+                    ['horas_contrato_asignadas' => 2],
+                ],
+            ],
+        ]]);
+
+        $this->assertSame([
+            'horas_plan_asignadas' => 50.0,
+            'horas_contrato_plan_asignadas' => 75.0,
+            'trabajo_colaborativo_pie_asignadas' => 5.0,
+            'contrato_plan_mas_trabajo_colaborativo_pie_asignadas' => 80.0,
+        ], $resultado);
     }
 
     public function test_vista_ofrece_todos_los_motivos_y_limita_horas_al_saldo_sin_asignar(): void

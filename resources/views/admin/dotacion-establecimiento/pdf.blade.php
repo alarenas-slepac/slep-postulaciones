@@ -67,6 +67,11 @@
     $horasBloqueDeclaradasAsignadas = (float) ($desgloseContratoBloque['total_declaradas_asignadas'] ?? 0);
     $horasContratoPieNecesarias = (float) ($resumen['horas_contrato_pie_necesarias'] ?? 0);
     $desgloseContratoPieNecesario = $resumen['horas_contrato_pie_necesarias_desglose'] ?? [];
+    $horasContratoPieNecesariasAsignadas = (float) ($desgloseContratoPieNecesario['total_asignadas'] ?? 0);
+    $horasPlanAsignadas = (float) ($resumen['horas_plan_asignadas'] ?? $resumen['horas_aula_asignadas'] ?? 0);
+    $horasContratoPlanAsignadas = (float) ($resumen['horas_plan_contrato_asignadas'] ?? 0);
+    $trabajoColaborativoPieAsignadas = (float) ($resumen['trabajo_colaborativo_pie_asignadas'] ?? 0);
+    $contratoPlanMasPieAsignadas = (float) ($resumen['contrato_plan_mas_trabajo_colaborativo_pie_asignadas'] ?? ($horasContratoPlanAsignadas + $trabajoColaborativoPieAsignadas));
     $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
     $horasContratoAula = (float) ($resumen['horas_contrato_docentes_aula'] ?? $horasContratoActuales);
     $horasContratoDocentePie = (float) ($resumen['horas_contrato_docente_pie'] ?? 0);
@@ -173,13 +178,13 @@
             <th>Matrícula</th>
             <th>Cursos</th>
             <th>Docentes</th>
-            <th>Horas plan</th>
-            <th>Contrato plan</th>
-            <th>Trabajo colab. PIE</th>
-            <th>Contrato plan + colab.</th>
+            <th>Horas plan<br><span class="small">Asig. / req.</span></th>
+            <th>Contrato plan<br><span class="small">Asig. / req.</span></th>
+            <th>Trabajo colab. PIE<br><span class="small">Asig. / req.</span></th>
+            <th>Contrato plan + colab.<br><span class="small">Asig. / req.</span></th>
             <th>Bloque normativo</th>
             <th>Bloque declarado<br><span class="small">Asig. / decl.</span></th>
-            <th>Contrato PIE necesario</th>
+            <th>Contrato PIE necesario<br><span class="small">Asig. / req.</span></th>
             <th>Horas contrato docentes</th>
             <th>Brecha</th>
         </tr>
@@ -189,13 +194,13 @@
             <td class="text-right">{{ number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.') }}</td>
             <td class="text-right">{{ number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.') }}</td>
             <td class="text-right">{{ number_format((int) ($resumen['docentes_total'] ?? 0), 0, ',', '.') }}</td>
-            <td class="text-right primary">{{ $fmt($resumen['horas_plan_total'] ?? 0) }}</td>
-            <td class="text-right primary">{{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }}</td>
-            <td class="text-right success">{{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }}</td>
-            <td class="text-right primary">{{ $fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($horasPlanAsignadas) }} / {{ $fmt($resumen['horas_plan_total'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($horasContratoPlanAsignadas) }} / {{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }}</td>
+            <td class="text-right success">{{ $fmt($trabajoColaborativoPieAsignadas) }} / {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($contratoPlanMasPieAsignadas) }} / {{ $fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) }}</td>
             <td class="text-right primary">{{ $fmt($horasBloqueNormativas) }}</td>
             <td class="text-right">{{ $fmt($horasBloqueDeclaradasAsignadas) }} / {{ $fmt($horasBloqueDeclaradas) }}</td>
-            <td class="text-right primary">{{ $fmt($horasContratoPieNecesarias) }}</td>
+            <td class="text-right primary">{{ $fmt($horasContratoPieNecesariasAsignadas) }} / {{ $fmt($horasContratoPieNecesarias) }}</td>
             <td class="text-right">{{ $fmt($resumen['horas_contrato_docentes'] ?? 0) }}</td>
             <td class="text-right"><span class="badge {{ $brechaClass }}">{{ $fmt($brechaValor) }} - {{ $brechaTexto }}</span></td>
         </tr>
@@ -282,16 +287,16 @@
 <table class="summary avoid-break">
     <thead>
         <tr>
-            <th>Coordinador(a) PIE</th>
-            <th>Educadoras diferenciales PIE</th>
-            <th>Total contrato PIE necesario</th>
+            <th>Coordinador(a) PIE<br><span class="small">Asig. / necesarias</span></th>
+            <th>Educadoras diferenciales PIE<br><span class="small">Asig. / necesarias</span></th>
+            <th>Total contrato PIE<br><span class="small">Asig. / necesarias</span></th>
         </tr>
     </thead>
     <tbody>
         <tr>
-            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</td>
-            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</td>
-            <td class="text-right primary">{{ $fmt($horasContratoPieNecesarias) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($horasContratoPieNecesariasAsignadas) }} / {{ $fmt($horasContratoPieNecesarias) }}</td>
         </tr>
     </tbody>
 </table>
@@ -336,13 +341,13 @@
     <tbody>
         <tr>
             <td>Contrato equivalente plan</td>
-            <td class="text-right">{{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }}</td>
-            <td>Contrato requerido para cubrir horas del plan de estudios.</td>
+            <td class="text-right">{{ $fmt($horasContratoPlanAsignadas) }} / {{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }}</td>
+            <td>Contrato asignado / requerido para cubrir el plan de estudios.</td>
         </tr>
         <tr>
             <td>Trabajo colaborativo PIE</td>
-            <td class="text-right">{{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }}</td>
-            <td>3 horas por curso con estudiantes NEE.</td>
+            <td class="text-right">{{ $fmt($trabajoColaborativoPieAsignadas) }} / {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }}</td>
+            <td>Horas asignadas / requeridas; la necesidad corresponde a 3 horas por curso con estudiantes NEE.</td>
         </tr>
         <tr>
             <td>Funciones directivas</td>
@@ -361,18 +366,18 @@
         </tr>
         <tr>
             <td>Coordinador(a) PIE necesario</td>
-            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</td>
-            <td>Horas automáticas normativas de coordinación del Programa de Integración Escolar.</td>
+            <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</td>
+            <td>Horas asignadas / necesarias para coordinación normativa del Programa de Integración Escolar.</td>
         </tr>
         <tr>
             <td>Educadoras diferenciales PIE necesarias</td>
-            <td class="text-right primary">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</td>
-            <td>Bolsa contractual automática normativa de Educadoras Diferenciales PIE.</td>
+            <td class="text-right primary">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</td>
+            <td>Horas asignadas / necesarias de la Bolsa de Educadoras Diferenciales PIE.</td>
         </tr>
         <tr class="total-row">
             <td>Horas de contrato PIE necesarias</td>
-            <td class="text-right primary">{{ $fmt($horasContratoPieNecesarias) }}</td>
-            <td>Suma de Coordinador(a) PIE y Educadoras Diferenciales PIE normativas.</td>
+            <td class="text-right primary">{{ $fmt($horasContratoPieNecesariasAsignadas) }} / {{ $fmt($horasContratoPieNecesarias) }}</td>
+            <td>Total asignado / necesario de Coordinador(a) PIE y Educadoras Diferenciales PIE normativas.</td>
         </tr>
         <tr>
             <td>Planes normativos</td>

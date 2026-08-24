@@ -106,7 +106,12 @@ class DotacionEstablecimientoCalculator
         $cursos['totales']['reduccion_cursos_combinados'] = $reduccionCursosCombinados;
         $cursos['totales']['reduccion_contrato_cursos_combinados'] = $reduccionContratoCursosCombinados;
 
-        $desgloseContratoPieNecesario = self::desgloseContratoPieNecesario($bloques);
+        $coberturaPlanPie = self::coberturaPlanYTrabajoColaborativo($asignacion);
+        $desgloseContratoPieNecesario = self::desgloseContratoPieNecesario(
+            $bloques,
+            data_get($asignacion, 'necesidades.funciones', []),
+            data_get($asignacion, 'necesidades.pie_educadora_diferencial', [])
+        );
         $bloquesContratoDotacion = self::bloquesSinContratoPieNecesario($bloques);
         $horasContratoPieNecesarias = (float) ($desgloseContratoPieNecesario['total'] ?? 0);
         $horasDotacionFunciones = collect($bloquesContratoDotacion)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
@@ -145,13 +150,17 @@ class DotacionEstablecimientoCalculator
             'docentes_total' => $docentes->count(),
             'asistentes_total' => $asistentes->count(),
             'horas_plan_total' => $horasPlanAjustadas,
+            'horas_plan_asignadas' => $coberturaPlanPie['horas_plan_asignadas'],
             'horas_plan_total_brutas' => $horasPlanBrutas,
             'horas_plan_reduccion_cursos_combinados' => $reduccionCursosCombinados,
             'horas_plan_contrato_equivalente' => $horasContratoPlanAjustadas,
+            'horas_plan_contrato_asignadas' => $coberturaPlanPie['horas_contrato_plan_asignadas'],
             'horas_plan_contrato_brutas' => $horasContratoPlanBrutas,
             'horas_plan_contrato_reduccion_cursos_combinados' => $reduccionContratoCursosCombinados,
             'trabajo_colaborativo_pie' => (float) ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0),
+            'trabajo_colaborativo_pie_asignadas' => $coberturaPlanPie['trabajo_colaborativo_pie_asignadas'],
             'contrato_plan_mas_trabajo_colaborativo_pie' => $contratoPlanMasTrabajoColaborativoPie,
+            'contrato_plan_mas_trabajo_colaborativo_pie_asignadas' => $coberturaPlanPie['contrato_plan_mas_trabajo_colaborativo_pie_asignadas'],
             'horas_dotacion_funciones' => $horasDotacionFunciones,
             'horas_dotacion_funciones_normativas' => $horasDotacionFuncionesNormativas,
             'horas_dotacion_funciones_declaradas' => $horasDotacionFuncionesDeclaradas,
@@ -1562,9 +1571,34 @@ class DotacionEstablecimientoCalculator
     }
 
     /**
-     * @return array{coordinacion_pie: float, educadoras_diferenciales: float, total: float}
+     * @return array{horas_plan_asignadas: float, horas_contrato_plan_asignadas: float, trabajo_colaborativo_pie_asignadas: float, contrato_plan_mas_trabajo_colaborativo_pie_asignadas: float}
      */
-    private static function desgloseContratoPieNecesario(array $bloques): array
+    private static function coberturaPlanYTrabajoColaborativo(array $asignacion): array
+    {
+        $necesidadesPlan = collect(data_get($asignacion, 'necesidades.plan_estudio', []));
+        $necesidadesTrabajoColaborativo = collect(data_get($asignacion, 'necesidades.pie_colaborativo', []));
+        $horasContratoPlanAsignadas = round((float) $necesidadesPlan
+            ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2);
+        $trabajoColaborativoPieAsignadas = round((float) $necesidadesTrabajoColaborativo
+            ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2);
+
+        return [
+            'horas_plan_asignadas' => round((float) $necesidadesPlan
+                ->sum(fn ($item) => (float) data_get($item, 'horas_plan_asignadas', 0)), 2),
+            'horas_contrato_plan_asignadas' => $horasContratoPlanAsignadas,
+            'trabajo_colaborativo_pie_asignadas' => $trabajoColaborativoPieAsignadas,
+            'contrato_plan_mas_trabajo_colaborativo_pie_asignadas' => round($horasContratoPlanAsignadas + $trabajoColaborativoPieAsignadas, 2),
+        ];
+    }
+
+    /**
+     * @return array{coordinacion_pie: float, coordinacion_pie_asignadas: float, educadoras_diferenciales: float, educadoras_diferenciales_asignadas: float, total: float, total_asignadas: float}
+     */
+    private static function desgloseContratoPieNecesario(
+        array $bloques,
+        iterable $necesidadesFunciones = [],
+        iterable $necesidadesEducadorasDiferenciales = []
+    ): array
     {
         $items = collect(data_get($bloques, 'pie.items', []));
         $coordinacionPie = (float) $items
@@ -1573,11 +1607,20 @@ class DotacionEstablecimientoCalculator
         $educadorasDiferenciales = (float) $items
             ->where('tipo_contrato_pie_necesario', 'educadoras_diferenciales')
             ->sum(fn ($item) => (float) ($item['horas'] ?? 0));
+        $coordinacionPieAsignadas = round((float) collect($necesidadesFunciones)
+            ->filter(fn ($item) => data_get($item, 'subtipo_asignacion') === 'pie'
+                && (int) data_get($item, 'dotacion_funcion_id', 0) <= 0)
+            ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2);
+        $educadorasDiferencialesAsignadas = round((float) collect($necesidadesEducadorasDiferenciales)
+            ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2);
 
         return [
             'coordinacion_pie' => round($coordinacionPie, 2),
+            'coordinacion_pie_asignadas' => $coordinacionPieAsignadas,
             'educadoras_diferenciales' => round($educadorasDiferenciales, 2),
+            'educadoras_diferenciales_asignadas' => $educadorasDiferencialesAsignadas,
             'total' => round($coordinacionPie + $educadorasDiferenciales, 2),
+            'total_asignadas' => round($coordinacionPieAsignadas + $educadorasDiferencialesAsignadas, 2),
         ];
     }
 
