@@ -9,7 +9,9 @@
         $horasContratoDocentePie = (float) ($resumen['horas_contrato_docente_pie'] ?? 0);
         $horasContratoCoordinacionPie = (float) ($resumen['horas_contrato_docente_pie_coordinacion'] ?? 0);
         $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
-        $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0)));
+        $horasContratoPieNecesarias = (float) ($resumen['horas_contrato_pie_necesarias'] ?? 0);
+        $desgloseContratoPieNecesario = $resumen['horas_contrato_pie_necesarias_desglose'] ?? [];
+        $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0) + $horasContratoPieNecesarias));
         $sobredotacion = max(0, $horasContratoActuales - $horasContratoRequeridas);
         $horasPorContratar = max(0, $horasContratoRequeridas - $horasContratoActuales);
         $brechaLabel = $sobredotacion > 0.01 ? 'Horas de sobredotación' : ($horasPorContratar > 0.01 ? 'Horas por contratar' : 'Dotación cuadrada');
@@ -20,11 +22,12 @@
             ['label' => 'Funciones directivas', 'value' => $desgloseContratoBloque['funciones_directivas'] ?? 0, 'tone' => 'primary', 'icon' => 'bi-person-badge'],
             ['label' => 'Téc.-pedagógicas normativas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0, 'hint' => 'Horas automáticas.', 'tone' => 'success', 'icon' => 'bi-shield-check'],
             ['label' => 'Téc.-pedagógicas declaradas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0, 'hint' => 'Informadas por el establecimiento.', 'tone' => 'success', 'icon' => 'bi-building-add'],
-            ['label' => 'Coordinación PIE', 'value' => $desgloseContratoBloque['coordinacion_pie'] ?? 0, 'tone' => 'info', 'icon' => 'bi-people-fill'],
-            ['label' => 'Educadoras diferenciales', 'value' => $desgloseContratoBloque['educadoras_diferenciales'] ?? 0, 'tone' => 'info', 'icon' => 'bi-universal-access'],
             ['label' => 'Planes normativos', 'value' => $desgloseContratoBloque['planes_normativos'] ?? 0, 'tone' => 'warning', 'icon' => 'bi-journal-check'],
             ['label' => 'Otras funciones declaradas', 'value' => $desgloseContratoBloque['otras_funciones_declaradas'] ?? 0, 'tone' => 'secondary', 'icon' => 'bi-plus-square-dotted'],
         ];
+        if ((float) ($desgloseContratoBloque['otras_funciones_pie'] ?? 0) > 0) {
+            $desgloseContratoItems[] = ['label' => 'Otras funciones PIE declaradas', 'value' => $desgloseContratoBloque['otras_funciones_pie'], 'tone' => 'info', 'icon' => 'bi-universal-access'];
+        }
         $kpis = [
             ['label' => 'Matrícula', 'value' => number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.'), 'hint' => 'Estudiantes con matrícula vigente.', 'tone' => 'dark', 'icon' => 'bi-people'],
             ['label' => 'Cursos', 'value' => number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.'), 'hint' => 'Cursos con matrícula.', 'tone' => 'primary', 'icon' => 'bi-grid-3x3-gap'],
@@ -34,6 +37,7 @@
             ['label' => 'Trabajo colab. PIE', 'value' => $fmt($resumen['trabajo_colaborativo_pie'] ?? 0), 'hint' => '3 horas por curso con NEE.', 'tone' => 'success', 'icon' => 'bi-universal-access'],
             ['label' => 'Contrato plan + PIE', 'value' => $fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0), 'hint' => 'Plan más trabajo colaborativo.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
             ['label' => 'Contrato bloque dotación', 'value' => $fmt($resumen['horas_dotacion_funciones'] ?? 0), 'hint' => 'Total de los componentes desglosados abajo.', 'tone' => 'warning', 'icon' => 'bi-diagram-3'],
+            ['label' => 'Horas contrato PIE necesarias', 'value' => $fmt($horasContratoPieNecesarias), 'hint' => 'Coordinación PIE y Educadoras Diferenciales normativas.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
             ['label' => 'Horas contrato docentes', 'value' => $fmt($horasContratoActuales), 'hint' => 'Horas contratadas vigentes.', 'tone' => 'dark', 'icon' => 'bi-briefcase'],
             ['label' => 'Horas contrato aula', 'value' => $fmt($horasContratoAula), 'hint' => 'Contrato vigente descontando las asignaciones docentes PIE.', 'tone' => 'primary', 'icon' => 'bi-easel2'],
             ['label' => 'Horas contrato docente PIE', 'value' => $fmt($horasContratoDocentePie), 'hint' => 'Coordinación PIE: '.$fmt($horasContratoCoordinacionPie).' · Bolsa Educ. Diferenciales: '.$fmt($horasContratoEducadorasDiferenciales).'.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
@@ -132,7 +136,7 @@
                     <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
                         <div>
                             <div class="text-muted small fw-semibold">Desglose contrato bloque dotación</div>
-                            <div class="small text-muted">Las horas técnico-pedagógicas normativas se separan de las declaradas por el establecimiento; Educadoras Diferenciales se mantiene separada de Coordinación PIE.</div>
+                            <div class="small text-muted">Excluye Coordinación PIE y Educadoras Diferenciales normativas, informadas en el bloque independiente de horas PIE necesarias.</div>
                         </div>
                         <div class="text-end">
                             <div class="small text-muted">Total bloque</div>
@@ -156,6 +160,36 @@
                                 </div>
                             </div>
                         @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="card dotacion-kpi border-0 bg-info-subtle">
+                <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+                        <div>
+                            <div class="text-muted small fw-semibold">Horas de contrato PIE necesarias</div>
+                            <div class="small text-muted">Horas automáticas normativas separadas del contrato bloque dotación.</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="small text-muted">Total PIE necesario</div>
+                            <div class="fs-4 fw-bold text-info">{{ $fmt($horasContratoPieNecesarias) }}</div>
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="dotacion-breakdown-item p-3">
+                                <div class="small text-muted fw-semibold">Coordinador(a) PIE</div>
+                                <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dotacion-breakdown-item p-3">
+                                <div class="small text-muted fw-semibold">Educadoras diferenciales PIE</div>
+                                <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

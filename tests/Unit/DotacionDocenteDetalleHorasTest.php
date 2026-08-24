@@ -98,23 +98,45 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         $this->assertSame(30.0, $resultado['horas_consideradas']);
     }
 
-    public function test_desglosa_el_contrato_del_bloque_y_separa_educadoras_diferenciales_de_coordinacion_pie(): void
+    public function test_extrae_horas_pie_normativas_del_contrato_bloque_sin_alterar_la_necesidad_total(): void
     {
-        $resultado = $this->invokePrivate('desgloseContratoBloqueDotacion', [[
+        $bloques = [
             'directiva' => ['total' => 44],
             'tecnico_pedagogica' => ['automaticas' => 38, 'declaradas' => 14, 'total' => 52],
-            'pie' => ['total' => 83, 'educadoras_diferenciales' => 65],
+            'pie' => [
+                'automaticas' => 83,
+                'declaradas' => 5,
+                'total' => 88,
+                'educadoras_diferenciales' => 65,
+                'items' => [
+                    ['nombre' => 'Coordinador(a) PIE', 'origen' => 'Automática', 'horas' => 18, 'tipo_contrato_pie_necesario' => 'coordinacion_pie'],
+                    ['nombre' => 'Educadoras diferenciales PIE', 'origen' => 'Automática', 'horas' => 65, 'tipo_contrato_pie_necesario' => 'educadoras_diferenciales'],
+                    ['nombre' => 'Apoyo PIE declarado', 'origen' => 'Declarada', 'horas' => 5],
+                ],
+            ],
             'planes_programas' => ['total' => 19],
             'otras_funciones_docentes' => ['total' => 7],
-        ]]);
+        ];
+
+        $desglosePie = $this->invokePrivate('desgloseContratoPieNecesario', [$bloques]);
+        $bloquesContratoDotacion = $this->invokePrivate('bloquesSinContratoPieNecesario', [$bloques]);
+        $resultado = $this->invokePrivate('desgloseContratoBloqueDotacion', [$bloquesContratoDotacion]);
+
+        $this->assertSame([
+            'coordinacion_pie' => 18.0,
+            'educadoras_diferenciales' => 65.0,
+            'total' => 83.0,
+        ], $desglosePie);
+        $this->assertSame(0.0, $bloquesContratoDotacion['pie']['automaticas']);
+        $this->assertSame(5.0, $bloquesContratoDotacion['pie']['total']);
+        $this->assertCount(1, $bloquesContratoDotacion['pie']['items']);
 
         $this->assertSame([
             'funciones_directivas' => 44.0,
             'funciones_tecnico_pedagogicas' => 52.0,
             'funciones_tecnico_pedagogicas_normativas' => 38.0,
             'funciones_tecnico_pedagogicas_declaradas' => 14.0,
-            'coordinacion_pie' => 18.0,
-            'educadoras_diferenciales' => 65.0,
+            'otras_funciones_pie' => 5.0,
             'planes_normativos' => 19.0,
             'otras_funciones_declaradas' => 7.0,
         ], $resultado);
@@ -122,10 +144,10 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             $resultado['funciones_tecnico_pedagogicas'],
             $resultado['funciones_tecnico_pedagogicas_normativas'] + $resultado['funciones_tecnico_pedagogicas_declaradas']
         );
-        $this->assertSame(205.0, collect($resultado)->except([
-            'funciones_tecnico_pedagogicas_normativas',
-            'funciones_tecnico_pedagogicas_declaradas',
-        ])->sum());
+        $this->assertSame(
+            210.0,
+            (float) collect($bloquesContratoDotacion)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0)) + $desglosePie['total']
+        );
     }
 
     public function test_vista_ofrece_todos_los_motivos_y_limita_horas_al_saldo_sin_asignar(): void
