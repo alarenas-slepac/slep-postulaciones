@@ -18,15 +18,25 @@
         $brechaValue = $sobredotacion > 0.01 ? $sobredotacion : ($horasPorContratar > 0.01 ? $horasPorContratar : 0);
         $brechaTone = $sobredotacion > 0.01 ? 'danger' : ($horasPorContratar > 0.01 ? 'success' : 'primary');
         $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
-        $desgloseContratoItems = [
-            ['label' => 'Funciones directivas', 'value' => $desgloseContratoBloque['funciones_directivas'] ?? 0, 'tone' => 'primary', 'icon' => 'bi-person-badge'],
-            ['label' => 'Téc.-pedagógicas normativas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0, 'hint' => 'Horas automáticas.', 'tone' => 'success', 'icon' => 'bi-shield-check'],
-            ['label' => 'Téc.-pedagógicas declaradas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0, 'hint' => 'Informadas por el establecimiento.', 'tone' => 'success', 'icon' => 'bi-building-add'],
-            ['label' => 'Planes normativos', 'value' => $desgloseContratoBloque['planes_normativos'] ?? 0, 'tone' => 'warning', 'icon' => 'bi-journal-check'],
+        $horasBloqueNormativas = (float) ($resumen['horas_dotacion_funciones_normativas'] ?? $desgloseContratoBloque['total_normativas'] ?? 0);
+        $horasBloqueDeclaradas = (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? $desgloseContratoBloque['total_declaradas'] ?? 0);
+        $desgloseNormativoItems = [
+            ['label' => 'Funciones directivas', 'assigned' => $desgloseContratoBloque['funciones_directivas_normativas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['funciones_directivas_normativas'] ?? 0, 'tone' => 'primary', 'icon' => 'bi-person-badge'],
+            ['label' => 'Téc.-pedagógicas normativas', 'assigned' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0, 'tone' => 'success', 'icon' => 'bi-shield-check'],
+            ['label' => 'Planes normativos', 'assigned' => $desgloseContratoBloque['planes_normativos_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['planes_normativos'] ?? 0, 'tone' => 'warning', 'icon' => 'bi-journal-check'],
+        ];
+        $desgloseDeclaradoItems = [
+            ['label' => 'Téc.-pedagógicas declaradas', 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0, 'tone' => 'success', 'icon' => 'bi-building-add'],
             ['label' => 'Otras funciones declaradas', 'value' => $desgloseContratoBloque['otras_funciones_declaradas'] ?? 0, 'tone' => 'secondary', 'icon' => 'bi-plus-square-dotted'],
         ];
+        if ((float) ($desgloseContratoBloque['funciones_directivas_declaradas'] ?? 0) > 0) {
+            $desgloseDeclaradoItems[] = ['label' => 'Funciones directivas declaradas', 'value' => $desgloseContratoBloque['funciones_directivas_declaradas'], 'tone' => 'primary', 'icon' => 'bi-person-add'];
+        }
+        if ((float) ($desgloseContratoBloque['planes_declarados'] ?? 0) > 0) {
+            $desgloseDeclaradoItems[] = ['label' => 'Planes declarados', 'value' => $desgloseContratoBloque['planes_declarados'], 'tone' => 'warning', 'icon' => 'bi-journal-plus'];
+        }
         if ((float) ($desgloseContratoBloque['otras_funciones_pie'] ?? 0) > 0) {
-            $desgloseContratoItems[] = ['label' => 'Otras funciones PIE declaradas', 'value' => $desgloseContratoBloque['otras_funciones_pie'], 'tone' => 'info', 'icon' => 'bi-universal-access'];
+            $desgloseDeclaradoItems[] = ['label' => 'Otras funciones PIE declaradas', 'value' => $desgloseContratoBloque['otras_funciones_pie'], 'tone' => 'info', 'icon' => 'bi-universal-access'];
         }
         $kpis = [
             ['label' => 'Matrícula', 'value' => number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.'), 'hint' => 'Estudiantes con matrícula vigente.', 'tone' => 'dark', 'icon' => 'bi-people'],
@@ -36,7 +46,8 @@
             ['label' => 'Contrato plan', 'value' => $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0), 'hint' => ((float) ($resumen['horas_plan_contrato_reduccion_cursos_combinados'] ?? 0) > 0 ? 'Equivalente ajustado después de consolidar cursos combinados.' : 'Equivalente contractual redondeado por curso.'), 'tone' => 'info', 'icon' => 'bi-calculator'],
             ['label' => 'Trabajo colab. PIE', 'value' => $fmt($resumen['trabajo_colaborativo_pie'] ?? 0), 'hint' => '3 horas por curso con NEE.', 'tone' => 'success', 'icon' => 'bi-universal-access'],
             ['label' => 'Contrato plan + PIE', 'value' => $fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0), 'hint' => 'Plan más trabajo colaborativo.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
-            ['label' => 'Contrato bloque dotación', 'value' => $fmt($resumen['horas_dotacion_funciones'] ?? 0), 'hint' => 'Total de los componentes desglosados abajo.', 'tone' => 'warning', 'icon' => 'bi-diagram-3'],
+            ['label' => 'Contrato bloque normativo', 'value' => $fmt($horasBloqueNormativas), 'hint' => 'Funciones y planes calculados por normativa.', 'tone' => 'warning', 'icon' => 'bi-shield-check'],
+            ['label' => 'Contrato bloque declarado', 'value' => $fmt($horasBloqueDeclaradas), 'hint' => 'Horas informadas por el establecimiento.', 'tone' => 'secondary', 'icon' => 'bi-building-add'],
             ['label' => 'Horas contrato PIE necesarias', 'value' => $fmt($horasContratoPieNecesarias), 'hint' => 'Coordinación PIE y Educadoras Diferenciales normativas.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
             ['label' => 'Horas contrato docentes', 'value' => $fmt($horasContratoActuales), 'hint' => 'Horas contratadas vigentes.', 'tone' => 'dark', 'icon' => 'bi-briefcase'],
             ['label' => 'Horas contrato aula', 'value' => $fmt($horasContratoAula), 'hint' => 'Contrato vigente descontando las asignaciones docentes PIE.', 'tone' => 'primary', 'icon' => 'bi-easel2'],
@@ -136,24 +147,47 @@
                     <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
                         <div>
                             <div class="text-muted small fw-semibold">Desglose contrato bloque dotación</div>
-                            <div class="small text-muted">Excluye Coordinación PIE y Educadoras Diferenciales normativas, informadas en el bloque independiente de horas PIE necesarias.</div>
+                            <div class="small text-muted">Separa las horas normativas de las declaradas. La cobertura normativa se muestra como horas asignadas / horas requeridas.</div>
                         </div>
                         <div class="text-end">
                             <div class="small text-muted">Total bloque</div>
                             <div class="fs-4 fw-bold text-warning">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</div>
+                            <div class="small text-muted">Normativas {{ $fmt($horasBloqueNormativas) }} · Declaradas {{ $fmt($horasBloqueDeclaradas) }}</div>
                         </div>
                     </div>
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                        <div class="small fw-bold text-uppercase text-muted">Horas normativas</div>
+                        <span class="badge rounded-pill text-bg-warning">Total {{ $fmt($horasBloqueNormativas) }}</span>
+                    </div>
                     <div class="row g-2">
-                        @foreach ($desgloseContratoItems as $item)
+                        @foreach ($desgloseNormativoItems as $item)
+                            <div class="col-lg-4 col-md-6">
+                                <div class="dotacion-breakdown-item p-3">
+                                    <div class="d-flex align-items-start justify-content-between gap-2">
+                                        <div>
+                                            <div class="small text-muted fw-semibold">{{ $item['label'] }}</div>
+                                            <div class="fs-5 fw-bold text-{{ $item['tone'] }}">{{ $fmt($item['assigned']) }} / {{ $fmt($item['value']) }}</div>
+                                            <div class="small text-muted">Asignadas / requeridas</div>
+                                        </div>
+                                        <span class="kpi-icon text-{{ $item['tone'] }}"><i class="bi {{ $item['icon'] }}"></i></span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <hr class="my-3">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                        <div class="small fw-bold text-uppercase text-muted">Horas declaradas por el establecimiento</div>
+                        <span class="badge rounded-pill text-bg-secondary">Total {{ $fmt($horasBloqueDeclaradas) }}</span>
+                    </div>
+                    <div class="row g-2">
+                        @foreach ($desgloseDeclaradoItems as $item)
                             <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
                                 <div class="dotacion-breakdown-item p-3">
                                     <div class="d-flex align-items-start justify-content-between gap-2">
                                         <div>
                                             <div class="small text-muted fw-semibold">{{ $item['label'] }}</div>
                                             <div class="fs-5 fw-bold text-{{ $item['tone'] }}">{{ $fmt($item['value']) }}</div>
-                                            @if (!empty($item['hint']))
-                                                <div class="small text-muted">{{ $item['hint'] }}</div>
-                                            @endif
                                         </div>
                                         <span class="kpi-icon text-{{ $item['tone'] }}"><i class="bi {{ $item['icon'] }}"></i></span>
                                     </div>

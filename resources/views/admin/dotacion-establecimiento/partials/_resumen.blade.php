@@ -69,9 +69,13 @@
             <div>
                 <div class="dotacion-eyebrow">Resumen por bloque</div>
                 <h2 class="h5 fw-bold mb-1">Bloques de dotación · horas de contrato</h2>
-                <div class="text-muted small">Horas automáticas, declaradas/aprobadas y total por bloque.</div>
+                <div class="text-muted small">Horas normativas, declaradas/aprobadas y total por bloque.</div>
             </div>
-            <span class="badge rounded-pill text-bg-primary">Total bloque: {{ $fmt($totalBloquesDotacion) }}</span>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge rounded-pill text-bg-warning">Normativas: {{ $fmt($totalAutomaticas) }}</span>
+                <span class="badge rounded-pill text-bg-secondary">Declaradas: {{ $fmt($totalDeclaradas) }}</span>
+                <span class="badge rounded-pill text-bg-primary">Total bloque: {{ $fmt($totalBloquesDotacion) }}</span>
+            </div>
         </div>
     </div>
     <div class="card-body">
@@ -86,7 +90,7 @@
                             </div>
                             <span class="rounded-3 d-inline-flex align-items-center justify-content-center bg-light text-{{ $toneClass[$bloque['tone']] ?? 'secondary' }}" style="width:34px;height:34px;"><i class="bi {{ $bloque['icon'] }}"></i></span>
                         </div>
-                        <div class="small text-muted mt-2">Auto: {{ $fmt($bloque['automaticas'] ?? 0) }} · Declaradas: {{ $fmt($bloque['declaradas'] ?? 0) }}</div>
+                        <div class="small text-muted mt-2">Normativas: {{ $fmt($bloque['automaticas'] ?? 0) }} · Declaradas: {{ $fmt($bloque['declaradas'] ?? 0) }}</div>
                     </div>
                 </div>
             @endforeach
@@ -96,7 +100,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>Bloque</th>
-                        <th class="text-end">Automáticas</th>
+                        <th class="text-end">Normativas</th>
                         <th class="text-end">Declaradas/aprobadas</th>
                         <th class="text-end">Total</th>
                         <th>Detalle principal</th>
