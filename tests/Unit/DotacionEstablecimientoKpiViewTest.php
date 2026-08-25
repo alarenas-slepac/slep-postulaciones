@@ -26,11 +26,16 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
         $this->assertIsString($source);
         $this->assertStringContainsString('Desglose de horas de contrato de funciones directivas, técnico pedagógicas, planes y Otras funciones', $source);
         $this->assertSame(2, substr_count($source, 'data-bs-toggle="collapse"'));
+        $this->assertSame(2, substr_count($source, 'dotacion-collapse-toggle collapsed'));
         $this->assertStringContainsString('data-bs-target="#dotacion-funciones-collapse"', $source);
         $this->assertStringContainsString('aria-controls="dotacion-funciones-collapse"', $source);
-        $this->assertStringContainsString('id="dotacion-funciones-collapse" class="collapse show"', $source);
+        $this->assertMatchesRegularExpression('/data-bs-target="#dotacion-funciones-collapse"\s+aria-expanded="false"\s+aria-controls="dotacion-funciones-collapse"/', $source);
+        $this->assertStringContainsString('id="dotacion-funciones-collapse" class="collapse"', $source);
         $this->assertStringContainsString('data-bs-target="#dotacion-pie-necesarias-collapse"', $source);
         $this->assertStringContainsString('aria-controls="dotacion-pie-necesarias-collapse"', $source);
-        $this->assertStringContainsString('id="dotacion-pie-necesarias-collapse" class="collapse show"', $source);
+        $this->assertMatchesRegularExpression('/data-bs-target="#dotacion-pie-necesarias-collapse"\s+aria-expanded="false"\s+aria-controls="dotacion-pie-necesarias-collapse"/', $source);
+        $this->assertStringContainsString('id="dotacion-pie-necesarias-collapse" class="collapse"', $source);
+        $this->assertStringNotContainsString('id="dotacion-funciones-collapse" class="collapse show"', $source);
+        $this->assertStringNotContainsString('id="dotacion-pie-necesarias-collapse" class="collapse show"', $source);
     }
 }
