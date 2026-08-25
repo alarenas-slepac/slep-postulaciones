@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.8.24.430' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Reagrupación de indicadores del resumen de dotación',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+        ],
+        'changes' => [
+            'Oculta los indicadores individuales Horas plan, Contrato plan y Trabajo colaborativo PIE, manteniendo su total consolidado en Contrato plan + PIE.',
+            'Renombra el bloque normativo como Funciones directivas / técnico pedagógicas y planes normativos.',
+            'Renombra el bloque declarado como Otras funciones no normativas y alinea la descripción de la fórmula de Dotación general.',
+            'Mantiene sin cambios los valores, cálculos y datos históricos de dotación.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.429' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',
