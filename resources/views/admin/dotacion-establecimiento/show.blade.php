@@ -83,6 +83,16 @@
         .dotacion-pill-tabs .nav-link { border-radius: .75rem; font-weight: 700; color: #0b4aa2; }
         .dotacion-pill-tabs .nav-link.active { background: #0d6efd; color: #fff; box-shadow: 0 8px 18px rgba(13, 110, 253, .22); }
         .dotacion-badge-soft { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+        .dotacion-collapse-toggle { background: rgba(255, 255, 255, .88); border: 1px solid #dbe5f2; color: #334155; white-space: nowrap; }
+        .dotacion-collapse-toggle:hover, .dotacion-collapse-toggle:focus-visible { background: #fff; border-color: #9db7dc; color: #0b4aa2; }
+        .dotacion-collapse-toggle .bi { transition: transform .2s ease; }
+        .dotacion-collapse-toggle .dotacion-collapse-show { display: none; }
+        .dotacion-collapse-toggle[aria-expanded="false"] .bi { transform: rotate(180deg); }
+        .dotacion-collapse-toggle[aria-expanded="false"] .dotacion-collapse-hide { display: none; }
+        .dotacion-collapse-toggle[aria-expanded="false"] .dotacion-collapse-show { display: inline; }
+        @media (prefers-reduced-motion: reduce) {
+            .dotacion-collapse-toggle .bi { transition: none; }
+        }
     </style>
 
     <div class="dotacion-hero p-4 p-lg-5 mb-4">
@@ -198,57 +208,75 @@
         <div class="col-12">
             <div class="card dotacion-kpi dotacion-breakdown border-0">
                 <div class="card-body">
-                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
                         <div>
-                            <div class="text-muted small fw-semibold">Desglose contrato bloque dotación</div>
+                            <div class="text-muted small fw-semibold">Desglose de horas de contrato de funciones directivas, técnico pedagógicas, planes y Otras funciones</div>
                             <div class="small text-muted">Separa las horas normativas de las declaradas. La cobertura normativa se muestra como horas asignadas / horas requeridas.</div>
                         </div>
-                        <div class="text-end">
-                            <div class="small text-muted">Total bloque</div>
-                            <div class="fs-4 fw-bold text-warning">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</div>
-                            <div class="small text-muted">Normativas {{ $fmt($horasBloqueNormativas) }} · Declaradas {{ $fmt($horasBloqueDeclaradas) }}</div>
+                        <div class="d-flex align-items-center justify-content-end gap-3 flex-wrap ms-auto">
+                            <div class="text-end">
+                                <div class="small text-muted">Total bloque</div>
+                                <div class="fs-4 fw-bold text-warning">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</div>
+                                <div class="small text-muted">Normativas {{ $fmt($horasBloqueNormativas) }} · Declaradas {{ $fmt($horasBloqueDeclaradas) }}</div>
+                            </div>
+                            <button
+                                class="btn btn-sm rounded-pill dotacion-collapse-toggle"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#dotacion-funciones-collapse"
+                                aria-expanded="true"
+                                aria-controls="dotacion-funciones-collapse"
+                            >
+                                <span class="dotacion-collapse-hide">Ocultar detalle</span>
+                                <span class="dotacion-collapse-show">Mostrar detalle</span>
+                                <i class="bi bi-chevron-up ms-1" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                        <div class="small fw-bold text-uppercase text-muted">Horas normativas</div>
-                        <span class="badge rounded-pill text-bg-warning">Total {{ $fmt($horasBloqueNormativas) }}</span>
-                    </div>
-                    <div class="row g-2">
-                        @foreach ($desgloseNormativoItems as $item)
-                            <div class="col-lg-4 col-md-6">
-                                <div class="dotacion-breakdown-item p-3">
-                                    <div class="d-flex align-items-start justify-content-between gap-2">
-                                        <div>
-                                            <div class="small text-muted fw-semibold">{{ $item['label'] }}</div>
-                                            <div class="fs-5 fw-bold text-{{ $item['tone'] }}">{{ $fmt($item['assigned']) }} / {{ $fmt($item['value']) }}</div>
-                                            <div class="small text-muted">Asignadas / requeridas</div>
-                                        </div>
-                                        <span class="kpi-icon text-{{ $item['tone'] }}"><i class="bi {{ $item['icon'] }}"></i></span>
-                                    </div>
-                                </div>
+                    <div id="dotacion-funciones-collapse" class="collapse show">
+                        <div class="pt-3 mt-3 border-top">
+                            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                <div class="small fw-bold text-uppercase text-muted">Horas normativas</div>
+                                <span class="badge rounded-pill text-bg-warning">Total {{ $fmt($horasBloqueNormativas) }}</span>
                             </div>
-                        @endforeach
-                    </div>
-                    <hr class="my-3">
-                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                        <div class="small fw-bold text-uppercase text-muted">Horas declaradas por el establecimiento</div>
-                        <span class="badge rounded-pill text-bg-secondary">Asignadas / declaradas: {{ $fmt($horasBloqueDeclaradasAsignadas) }} / {{ $fmt($horasBloqueDeclaradas) }}</span>
-                    </div>
-                    <div class="row g-2">
-                        @foreach ($desgloseDeclaradoItems as $item)
-                            <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
-                                <div class="dotacion-breakdown-item p-3">
-                                    <div class="d-flex align-items-start justify-content-between gap-2">
-                                        <div>
-                                            <div class="small text-muted fw-semibold">{{ $item['label'] }}</div>
-                                            <div class="fs-5 fw-bold text-{{ $item['tone'] }}">{{ $fmt($item['assigned']) }} / {{ $fmt($item['value']) }}</div>
-                                            <div class="small text-muted">Asignadas / declaradas</div>
+                            <div class="row g-2">
+                                @foreach ($desgloseNormativoItems as $item)
+                                    <div class="col-lg-4 col-md-6">
+                                        <div class="dotacion-breakdown-item p-3">
+                                            <div class="d-flex align-items-start justify-content-between gap-2">
+                                                <div>
+                                                    <div class="small text-muted fw-semibold">{{ $item['label'] }}</div>
+                                                    <div class="fs-5 fw-bold text-{{ $item['tone'] }}">{{ $fmt($item['assigned']) }} / {{ $fmt($item['value']) }}</div>
+                                                    <div class="small text-muted">Asignadas / requeridas</div>
+                                                </div>
+                                                <span class="kpi-icon text-{{ $item['tone'] }}"><i class="bi {{ $item['icon'] }}"></i></span>
+                                            </div>
                                         </div>
-                                        <span class="kpi-icon text-{{ $item['tone'] }}"><i class="bi {{ $item['icon'] }}"></i></span>
                                     </div>
-                                </div>
+                                @endforeach
                             </div>
-                        @endforeach
+                            <hr class="my-3">
+                            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                <div class="small fw-bold text-uppercase text-muted">Horas declaradas por el establecimiento</div>
+                                <span class="badge rounded-pill text-bg-secondary">Asignadas / declaradas: {{ $fmt($horasBloqueDeclaradasAsignadas) }} / {{ $fmt($horasBloqueDeclaradas) }}</span>
+                            </div>
+                            <div class="row g-2">
+                                @foreach ($desgloseDeclaradoItems as $item)
+                                    <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
+                                        <div class="dotacion-breakdown-item p-3">
+                                            <div class="d-flex align-items-start justify-content-between gap-2">
+                                                <div>
+                                                    <div class="small text-muted fw-semibold">{{ $item['label'] }}</div>
+                                                    <div class="fs-5 fw-bold text-{{ $item['tone'] }}">{{ $fmt($item['assigned']) }} / {{ $fmt($item['value']) }}</div>
+                                                    <div class="small text-muted">Asignadas / declaradas</div>
+                                                </div>
+                                                <span class="kpi-icon text-{{ $item['tone'] }}"><i class="bi {{ $item['icon'] }}"></i></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -256,29 +284,45 @@
         <div class="col-12">
             <div class="card dotacion-kpi border-0 bg-info-subtle">
                 <div class="card-body">
-                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
                         <div>
                             <div class="text-muted small fw-semibold">Horas de contrato PIE necesarias</div>
                             <div class="small text-muted">Horas automáticas normativas separadas del contrato bloque dotación.</div>
                         </div>
-                        <div class="text-end">
-                            <div class="small text-muted">Asignadas / necesarias</div>
-                            <div class="fs-4 fw-bold text-info">{{ $fmt($horasContratoPieNecesariasAsignadas) }} / {{ $fmt($horasContratoPieNecesarias) }}</div>
+                        <div class="d-flex align-items-center justify-content-end gap-3 flex-wrap ms-auto">
+                            <div class="text-end">
+                                <div class="small text-muted">Asignadas / necesarias</div>
+                                <div class="fs-4 fw-bold text-info">{{ $fmt($horasContratoPieNecesariasAsignadas) }} / {{ $fmt($horasContratoPieNecesarias) }}</div>
+                            </div>
+                            <button
+                                class="btn btn-sm rounded-pill dotacion-collapse-toggle"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#dotacion-pie-necesarias-collapse"
+                                aria-expanded="true"
+                                aria-controls="dotacion-pie-necesarias-collapse"
+                            >
+                                <span class="dotacion-collapse-hide">Ocultar detalle</span>
+                                <span class="dotacion-collapse-show">Mostrar detalle</span>
+                                <i class="bi bi-chevron-up ms-1" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <div class="dotacion-breakdown-item p-3">
-                                <div class="small text-muted fw-semibold">Coordinador(a) PIE</div>
-                                <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</div>
-                                <div class="small text-muted">Asignadas / necesarias</div>
+                    <div id="dotacion-pie-necesarias-collapse" class="collapse show">
+                        <div class="row g-2 pt-3 mt-3 border-top">
+                            <div class="col-md-6">
+                                <div class="dotacion-breakdown-item p-3">
+                                    <div class="small text-muted fw-semibold">Coordinador(a) PIE</div>
+                                    <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</div>
+                                    <div class="small text-muted">Asignadas / necesarias</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="dotacion-breakdown-item p-3">
-                                <div class="small text-muted fw-semibold">Educadoras diferenciales PIE</div>
-                                <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</div>
-                                <div class="small text-muted">Asignadas / necesarias</div>
+                            <div class="col-md-6">
+                                <div class="dotacion-breakdown-item p-3">
+                                    <div class="small text-muted fw-semibold">Educadoras diferenciales PIE</div>
+                                    <div class="fs-5 fw-bold text-info">{{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['educadoras_diferenciales'] ?? 0) }}</div>
+                                    <div class="small text-muted">Asignadas / necesarias</div>
+                                </div>
                             </div>
                         </div>
                     </div>
