@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.8.24.431' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Paneles desplegables en el resumen de dotación',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+        ],
+        'changes' => [
+            'Convierte el desglose de funciones y el bloque de horas de contrato PIE necesarias en paneles colapsables independientes, abiertos inicialmente.',
+            'Mantiene visibles los títulos y totales cuando se oculta el detalle de cada panel.',
+            'Agrega controles accesibles para mostrar u ocultar los detalles, con indicador visual y compatibilidad con movimiento reducido.',
+            'Renombra el primer panel como Desglose de horas de contrato de funciones directivas, técnico pedagógicas, planes y Otras funciones.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.430' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',
