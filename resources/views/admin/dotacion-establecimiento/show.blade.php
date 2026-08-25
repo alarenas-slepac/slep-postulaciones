@@ -220,11 +220,11 @@
                                 <div class="small text-muted">Normativas {{ $fmt($horasBloqueNormativas) }} · Declaradas {{ $fmt($horasBloqueDeclaradas) }}</div>
                             </div>
                             <button
-                                class="btn btn-sm rounded-pill dotacion-collapse-toggle"
+                                class="btn btn-sm rounded-pill dotacion-collapse-toggle collapsed"
                                 type="button"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#dotacion-funciones-collapse"
-                                aria-expanded="true"
+                                aria-expanded="false"
                                 aria-controls="dotacion-funciones-collapse"
                             >
                                 <span class="dotacion-collapse-hide">Ocultar detalle</span>
@@ -233,7 +233,7 @@
                             </button>
                         </div>
                     </div>
-                    <div id="dotacion-funciones-collapse" class="collapse show">
+                    <div id="dotacion-funciones-collapse" class="collapse">
                         <div class="pt-3 mt-3 border-top">
                             <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
                                 <div class="small fw-bold text-uppercase text-muted">Horas normativas</div>
@@ -295,11 +295,11 @@
                                 <div class="fs-4 fw-bold text-info">{{ $fmt($horasContratoPieNecesariasAsignadas) }} / {{ $fmt($horasContratoPieNecesarias) }}</div>
                             </div>
                             <button
-                                class="btn btn-sm rounded-pill dotacion-collapse-toggle"
+                                class="btn btn-sm rounded-pill dotacion-collapse-toggle collapsed"
                                 type="button"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#dotacion-pie-necesarias-collapse"
-                                aria-expanded="true"
+                                aria-expanded="false"
                                 aria-controls="dotacion-pie-necesarias-collapse"
                             >
                                 <span class="dotacion-collapse-hide">Ocultar detalle</span>
@@ -308,7 +308,7 @@
                             </button>
                         </div>
                     </div>
-                    <div id="dotacion-pie-necesarias-collapse" class="collapse show">
+                    <div id="dotacion-pie-necesarias-collapse" class="collapse">
                         <div class="row g-2 pt-3 mt-3 border-top">
                             <div class="col-md-6">
                                 <div class="dotacion-breakdown-item p-3">

@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.8.24.432' => [
+        'date' => '2026-08-24',
+        'module' => 'Dotación',
+        'title' => 'Desgloses contraídos al abrir el resumen de dotación',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+        ],
+        'changes' => [
+            'Muestra inicialmente contraído el desglose de horas de contrato de funciones, manteniendo visibles su título y total.',
+            'Muestra inicialmente contraído el detalle de horas de contrato PIE necesarias, manteniendo visible su resumen.',
+            'Sincroniza el texto Mostrar detalle, el indicador visual y los atributos accesibles con el estado contraído inicial.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP', 'Directivo de establecimiento'],
+    ],
     '2026.8.24.431' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',
