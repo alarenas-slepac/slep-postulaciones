@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.8.26.437' => [
+        'date' => '2026-08-26',
+        'module' => 'Dotación',
+        'title' => 'Sobredotación real unificada en vistas e informes',
+        'files' => [
+            'app/Exports/DotacionSobredotacionEstablecimientosExport.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+        ],
+        'changes' => [
+            'Usa las horas contractuales realmente sin asignación como cifra de sobredotación de Dotación General en la vista web y el PDF.',
+            'Mantiene la brecha estructural como indicador separado y muestra únicamente su resultado numérico.',
+            'Elimina las fórmulas y la conciliación explicativa de ambos indicadores en las vistas y simplifica el resumen territorial Excel.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.26.436' => [
         'date' => '2026-08-26',
         'module' => 'Dotación',

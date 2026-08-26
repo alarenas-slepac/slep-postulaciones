@@ -79,6 +79,7 @@
     $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
     $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0) + $horasContratoPieNecesarias));
     $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas + $horasBloqueDeclaradas) - $horasContratoAula));
+    $horasSobredotacionGeneral = (float) data_get($sobredotacion ?? [], 'aula.resumen.horas_sobredotacion_total', max(0, -$brechaDotacionGeneral));
     $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));
     $brechaContratoFinal = (float) ($resumen['brecha_contrato_final'] ?? ($horasContratoRequeridas - $horasContratoActuales));
     $resultadoBrecha = static function (float $valor) use ($fmt): array {
@@ -92,7 +93,10 @@
 
         return ['label' => 'Dotación cuadrada', 'value' => '0', 'badge' => 'badge-blue', 'text' => 'primary'];
     };
-    $resultadoGeneral = $resultadoBrecha($brechaDotacionGeneral);
+    $resultadoGeneral = $horasSobredotacionGeneral > 0.01
+        ? $resultadoBrecha(-$horasSobredotacionGeneral)
+        : $resultadoBrecha(max(0, $brechaDotacionGeneral));
+    $resultadoEstructuralGeneral = $resultadoBrecha($brechaDotacionGeneral);
     $resultadoPie = $resultadoBrecha($brechaDotacionPie);
     $resultadoFinal = $resultadoBrecha($brechaContratoFinal);
     $horasAulaAsignadas = (float) ($resumen['horas_aula_asignadas'] ?? $resumen['horas_aula_docentes'] ?? 0);
@@ -231,8 +235,13 @@
     <tbody>
         <tr>
             <td><strong>Dotación general</strong></td>
-            <td>(Contrato plan + trabajo colaborativo PIE + bloque normativo + bloque declarado) − contrato aula.<br><span class="muted">({{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }} + {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }} + {{ $fmt($horasBloqueNormativas) }} + {{ $fmt($horasBloqueDeclaradas) }}) − {{ $fmt($horasContratoAula) }}</span></td>
+            <td></td>
             <td class="text-right {{ $resultadoGeneral['text'] }}">{{ $resultadoGeneral['value'] }} - {{ $resultadoGeneral['label'] }}</td>
+        </tr>
+        <tr>
+            <td><strong>Brecha estructural de Dotación General</strong></td>
+            <td></td>
+            <td class="text-right {{ $resultadoEstructuralGeneral['text'] }}">{{ $resultadoEstructuralGeneral['value'] }}</td>
         </tr>
         <tr>
             <td><strong>Dotación PIE</strong></td>

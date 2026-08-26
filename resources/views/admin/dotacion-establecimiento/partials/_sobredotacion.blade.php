@@ -13,10 +13,6 @@
         : ($brechaEstructural > 0.01
             ? ['label' => 'Horas estructuralmente necesarias', 'value' => '+'.$fmt($brechaEstructural), 'class' => 'alert-success']
             : ['label' => 'Dotación estructural cuadrada', 'value' => '0', 'class' => 'alert-primary']);
-    $horasSobredotacionEstructural = (float) ($sobredotacionResumen['horas_sobredotacion_estructural'] ?? 0);
-    $horasContratoSinAsignacion = (float) ($sobredotacionResumen['horas_sobredotacion_total'] ?? 0);
-    $diferenciaIndicadores = (float) ($sobredotacionResumen['horas_diferencia_indicadores'] ?? ($horasContratoSinAsignacion - $horasSobredotacionEstructural));
-    $operadorConciliacion = $diferenciaIndicadores >= 0 ? '+' : '−';
 @endphp
 
 <div class="card dotacion-section mb-4">
@@ -47,20 +43,7 @@
         @if ($esAula)
             <div class="alert {{ $resultadoEstructural['class'] }} border-0 rounded-4">
                 <div class="fw-bold mb-1">Brecha estructural de Dotación General</div>
-                <div>(Contrato plan + trabajo colaborativo PIE + bloque normativo + bloque declarado) − contrato Aula.</div>
-                <div class="fw-semibold mt-1">({{ $fmt($formula['contrato_plan_pie'] ?? 0) }} + {{ $fmt($formula['bloque_normativo'] ?? 0) }} + {{ $fmt($formula['bloque_declarado'] ?? 0) }}) − {{ $fmt($formula['contrato_aula'] ?? 0) }}</div>
-                <div class="fs-4 fw-bold mt-2">{{ $resultadoEstructural['label'] }}: {{ $resultadoEstructural['value'] }}</div>
-                <div class="small mt-1">Este indicador institucional se presenta como referencia y no reemplaza el cálculo factual de horas sin asignación por docente.</div>
-            </div>
-
-            <div class="alert alert-light border rounded-4">
-                <div class="fw-bold mb-1"><i class="bi bi-arrow-left-right"></i> Conciliación de indicadores</div>
-                <div class="fw-semibold">
-                    Sobredotación estructural {{ $fmt($horasSobredotacionEstructural) }}
-                    {{ $operadorConciliacion }} diferencia por cobertura y distribución individual {{ $fmt(abs($diferenciaIndicadores)) }}
-                    = contrato sin asignación {{ $fmt($horasContratoSinAsignacion) }}.
-                </div>
-                <div class="small text-muted mt-1">La brecha estructural compara contrato con necesidades; el contrato sin asignación compara las horas de cada docente con sus asignaciones registradas.</div>
+                <div class="fs-4 fw-bold">{{ $resultadoEstructural['value'] }}</div>
             </div>
 
             <div class="row g-3">

@@ -21,6 +21,7 @@
         $horasBloqueDeclaradas = (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? $desgloseContratoBloque['total_declaradas'] ?? 0);
         $horasBloqueDeclaradasAsignadas = (float) ($desgloseContratoBloque['total_declaradas_asignadas'] ?? 0);
         $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas + $horasBloqueDeclaradas) - $horasContratoAula));
+        $horasSobredotacionGeneral = (float) data_get($sobredotacion ?? [], 'aula.resumen.horas_sobredotacion_total', max(0, -$brechaDotacionGeneral));
         $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));
         $brechaContratoFinal = (float) ($resumen['brecha_contrato_final'] ?? ($horasContratoRequeridas - $horasContratoActuales));
         $resultadoBrecha = static function (float $valor) use ($fmt): array {
@@ -34,7 +35,9 @@
 
             return ['label' => 'Dotación cuadrada', 'value' => '0', 'tone' => 'primary', 'icon' => 'bi-check-circle'];
         };
-        $resultadoGeneral = $resultadoBrecha($brechaDotacionGeneral);
+        $resultadoGeneral = $horasSobredotacionGeneral > 0.01
+            ? $resultadoBrecha(-$horasSobredotacionGeneral)
+            : $resultadoBrecha(max(0, $brechaDotacionGeneral));
         $resultadoPie = $resultadoBrecha($brechaDotacionPie);
         $resultadoFinal = $resultadoBrecha($brechaContratoFinal);
         $desgloseNormativoItems = [
@@ -165,10 +168,6 @@
                                 <span class="kpi-icon text-{{ $resultadoGeneral['tone'] }}"><i class="bi {{ $resultadoGeneral['icon'] }}"></i></span>
                             </div>
                             <div class="fs-2 fw-bold text-{{ $resultadoGeneral['tone'] }}">{{ $resultadoGeneral['value'] }}</div>
-                            <div class="small text-muted mt-1">
-                                (Contrato plan + trabajo colaborativo PIE + funciones directivas / técnico pedagógicas y planes normativos + otras funciones no normativas) − contrato aula.<br>
-                                <span class="fw-semibold">({{ $fmt($resumen['horas_plan_contrato_equivalente'] ?? 0) }} + {{ $fmt($resumen['trabajo_colaborativo_pie'] ?? 0) }} + {{ $fmt($horasBloqueNormativas) }} + {{ $fmt($horasBloqueDeclaradas) }}) − {{ $fmt($horasContratoAula) }}</span>
-                            </div>
                         </div>
                     </div>
                 </div>

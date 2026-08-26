@@ -56,6 +56,13 @@ class DotacionSobredotacionEstablecimientosExportTest extends TestCase
         $this->assertContains('Coordinación de convivencia', $values);
         $this->assertContains('Docente mixto ajustable', $values);
         $this->assertContains('Educadora diferencial', $values);
+        $this->assertNotContains('Fórmula', $values);
+
+        $dotacionGeneralRow = collect($sheetRows)->first(fn (array $row) => ($row[0] ?? null) === 'Dotación general');
+        $brechaEstructuralRow = collect($sheetRows)->first(fn (array $row) => ($row[0] ?? null) === 'Brecha estructural');
+        $this->assertSame('Horas de sobredotación', $dotacionGeneralRow[1] ?? null);
+        $this->assertSame(28.0, (float) ($dotacionGeneralRow[3] ?? 0));
+        $this->assertSame(22.0, (float) ($brechaEstructuralRow[3] ?? 0));
 
         $ajusteHeader = collect($sheetRows)->search(fn (array $row) => in_array('Total declarado asignado', $row, true));
         $this->assertIsInt($ajusteHeader);
@@ -178,7 +185,7 @@ class DotacionSobredotacionEstablecimientosExportTest extends TestCase
                 'horas_contrato_pie' => 30,
             ],
         ], [
-            'contrato_plan_mas_trabajo_colaborativo_pie' => 46,
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 52,
             'horas_dotacion_funciones_normativas' => 0,
             'horas_contrato_docentes_aula' => 88,
             'horas_dotacion_funciones_declaradas' => 14,
