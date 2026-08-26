@@ -12,6 +12,7 @@ use App\Support\ModuleRegistry;
 use App\Support\SlepUiRegistry;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -43,6 +44,18 @@ class DescuentosCgrModuleTest extends TestCase
             $table->string('nombre');
             $table->unsignedSmallInteger('anio');
             $table->unsignedTinyInteger('mes');
+            $table->timestamps();
+        });
+
+        Schema::dropIfExists('funcionarios_ac_autorizados');
+        Schema::create('funcionarios_ac_autorizados', function (Blueprint $table) {
+            $table->id();
+            $table->string('periodo_nomina', 20)->nullable();
+            $table->string('run_normalizado', 30)->nullable();
+            $table->string('rut_normalizado', 30)->nullable();
+            $table->string('nombres', 180)->nullable();
+            $table->string('apellido_paterno', 120)->nullable();
+            $table->string('apellido_materno', 120)->nullable();
             $table->timestamps();
         });
 
@@ -90,6 +103,7 @@ class DescuentosCgrModuleTest extends TestCase
     {
         Schema::dropIfExists('descuentos_cgr_documentos_mensuales');
         Schema::dropIfExists('descuentos_cgr');
+        Schema::dropIfExists('funcionarios_ac_autorizados');
         Schema::dropIfExists('reemplazos_personal');
         Schema::dropIfExists('utm_valores');
         parent::tearDown();
@@ -175,6 +189,47 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertSame('12345678-5', $resultado['rut']);
         $this->assertSame('Persona Ejemplo Vigente', $resultado['nombre']);
         $this->assertSame('2026-08', $resultado['periodo']);
+        $this->assertSame('el padrón de reemplazos personal', $resultado['fuente']);
+    }
+
+    public function test_busqueda_prioriza_funcionario_ac_y_admite_run_normalizado_historico(): void
+    {
+        \App\Models\ReemplazoPersonal::create([
+            'rut' => '12345678-5',
+            'nombre' => 'Nombre desde reemplazos personal',
+            'anio' => 2026,
+            'mes' => 8,
+        ]);
+
+        DB::table('funcionarios_ac_autorizados')->insert([
+            'periodo_nomina' => '2026-08',
+            'run_normalizado' => '123456785',
+            'nombres' => '  Persona   Administración ',
+            'apellido_paterno' => ' Central ',
+            'apellido_materno' => ' Autorizada ',
+        ]);
+
+        $resultado = app(ReemplazoPersonalRutService::class)->buscar('12.345.678-5');
+
+        $this->assertSame('12345678-5', $resultado['rut']);
+        $this->assertSame('Persona Administración Central Autorizada', $resultado['nombre']);
+        $this->assertSame('2026-08', $resultado['periodo']);
+        $this->assertSame('funcionarios autorizados de Administración Central', $resultado['fuente']);
+    }
+
+    public function test_busqueda_funcionario_ac_usa_rut_normalizado_del_esquema_actual(): void
+    {
+        DB::table('funcionarios_ac_autorizados')->insert([
+            'rut_normalizado' => '111111111',
+            'nombres' => 'Nombre',
+            'apellido_paterno' => 'Apellido Uno',
+            'apellido_materno' => 'Apellido Dos',
+        ]);
+
+        $resultado = app(ReemplazoPersonalRutService::class)->buscar('11.111.111-1');
+
+        $this->assertSame('Nombre Apellido Uno Apellido Dos', $resultado['nombre']);
+        $this->assertNull($resultado['periodo']);
     }
 
     public function test_rutas_permisos_y_navegacion_del_modulo(): void
