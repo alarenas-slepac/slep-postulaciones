@@ -33,7 +33,11 @@ class DotacionSobredotacionEstablecimientosExport
 
                 return [
                     'establecimiento' => $establecimiento,
-                    'sobredotacion' => DotacionSobredotacionCalculator::build($data['docentes'], $data['resumen']),
+                    'sobredotacion' => DotacionSobredotacionCalculator::build(
+                        $data['docentes'],
+                        $data['resumen'],
+                        data_get($data, 'asignacion.necesidades.funciones', [])
+                    ),
                     'error' => null,
                 ];
             } catch (\Throwable $exception) {
@@ -173,7 +177,7 @@ class DotacionSobredotacionEstablecimientosExport
         $row = $this->writeTable(
             $sheet,
             $row,
-            'Sobredotación Aula sin asignación',
+            'Contrato Aula sin asignación registrada',
             ['RUT', 'Docente', 'Función', 'Tipo contrato', 'Contrato Aula', 'Protegidas', 'Declaradas', 'Total asignado', 'Sin asignación', 'Titular / Planta', 'Contrata', 'Sobreasignadas'],
             collect(data_get($aula, 'items', []))->map(fn (array $item) => [
                 (string) ($item['rut'] ?? ''),
@@ -197,8 +201,8 @@ class DotacionSobredotacionEstablecimientosExport
         $row = $this->writeTable(
             $sheet,
             $row,
-            'Funciones no normativas asignadas (posible ajuste)',
-            ['RUT', 'Docente', 'Función', 'Tipo contrato', 'Contrato Aula', 'Total ajustable', 'Titulares', 'Contrata', 'Sin cobertura', 'Protegidas', 'Sin asignación', 'Sobreasignadas'],
+            'Funciones declaradas asignadas a docentes (revisables)',
+            ['RUT', 'Docente', 'Función', 'Tipo contrato', 'Contrato Aula', 'Total declarado asignado', 'Titulares', 'Contrata', 'Sin cobertura', 'Protegidas', 'Sin asignación', 'Sobreasignadas'],
             $ajustes->map(fn (array $item) => [
                 (string) ($item['rut'] ?? ''),
                 (string) ($item['nombre'] ?? ''),
@@ -275,7 +279,7 @@ class DotacionSobredotacionEstablecimientosExport
     ): void {
         foreach ([
             ['A6:D6', 'Dotación General (brecha estructural)', 'D9EAF7'],
-            ['E6:H6', 'Sobredotación Aula factual', 'FCE4D6'],
+            ['E6:H6', 'Contrato Aula sin asignación', 'FCE4D6'],
             ['I6:L6', 'Dotación PIE', 'DDEBF7'],
         ] as [$range, $title, $color]) {
             $sheet->mergeCells($range);
@@ -301,10 +305,10 @@ class DotacionSobredotacionEstablecimientosExport
         ];
         $aulaRows = [
             ['Contrato Aula individualizado', $this->hours($aula['horas_dotacion_total'] ?? 0), 'Asignaciones protegidas', $this->hours($aula['horas_asignadas_protegidas'] ?? 0)],
-            ['Declaradas ajustables', $this->hours($aula['horas_declaradas_ajustables'] ?? 0), 'Sin asignación', $this->hours($aula['horas_sobredotacion_total'] ?? 0)],
+            ['Declaradas docentes', $this->hours($aula['horas_declaradas_ajustables'] ?? 0), 'Declaradas requeridas', $this->hours($aula['horas_declaradas_requeridas'] ?? $aulaFormula['bloque_declarado'] ?? 0)],
+            ['Declaradas pendientes', $this->hours($aula['horas_declaradas_pendientes'] ?? 0), 'Contrato sin asignación', $this->hours($aula['horas_sobredotacion_total'] ?? 0)],
             ['Sin asignación Titular', $this->hours($aula['horas_sobredotacion_planta'] ?? 0), 'Sin asignación Contrata', $this->hours($aula['horas_sobredotacion_contrata'] ?? 0)],
-            ['Potencial total de ajuste', $this->hours($aula['horas_potencial_ajuste'] ?? 0), 'Docentes identificados', (int) ($aula['docentes_sobredotacion'] ?? 0)],
-            ['Declaradas Titulares', $this->hours($aula['horas_declaradas_titulares'] ?? 0), 'Declaradas Contrata', $this->hours($aula['horas_declaradas_contrata'] ?? 0)],
+            ['Universo sujeto a revisión', $this->hours($aula['horas_universo_revision'] ?? $aula['horas_potencial_ajuste'] ?? 0), 'Diferencia entre indicadores', round((float) ($aula['horas_diferencia_indicadores'] ?? 0), 2)],
             ['Declaradas sin cobertura', $this->hours($aula['horas_declaradas_sin_cobertura'] ?? 0), 'Sobreasignadas', $this->hours($aula['horas_sobreasignadas'] ?? 0)],
         ];
         $pieRows = [

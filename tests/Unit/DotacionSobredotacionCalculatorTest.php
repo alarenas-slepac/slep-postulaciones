@@ -2,8 +2,11 @@
 
 namespace Tests\Unit;
 
+use App\Models\DotacionDocenteAsignacion;
 use App\Models\Establecimiento;
+use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionSobredotacionCalculator;
+use ReflectionMethod;
 use Tests\TestCase;
 
 class DotacionSobredotacionCalculatorTest extends TestCase
@@ -26,6 +29,10 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertSame(24.0, $aula['resumen']['horas_sobredotacion_contrata']);
         $this->assertSame(33.0, $aula['resumen']['horas_potencial_ajuste']);
         $this->assertSame(16.0, $aula['resumen']['horas_sobredotacion_estructural']);
+        $this->assertSame(12.0, $aula['resumen']['horas_declaradas_requeridas']);
+        $this->assertSame(3.0, $aula['resumen']['horas_declaradas_pendientes']);
+        $this->assertSame(8.0, $aula['resumen']['horas_brecha_cobertura']);
+        $this->assertSame(8.0, $aula['resumen']['horas_diferencia_indicadores']);
         $this->assertSame('Docente contrata Aula', $aula['items']->sole()['nombre']);
         $this->assertSame('Docente planta Aula', $aula['ajustes']->sole()['nombre']);
 
@@ -112,6 +119,56 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertSame('Otra función', $ajuste['horas_declaradas_detalle'][0]['tipo_label']);
         $this->assertSame(6.0, $resultado['pie']['resumen']['horas_asignadas_registradas']);
         $this->assertSame(4.0, $resultado['pie']['resumen']['horas_sobredotacion_total']);
+    }
+
+    public function test_clasifica_como_declarada_una_asignacion_historica_segun_su_necesidad_vigente(): void
+    {
+        $docente = $this->docente('11111111-1', 'Docente histórico', 44, 44, 0, 0, 0, 0, true);
+        unset($docente['horas_asignadas_protegidas'], $docente['horas_declaradas_ajustables']);
+        $docente['asignaciones'] = [[
+            'tipo_asignacion' => 'funcion_tecnico_pedagogica',
+            'subtipo_asignacion' => 'tecnico_pedagogica',
+            'necesidad_key' => 'funcion:declarada-vigente',
+            'dotacion_funcion_id' => null,
+            'horas_contrato' => 12,
+        ]];
+
+        $resultado = DotacionSobredotacionCalculator::build([$docente], [
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 0,
+            'horas_dotacion_funciones_normativas' => 0,
+            'horas_contrato_docentes_aula' => 44,
+            'horas_dotacion_funciones_declaradas' => 12,
+            'horas_contrato_pie_necesarias' => 0,
+            'horas_contrato_docente_pie' => 0,
+        ], [[
+            'key' => 'funcion:declarada-vigente',
+            'dotacion_funcion_id' => 25,
+        ]]);
+
+        $aula = $resultado['aula'];
+        $this->assertSame(0.0, $aula['resumen']['horas_asignadas_protegidas']);
+        $this->assertSame(12.0, $aula['resumen']['horas_declaradas_ajustables']);
+        $this->assertSame(12.0, collect($aula['ajustes']->sole()['horas_declaradas_detalle'])->sum('horas'));
+        $this->assertSame(32.0, $aula['resumen']['horas_sobredotacion_total']);
+    }
+
+    public function test_concilia_necesidad_declarada_por_identificador_estable_si_la_clave_historica_cambio(): void
+    {
+        $asignacion = new DotacionDocenteAsignacion([
+            'necesidad_key' => 'funcion:clave-anterior',
+            'dotacion_funcion_id' => 25,
+            'horas_contrato' => 12,
+        ]);
+        $metodo = new ReflectionMethod(DotacionAsignacionCalculator::class, 'needRow');
+
+        $necesidad = $metodo->invoke(null, 'funcion:clave-vigente', 'otra_funcion', 'otras_funciones_docentes', [
+            'horas_contrato' => 12,
+            'dotacion_funcion_id' => 25,
+        ], collect([$asignacion]));
+
+        $this->assertSame(12.0, $necesidad['horas_contrato_asignadas']);
+        $this->assertSame(0.0, $necesidad['horas_contrato_pendientes']);
+        $this->assertSame('cubierta', $necesidad['estado']['key']);
     }
 
     public function test_desglosa_horas_declaradas_entre_titulares_contrata_y_conceptos(): void
@@ -233,7 +290,10 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         ])->render();
         $this->assertStringContainsString('Horas contrato Aula', $htmlAula);
         $this->assertStringContainsString('Sobredotaci', $htmlAula);
-        $this->assertStringContainsString('Horas de posible ajuste', $htmlAula);
+        $this->assertStringContainsString('Conciliación de indicadores', $htmlAula);
+        $this->assertStringContainsString('Contrato sin asignación registrada', $htmlAula);
+        $this->assertStringContainsString('Funciones declaradas asignadas a docentes (revisables)', $htmlAula);
+        $this->assertStringContainsString('Declaradas docentes / requeridas', $htmlAula);
         $this->assertStringContainsString('Asignaciones protegidas', $htmlAula);
         $this->assertStringContainsString('Horas titulares', $htmlAula);
         $this->assertStringContainsString('Horas Contrata', $htmlAula);
@@ -253,7 +313,7 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertStringContainsString('Horas contrato docente PIE', $htmlPie);
         $this->assertStringContainsString('Necesidad cubierta', $htmlPie);
         $this->assertStringContainsString('Educadora diferencial', $htmlPie);
-        $this->assertStringNotContainsString('Horas de posible ajuste', $htmlPie);
+        $this->assertStringNotContainsString('Funciones declaradas asignadas a docentes (revisables)', $htmlPie);
     }
 
     /** @return array<string, float> */
