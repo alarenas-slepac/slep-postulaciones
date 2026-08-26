@@ -301,13 +301,13 @@ class EstablecimientoCursoPieController extends Controller
         $anioDefault = (int) $data['anio'];
         $user = $request->user();
         $activeRole = $this->activeRole($request);
-        $created = 0;
         $updated = 0;
         $skipped = 0;
         $read = 0;
         $errors = [];
+        $processedItems = [];
 
-        DB::transaction(function () use ($rows, $header, $anioDefault, $user, $activeRole, &$created, &$updated, &$skipped, &$read, &$errors) {
+        DB::transaction(function () use ($rows, $header, $anioDefault, $user, $activeRole, &$updated, &$skipped, &$read, &$errors, &$processedItems) {
             foreach (array_slice($rows, 1) as $offset => $row) {
                 $line = $offset + 2;
                 if ($this->rowIsEmpty($row)) {
@@ -323,18 +323,31 @@ class EstablecimientoCursoPieController extends Controller
                 $neep = $this->normalizeInteger($row[$header['neep']] ?? 0);
                 $observacion = array_key_exists('observacion', $header) ? trim((string) ($row[$header['observacion']] ?? '')) : null;
 
-                if (! $rbd) { $skipped++; $errors[] = "Fila {$line}: RBD inválido."; continue; }
-                if ($cursoRaw === '') { $skipped++; $errors[] = "Fila {$line}: curso vacío."; continue; }
-                if ($neet === null || $neet < 0) { $skipped++; $errors[] = "Fila {$line}: NEET debe ser mayor o igual a 0."; continue; }
-                if ($neep === null || $neep < 0) { $skipped++; $errors[] = "Fila {$line}: NEEP debe ser mayor o igual a 0."; continue; }
+                $reject = function (string $motivo) use (&$skipped, &$errors, $line, $rbd, $cursoRaw, $letra, $anio): void {
+                    $skipped++;
+                    $errors[] = [
+                        'fila' => $line,
+                        'rbd' => $rbd,
+                        'curso' => $cursoRaw,
+                        'letra' => $letra,
+                        'anio' => $anio,
+                        'motivo' => $motivo,
+                    ];
+                };
+
+                if ($rbd === null || $rbd <= 0) { $reject('RBD inválido.'); continue; }
+                if ($cursoRaw === '') { $reject('El curso está vacío.'); continue; }
+                if ($anio < 2020 || $anio > 2100) { $reject('El año debe estar entre 2020 y 2100.'); continue; }
+                if ($neet === null || $neet < 0) { $reject('NEET debe ser mayor o igual a 0.'); continue; }
+                if ($neep === null || $neep < 0) { $reject('NEEP debe ser mayor o igual a 0.'); continue; }
 
                 $curso = $this->findCursoByName($cursoRaw);
-                if (! $curso) { $skipped++; $errors[] = "Fila {$line}: curso '{$cursoRaw}' no existe en el mantenedor Cursos."; continue; }
+                if (! $curso) { $reject("El curso '{$cursoRaw}' no existe en el mantenedor Cursos."); continue; }
 
                 $establecimiento = $this->findEstablecimientoByRbd($rbd);
-                if (! $establecimiento) { $skipped++; $errors[] = "Fila {$line}: RBD {$rbd} no existe en establecimientos."; continue; }
+                if (! $establecimiento) { $reject("El RBD {$rbd} no existe en establecimientos."); continue; }
                 if ($this->isEstablecimientoRole($activeRole) && (int) ($user->establecimiento_id ?? 0) !== (int) $establecimiento->id) {
-                    $skipped++; $errors[] = "Fila {$line}: no puedes cargar datos para un establecimiento distinto al asociado a tu usuario."; continue;
+                    $reject('No puedes actualizar datos de un establecimiento distinto al asociado a tu usuario.'); continue;
                 }
 
                 $establecimientoCurso = EstablecimientoCurso::query()
@@ -352,11 +365,24 @@ class EstablecimientoCursoPieController extends Controller
                     ->first();
 
                 if (! $establecimientoCurso) {
-                    $skipped++; $errors[] = "Fila {$line}: no se encontró curso/sección activo para RBD {$rbd}, curso {$cursoRaw}, letra ".($letra ?: 'sin letra').", año {$anio}."; continue;
+                    $reject('No se encontró un curso/sección activo que coincida con el RBD, curso, letra y año indicados.'); continue;
                 }
 
                 if (($neet + $neep) > (int) $establecimientoCurso->matricula) {
-                    $skipped++; $errors[] = "Fila {$line}: NEET + NEEP supera la matrícula del curso/sección ({$establecimientoCurso->matricula})."; continue;
+                    $reject("NEET + NEEP supera la matrícula del curso/sección ({$establecimientoCurso->matricula})."); continue;
+                }
+
+                $item = EstablecimientoCursoPie::query()
+                    ->where('establecimiento_curso_id', $establecimientoCurso->id)
+                    ->where('anio', $anio)
+                    ->first();
+
+                if (! $item) {
+                    $reject('No existe un registro PIE para este curso/sección. Esta carga solo actualiza registros existentes.'); continue;
+                }
+
+                if (isset($processedItems[$item->id])) {
+                    $reject("El mismo registro PIE ya fue procesado en la fila {$processedItems[$item->id]}."); continue;
                 }
 
                 $calculo = PieHorasCalculator::calculate($establecimientoCurso, $neet, $neep);
@@ -372,31 +398,25 @@ class EstablecimientoCursoPieController extends Controller
                     'necesidades_permanentes' => $neep,
                     'total_pie' => $neet + $neep,
                     'observacion' => $observacion,
-                    'estado' => $this->isEstablecimientoRole($activeRole) ? 'borrador' : 'validado',
                     'updated_by' => $user?->id,
                 ];
                 $payload = array_merge($payload, $calculo);
 
-                $item = EstablecimientoCursoPie::query()
-                    ->where('establecimiento_curso_id', $establecimientoCurso->id)
-                    ->where('anio', $anio)
-                    ->first();
-
-                if ($item) {
-                    $item->update($payload);
-                    $updated++;
-                } else {
-                    $payload['created_by'] = $user?->id;
-                    EstablecimientoCursoPie::create($payload);
-                    $created++;
-                }
+                $item->update($payload);
+                $processedItems[$item->id] = $line;
+                $updated++;
             }
         });
 
-        return redirect()
-            ->route('admin.establecimiento-curso-pie.index', ['anio' => $anioDefault])
-            ->with('status', "Carga masiva PIE procesada. Filas leídas: {$read}. Creados: {$created}. Actualizados: {$updated}. Omitidos: {$skipped}.")
-            ->with('import_errors', array_slice($errors, 0, 150));
+        return view('admin.establecimiento-curso-pie.import', [
+            'importResult' => [
+                'anio' => $anioDefault,
+                'read' => $read,
+                'updated' => $updated,
+                'not_updated' => $skipped,
+                'errors' => $errors,
+            ],
+        ]);
     }
 
     private function authorizePieAccess(Request $request, bool $requiresEdit = false): string
