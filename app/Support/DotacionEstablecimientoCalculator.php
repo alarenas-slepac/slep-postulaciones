@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\AlumnoPrioritarioPorcentaje;
 use App\Models\DeclaracionSostenedor;
+use App\Models\DotacionDocenteAsignacion;
 use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\Establecimiento;
@@ -17,6 +18,8 @@ use Illuminate\Support\Str;
 
 class DotacionEstablecimientoCalculator
 {
+    private const HORAS_LIBRE_DISPOSICION_NT_OTRO_DOCENTE_MAX = 6.0;
+
     /** @var array<string, bool> */
     private static array $schemaTableCache = [];
 
@@ -70,14 +73,17 @@ class DotacionEstablecimientoCalculator
 
         $horasPlanBrutas = (float) ($cursos['totales']['horas'] ?? 0);
         $horasContratoPlanBrutas = (float) ($cursos['totales']['horas_contrato_equivalente'] ?? 0);
+        $horasPlanRefuerzoNt = (float) ($cursos['totales']['horas_plan_refuerzo_ld_otro_docente'] ?? 0);
         $gruposCombinadosActivos = collect(data_get($cursosCombinados, 'grupos', []))
             ->where('activo', true)
             ->values();
         $horasPlanAjustadas = $gruposCombinadosActivos->isEmpty()
             ? $horasPlanBrutas
-            : round((float) $planNeeds->sum(
-                fn ($item) => (float) ($item['horas_plan_requeridas'] ?? 0)
-            ), 2);
+            : round(
+                (float) $planNeeds->sum(fn ($item) => (float) ($item['horas_plan_requeridas'] ?? 0))
+                + $horasPlanRefuerzoNt,
+                2
+            );
 
         $cursoIdsCombinados = $gruposCombinadosActivos
             ->flatMap(fn ($grupo) => collect($grupo['miembros'] ?? [])->pluck('id'))
@@ -88,12 +94,18 @@ class DotacionEstablecimientoCalculator
             ->flatMap(fn ($row) => collect($row['detalles'] ?? []))
             ->filter(fn ($detalle) => $cursoIdsCombinados->contains((int) ($detalle['establecimiento_curso_id'] ?? 0)))
             ->sum(fn ($detalle) => (float) ($detalle['horas_contrato_equivalente_redondeado'] ?? 0));
+        $contratoRefuerzoNtCursosCombinados = collect($cursos['rows'] ?? [])
+            ->flatMap(fn ($row) => collect($row['detalles'] ?? []))
+            ->filter(fn ($detalle) => $cursoIdsCombinados->contains((int) ($detalle['establecimiento_curso_id'] ?? 0)))
+            ->sum(fn ($detalle) => (float) ($detalle['horas_contrato_refuerzo_ld_otro_docente'] ?? 0));
         $contratoGruposCombinados = $gruposCombinadosActivos
             ->sum(fn ($grupo) => (float) data_get($grupo, 'totales.horas_contrato', 0));
         $horasContratoPlanAjustadas = $gruposCombinadosActivos->isEmpty()
             ? $horasContratoPlanBrutas
             : round(
-                max(0.0, $horasContratoPlanBrutas - $contratoCursosReemplazados) + $contratoGruposCombinados,
+                max(0.0, $horasContratoPlanBrutas - $contratoCursosReemplazados)
+                + $contratoGruposCombinados
+                + $contratoRefuerzoNtCursosCombinados,
                 2
             );
 
@@ -254,6 +266,7 @@ class DotacionEstablecimientoCalculator
             ->orderBy('curso_id')
             ->orderBy('letra')
             ->get();
+        $refuerzosLibreDisposicionNt = self::refuerzosLibreDisposicionNt($establecimiento, $anio, $rows);
 
         foreach ($rows as $cursoEstablecimiento) {
             $nivel = self::nivelMeta($cursoEstablecimiento);
@@ -262,9 +275,31 @@ class DotacionEstablecimientoCalculator
 
             $horas = self::horasCurso($cursoEstablecimiento);
             $contratoEquivalente = self::horasContratoEquivalenteCurso($cursoEstablecimiento, (float) ($horas['horas'] ?? 0), $porcentajePrioritarios);
-            $contratoEquivalenteRedondeado = (float) ($contratoEquivalente['horas_contrato_equivalente_redondeado'] ?? 0);
-            if ($contratoEquivalenteRedondeado <= 0 && (float) ($contratoEquivalente['horas_contrato_equivalente'] ?? 0) > 0) {
-                $contratoEquivalenteRedondeado = (float) ceil((float) $contratoEquivalente['horas_contrato_equivalente']);
+            $horasPlanBase = (float) ($horas['horas'] ?? 0);
+            $contratoEquivalenteBase = (float) ($contratoEquivalente['horas_contrato_equivalente_redondeado'] ?? 0);
+            if ($contratoEquivalenteBase <= 0 && (float) ($contratoEquivalente['horas_contrato_equivalente'] ?? 0) > 0) {
+                $contratoEquivalenteBase = (float) ceil((float) $contratoEquivalente['horas_contrato_equivalente']);
+            }
+            $refuerzoLibreDisposicion = $refuerzosLibreDisposicionNt[(int) $cursoEstablecimiento->id] ?? [];
+            $horasPlanRefuerzo = (float) ($refuerzoLibreDisposicion['horas_plan'] ?? 0);
+            $horasContratoRefuerzo = (float) ($refuerzoLibreDisposicion['horas_contrato'] ?? 0);
+            $horasPlanTotal = round($horasPlanBase + $horasPlanRefuerzo, 2);
+            $horasAulaCronologicasTotal = round(
+                (float) ($contratoEquivalente['horas_aula_cronologicas'] ?? 0)
+                + ($horasPlanRefuerzo * 45 / 60),
+                4
+            );
+            $contratoEquivalenteDecimalTotal = round(
+                (float) ($contratoEquivalente['horas_contrato_equivalente'] ?? 0)
+                + $horasContratoRefuerzo,
+                4
+            );
+            $contratoEquivalenteRedondeado = round($contratoEquivalenteBase + $horasContratoRefuerzo, 2);
+            $proporcionLabel = (string) ($contratoEquivalente['proporcion_label'] ?? '—');
+            $origenProporcionLabel = (string) ($contratoEquivalente['origen_proporcion_label'] ?? 'Regla general');
+            if ($horasPlanRefuerzo > 0) {
+                $proporcionLabel .= ' + 65/35 LD otro docente';
+                $origenProporcionLabel .= ' + libre disposición asignada';
             }
             $cursoNeeKey = 'ec_'.$cursoEstablecimiento->id;
             $cursoBaseNeeKey = 'curso_'.$cursoEstablecimiento->curso_id;
@@ -272,31 +307,41 @@ class DotacionEstablecimientoCalculator
             $trabajoColaborativoPie = $tieneNee ? 3.0 : 0.0;
             $base['rows'][$nivelKey]['matricula'] += (int) ($cursoEstablecimiento->matricula ?? 0);
             $base['rows'][$nivelKey]['cursos'] += 1;
-            $base['rows'][$nivelKey]['total_horas'] += $horas['horas'];
+            $base['rows'][$nivelKey]['total_horas'] += $horasPlanTotal;
             // Para dotación contractual no se mantienen decimales: cada curso se redondea hacia arriba.
             $base['rows'][$nivelKey]['total_horas_contrato_equivalente'] += $contratoEquivalenteRedondeado;
             $base['rows'][$nivelKey]['total_trabajo_colaborativo_pie'] += $trabajoColaborativoPie;
             $base['rows'][$nivelKey]['total_contrato_mas_trabajo_colaborativo_pie'] += $contratoEquivalenteRedondeado + $trabajoColaborativoPie;
-            $base['rows'][$nivelKey]['horas_valores'][] = $horas['horas'];
-            $base['rows'][$nivelKey]['proporcion_valores'][] = $contratoEquivalente['proporcion_label'];
-            $base['rows'][$nivelKey]['origen_proporcion_valores'][] = $contratoEquivalente['origen_proporcion_label'] ?? 'Regla general';
-            $base['rows'][$nivelKey]['sin_horas_plan'] += $horas['horas'] > 0 ? 0 : 1;
+            $base['rows'][$nivelKey]['horas_valores'][] = $horasPlanTotal;
+            $base['rows'][$nivelKey]['proporcion_valores'][] = $proporcionLabel;
+            $base['rows'][$nivelKey]['origen_proporcion_valores'][] = $origenProporcionLabel;
+            $base['rows'][$nivelKey]['sin_horas_plan'] += $horasPlanTotal > 0 ? 0 : 1;
+            if ($horasPlanRefuerzo > 0) {
+                $base['rows'][$nivelKey]['cursos_refuerzo_ld_otro_docente'] += 1;
+                $base['rows'][$nivelKey]['horas_plan_refuerzo_ld_otro_docente'] += $horasPlanRefuerzo;
+                $base['rows'][$nivelKey]['horas_contrato_refuerzo_ld_otro_docente'] += $horasContratoRefuerzo;
+            }
             $base['rows'][$nivelKey]['detalles'][] = [
                 'establecimiento_curso_id' => $cursoEstablecimiento->id,
                 'nombre_seccion' => $cursoEstablecimiento->nombre_seccion,
                 'letra' => $cursoEstablecimiento->letra,
                 'matricula' => (int) ($cursoEstablecimiento->matricula ?? 0),
                 'regimen_jec' => $cursoEstablecimiento->regimen_jec,
-                'horas' => $horas['horas'],
-                'horas_aula_cronologicas' => $contratoEquivalente['horas_aula_cronologicas'],
-                'horas_contrato_equivalente' => $contratoEquivalente['horas_contrato_equivalente'],
+                'horas' => $horasPlanTotal,
+                'horas_plan_base' => $horasPlanBase,
+                'horas_plan_refuerzo_ld_otro_docente' => $horasPlanRefuerzo,
+                'horas_aula_cronologicas' => $horasAulaCronologicasTotal,
+                'horas_contrato_equivalente' => $contratoEquivalenteDecimalTotal,
                 'horas_contrato_equivalente_redondeado' => $contratoEquivalenteRedondeado,
+                'horas_contrato_base' => $contratoEquivalenteBase,
+                'horas_contrato_refuerzo_ld_otro_docente' => $horasContratoRefuerzo,
+                'asignaciones_refuerzo_ld_otro_docente' => (int) ($refuerzoLibreDisposicion['asignaciones'] ?? 0),
                 'tiene_nee' => $tieneNee,
                 'trabajo_colaborativo_pie' => $trabajoColaborativoPie,
                 'proporcion_docente' => $contratoEquivalente['proporcion'],
-                'proporcion_docente_label' => $contratoEquivalente['proporcion_label'],
+                'proporcion_docente_label' => $proporcionLabel,
                 'origen_proporcion' => $contratoEquivalente['origen_proporcion'] ?? 'regla_general',
-                'origen_proporcion_label' => $contratoEquivalente['origen_proporcion_label'] ?? 'Regla general',
+                'origen_proporcion_label' => $origenProporcionLabel,
                 'motivo_proporcion' => $contratoEquivalente['motivo'],
                 'fuente_horas' => $horas['fuente'],
             ];
@@ -322,7 +367,7 @@ class DotacionEstablecimientoCalculator
                 ->values()
                 ->all();
 
-            $total = ['matricula' => 0, 'cursos' => 0, 'horas' => 0.0, 'horas_contrato_equivalente' => 0.0, 'trabajo_colaborativo_pie' => 0.0, 'contrato_mas_trabajo_colaborativo_pie' => 0.0, 'sin_horas_plan' => 0];
+            $total = ['matricula' => 0, 'cursos' => 0, 'horas' => 0.0, 'horas_contrato_equivalente' => 0.0, 'trabajo_colaborativo_pie' => 0.0, 'contrato_mas_trabajo_colaborativo_pie' => 0.0, 'sin_horas_plan' => 0, 'cursos_refuerzo_ld_otro_docente' => 0, 'horas_plan_refuerzo_ld_otro_docente' => 0.0, 'horas_contrato_refuerzo_ld_otro_docente' => 0.0];
             foreach ($niveles as $nivelKey) {
                 $row = $base['rows'][$nivelKey] ?? null;
                 if (! $row) {
@@ -335,6 +380,9 @@ class DotacionEstablecimientoCalculator
                 $total['trabajo_colaborativo_pie'] += (float) ($row['total_trabajo_colaborativo_pie'] ?? 0);
                 $total['contrato_mas_trabajo_colaborativo_pie'] += (float) ($row['total_contrato_mas_trabajo_colaborativo_pie'] ?? (($row['total_horas_contrato_equivalente'] ?? 0) + ($row['total_trabajo_colaborativo_pie'] ?? 0)));
                 $total['sin_horas_plan'] += (int) $row['sin_horas_plan'];
+                $total['cursos_refuerzo_ld_otro_docente'] += (int) ($row['cursos_refuerzo_ld_otro_docente'] ?? 0);
+                $total['horas_plan_refuerzo_ld_otro_docente'] += (float) ($row['horas_plan_refuerzo_ld_otro_docente'] ?? 0);
+                $total['horas_contrato_refuerzo_ld_otro_docente'] += (float) ($row['horas_contrato_refuerzo_ld_otro_docente'] ?? 0);
             }
             $base['grupos'][$grupoKey]['niveles'] = $niveles;
             $base['grupos'][$grupoKey]['totales'] = $total;
@@ -353,9 +401,133 @@ class DotacionEstablecimientoCalculator
             'trabajo_colaborativo_pie' => collect($base['grupos'])->sum(fn ($g) => (float) ($g['totales']['trabajo_colaborativo_pie'] ?? 0)),
             'contrato_mas_trabajo_colaborativo_pie' => collect($base['grupos'])->sum(fn ($g) => (float) ($g['totales']['contrato_mas_trabajo_colaborativo_pie'] ?? (($g['totales']['horas_contrato_equivalente'] ?? 0) + ($g['totales']['trabajo_colaborativo_pie'] ?? 0)))),
             'sin_horas_plan' => collect($base['grupos'])->sum(fn ($g) => (int) ($g['totales']['sin_horas_plan'] ?? 0)),
+            'cursos_refuerzo_ld_otro_docente' => collect($base['grupos'])->sum(fn ($g) => (int) ($g['totales']['cursos_refuerzo_ld_otro_docente'] ?? 0)),
+            'horas_plan_refuerzo_ld_otro_docente' => collect($base['grupos'])->sum(fn ($g) => (float) ($g['totales']['horas_plan_refuerzo_ld_otro_docente'] ?? 0)),
+            'horas_contrato_refuerzo_ld_otro_docente' => collect($base['grupos'])->sum(fn ($g) => (float) ($g['totales']['horas_contrato_refuerzo_ld_otro_docente'] ?? 0)),
         ];
 
         return $base;
+    }
+
+    /**
+     * Obtiene el refuerzo real de libre disposición para NT1/NT2 con JEC.
+     *
+     * Solo se consideran asignaciones docentes activas cuyo título no sea
+     * Pedagogía en Educación de Párvulos. Las horas plan se limitan a seis por
+     * curso y su contrato equivalente se obtiene desde la tabla oficial 65/35.
+     *
+     * @return array<int, array{horas_plan: float, horas_contrato: float, asignaciones: int}>
+     */
+    private static function refuerzosLibreDisposicionNt(
+        Establecimiento $establecimiento,
+        int $anio,
+        Collection $cursos
+    ): array {
+        if (! self::schemaHasTable('dotacion_docente_asignaciones')) {
+            return [];
+        }
+
+        $cursoIds = $cursos
+            ->filter(fn ($curso) => $curso instanceof EstablecimientoCurso
+                && DotacionProfesionDocenteResolver::esCursoNt($curso)
+                && self::cursoTieneJec($curso))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+
+        if ($cursoIds->isEmpty()) {
+            return [];
+        }
+
+        $query = DotacionDocenteAsignacion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->where('estado', 'activa')
+            ->where('tipo_asignacion', 'plan_estudio')
+            ->where('subtipo_asignacion', 'libre_disposicion')
+            ->whereIn('establecimiento_curso_id', $cursoIds)
+            ->where('horas_plan_pedagogicas', '>', 0);
+
+        if (self::schemaHasColumn('dotacion_docente_asignaciones', 'estamento_cobertura')) {
+            $query->where(function ($subquery) {
+                $subquery->whereNull('estamento_cobertura')
+                    ->orWhere('estamento_cobertura', 'docente');
+            });
+        }
+
+        if (self::schemaHasTable('declaracion_sostenedores')) {
+            $query->with('declaracionSostenedor');
+        }
+
+        $horasPorCurso = self::horasLibreDisposicionNtOtroDocente($cursos, $query->get());
+
+        return collect($horasPorCurso)
+            ->map(function (array $detalle): array {
+                $conversion = DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula(
+                    DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL,
+                    (float) $detalle['horas_plan']
+                );
+
+                return [
+                    'horas_plan' => (float) $detalle['horas_plan'],
+                    'horas_contrato' => (float) ($conversion['horas_contrato'] ?? 0),
+                    'asignaciones' => (int) $detalle['asignaciones'],
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{horas_plan: float, asignaciones: int}>
+     */
+    private static function horasLibreDisposicionNtOtroDocente(
+        Collection $cursos,
+        Collection $asignaciones
+    ): array {
+        $cursosElegibles = $cursos
+            ->filter(fn ($curso) => $curso instanceof EstablecimientoCurso
+                && DotacionProfesionDocenteResolver::esCursoNt($curso)
+                && self::cursoTieneJec($curso))
+            ->keyBy(fn ($curso) => (int) $curso->id);
+
+        return $asignaciones
+            ->filter(function ($asignacion) use ($cursosElegibles): bool {
+                $cursoId = (int) data_get($asignacion, 'establecimiento_curso_id', 0);
+                if (! $cursosElegibles->has($cursoId)) {
+                    return false;
+                }
+
+                $estamento = trim((string) data_get($asignacion, 'estamento_cobertura', ''));
+                if ($estamento !== '' && $estamento !== 'docente') {
+                    return false;
+                }
+
+                $declaracion = $asignacion instanceof DotacionDocenteAsignacion
+                    && $asignacion->relationLoaded('declaracionSostenedor')
+                        ? $asignacion->getRelation('declaracionSostenedor')
+                        : null;
+                $perfil = DotacionProfesionDocenteResolver::perfilTitulo([
+                    'declaracion' => $declaracion,
+                ]);
+
+                return ! $perfil['es_educacion_parvulos']
+                    && (float) data_get($asignacion, 'horas_plan_pedagogicas', 0) > 0;
+            })
+            ->groupBy(fn ($asignacion) => (int) data_get($asignacion, 'establecimiento_curso_id'))
+            ->map(function (Collection $asignaciones): array {
+                return [
+                    'horas_plan' => min(
+                        self::HORAS_LIBRE_DISPOSICION_NT_OTRO_DOCENTE_MAX,
+                        round((float) $asignaciones->sum(
+                            fn ($asignacion) => (float) data_get($asignacion, 'horas_plan_pedagogicas', 0)
+                        ),
+                        2)
+                    ),
+                    'asignaciones' => $asignaciones->count(),
+                ];
+            })
+            ->all();
     }
 
     public static function bloquesDotacion(Establecimiento $establecimiento, int $anio): array
@@ -1171,7 +1343,7 @@ class DotacionEstablecimientoCalculator
                 'otros' => ['label' => 'Otros niveles', 'niveles' => [], 'order' => 60],
             ],
             'rows' => $rows,
-            'totales' => ['matricula' => 0, 'cursos' => 0, 'horas' => 0.0, 'horas_contrato_equivalente' => 0.0, 'trabajo_colaborativo_pie' => 0.0, 'contrato_mas_trabajo_colaborativo_pie' => 0.0, 'sin_horas_plan' => 0],
+            'totales' => ['matricula' => 0, 'cursos' => 0, 'horas' => 0.0, 'horas_contrato_equivalente' => 0.0, 'trabajo_colaborativo_pie' => 0.0, 'contrato_mas_trabajo_colaborativo_pie' => 0.0, 'sin_horas_plan' => 0, 'cursos_refuerzo_ld_otro_docente' => 0, 'horas_plan_refuerzo_ld_otro_docente' => 0.0, 'horas_contrato_refuerzo_ld_otro_docente' => 0.0],
         ];
     }
 
@@ -1193,6 +1365,9 @@ class DotacionEstablecimientoCalculator
             'proporcion_valores' => [],
             'origen_proporcion_valores' => [],
             'sin_horas_plan' => 0,
+            'cursos_refuerzo_ld_otro_docente' => 0,
+            'horas_plan_refuerzo_ld_otro_docente' => 0.0,
+            'horas_contrato_refuerzo_ld_otro_docente' => 0.0,
             'detalles' => [],
         ];
     }
