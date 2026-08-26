@@ -7,6 +7,18 @@
 @endpush
 
 @section('content')
+@php
+    $nombresDimension = [
+        'administrativo' => 'Administrativo',
+        'compin' => 'Resolución COMPIN',
+        'recuperacion' => 'Recuperación financiera',
+    ];
+    $estadoActualPorDimension = [
+        'administrativo' => $licencia->estado_administrativo_codigo,
+        'compin' => $licencia->estado_compin_codigo,
+        'recuperacion' => $licencia->estado_recuperacion_codigo,
+    ];
+@endphp
 <div class="container-fluid py-4">
     <div class="cf-page-header mb-4">
         <div class="cf-page-header__top">
@@ -19,13 +31,21 @@
                 @if($licencia->archivo_licencia_path)
                     <a href="{{ route('tramites.licencias-medicas.archivo', $licencia) }}" class="cf-btn-secondary"><i class="bi bi-download"></i> Descargar respaldo</a>
                 @endif
-                <a href="{{ route('tramites.licencias-medicas.feriados.index') }}" class="cf-btn-secondary"><i class="bi bi-calendar2-week"></i> Feriados</a>
+                @if($permisos['configuracion'])
+                    <a href="{{ route('tramites.licencias-medicas.feriados.index') }}" class="cf-btn-secondary"><i class="bi bi-calendar2-week"></i> Feriados</a>
+                @endif
                 <a href="{{ route('tramites.licencias-medicas.index') }}" class="cf-btn-outline"><i class="bi bi-arrow-left"></i> Volver</a>
             </div>
         </div>
     </div>
 
     @if(session('success'))<div class="alert alert-success rounded-4 shadow-sm">{{ session('success') }}</div>@endif
+    @if($errors->any())
+        <div class="alert alert-danger rounded-4 shadow-sm">
+            <strong>No fue posible actualizar el estado:</strong>
+            <ul class="mb-0 mt-2">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+        </div>
+    @endif
 
     <div class="row g-4">
         <div class="col-xl-8">
@@ -33,8 +53,7 @@
                 <div class="cf-section-title"><i class="bi bi-clipboard2-pulse"></i> Datos de la licencia</div>
                 <div class="cf-data-grid">
                     <div class="cf-data"><div class="cf-data-label">Folio</div><div class="cf-data-value">{{ $licencia->folio_licencia }}</div></div>
-                    <div class="cf-data"><div class="cf-data-label">Origen</div><div class="cf-data-value"><span class="cf-pill {{ $licencia->origen_ingreso === 'digital_pdf' ? 'is-ok' : 'is-warn' }}">{{ $licencia->origen_ingreso === 'digital_pdf' ? 'Digital PDF' : 'Escaneada/manual' }}</span></div></div>
-                    <div class="cf-data"><div class="cf-data-label">Estado</div><div class="cf-data-value">{{ $licencia->estado_actual }}</div></div>
+                    <div class="cf-data"><div class="cf-data-label">Origen</div><div class="cf-data-value"><span class="cf-pill {{ $licencia->origen_ingreso === 'digital_pdf' ? 'is-ok' : 'is-warn' }}">{{ match($licencia->origen_ingreso) { 'digital_pdf' => 'Digital PDF', 'escaneada_manual' => 'Escaneada/manual', 'importacion_excel_seguimiento' => 'Importación de seguimiento', default => 'Otro' } }}</span></div></div>
                     <div class="cf-data"><div class="cf-data-label">Tipo LM</div><div class="cf-data-value">{{ $licencia->tipo_licencia_descripcion }}</div></div>
                     <div class="cf-data"><div class="cf-data-label">Sistema salud</div><div class="cf-data-value">{{ $licencia->sistema_salud ?: '-' }}</div></div>
                     <div class="cf-data"><div class="cf-data-label">Institución salud</div><div class="cf-data-value">{{ $licencia->institucion_salud ?: '-' }}</div></div>
@@ -46,13 +65,50 @@
                     <div class="cf-data"><div class="cf-data-label">Extracción PDF</div><div class="cf-data-value">{{ $licencia->extraccion_pdf_estado ?: '-' }}</div></div>
                     <div class="cf-data"><div class="cf-data-label">Confianza</div><div class="cf-data-value">{{ $licencia->extraccion_pdf_confianza ?: '-' }}</div></div>
                 </div>
-                <form method="POST" action="{{ route('tramites.licencias-medicas.recalcular-dias', $licencia) }}" class="mt-3">
-                    @csrf
-                    <button type="submit" class="cf-btn-secondary" onclick="return confirm('¿Recalcular días corridos y laborales usando los feriados activos?');">
-                        <i class="bi bi-arrow-repeat"></i> Recalcular días laborales
-                    </button>
-                    <div class="form-text mt-2">El cálculo descuenta sábados, domingos y feriados activos cargados en el módulo.</div>
-                </form>
+                @if($permisos['digitacion'])
+                    <form method="POST" action="{{ route('tramites.licencias-medicas.recalcular-dias', $licencia) }}" class="mt-3">
+                        @csrf
+                        <button type="submit" class="cf-btn-secondary" onclick="return confirm('¿Recalcular días corridos y laborales usando los feriados activos?');">
+                            <i class="bi bi-arrow-repeat"></i> Recalcular días laborales
+                        </button>
+                        <div class="form-text mt-2">El cálculo descuenta sábados, domingos y feriados activos cargados en el módulo.</div>
+                    </form>
+                @endif
+            </div>
+
+            <div class="cf-panel mb-4">
+                <div class="cf-section-title"><i class="bi bi-signpost-split"></i> Estados del proceso</div>
+                <div class="row g-3">
+                    @foreach($nombresDimension as $dimension => $nombreDimension)
+                        @php($codigoActual = $estadoActualPorDimension[$dimension])
+                        <div class="col-lg-4">
+                            <div class="cf-data h-100">
+                                <div class="cf-data-label">{{ $nombreDimension }}</div>
+                                <div class="cf-data-value mb-3">{{ $opcionesEstado[$dimension][$codigoActual] ?? 'Sin clasificar' }}</div>
+                                @if($puedeGestionarEstado[$dimension])
+                                    <form method="POST" action="{{ route('tramites.licencias-medicas.estado.update', $licencia) }}" class="row g-2">
+                                        @csrf
+                                        @method('PATCH')
+                                        <input type="hidden" name="dimension" value="{{ $dimension }}">
+                                        <div class="col-12">
+                                            <label class="form-label small">Nuevo estado</label>
+                                            <select name="estado_codigo" class="form-select" required>
+                                                @foreach($opcionesEstado[$dimension] as $codigo => $etiqueta)
+                                                    <option value="{{ $codigo }}" @selected($codigoActual === $codigo)>{{ $etiqueta }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small">Fundamento del cambio</label>
+                                            <textarea name="observacion" rows="2" minlength="5" maxlength="1000" class="form-control" required></textarea>
+                                        </div>
+                                        <div class="col-12"><button type="submit" class="cf-btn-secondary w-100"><i class="bi bi-check2-circle"></i> Actualizar</button></div>
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             </div>
 
             <div class="cf-panel mb-4">
@@ -89,6 +145,16 @@
                     <div class="border-start ps-3 mb-3">
                         <strong>{{ $h->accion }}</strong><br>
                         <small class="text-muted">{{ optional($h->created_at)->format('d-m-Y H:i') }} — {{ optional($h->usuario)->name ?: 'Sistema' }}</small>
+                        @if($h->estado_dimension)
+                            @php
+                                $dimensionHistorial = $h->estado_dimension;
+                                $estadoAnterior = $h->estado_anterior
+                                    ? ($opcionesEstado[$dimensionHistorial][$h->estado_anterior] ?? $h->estado_anterior)
+                                    : 'Sin estado';
+                                $estadoNuevo = $opcionesEstado[$dimensionHistorial][$h->estado_nuevo] ?? ($h->estado_nuevo ?: 'Sin estado');
+                            @endphp
+                            <div class="small fw-bold mt-1">{{ $nombresDimension[$dimensionHistorial] ?? ucfirst($dimensionHistorial) }}: {{ $estadoAnterior }} → {{ $estadoNuevo }}</div>
+                        @endif
                         <div class="text-muted small">{{ $h->descripcion }}</div>
                     </div>
                 @empty

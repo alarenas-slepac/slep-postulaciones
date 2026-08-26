@@ -56,9 +56,12 @@
                 <div class="cf-section-title"><i class="bi bi-info-circle"></i> Reglas aplicadas</div>
                 <div class="cf-help">
                     <p class="mb-2"><strong>Duplicidad:</strong> no se crean registros repetidos. El sistema valida por tipo de ingreso, cuerpo y DV de licencia médica.</p>
-                    <p class="mb-2"><strong>RUT:</strong> se normaliza a formato sin puntos ni guion, con DV incluido, para cruces posteriores con remuneraciones y COMPIN.</p>
+                    <p class="mb-2"><strong>RUT:</strong> se valida el dígito verificador y luego se normaliza a formato sin puntos ni guion, con DV incluido, para cruces posteriores con remuneraciones y COMPIN.</p>
                     <p class="mb-2"><strong>Dependencia:</strong> se busca primero en funcionarios de Administración Central y luego en reemplazos_personal usando sólo el mes más reciente. Si no cruza, se mantiene la dependencia/comuna del Excel como dato manual.</p>
-                    <p class="mb-2"><strong>Historial:</strong> cada creación o actualización queda registrada con usuario, fecha y origen de importación, usando registro liviano para evitar saturación en planillas de 10.000+ filas.</p><p class="mb-0"><strong>Procesamiento masivo:</strong> las hojas se leen por bloques, se desactiva el query log y se reutiliza el cruce de funcionarios por RUT para reducir carga del servidor.</p>
+                    <p class="mb-2"><strong>Historial:</strong> cada cambio de estado queda registrado con su dimensión, valor anterior, valor nuevo, usuario y carga de origen.</p>
+                    <p class="mb-2"><strong>Estados:</strong> la importación clasifica por separado el avance administrativo, la resolución COMPIN y la recuperación financiera.</p>
+                    <p class="mb-2"><strong>Fallas:</strong> si el proceso no puede completarse, la carga queda marcada como fallida para revisión.</p>
+                    <p class="mb-0"><strong>Procesamiento masivo:</strong> las hojas se leen por bloques, se desactiva el query log y se reutiliza el cruce de funcionarios por RUT para reducir carga del servidor.</p>
                 </div>
             </div>
         </div>
@@ -79,7 +82,7 @@
 
             @if(!empty($result['resumen']['hojas']))
                 <table class="cf-table">
-                    <thead><tr><th>Hoja</th><th>Estado</th><th>Filas</th><th>Importadas</th><th>Actualizadas</th><th>Omitidas</th><th>Inconsistencias</th></tr></thead>
+                    <thead><tr><th>Hoja</th><th>Estado</th><th>Filas</th><th>Importadas</th><th>Actualizadas</th><th>Duplicadas</th><th>Omitidas</th><th>Inconsistencias</th></tr></thead>
                     <tbody>
                     @foreach($result['resumen']['hojas'] as $hoja => $info)
                         <tr>
@@ -88,6 +91,7 @@
                             <td>{{ number_format($info['filas'] ?? 0,0,',','.') }}</td>
                             <td>{{ number_format($info['importadas'] ?? 0,0,',','.') }}</td>
                             <td>{{ number_format($info['actualizadas'] ?? 0,0,',','.') }}</td>
+                            <td>{{ number_format($info['duplicadas'] ?? 0,0,',','.') }}</td>
                             <td>{{ number_format($info['omitidas'] ?? 0,0,',','.') }}</td>
                             <td>{{ number_format($info['inconsistencias'] ?? 0,0,',','.') }}</td>
                         </tr>

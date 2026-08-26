@@ -879,23 +879,35 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     // Trámites: Licencias Médicas
     // -------------------------
     Route::prefix('tramites/licencias-medicas')
-        ->middleware('ensure.role:admin|funcionario_slep|coordinador_gdp')
         ->name('tramites.licencias-medicas.')
         ->group(function () {
-            Route::get('/', [LicenciaMedicaController::class, 'index'])->name('index');
-            Route::get('/crear', [LicenciaMedicaController::class, 'create'])->name('create');
-            Route::post('/extraer-digital', [LicenciaMedicaController::class, 'extractDigital'])->name('extraer-digital');
-            Route::post('/descartar-carga', [LicenciaMedicaController::class, 'descartarCarga'])->name('descartar-carga');
-            Route::get('/importar-seguimiento', [LicenciaMedicaController::class, 'importarSeguimientoForm'])->name('importar-seguimiento');
-            Route::post('/importar-seguimiento', [LicenciaMedicaController::class, 'importarSeguimiento'])->name('importar-seguimiento.store');
-            Route::get('/feriados', [LicenciaFeriadoController::class, 'index'])->name('feriados.index');
-            Route::post('/feriados', [LicenciaFeriadoController::class, 'store'])->name('feriados.store');
-            Route::put('/feriados/{feriado}', [LicenciaFeriadoController::class, 'update'])->name('feriados.update');
-            Route::delete('/feriados/{feriado}', [LicenciaFeriadoController::class, 'destroy'])->name('feriados.destroy');
-            Route::post('/', [LicenciaMedicaController::class, 'store'])->name('store');
-            Route::get('/{licenciaMedica}', [LicenciaMedicaController::class, 'show'])->name('show');
-            Route::post('/{licenciaMedica}/recalcular-dias', [LicenciaMedicaController::class, 'recalcularDias'])->name('recalcular-dias');
-            Route::get('/{licenciaMedica}/archivo', [LicenciaMedicaController::class, 'descargarArchivo'])->name('archivo');
+            $lectura = 'ensure.role:admin|funcionario_slep|coordinador_gdp|digitador_licencias|analista_licencias|analista_smc|administrador_licencias';
+            $digitacion = 'ensure.role:admin|funcionario_slep|coordinador_gdp|digitador_licencias|analista_licencias|administrador_licencias';
+            $seguimiento = 'ensure.role:admin|funcionario_slep|coordinador_gdp|analista_licencias|analista_smc|administrador_licencias';
+            $importacion = 'ensure.role:admin|funcionario_slep|coordinador_gdp|analista_smc|administrador_licencias';
+            $configuracion = 'ensure.role:admin|funcionario_slep|coordinador_gdp|administrador_licencias';
+
+            Route::get('/', [LicenciaMedicaController::class, 'index'])->middleware($lectura)->name('index');
+            Route::get('/crear', [LicenciaMedicaController::class, 'create'])->middleware($digitacion)->name('create');
+            Route::post('/extraer-digital', [LicenciaMedicaController::class, 'extractDigital'])->middleware($digitacion)->name('extraer-digital');
+            Route::post('/descartar-carga', [LicenciaMedicaController::class, 'descartarCarga'])->middleware($digitacion)->name('descartar-carga');
+            Route::get('/importar-seguimiento', [LicenciaMedicaController::class, 'importarSeguimientoForm'])->middleware($importacion)->name('importar-seguimiento');
+            Route::post('/importar-seguimiento', [LicenciaMedicaController::class, 'importarSeguimiento'])->middleware($importacion)->name('importar-seguimiento.store');
+            Route::get('/actualizar-estados', [LicenciaMedicaController::class, 'actualizacionEstadosIndex'])->middleware($importacion)->name('actualizaciones.index');
+            Route::post('/actualizar-estados/prevalidar', [LicenciaMedicaController::class, 'prevalidarEstados'])->middleware($importacion)->name('actualizaciones.prevalidar');
+            Route::get('/actualizar-estados/plantilla', [LicenciaMedicaController::class, 'plantillaEstados'])->middleware($importacion)->name('actualizaciones.plantilla');
+            Route::get('/actualizar-estados/{importacion}', [LicenciaMedicaController::class, 'actualizacionEstadosShow'])->middleware($importacion)->name('actualizaciones.show');
+            Route::post('/actualizar-estados/{importacion}/confirmar', [LicenciaMedicaController::class, 'confirmarEstados'])->middleware($importacion)->name('actualizaciones.confirmar');
+            Route::post('/actualizar-estados/{importacion}/revertir', [LicenciaMedicaController::class, 'revertirEstados'])->middleware($importacion)->name('actualizaciones.revertir');
+            Route::get('/feriados', [LicenciaFeriadoController::class, 'index'])->middleware($configuracion)->name('feriados.index');
+            Route::post('/feriados', [LicenciaFeriadoController::class, 'store'])->middleware($configuracion)->name('feriados.store');
+            Route::put('/feriados/{feriado}', [LicenciaFeriadoController::class, 'update'])->middleware($configuracion)->name('feriados.update');
+            Route::delete('/feriados/{feriado}', [LicenciaFeriadoController::class, 'destroy'])->middleware($configuracion)->name('feriados.destroy');
+            Route::post('/', [LicenciaMedicaController::class, 'store'])->middleware($digitacion)->name('store');
+            Route::patch('/{licenciaMedica}/estado', [LicenciaMedicaController::class, 'updateEstado'])->middleware($seguimiento)->name('estado.update');
+            Route::post('/{licenciaMedica}/recalcular-dias', [LicenciaMedicaController::class, 'recalcularDias'])->middleware($digitacion)->name('recalcular-dias');
+            Route::get('/{licenciaMedica}/archivo', [LicenciaMedicaController::class, 'descargarArchivo'])->middleware($lectura)->name('archivo');
+            Route::get('/{licenciaMedica}', [LicenciaMedicaController::class, 'show'])->middleware($lectura)->name('show');
         });
 
 

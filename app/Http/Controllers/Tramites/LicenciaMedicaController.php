@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Models\LicenciaMedica;
 use App\Models\LicenciaMedicaHistorial;
+use App\Models\LicenciaMedicaImportacion;
 use App\Models\ReemplazoPersonal;
 use App\Services\LicenciasMedicas\LicenciaFolio;
 use App\Services\LicenciasMedicas\LicenciaPdfExtractor;
 use App\Services\LicenciasMedicas\LicenciaFuncionarioResolver;
 use App\Services\LicenciasMedicas\LicenciaDiasLaboralesService;
+use App\Services\LicenciasMedicas\LicenciaEstadoService;
+use App\Services\LicenciasMedicas\LicenciaEstadoMasivoService;
 use App\Services\LicenciasMedicas\RutNormalizer;
 use App\Services\LicenciasMedicas\LicenciaSeguimientoImportService;
 use Carbon\Carbon;
@@ -19,6 +22,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class LicenciaMedicaController extends Controller
 {
@@ -38,6 +43,10 @@ class LicenciaMedicaController extends Controller
 
         if ($request->filled('estado')) {
             $query->where('estado_actual', $request->estado);
+        }
+
+        if ($request->filled('estado_administrativo')) {
+            $query->where('estado_administrativo_codigo', $request->input('estado_administrativo'));
         }
 
         if ($request->filled('origen')) {
@@ -64,7 +73,14 @@ class LicenciaMedicaController extends Controller
             'establecimiento' => LicenciaMedica::where('tipo_dependencia', 'establecimiento')->count(),
         ];
 
-        return view('tramites.licencias-medicas.index', compact('licencias', 'metricas'));
+        $estadosAdministrativos = app(LicenciaEstadoService::class)->opciones(LicenciaEstadoService::ADMINISTRATIVO);
+        $permisos = [
+            'digitacion' => $request->user()->hasAnyRole(config('licencias_medicas.roles.digitacion', [])),
+            'importacion' => $request->user()->hasAnyRole(config('licencias_medicas.roles.importacion_compin', [])),
+            'configuracion' => $request->user()->hasAnyRole(config('licencias_medicas.roles.configuracion', [])),
+        ];
+
+        return view('tramites.licencias-medicas.index', compact('licencias', 'metricas', 'estadosAdministrativos', 'permisos'));
     }
 
     public function create(Request $request)
@@ -73,7 +89,14 @@ class LicenciaMedicaController extends Controller
         $extracted = session('licencia_medica_extracted', []);
         $archivoTemporal = session('licencia_medica_archivo_temporal');
 
-        return view('tramites.licencias-medicas.create', compact('tipoDocumento', 'extracted', 'archivoTemporal'));
+        $estados = app(LicenciaEstadoService::class);
+        $estadosAdministrativos = $estados->opciones(LicenciaEstadoService::ADMINISTRATIVO);
+        $estadoAdministrativoInicial = $estados->normalizar(
+            LicenciaEstadoService::ADMINISTRATIVO,
+            $extracted['datos']['estado_actual'] ?? null
+        ) ?: 'ingresada';
+
+        return view('tramites.licencias-medicas.create', compact('tipoDocumento', 'extracted', 'archivoTemporal', 'estadosAdministrativos', 'estadoAdministrativoInicial'));
     }
 
     public function extractDigital(Request $request, LicenciaPdfExtractor $extractor)
@@ -152,6 +175,7 @@ class LicenciaMedicaController extends Controller
             'tipo_licencia' => ['nullable', Rule::in(['1', '2', '3', '4', '5', '6', '7'])],
             'sistema_salud' => ['nullable', Rule::in(['FONASA', 'ISAPRE'])],
             'institucion_salud' => ['nullable', 'string', 'max:150', 'required_if:sistema_salud,ISAPRE'],
+            'estado_administrativo_codigo' => ['required', Rule::in(array_keys(config('licencias_medicas.estados.administrativo', [])))],
             'archivo_licencia' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
             'archivo_temporal_path' => ['nullable', 'string'],
         ], [
@@ -211,7 +235,7 @@ class LicenciaMedicaController extends Controller
         }
 
         $rut = RutNormalizer::normalize($request->rut_funcionario_input);
-        if (!$rut['rut']) {
+        if (! $rut['valido']) {
             return back()->withInput()->withErrors(['rut_funcionario_input' => 'El RUT del funcionario no es valido.']);
         }
 
@@ -230,8 +254,10 @@ class LicenciaMedicaController extends Controller
         $diasLaborales = $calculoDias['dias_laborales'];
         $origen = $request->tipo_documento_ingreso === 'digital' ? 'digital_pdf' : 'escaneada_manual';
         $extraccion = session('licencia_medica_extracted');
+        $estadoAdministrativo = $request->input('estado_administrativo_codigo', 'ingresada');
+        $estadoAdministrativoLabel = app(LicenciaEstadoService::class)->etiqueta(LicenciaEstadoService::ADMINISTRATIVO, $estadoAdministrativo);
 
-        $licencia = DB::transaction(function () use ($request, $tipo, $cuerpo, $dvLicencia, $folio, $rut, $archivo, $asociacion, $fechaInicio, $fechaTermino, $diasCorridos, $diasLaborales, $origen, $extraccion) {
+        $licencia = DB::transaction(function () use ($request, $tipo, $cuerpo, $dvLicencia, $folio, $rut, $archivo, $asociacion, $fechaInicio, $fechaTermino, $diasCorridos, $diasLaborales, $origen, $extraccion, $estadoAdministrativo, $estadoAdministrativoLabel) {
             $licencia = LicenciaMedica::create([
                 'tipo_ingreso_licencia' => $tipo,
                 'cuerpo_licencia' => $cuerpo,
@@ -274,7 +300,10 @@ class LicenciaMedicaController extends Controller
                 'correo_trabajador' => $request->correo_trabajador,
                 'rut_empleador' => $request->rut_empleador,
                 'nombre_empleador' => $request->nombre_empleador,
-                'estado_actual' => $request->estado_actual ?: 'Ingresada',
+                'estado_actual' => $estadoAdministrativoLabel,
+                'estado_administrativo_codigo' => $estadoAdministrativo,
+                'estado_compin_codigo' => 'sin_informacion',
+                'estado_recuperacion_codigo' => 'no_evaluada',
                 'estado_notificacion' => 'sin_notificacion',
                 'estado_alerta' => 'sin_alerta',
                 'origen_ingreso' => $origen,
@@ -298,6 +327,9 @@ class LicenciaMedicaController extends Controller
                 'accion' => 'creacion',
                 'descripcion' => 'Ingreso de licencia medica ' . ($request->tipo_documento_ingreso === 'digital' ? 'digital con respaldo PDF' : 'escaneada/manual con respaldo'),
                 'datos_nuevos' => $licencia->toArray(),
+                'estado_dimension' => LicenciaEstadoService::ADMINISTRATIVO,
+                'estado_nuevo' => $estadoAdministrativo,
+                'origen' => $origen,
                 'user_id' => $request->user()->id,
                 'created_at' => now(),
             ]);
@@ -314,6 +346,138 @@ class LicenciaMedicaController extends Controller
     public function importarSeguimientoForm()
     {
         return view('tramites.licencias-medicas.importar-seguimiento');
+    }
+
+    public function actualizacionEstadosIndex()
+    {
+        $importaciones = LicenciaMedicaImportacion::query()
+            ->with(['usuario', 'revertidoPor'])
+            ->where('tipo', LicenciaEstadoMasivoService::TIPO_IMPORTACION)
+            ->latest('id')
+            ->paginate(15);
+
+        return view('tramites.licencias-medicas.actualizar-estados', [
+            'importaciones' => $importaciones,
+            'dimensiones' => collect(config('licencias_medicas.dimensiones_masivas_habilitadas', []))
+                ->mapWithKeys(fn (string $dimension) => [$dimension => match ($dimension) {
+                    LicenciaEstadoService::COMPIN => 'Resolución COMPIN',
+                    LicenciaEstadoService::ADMINISTRATIVO => 'Estado administrativo',
+                    LicenciaEstadoService::RECUPERACION => 'Recuperación financiera',
+                    default => ucfirst($dimension),
+                }])
+                ->all(),
+        ]);
+    }
+
+    public function prevalidarEstados(Request $request, LicenciaEstadoMasivoService $servicio)
+    {
+        $data = $request->validate([
+            'archivo_estados' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
+            'dimension' => ['required', Rule::in(config('licencias_medicas.dimensiones_masivas_habilitadas', []))],
+        ], [
+            'archivo_estados.required' => 'Debe adjuntar la planilla de actualización.',
+            'archivo_estados.mimes' => 'La planilla debe estar en formato Excel (.xlsx o .xls).',
+        ]);
+
+        $file = $request->file('archivo_estados');
+        $storedPath = $file->store('licencias_medicas/importaciones/estados/'.now()->format('Y/m'), 'local');
+        $importacion = LicenciaMedicaImportacion::create([
+            'tipo' => LicenciaEstadoMasivoService::TIPO_IMPORTACION,
+            'dimension_estado' => $data['dimension'],
+            'nombre_archivo' => $file->getClientOriginalName(),
+            'archivo_path' => $storedPath,
+            'estado' => 'procesando',
+            'subido_por' => $request->user()->id,
+        ]);
+
+        try {
+            $servicio->prevalidar($importacion, $data['dimension']);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()
+                ->withErrors(['archivo_estados' => $e instanceof \Illuminate\Validation\ValidationException
+                    ? collect($e->errors())->flatten()->first()
+                    : 'No fue posible prevalidar la planilla. La carga quedó registrada como fallida.'])
+                ->withInput();
+        }
+
+        return redirect()
+            ->route('tramites.licencias-medicas.actualizaciones.show', $importacion)
+            ->with('success', 'Prevalidación completada. Revise el resumen antes de confirmar.');
+    }
+
+    public function actualizacionEstadosShow(LicenciaMedicaImportacion $importacion)
+    {
+        abort_unless($importacion->tipo === LicenciaEstadoMasivoService::TIPO_IMPORTACION, 404);
+        $importacion->load(['usuario', 'revertidoPor']);
+
+        return view('tramites.licencias-medicas.actualizacion-estados-show', [
+            'importacion' => $importacion,
+            'resumen' => (array) $importacion->resumen_json,
+        ]);
+    }
+
+    public function confirmarEstados(
+        Request $request,
+        LicenciaMedicaImportacion $importacion,
+        LicenciaEstadoMasivoService $servicio
+    ) {
+        abort_unless($importacion->tipo === LicenciaEstadoMasivoService::TIPO_IMPORTACION, 404);
+        $data = $request->validate([
+            'observacion' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $servicio->confirmar($importacion, $request->user()->id, $data['observacion']);
+
+        return back()->with('success', 'Actualización masiva aplicada de forma transaccional.');
+    }
+
+    public function revertirEstados(
+        Request $request,
+        LicenciaMedicaImportacion $importacion,
+        LicenciaEstadoMasivoService $servicio
+    ) {
+        abort_unless($importacion->tipo === LicenciaEstadoMasivoService::TIPO_IMPORTACION, 404);
+        $data = $request->validate([
+            'observacion_reversion' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $servicio->revertir($importacion, $request->user()->id, $data['observacion_reversion']);
+
+        return back()->with('success', 'La carga fue revertida completamente y quedó registrada en el historial.');
+    }
+
+    public function plantillaEstados()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Actualizacion COMPIN');
+        $sheet->fromArray(['FOLIO_LICENCIA', 'RUT', 'ESTADO', 'OBSERVACION'], null, 'A1');
+        $sheet->getStyle('A1:D1')->getFont()->setBold(true);
+        $sheet->freezePane('A2');
+        foreach (['A' => 24, 'B' => 18, 'C' => 28, 'D' => 60] as $column => $width) {
+            $sheet->getColumnDimension($column)->setWidth($width);
+        }
+
+        $catalogo = $spreadsheet->createSheet();
+        $catalogo->setTitle('Catalogo estados');
+        $catalogo->fromArray(['CODIGO', 'ETIQUETA'], null, 'A1');
+        $catalogo->getStyle('A1:B1')->getFont()->setBold(true);
+        $row = 2;
+        foreach (app(LicenciaEstadoService::class)->opciones(LicenciaEstadoService::COMPIN) as $codigo => $etiqueta) {
+            $catalogo->fromArray([$codigo, $etiqueta], null, "A{$row}");
+            $row++;
+        }
+        $catalogo->getColumnDimension('A')->setWidth(30);
+        $catalogo->getColumnDimension('B')->setWidth(40);
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            (new Xlsx($spreadsheet))->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+        }, 'plantilla_actualizacion_estados_compin.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     public function importarSeguimiento(Request $request, LicenciaSeguimientoImportService $importer)
@@ -343,7 +507,7 @@ class LicenciaMedicaController extends Controller
             report($e);
 
             return back()
-                ->withErrors(['archivo_seguimiento' => 'No se pudo procesar la planilla completa. Revise que el archivo no esté dañado y vuelva a intentar. Detalle técnico: ' . $e->getMessage()])
+                ->withErrors(['archivo_seguimiento' => 'No se pudo procesar la planilla completa. La carga quedó marcada como fallida para su revisión.'])
                 ->withInput();
         }
 
@@ -353,10 +517,49 @@ class LicenciaMedicaController extends Controller
             ->with('import_result', $resultado);
     }
 
-    public function show(LicenciaMedica $licenciaMedica)
+    public function show(LicenciaMedica $licenciaMedica, LicenciaEstadoService $estados)
     {
         $licenciaMedica->load(['historial.usuario']);
-        return view('tramites.licencias-medicas.show', ['licencia' => $licenciaMedica]);
+        $opcionesEstado = collect($estados->dimensiones())
+            ->mapWithKeys(fn (string $dimension) => [$dimension => $estados->opciones($dimension)])
+            ->all();
+        $puedeGestionarEstado = collect($estados->dimensiones())
+            ->mapWithKeys(fn (string $dimension) => [$dimension => $estados->puedeGestionar(auth()->user(), $dimension)])
+            ->all();
+        $permisos = [
+            'digitacion' => auth()->user()->hasAnyRole(config('licencias_medicas.roles.digitacion', [])),
+            'configuracion' => auth()->user()->hasAnyRole(config('licencias_medicas.roles.configuracion', [])),
+        ];
+
+        return view('tramites.licencias-medicas.show', [
+            'licencia' => $licenciaMedica,
+            'opcionesEstado' => $opcionesEstado,
+            'puedeGestionarEstado' => $puedeGestionarEstado,
+            'permisos' => $permisos,
+        ]);
+    }
+
+    public function updateEstado(Request $request, LicenciaMedica $licenciaMedica, LicenciaEstadoService $estados)
+    {
+        $data = $request->validate([
+            'dimension' => ['required', Rule::in($estados->dimensiones())],
+            'estado_codigo' => ['required', 'string', 'max:80'],
+            'observacion' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        if (! $estados->puedeGestionar($request->user(), $data['dimension'])) {
+            abort(403, 'No tiene permisos para modificar esta dimensión de estado.');
+        }
+
+        $estados->cambiar(
+            $licenciaMedica,
+            $data['dimension'],
+            $data['estado_codigo'],
+            $request->user()->id,
+            $data['observacion']
+        );
+
+        return back()->with('success', 'Estado actualizado y registrado en el historial.');
     }
 
     public function descargarArchivo(LicenciaMedica $licenciaMedica)
@@ -551,6 +754,7 @@ class LicenciaMedicaController extends Controller
                 'dias_laborales' => $calculo['dias_laborales'],
                 'feriados_descontados' => $calculo['feriados_descontados'],
             ],
+            'origen' => 'recalculo_manual',
             'user_id' => auth()->id(),
             'created_at' => now(),
         ]);
@@ -558,4 +762,3 @@ class LicenciaMedicaController extends Controller
         return back()->with('success', 'Días corridos y laborales recalculados correctamente.');
     }
 }
-

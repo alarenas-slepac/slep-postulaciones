@@ -70,7 +70,10 @@ class LicenciaMedica extends Model
         'rut_empleador',
         'nombre_empleador',
         'estado_actual',
+        'estado_administrativo_codigo',
         'estado_compin',
+        'estado_compin_codigo',
+        'estado_recuperacion_codigo',
         'dias_autorizados',
         'derecho_subsidio',
         'monto_subsidio',
@@ -134,6 +137,29 @@ class LicenciaMedica extends Model
     public function historial(): HasMany
     {
         return $this->hasMany(LicenciaMedicaHistorial::class, 'licencia_medica_id')->latest();
+    }
+
+    public function importacion(): BelongsTo
+    {
+        return $this->belongsTo(LicenciaMedicaImportacion::class, 'importacion_id');
+    }
+
+    public function getEstadoAdministrativoLabelAttribute(): string
+    {
+        return config('licencias_medicas.estados.administrativo.'.$this->estado_administrativo_codigo)
+            ?: ($this->estado_actual ?: 'Sin clasificar');
+    }
+
+    public function getEstadoCompinLabelAttribute(): string
+    {
+        return config('licencias_medicas.estados.compin.'.$this->estado_compin_codigo)
+            ?: ($this->estado_compin ?: 'Sin información');
+    }
+
+    public function getEstadoRecuperacionLabelAttribute(): string
+    {
+        return config('licencias_medicas.estados.recuperacion.'.$this->estado_recuperacion_codigo)
+            ?: 'No evaluada';
     }
 
     public function getTipoLicenciaDescripcionAttribute(): string
