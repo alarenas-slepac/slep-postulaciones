@@ -40,7 +40,7 @@
                     <div class="col-md-8">
                         <label for="nombre" class="form-label">Nombre completo <span class="text-danger">*</span></label>
                         <input id="nombre" name="nombre" class="form-control @error('nombre') is-invalid @enderror" value="{{ $valor('nombre') }}" required maxlength="255" readonly>
-                        <div class="form-text">Se completa desde el registro más reciente del RUT en reemplazos personal.</div>
+                        <div class="form-text">Se completa desde funcionarios autorizados de Administración Central o desde el registro más reciente en reemplazos personal.</div>
                     </div>
                     <div class="col-md-4">
                         <label for="numero_resolucion" class="form-label">N° dictamen o resolución <span class="text-danger">*</span></label>
@@ -149,7 +149,9 @@ document.addEventListener('DOMContentLoaded', () => {
             rutInput.value = payload.rut;
             nombreInput.value = payload.nombre;
             rutResuelto = payload.rut;
-            mostrarEstado(`Funcionario encontrado en el padrón ${payload.periodo}.`, 'success');
+            const fuente = payload.fuente || 'el padrón de funcionarios';
+            const periodo = payload.periodo ? ` (${payload.periodo})` : '';
+            mostrarEstado(`Funcionario encontrado en ${fuente}${periodo}.`, 'success');
         } catch (error) {
             nombreInput.value = '';
             mostrarEstado(error.message || 'No fue posible buscar el funcionario.', 'danger');

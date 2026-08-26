@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.26.433' => [
+        'date' => '2026-08-26',
+        'module' => 'Descuentos CGR',
+        'title' => 'Validación de RUT con funcionarios de Administración Central',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Services/Remuneraciones/ReemplazoPersonalRutService.php',
+            'config/changelog.php',
+            'resources/views/remuneraciones/descuentos-cgr/form.blade.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Consulta primero funcionarios_ac_autorizados mediante el RUT sin puntos ni guion y mantiene reemplazos_personal como respaldo.',
+            'Compone el nombre completo con nombres, apellido paterno y apellido materno del funcionario de Administración Central.',
+            'Admite tanto run_normalizado como rut_normalizado para conservar compatibilidad con esquemas históricos y actuales.',
+            'Actualiza los mensajes del formulario para identificar la fuente donde fue encontrado el funcionario.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.8.24.432' => [
         'date' => '2026-08-24',
         'module' => 'Dotación',

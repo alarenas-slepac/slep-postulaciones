@@ -94,7 +94,7 @@ class DescuentoCgrController extends Controller
         $funcionario = $funcionarios->buscar($rutNormalizado);
         if (! $funcionario) {
             return response()->json([
-                'message' => 'No se encontró el RUT en el padrón de reemplazos personal.',
+                'message' => 'No se encontró el RUT en funcionarios autorizados de Administración Central ni en el padrón de reemplazos personal.',
                 'rut' => $rutNormalizado,
             ], 404);
         }
@@ -181,7 +181,7 @@ class DescuentoCgrController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'rut' => 'No se encontró el RUT en el padrón de reemplazos personal.',
+            'rut' => 'No se encontró el RUT en funcionarios autorizados de Administración Central ni en el padrón de reemplazos personal.',
         ]);
     }
 
