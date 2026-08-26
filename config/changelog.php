@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.26.439' => [
+        'date' => '2026-08-26',
+        'module' => 'Estudiantes PIE por curso',
+        'title' => 'Actualización masiva exclusiva de registros PIE existentes',
+        'files' => [
+            'app/Http/Controllers/Admin/EstablecimientoCursoPieController.php',
+            'config/changelog.php',
+            'resources/views/admin/establecimiento-curso-pie/import.blade.php',
+            'tests/Feature/EstablecimientoCursoPieImportUpdateOnlyTest.php',
+        ],
+        'changes' => [
+            'Restringe la carga masiva a la actualización de registros PIE existentes, sin crear automáticamente registros para cursos o secciones sin PIE.',
+            'Conserva el estado vigente de cada registro durante la actualización de NEET, NEEP, observación y cálculos asociados.',
+            'Muestra en pantalla el total procesado y una tabla con fila, RBD, curso, letra, año y motivo para cada registro no actualizado.',
+            'Detecta filas duplicadas de la plantilla y evita que un mismo registro PIE se actualice más de una vez en la misma carga.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP'],
+    ],
     '2026.8.26.438' => [
         'date' => '2026-08-26',
         'module' => 'Dotación',
