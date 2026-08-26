@@ -492,6 +492,9 @@
 @endif
 
 <div class="section-title">Cantidad de cursos por nivel</div>
+<div class="note avoid-break">
+    En NT1/NT2 con JEC se agregan las horas de libre disposición efectivamente asignadas a docentes distintos de una Educadora de Párvulos, con un máximo de 6 h plan por curso. El contrato equivalente de esas horas se calcula mediante 65/35.
+</div>
 <table>
     <thead>
         <tr>
@@ -523,7 +526,12 @@
                     <td class="text-right primary">{{ $fmt($row['total_horas_contrato_equivalente'] ?? 0) }}</td>
                     <td class="text-right success">{{ $fmt($row['total_trabajo_colaborativo_pie'] ?? 0) }}</td>
                     <td class="text-right primary">{{ $fmt($row['total_contrato_mas_trabajo_colaborativo_pie'] ?? 0) }}</td>
-                    <td class="small">{{ ((int) ($row['sin_horas_plan'] ?? 0) > 0) ? 'Revisar plan' : 'Plan asociado' }}</td>
+                    <td class="small">
+                        @if ((int) ($row['cursos_refuerzo_ld_otro_docente'] ?? 0) > 0)
+                            {{ (int) $row['cursos_refuerzo_ld_otro_docente'] }} curso(s) JEC: +{{ $fmt($row['horas_plan_refuerzo_ld_otro_docente'] ?? 0) }} h plan / +{{ $fmt($row['horas_contrato_refuerzo_ld_otro_docente'] ?? 0) }} h contrato LD.<br>
+                        @endif
+                        {{ ((int) ($row['sin_horas_plan'] ?? 0) > 0) ? 'Revisar plan' : 'Plan asociado' }}
+                    </td>
                 </tr>
             @endforeach
             <tr class="total-row">

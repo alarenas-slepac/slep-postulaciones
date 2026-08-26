@@ -155,7 +155,7 @@
         </div>
         <div class="alert alert-info border-0 rounded-4 small">
             <i class="bi bi-info-circle"></i>
-            Para NT1 y NT2 se aplica regla especial sobre las primeras 32 h del plan: Con JEC equivale a 50 h de contrato y Sin JEC equivale a 47 h; la libre disposición se convierte aparte con 65/35. El resto de cursos usa 65/35 o 60/40 según corresponda. Las 3 h de trabajo colaborativo PIE se muestran aquí y no se duplican en el bloque PIE.
+            Para NT1 y NT2 se aplica regla especial sobre las primeras 32 h del plan: Con JEC equivale a 50 h de contrato y Sin JEC equivale a 47 h. Solo en cursos con JEC se agregan las horas de libre disposición efectivamente asignadas a docentes distintos de una Educadora de Párvulos, con un máximo de 6 h plan por curso; su contrato equivalente se calcula mediante 65/35. El resto de cursos usa 65/35 o 60/40 según corresponda. Las 3 h de trabajo colaborativo PIE se muestran aquí y no se duplican en el bloque PIE.
         </div>
         <div class="table-responsive border rounded-4">
             <table class="table table-sm align-middle mb-0">
@@ -192,7 +192,12 @@
                                 <td class="text-end fw-semibold text-info">{{ $fmt($row['total_horas_contrato_equivalente'] ?? 0) }}</td>
                                 <td class="text-end fw-semibold text-success">@if (($row['total_trabajo_colaborativo_pie'] ?? 0) > 0){{ $fmt($row['total_trabajo_colaborativo_pie']) }}@else<span class="text-muted">—</span>@endif</td>
                                 <td class="text-end fw-semibold text-info">{{ $fmt($row['total_contrato_mas_trabajo_colaborativo_pie'] ?? (($row['total_horas_contrato_equivalente'] ?? 0) + ($row['total_trabajo_colaborativo_pie'] ?? 0))) }}</td>
-                                <td class="small">@if ((int) $row['sin_horas_plan'] > 0)<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> {{ (int) $row['sin_horas_plan'] }} curso(s) sin horas de plan</span>@elseif ((int) $row['cursos'] > 0)<span class="text-muted">Plan asociado</span>@else<span class="text-muted">—</span>@endif</td>
+                                <td class="small">
+                                    @if ((int) ($row['cursos_refuerzo_ld_otro_docente'] ?? 0) > 0)
+                                        <span class="text-primary d-block"><i class="bi bi-person-plus"></i> {{ (int) $row['cursos_refuerzo_ld_otro_docente'] }} curso(s) JEC: +{{ $fmt($row['horas_plan_refuerzo_ld_otro_docente'] ?? 0) }} h plan / +{{ $fmt($row['horas_contrato_refuerzo_ld_otro_docente'] ?? 0) }} h contrato por libre disposición</span>
+                                    @endif
+                                    @if ((int) $row['sin_horas_plan'] > 0)<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> {{ (int) $row['sin_horas_plan'] }} curso(s) sin horas de plan</span>@elseif ((int) $row['cursos'] > 0)<span class="text-muted">Plan asociado</span>@else<span class="text-muted">—</span>@endif
+                                </td>
                             </tr>
                         @endforeach
                         <tr class="fw-semibold">

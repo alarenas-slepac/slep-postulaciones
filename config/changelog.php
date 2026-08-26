@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.26.440' => [
+        'date' => '2026-08-26',
+        'module' => 'Dotación',
+        'title' => 'Libre disposición NT cubierta por docentes distintos de Párvulos',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'tests/Unit/DotacionParvulariaLibreDisposicionTest.php',
+        ],
+        'changes' => [
+            'En NT1 y NT2 con JEC suma las horas de libre disposición efectivamente asignadas a docentes cuyo título no corresponde a Pedagogía en Educación de Párvulos.',
+            'Limita el incremento a 6 horas plan por curso y calcula su contrato equivalente mediante la tabla vigente de proporción 65/35.',
+            'Excluye cursos sin JEC, asistentes de la educación y asignaciones realizadas por Educadoras de Párvulos.',
+            'Informa el incremento por nivel en el resumen web y en el PDF de dotación del establecimiento.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.26.439' => [
         'date' => '2026-08-26',
         'module' => 'Estudiantes PIE por curso',
