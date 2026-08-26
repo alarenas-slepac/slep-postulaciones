@@ -1060,7 +1060,18 @@ class DotacionAsignacionCalculator
 
     private static function needRow(string $key, string $tipo, ?string $subtipo, array $data, Collection $asignaciones): array
     {
-        $assigned = $asignaciones->where('necesidad_key', $key);
+        $dotacionFuncionId = (int) ($data['dotacion_funcion_id'] ?? 0);
+        $assigned = $asignaciones->filter(function ($row) use ($key, $dotacionFuncionId) {
+            if ((string) ($row->necesidad_key ?? '') === $key) {
+                return true;
+            }
+
+            // El identificador de la función declarada es estable aunque una
+            // asignación histórica conserve una necesidad_key generada antes
+            // de reordenar o renombrar los bloques del establecimiento.
+            return $dotacionFuncionId > 0
+                && (int) ($row->dotacion_funcion_id ?? 0) === $dotacionFuncionId;
+        });
         $horasContrato = (float) ($data['horas_contrato'] ?? 0);
         $horasPlan = isset($data['horas_plan']) ? (float) $data['horas_plan'] : null;
         $assignedContrato = (float) $assigned->sum(fn ($row) => (float) $row->horas_contrato);

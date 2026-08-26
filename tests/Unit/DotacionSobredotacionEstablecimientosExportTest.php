@@ -48,8 +48,8 @@ class DotacionSobredotacionEstablecimientosExportTest extends TestCase
         $sheetRows = $firstSheet->toArray(null, true, false, false);
         $values = collect($sheetRows)->flatten();
         $this->assertContains('DETALLE DE SOBREDOTACIÓN - DOTACIÓN ESTABLECIMIENTO', $values);
-        $this->assertContains('Sobredotación Aula sin asignación', $values);
-        $this->assertContains('Funciones no normativas asignadas (posible ajuste)', $values);
+        $this->assertContains('Contrato Aula sin asignación registrada', $values);
+        $this->assertContains('Funciones declaradas asignadas a docentes (revisables)', $values);
         $this->assertContains('Detalle de funciones no normativas', $values);
         $this->assertContains('Sobredotación PIE', $values);
         $this->assertContains('Apoyo a dirección', $values);
@@ -57,7 +57,7 @@ class DotacionSobredotacionEstablecimientosExportTest extends TestCase
         $this->assertContains('Docente mixto ajustable', $values);
         $this->assertContains('Educadora diferencial', $values);
 
-        $ajusteHeader = collect($sheetRows)->search(fn (array $row) => in_array('Total ajustable', $row, true));
+        $ajusteHeader = collect($sheetRows)->search(fn (array $row) => in_array('Total declarado asignado', $row, true));
         $this->assertIsInt($ajusteHeader);
         $ajusteRow = $sheetRows[$ajusteHeader + 1];
         $this->assertSame(14.0, $ajusteRow[5]);

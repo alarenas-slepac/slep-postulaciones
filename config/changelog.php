@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.8.26.436' => [
+        'date' => '2026-08-26',
+        'module' => 'Dotación',
+        'title' => 'Conciliación de sobredotación y asignaciones declaradas',
+        'files' => [
+            'app/Exports/DotacionSobredotacionEstablecimientosExport.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+            'tests/Unit/DotacionSobredotacionEstablecimientosExportTest.php',
+        ],
+        'changes' => [
+            'Concilia asignaciones históricas con la necesidad vigente mediante necesidad_key o el identificador estable de la función declarada.',
+            'Concilia visualmente la sobredotación estructural con las horas de contrato sin asignación registrada.',
+            'Muestra horas declaradas asignadas, requeridas y pendientes sin confundirlas con una reducción contractual confirmada.',
+            'Renombra el potencial de ajuste como universo sujeto a revisión y replica las aclaraciones en la exportación territorial.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.26.435' => [
         'date' => '2026-08-26',
         'module' => 'Licencias Médicas',

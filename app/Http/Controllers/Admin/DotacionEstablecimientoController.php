@@ -253,7 +253,11 @@ class DotacionEstablecimientoController extends Controller
             $sobredotacionTipo = 'aula';
         }
         $sobredotacion = $tab === 'sobredotacion'
-            ? DotacionSobredotacionCalculator::build($data['docentes'], $data['resumen'])
+            ? DotacionSobredotacionCalculator::build(
+                $data['docentes'],
+                $data['resumen'],
+                data_get($data, 'asignacion.necesidades.funciones', [])
+            )
             : ['aula' => ['items' => collect(), 'resumen' => []], 'pie' => ['items' => collect(), 'resumen' => []]];
         $proporcionExcepcionTableReady = Schema::hasTable('dotacion_proporcion_excepciones');
         $proporcionExcepcion = $proporcionExcepcionTableReady

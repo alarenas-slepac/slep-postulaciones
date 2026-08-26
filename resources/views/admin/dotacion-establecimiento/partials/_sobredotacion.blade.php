@@ -13,6 +13,10 @@
         : ($brechaEstructural > 0.01
             ? ['label' => 'Horas estructuralmente necesarias', 'value' => '+'.$fmt($brechaEstructural), 'class' => 'alert-success']
             : ['label' => 'Dotación estructural cuadrada', 'value' => '0', 'class' => 'alert-primary']);
+    $horasSobredotacionEstructural = (float) ($sobredotacionResumen['horas_sobredotacion_estructural'] ?? 0);
+    $horasContratoSinAsignacion = (float) ($sobredotacionResumen['horas_sobredotacion_total'] ?? 0);
+    $diferenciaIndicadores = (float) ($sobredotacionResumen['horas_diferencia_indicadores'] ?? ($horasContratoSinAsignacion - $horasSobredotacionEstructural));
+    $operadorConciliacion = $diferenciaIndicadores >= 0 ? '+' : '−';
 @endphp
 
 <div class="card dotacion-section mb-4">
@@ -49,15 +53,25 @@
                 <div class="small mt-1">Este indicador institucional se presenta como referencia y no reemplaza el cálculo factual de horas sin asignación por docente.</div>
             </div>
 
+            <div class="alert alert-light border rounded-4">
+                <div class="fw-bold mb-1"><i class="bi bi-arrow-left-right"></i> Conciliación de indicadores</div>
+                <div class="fw-semibold">
+                    Sobredotación estructural {{ $fmt($horasSobredotacionEstructural) }}
+                    {{ $operadorConciliacion }} diferencia por cobertura y distribución individual {{ $fmt(abs($diferenciaIndicadores)) }}
+                    = contrato sin asignación {{ $fmt($horasContratoSinAsignacion) }}.
+                </div>
+                <div class="small text-muted mt-1">La brecha estructural compara contrato con necesidades; el contrato sin asignación compara las horas de cada docente con sus asignaciones registradas.</div>
+            </div>
+
             <div class="row g-3">
                 <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Docentes analizados</div><div class="h4 fw-bold mb-0">{{ number_format((int) ($sobredotacionResumen['docentes_analizados'] ?? 0), 0, ',', '.') }}</div><div class="small text-muted">Con contrato Aula o asignación</div></div></div>
                 <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Contrato Aula</div><div class="h4 fw-bold mb-0">{{ $fmt($sobredotacionResumen['horas_dotacion_total'] ?? 0) }}</div><div class="small text-muted">Contrato individualizado</div></div></div>
                 <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-success-subtle h-100"><div class="small text-muted">Asignaciones protegidas</div><div class="h4 fw-bold text-success mb-0">{{ $fmt($sobredotacionResumen['horas_asignadas_protegidas'] ?? 0) }}</div><div class="small text-muted">Plan, colaboración y normativa</div></div></div>
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-warning-subtle h-100"><div class="small text-muted">Declaradas ajustables</div><div class="h4 fw-bold text-warning-emphasis mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_ajustables'] ?? 0) }}</div><div class="small text-muted">Asignadas, no normativas</div></div></div>
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-danger-subtle h-100"><div class="small text-muted">Sobredotación sin asignación</div><div class="h4 fw-bold text-danger mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_total'] ?? 0) }}</div><div class="small text-muted">Horas contractuales vacantes</div></div></div>
+                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-warning-subtle h-100"><div class="small text-muted">Declaradas docentes / requeridas</div><div class="h4 fw-bold text-warning-emphasis mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_ajustables'] ?? 0) }} / {{ $fmt($sobredotacionResumen['horas_declaradas_requeridas'] ?? $formula['bloque_declarado'] ?? 0) }}</div><div class="small text-muted">Pendientes de cobertura docente: {{ $fmt($sobredotacionResumen['horas_declaradas_pendientes'] ?? 0) }}</div></div></div>
+                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-danger-subtle h-100"><div class="small text-muted">Contrato sin asignación registrada</div><div class="h4 fw-bold text-danger mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_total'] ?? 0) }}</div><div class="small text-muted">Horas contractuales vacantes</div></div></div>
                 <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-primary-subtle h-100"><div class="small text-muted">Sin asignación Planta</div><div class="h4 fw-bold text-primary mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_planta'] ?? 0) }}</div><div class="small text-muted">Horas titulares</div></div></div>
                 <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-info-subtle h-100"><div class="small text-muted">Sin asignación Contrata</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_contrata'] ?? 0) }}</div><div class="small text-muted">Horas a contrata</div></div></div>
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-secondary-subtle h-100"><div class="small text-muted">Potencial total de ajuste</div><div class="h4 fw-bold text-secondary mb-0">{{ $fmt($sobredotacionResumen['horas_potencial_ajuste'] ?? 0) }}</div><div class="small text-muted">Sin asignación + declaradas</div></div></div>
+                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-secondary-subtle h-100"><div class="small text-muted">Universo sujeto a revisión</div><div class="h4 fw-bold text-secondary mb-0">{{ $fmt($sobredotacionResumen['horas_universo_revision'] ?? $sobredotacionResumen['horas_potencial_ajuste'] ?? 0) }}</div><div class="small text-muted">Sin asignación + declaradas asignadas</div></div></div>
             </div>
         @else
             @php
@@ -106,7 +120,7 @@
         <div class="dotacion-section-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <div class="dotacion-eyebrow">Horas contractuales vacantes</div>
-                <h2 class="h5 fw-bold mb-1">Sobredotación sin asignación</h2>
+                <h2 class="h5 fw-bold mb-1">Contrato sin asignación registrada</h2>
                 <div class="text-muted small">Sólo aparecen docentes cuyo contrato Aula supera la suma de sus asignaciones protegidas y declaradas.</div>
             </div>
             <span class="badge rounded-pill text-bg-danger">{{ $sobredotacionItems->count() }} docente(s)</span>
@@ -134,7 +148,7 @@
                     @endforelse
                 </tbody>
                 @if ($sobredotacionItems->isNotEmpty())
-                    <tfoot class="table-light fw-bold"><tr><td colspan="7">Total sobredotación sin asignación</td><td class="text-end text-danger">{{ $fmt($sobredotacionResumen['horas_sobredotacion_total'] ?? 0) }}</td><td class="text-end text-primary">{{ $fmt($sobredotacionResumen['horas_sobredotacion_planta'] ?? 0) }}</td><td class="text-end text-info">{{ $fmt($sobredotacionResumen['horas_sobredotacion_contrata'] ?? 0) }}</td><td></td></tr></tfoot>
+                    <tfoot class="table-light fw-bold"><tr><td colspan="7">Total contrato sin asignación registrada</td><td class="text-end text-danger">{{ $fmt($sobredotacionResumen['horas_sobredotacion_total'] ?? 0) }}</td><td class="text-end text-primary">{{ $fmt($sobredotacionResumen['horas_sobredotacion_planta'] ?? 0) }}</td><td class="text-end text-info">{{ $fmt($sobredotacionResumen['horas_sobredotacion_contrata'] ?? 0) }}</td><td></td></tr></tfoot>
                 @endif
             </table>
         </div>
@@ -144,14 +158,14 @@
         <div class="dotacion-section-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <div class="dotacion-eyebrow">Funciones no normativas asignadas</div>
-                <h2 class="h5 fw-bold mb-1">Horas de posible ajuste</h2>
+                <h2 class="h5 fw-bold mb-1">Funciones declaradas asignadas a docentes (revisables)</h2>
                 <div class="text-muted small">Son horas del bloque declarado que actualmente tienen asignación. No forman parte de la sobredotación sin asignación, pero pueden revisarse. Abre cada docente para conocer las funciones que componen sus horas.</div>
             </div>
             <span class="badge rounded-pill text-bg-warning">{{ $ajusteItems->count() }} docente(s)</span>
         </div>
         <div class="card-body border-bottom">
             <div class="row g-3">
-                <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-warning-subtle h-100"><div class="small text-muted">Total posible ajuste</div><div class="h4 fw-bold text-warning-emphasis mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_ajustables'] ?? 0) }}</div><div class="small text-muted">Funciones declaradas asignadas</div></div></div>
+                <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-warning-subtle h-100"><div class="small text-muted">Docentes asignadas / requeridas</div><div class="h4 fw-bold text-warning-emphasis mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_ajustables'] ?? 0) }} / {{ $fmt($sobredotacionResumen['horas_declaradas_requeridas'] ?? $formula['bloque_declarado'] ?? 0) }}</div><div class="small text-muted">Pendientes de cobertura docente: {{ $fmt($sobredotacionResumen['horas_declaradas_pendientes'] ?? 0) }}</div></div></div>
                 <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-primary-subtle h-100"><div class="small text-muted">Horas titulares</div><div class="h4 fw-bold text-primary mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_titulares'] ?? 0) }}</div><div class="small text-muted">Imputadas a contrato Planta</div></div></div>
                 <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-info-subtle h-100"><div class="small text-muted">Horas Contrata</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_contrata'] ?? 0) }}</div><div class="small text-muted">Imputadas a contrato Contrata</div></div></div>
                 <div class="col-xl-3 col-md-6"><div class="p-3 rounded-4 bg-danger-subtle h-100"><div class="small text-muted">Sin cobertura contractual</div><div class="h4 fw-bold text-danger mb-0">{{ $fmt($sobredotacionResumen['horas_declaradas_sin_cobertura'] ?? 0) }}</div><div class="small text-muted">Declaradas sobre el contrato disponible</div></div></div>
@@ -160,7 +174,7 @@
         </div>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
-                <thead class="table-light"><tr><th><span class="visually-hidden">Detalle</span></th><th>Docente</th><th>Función</th><th class="text-end">Contrato Aula</th><th class="text-end">Protegidas</th><th class="text-end">Ajustables</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Sin cobertura</th><th class="text-end">Sin asignación</th><th class="text-end">Sobreasignadas</th></tr></thead>
+                <thead class="table-light"><tr><th><span class="visually-hidden">Detalle</span></th><th>Docente</th><th>Función</th><th class="text-end">Contrato Aula</th><th class="text-end">Protegidas</th><th class="text-end">Declaradas asignadas</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Sin cobertura</th><th class="text-end">Sin asignación</th><th class="text-end">Sobreasignadas</th></tr></thead>
                 <tbody>
                     @forelse ($ajusteItems as $docente)
                         @php($detalleId = 'detalle-ajuste-docente-'.$loop->index)
