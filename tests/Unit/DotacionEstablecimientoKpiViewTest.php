@@ -49,6 +49,8 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
         $this->assertStringContainsString('aula.resumen.horas_sobredotacion_total', $source);
         $this->assertStringContainsString('$resultadoBrecha(-$horasSobredotacionGeneral)', $source);
         $this->assertStringNotContainsString('(Contrato plan + trabajo colaborativo PIE + funciones directivas', $source);
+        $this->assertStringNotContainsString('Resultado contractual final para comparación.', $source);
+        $this->assertStringNotContainsString('$resultadoFinal', $source);
         $this->assertStringContainsString('aula.resumen.horas_sobredotacion_total', $pdfSource);
         $this->assertStringContainsString('Brecha estructural de Dotación General', $pdfSource);
         $this->assertStringNotContainsString('(Contrato plan + trabajo colaborativo PIE + bloque normativo + bloque declarado)', $pdfSource);

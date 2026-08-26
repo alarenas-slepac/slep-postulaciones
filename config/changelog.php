@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.8.26.438' => [
+        'date' => '2026-08-26',
+        'module' => 'Dotación',
+        'title' => 'Eliminación de tarjeta contractual redundante',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+        ],
+        'changes' => [
+            'Elimina la tarjeta de resultado contractual que aparecía debajo de Dotación General y Dotación PIE.',
+            'Mantiene sin cambios las cifras independientes de sobredotación general y dotación PIE.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.26.437' => [
         'date' => '2026-08-26',
         'module' => 'Dotación',
