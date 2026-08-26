@@ -252,13 +252,11 @@ class DotacionEstablecimientoController extends Controller
         if (! in_array($sobredotacionTipo, DotacionSobredotacionCalculator::TIPOS, true)) {
             $sobredotacionTipo = 'aula';
         }
-        $sobredotacion = $tab === 'sobredotacion'
-            ? DotacionSobredotacionCalculator::build(
-                $data['docentes'],
-                $data['resumen'],
-                data_get($data, 'asignacion.necesidades.funciones', [])
-            )
-            : ['aula' => ['items' => collect(), 'resumen' => []], 'pie' => ['items' => collect(), 'resumen' => []]];
+        $sobredotacion = DotacionSobredotacionCalculator::build(
+            $data['docentes'],
+            $data['resumen'],
+            data_get($data, 'asignacion.necesidades.funciones', [])
+        );
         $proporcionExcepcionTableReady = Schema::hasTable('dotacion_proporcion_excepciones');
         $proporcionExcepcion = $proporcionExcepcionTableReady
             ? DotacionProporcionExcepcion::query()
@@ -322,6 +320,11 @@ class DotacionEstablecimientoController extends Controller
 
         $anio = (int) $request->query('anio', now()->year);
         $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
+        $sobredotacion = DotacionSobredotacionCalculator::build(
+            $data['docentes'],
+            $data['resumen'],
+            data_get($data, 'asignacion.necesidades.funciones', [])
+        );
         $generatedAt = now();
         $generatedBy = $request->user();
 
@@ -342,6 +345,7 @@ class DotacionEstablecimientoController extends Controller
             'bloques' => $data['bloques'],
             'bloquesContratoDotacion' => $data['bloques_contrato_dotacion'] ?? $data['bloques'],
             'docentes' => $data['docentes'],
+            'sobredotacion' => $sobredotacion,
             // El PDF utiliza solamente las necesidades del plan; no se conserva
             // el árbol completo de asignación, que puede ser considerablemente mayor.
             'necesidadesPlan' => data_get($data, 'asignacion.necesidades.plan_estudio', []),

@@ -289,8 +289,11 @@ class DotacionSobredotacionCalculatorTest extends TestCase
             'anio' => 2026,
         ])->render();
         $this->assertStringContainsString('Horas contrato Aula', $htmlAula);
-        $this->assertStringContainsString('Sobredotaci', $htmlAula);
-        $this->assertStringContainsString('Conciliación de indicadores', $htmlAula);
+        $this->assertStringContainsString('Detalle sobredotación', $htmlAula);
+        $this->assertStringContainsString('Brecha estructural de Dotación General', $htmlAula);
+        $this->assertStringNotContainsString('Conciliación de indicadores', $htmlAula);
+        $this->assertStringNotContainsString('diferencia por cobertura y distribución individual', $htmlAula);
+        $this->assertStringNotContainsString('(50 + 10 + 12)', $htmlAula);
         $this->assertStringContainsString('Contrato sin asignación registrada', $htmlAula);
         $this->assertStringContainsString('Funciones declaradas asignadas a docentes (revisables)', $htmlAula);
         $this->assertStringContainsString('Declaradas docentes / requeridas', $htmlAula);
