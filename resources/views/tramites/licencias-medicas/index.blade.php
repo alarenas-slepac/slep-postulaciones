@@ -16,9 +16,16 @@
                 <p class="cf-page-header__subtitle">Ingreso digital o escaneado, respaldo documental, control por folio tipo-cuerpo-DV y asociación con Administración Central o con el padrón vigente de establecimientos.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ route('tramites.licencias-medicas.importar-seguimiento') }}" class="cf-btn-secondary"><i class="bi bi-file-earmark-spreadsheet"></i> Importar seguimiento</a>
-                <a href="{{ route('tramites.licencias-medicas.feriados.index') }}" class="cf-btn-secondary"><i class="bi bi-calendar2-week"></i> Feriados</a>
-                <a href="{{ route('tramites.licencias-medicas.create') }}" class="cf-btn-primary"><i class="bi bi-plus-circle"></i> Nueva licencia</a>
+                @if($permisos['importacion'])
+                    <a href="{{ route('tramites.licencias-medicas.importar-seguimiento') }}" class="cf-btn-secondary"><i class="bi bi-file-earmark-spreadsheet"></i> Importar seguimiento</a>
+                    <a href="{{ route('tramites.licencias-medicas.actualizaciones.index') }}" class="cf-btn-secondary"><i class="bi bi-arrow-repeat"></i> Actualización masiva</a>
+                @endif
+                @if($permisos['configuracion'])
+                    <a href="{{ route('tramites.licencias-medicas.feriados.index') }}" class="cf-btn-secondary"><i class="bi bi-calendar2-week"></i> Feriados</a>
+                @endif
+                @if($permisos['digitacion'])
+                    <a href="{{ route('tramites.licencias-medicas.create') }}" class="cf-btn-primary"><i class="bi bi-plus-circle"></i> Nueva licencia</a>
+                @endif
             </div>
         </div>
         <div class="cf-summary-strip">
@@ -35,10 +42,11 @@
 
     <div class="cf-panel mb-4">
         <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-4"><label class="form-label fw-bold">Buscar</label><input type="text" name="q" value="{{ request('q') }}" class="form-control" placeholder="Folio, RUT o nombre"></div>
+            <div class="col-md-3"><label class="form-label fw-bold">Buscar</label><input type="text" name="q" value="{{ request('q') }}" class="form-control" placeholder="Folio, RUT o nombre"></div>
             <div class="col-md-2"><label class="form-label fw-bold">Año</label><input type="number" name="anio" value="{{ request('anio') }}" class="form-control" placeholder="2026"></div>
-            <div class="col-md-2"><label class="form-label fw-bold">Mes</label><input type="number" min="1" max="12" name="mes" value="{{ request('mes') }}" class="form-control" placeholder="1-12"></div>
-            <div class="col-md-2"><label class="form-label fw-bold">Origen</label><select name="origen" class="form-select"><option value="">Todos</option><option value="digital_pdf" @selected(request('origen')==='digital_pdf')>Digital</option><option value="escaneada_manual" @selected(request('origen')==='escaneada_manual')>Escaneada</option></select></div>
+            <div class="col-md-1"><label class="form-label fw-bold">Mes</label><input type="number" min="1" max="12" name="mes" value="{{ request('mes') }}" class="form-control" placeholder="1-12"></div>
+            <div class="col-md-2"><label class="form-label fw-bold">Estado administrativo</label><select name="estado_administrativo" class="form-select"><option value="">Todos</option>@foreach($estadosAdministrativos as $codigo => $etiqueta)<option value="{{ $codigo }}" @selected(request('estado_administrativo') === $codigo)>{{ $etiqueta }}</option>@endforeach</select></div>
+            <div class="col-md-2"><label class="form-label fw-bold">Origen</label><select name="origen" class="form-select"><option value="">Todos</option><option value="digital_pdf" @selected(request('origen')==='digital_pdf')>Digital</option><option value="escaneada_manual" @selected(request('origen')==='escaneada_manual')>Escaneada</option><option value="importacion_excel_seguimiento" @selected(request('origen')==='importacion_excel_seguimiento')>Importación</option></select></div>
             <div class="col-md-2 d-flex gap-2"><button class="cf-btn-secondary flex-fill" type="submit"><i class="bi bi-search"></i> Filtrar</button><a href="{{ route('tramites.licencias-medicas.index') }}" class="cf-btn-outline"><i class="bi bi-x-lg"></i></a></div>
         </form>
     </div>
@@ -52,7 +60,17 @@
                         <td><strong>{{ $licencia->folio_licencia }}</strong><br><small class="text-muted">Tipo {{ $licencia->tipo_ingreso_licencia }} / cuerpo {{ $licencia->cuerpo_licencia }}</small></td>
                         <td><strong>{{ $licencia->nombre_funcionario }}</strong><br><small class="text-muted">{{ $licencia->rut_formateado }}</small></td>
                         <td>{{ optional($licencia->fecha_inicio)->format('d-m-Y') }} @if($licencia->fecha_termino) al {{ $licencia->fecha_termino->format('d-m-Y') }} @endif<br><small class="text-muted">{{ $licencia->dias_solicitados ?? '-' }} solicitados / {{ $licencia->dias_corridos ?? '-' }} corridos / {{ $licencia->dias_laborales ?? '-' }} laborales</small></td>
-                        <td><span class="cf-pill {{ $licencia->origen_ingreso === 'digital_pdf' ? 'is-ok' : 'is-warn' }}"><i class="bi {{ $licencia->origen_ingreso === 'digital_pdf' ? 'bi-filetype-pdf' : 'bi-file-earmark-image' }}"></i> {{ $licencia->origen_ingreso === 'digital_pdf' ? 'Digital' : 'Escaneada' }}</span></td>
+                        <td>
+                            @php
+                                $origenLabel = match($licencia->origen_ingreso) {
+                                    'digital_pdf' => 'Digital',
+                                    'escaneada_manual' => 'Escaneada',
+                                    'importacion_excel_seguimiento' => 'Importación',
+                                    default => 'Otro',
+                                };
+                            @endphp
+                            <span class="cf-pill {{ $licencia->origen_ingreso === 'digital_pdf' ? 'is-ok' : 'is-warn' }}">{{ $origenLabel }}</span>
+                        </td>
                         <td>
                             @if($licencia->tipo_dependencia === 'administracion_central')
                                 <strong>Administración Central</strong><br><small class="text-muted">{{ $licencia->subdireccion ?: ($licencia->unidad_departamento ?: '-') }}</small>
@@ -60,7 +78,7 @@
                                 {{ $licencia->establecimiento_nombre ?: 'Sin asociación' }}<br><small class="text-muted">{{ $licencia->comuna ?: '-' }}</small>
                             @endif
                         </td>
-                        <td><span class="cf-pill">{{ $licencia->estado_actual }}</span></td>
+                        <td><span class="cf-pill">{{ $licencia->estado_administrativo_label }}</span></td>
                         <td class="text-end"><a href="{{ route('tramites.licencias-medicas.show', $licencia) }}" class="cf-btn-outline"><i class="bi bi-eye"></i> Ver</a></td>
                     </tr>
                 @empty

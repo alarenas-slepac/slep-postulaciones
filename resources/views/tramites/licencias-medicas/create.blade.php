@@ -115,7 +115,14 @@
                 <div class="col-md-2"><label class="form-label">Tipo ingreso</label><select name="tipo_ingreso_licencia" class="form-select" required><option value="">Seleccione</option>@foreach(['1','2','3','4'] as $t)<option value="{{ $t }}" @selected(old('tipo_ingreso_licencia', $datos['tipo_ingreso_licencia'] ?? '')==$t)>{{ $t }}</option>@endforeach</select></div>
                 <div class="col-md-4"><label class="form-label">Cuerpo licencia</label><input type="text" name="cuerpo_licencia" class="form-control" value="{{ old('cuerpo_licencia', $datos['cuerpo_licencia'] ?? '') }}" required></div>
                 <div class="col-md-2"><label class="form-label">DV licencia</label><input type="text" name="dv_licencia" maxlength="1" class="form-control text-uppercase" value="{{ old('dv_licencia', $datos['dv_licencia'] ?? '') }}" required></div>
-                <div class="col-md-4"><label class="form-label">Estado inicial</label><input type="text" name="estado_actual" class="form-control" value="{{ old('estado_actual', $datos['estado_actual'] ?? 'Ingresada') }}"></div>
+                <div class="col-md-4">
+                    <label class="form-label">Estado administrativo inicial</label>
+                    <select name="estado_administrativo_codigo" class="form-select" required>
+                        @foreach($estadosAdministrativos as $codigo => $etiqueta)
+                            <option value="{{ $codigo }}" @selected(old('estado_administrativo_codigo', $estadoAdministrativoInicial) === $codigo)>{{ $etiqueta }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
                 <div class="col-md-4"><label class="form-label">RUT funcionario</label><input type="text" name="rut_funcionario_input" class="form-control" value="{{ old('rut_funcionario_input', $datos['rut_formateado'] ?? '') }}" required></div>
                 <div class="col-md-8"><label class="form-label">Nombre funcionario</label><input type="text" name="nombre_funcionario" class="form-control" value="{{ old('nombre_funcionario', $datos['nombre_funcionario'] ?? '') }}" required></div>

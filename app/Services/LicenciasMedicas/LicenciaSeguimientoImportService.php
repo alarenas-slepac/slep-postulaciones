@@ -18,7 +18,8 @@ class LicenciaSeguimientoImportService
 
     public function __construct(
         private readonly LicenciaFuncionarioResolver $resolver,
-        private readonly LicenciaDiasLaboralesService $diasLaboralesService
+        private readonly LicenciaDiasLaboralesService $diasLaboralesService,
+        private readonly LicenciaEstadoService $estados
     ) {
     }
 
@@ -37,9 +38,10 @@ class LicenciaSeguimientoImportService
             'subido_por' => $userId,
         ]);
 
-        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'xlsx' && class_exists(ZipArchive::class) && class_exists(XMLReader::class)) {
-            return $this->importStreamingXlsx($path, $importacion, $userId, $tipoIngresoDefault, $originalName);
-        }
+        try {
+            if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'xlsx' && class_exists(ZipArchive::class) && class_exists(XMLReader::class)) {
+                return $this->importStreamingXlsx($path, $importacion, $userId, $tipoIngresoDefault, $originalName);
+            }
 
         $reader = IOFactory::createReaderForFile($path);
         $reader->setReadDataOnly(true);
@@ -102,11 +104,19 @@ class LicenciaSeguimientoImportService
             'estado' => 'procesado',
         ]);
 
-        return [
-            'importacion_id' => $importacion->id,
-            'totales' => $totales,
-            'resumen' => $resumen,
-        ];
+            return [
+                'importacion_id' => $importacion->id,
+                'totales' => $totales,
+                'resumen' => $resumen,
+            ];
+        } catch (\Throwable $e) {
+            $importacion->update([
+                'estado' => 'fallido',
+                'resumen_json' => ['error' => 'La importación no pudo completarse.'],
+            ]);
+
+            throw $e;
+        }
     }
 
     private function procesarHoja($sheet, string $sheetName, string $tipoIngresoDefault, array $datosFuncionarios, int $importacionId, int $userId): array
@@ -172,9 +182,6 @@ class LicenciaSeguimientoImportService
 
                 $resultado = $this->guardarLicencia($parsed['data'], $importacionId, $userId);
                 $stats[$resultado]++;
-                if ($resultado === 'duplicadas') {
-                    $this->addInconsistencia($stats, $sheetName, $row, 'Licencia ya existente; se actualizó información histórica sin duplicar folio.');
-                }
             }
 
             if (function_exists('gc_collect_cycles')) {
@@ -201,7 +208,7 @@ class LicenciaSeguimientoImportService
         }
 
         $rut = RutNormalizer::normalize((string) $this->value($row, $map, 'rut'));
-        if (! $rut['rut']) {
+        if (! $rut['valido']) {
             return ['error' => 'RUT del funcionario inválido o vacío.'];
         }
 
@@ -230,6 +237,13 @@ class LicenciaSeguimientoImportService
 
         $primerEstado = $this->clean($this->value($row, $map, 'primer_estado'));
         $estadoActual = $primerEstado ?: 'Importada seguimiento';
+        $estadoAdministrativoCodigo = $this->estados->normalizar(LicenciaEstadoService::ADMINISTRATIVO, $estadoActual) ?: 'otro';
+        $estadoCompinCodigo = $this->estados->normalizar(LicenciaEstadoService::COMPIN, $primerEstado) ?: 'sin_informacion';
+        $recuperabilidad = mb_strtoupper((string) $this->clean($this->value($row, $map, 'se_puede_recuperar')));
+        $gestionCobro = $this->clean($this->value($row, $map, 'gestion_cobro'));
+        $estadoRecuperacionCodigo = str_starts_with($recuperabilidad, 'NO')
+            ? 'no_recuperable'
+            : ($gestionCobro ? 'en_cobro' : 'no_evaluada');
         $diasCorridos = null;
         $diasLaborales = $this->int($this->value($row, $map, 'dias_lab'));
         if ($fechaInicio && $fechaTermino) {
@@ -289,9 +303,12 @@ class LicenciaSeguimientoImportService
                 'realizo_apelacion' => $this->clean($this->value($row, $map, 'realizo_apelacion')),
                 'estado_actual' => $estadoActual,
                 'estado_compin' => $primerEstado,
+                'estado_administrativo_codigo' => $estadoAdministrativoCodigo,
+                'estado_compin_codigo' => $estadoCompinCodigo,
+                'estado_recuperacion_codigo' => $estadoRecuperacionCodigo,
                 'dias_autorizados' => $this->int($this->value($row, $map, 'dias_autorizados')),
                 'estado_notificacion' => 'sin_notificacion',
-                'estado_alerta' => in_array(mb_strtoupper($primerEstado ?? ''), ['RECHAZADA', 'REDUCCION', 'REDUCCIÓN'], true) ? 'alerta_revision' : 'sin_alerta',
+                'estado_alerta' => in_array(mb_strtoupper($primerEstado ?? ''), ['RECHAZADA', 'REDUCIDA', 'REDUCCION', 'REDUCCIÓN'], true) ? 'alerta_revision' : 'sin_alerta',
                 'origen_ingreso' => 'importacion_excel_seguimiento',
                 'tipo_documento_ingreso' => 'importacion_excel',
                 'fuente_asociacion_funcionario' => $asociacion['fuente'] ?? 'sin_asociacion',
@@ -308,20 +325,27 @@ class LicenciaSeguimientoImportService
             ->where('dv_licencia', $data['dv_licencia'])
             ->first();
 
-        $data['importacion_id'] = $importacionId;
-        $data['updated_by'] = $userId;
-
         if ($existing) {
+            $anteriores = $this->estadosAnteriores($existing);
             $existing->fill(array_filter($data, fn ($value) => ! is_null($value)));
+
+            if (! $existing->isDirty()) {
+                return 'duplicadas';
+            }
+
+            $existing->importacion_id = $importacionId;
+            $existing->updated_by = $userId;
             $existing->save();
 
-            $this->registrarHistorialLiviano($existing->id, 'importacion_excel_actualizacion', $userId);
+            $this->registrarCambiosEstado($existing, $anteriores, $userId, $importacionId);
             return 'actualizadas';
         }
 
+        $data['importacion_id'] = $importacionId;
+        $data['updated_by'] = $userId;
         $data['created_by'] = $userId;
         $licencia = LicenciaMedica::create($data);
-        $this->registrarHistorialLiviano($licencia->id, 'importacion_excel_creacion', $userId);
+        $this->registrarCambiosEstado($licencia, [], $userId, $importacionId);
 
         return 'importadas';
     }
@@ -752,12 +776,45 @@ class LicenciaSeguimientoImportService
         return $this->resolverCache[$cacheKey];
     }
 
-    private function registrarHistorialLiviano(int $licenciaId, string $accion, int $userId): void
+    private function estadosAnteriores(LicenciaMedica $licencia): array
     {
-        // La importación histórica puede superar 10.000 filas. La trazabilidad principal queda
-        // en licencias_medicas_importaciones; no se genera un historial por cada fila para evitar
-        // timeouts 504 y saturación de base de datos en cPanel.
-        return;
+        return [
+            LicenciaEstadoService::ADMINISTRATIVO => $licencia->estado_administrativo_codigo,
+            LicenciaEstadoService::COMPIN => $licencia->estado_compin_codigo,
+            LicenciaEstadoService::RECUPERACION => $licencia->estado_recuperacion_codigo,
+        ];
+    }
+
+    private function registrarCambiosEstado(
+        LicenciaMedica $licencia,
+        array $anteriores,
+        int $userId,
+        int $importacionId
+    ): void {
+        foreach ($this->estados->dimensiones() as $dimension) {
+            $columna = $this->estados->columna($dimension);
+            $anterior = $anteriores[$dimension] ?? null;
+            $nuevo = $licencia->{$columna};
+
+            if ($anterior === $nuevo || $nuevo === null) {
+                continue;
+            }
+
+            LicenciaMedicaHistorial::create([
+                'licencia_medica_id' => $licencia->id,
+                'accion' => 'cambio_estado',
+                'descripcion' => 'Estado registrado por importación de seguimiento.',
+                'estado_dimension' => $dimension,
+                'estado_anterior' => $anterior,
+                'estado_nuevo' => $nuevo,
+                'datos_anteriores' => [$columna => $anterior],
+                'datos_nuevos' => [$columna => $nuevo],
+                'origen' => 'importacion_excel',
+                'importacion_id' => $importacionId,
+                'user_id' => $userId,
+                'created_at' => now(),
+            ]);
+        }
     }
 
     private function resolverSistemaSalud(?string $salud): ?string
@@ -843,7 +900,7 @@ class LicenciaSeguimientoImportService
             'numero_ord' => $this->find($normalized, ['NUMERODEORD', 'NUMEROORD']),
             'fecha_cobro' => $this->find($normalized, ['FECHADELCOBRO', 'FECHACOBRO']),
             'numero_ord_nuevo_cobro' => $this->find($normalized, ['NUMEROORDNUEVOCOBRO', 'NUMEROORDNUEVOCOBRO']),
-            'fecha_nuevo_cobro' => $this->find($normalized, ['FECHACOBRO']),
+            'fecha_nuevo_cobro' => $this->find($normalized, ['FECHANUEVOCOBRO', 'FECHADELNUEVOCOBRO']),
             'ingresar_siaper' => $this->find($normalized, ['INGRESARASIAPER']),
             'rex_siaper' => $this->find($normalized, ['REXSIAPER']),
             'realizo_apelacion' => $this->find($normalized, ['REALIZOAPELACION']),

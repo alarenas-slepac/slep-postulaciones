@@ -15,8 +15,13 @@ class LicenciaMedicaHistorial extends Model
         'licencia_medica_id',
         'accion',
         'descripcion',
+        'estado_dimension',
+        'estado_anterior',
+        'estado_nuevo',
         'datos_anteriores',
         'datos_nuevos',
+        'origen',
+        'importacion_id',
         'user_id',
         'created_at',
     ];
@@ -35,5 +40,10 @@ class LicenciaMedicaHistorial extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function importacion(): BelongsTo
+    {
+        return $this->belongsTo(LicenciaMedicaImportacion::class, 'importacion_id');
     }
 }
