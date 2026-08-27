@@ -36,7 +36,10 @@ class VotacionesModuleTest extends TestCase
         Cache::flush();
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('rut')->unique();
+            $table->string('nombres');
+            $table->string('apellido_paterno');
+            $table->string('apellido_materno');
             $table->string('email')->unique();
             $table->string('password');
             $table->timestamps();
@@ -62,9 +65,13 @@ class VotacionesModuleTest extends TestCase
         $this->permissionMigration->up();
         $this->migration = require database_path('migrations/2026_08_27_210000_create_votaciones_module_tables.php');
         $this->migration->up();
-        $id = DB::table('users')->insertGetId(['name' => 'Operador de prueba', 'email' => 'operador@example.test', 'password' => 'x', 'created_at' => now(), 'updated_at' => now()]);
+        $id = DB::table('users')->insertGetId(['rut' => '111111111', 'nombres' => 'Operador', 'apellido_paterno' => 'de', 'apellido_materno' => 'Prueba', 'email' => 'operador@example.test', 'password' => 'x', 'created_at' => now(), 'updated_at' => now()]);
         $this->operator = User::findOrFail($id);
-        $this->operator->givePermissionTo(Permission::create(['name' => 'votaciones.manage-jornadas', 'guard_name' => 'web']));
+        $this->operator->givePermissionTo([
+            Permission::create(['name' => 'votaciones.manage-jornadas', 'guard_name' => 'web']),
+            Permission::create(['name' => 'votaciones.operate-group', 'guard_name' => 'web']),
+        ]);
+        Permission::create(['name' => 'votaciones.admin', 'guard_name' => 'web']);
     }
 
     protected function tearDown(): void
@@ -114,6 +121,22 @@ class VotacionesModuleTest extends TestCase
             'jornada_votacion_id' => $jornada->id,
             'evento' => 'jornada_creada',
         ]);
+    }
+
+    public function test_detalle_jornada_usa_el_nombre_completo_del_esquema_real_de_usuarios(): void
+    {
+        [$jornada] = $this->escenario();
+
+        $this->withoutMiddleware([
+            \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+            \App\Http\Middleware\EnsureModuleAccess::class,
+            \App\Http\Middleware\TouchLastSeen::class,
+            \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        ]);
+        $this->actingAs($this->operator)
+            ->get(route('votaciones.admin.jornadas.show', $jornada))
+            ->assertOk()
+            ->assertSee('Operador de Prueba');
     }
 
     public function test_estado_publico_expone_solo_datos_operativos_y_conserva_orden(): void

@@ -69,7 +69,7 @@ class JornadaVotacionController extends Controller
     public function show(JornadaVotacion $jornada): View
     {
         $jornada->load(['procesos', 'grupos.encargado', 'grupos.miembros', 'grupos.rutas.establecimiento', 'grupos.rutas.visita', 'incidencias.grupo', 'bitacora.usuario']);
-        $usuarios = User::permission('votaciones.operate-group')->orderBy('nombres')->orderBy('apellido_paterno')->get(['id', 'name', 'nombres', 'apellido_paterno', 'apellido_materno', 'email']);
+        $usuarios = User::permission('votaciones.operate-group')->orderBy('nombres')->orderBy('apellido_paterno')->get(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email']);
         $establecimientos = Establecimiento::orderBy('comuna')->orderBy('nombre_establecimiento')->get(['id', 'rbd', 'nombre_establecimiento', 'comuna', 'latitud', 'longitud']);
 
         return view('votaciones.admin.show', compact('jornada', 'usuarios', 'establecimientos'));

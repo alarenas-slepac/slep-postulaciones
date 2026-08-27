@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.27.451' => [
+        'date' => '2026-08-27',
+        'module' => 'Votaciones CCAF y Mutualidades',
+        'title' => 'Corrección del detalle con el esquema real de usuarios',
+        'files' => [
+            'app/Http/Controllers/Votaciones/JornadaVotacionController.php',
+            'config/changelog.php',
+            'resources/views/votaciones/admin/show.blade.php',
+            'tests/Feature/VotacionesModuleTest.php',
+        ],
+        'changes' => [
+            'Elimina la columna inexistente users.name de la consulta de operadores disponibles.',
+            'Muestra responsables, integrantes y usuarios de bitácora mediante el nombre completo calculado desde los campos personales vigentes.',
+            'Corrige el cierre de directivas Blade anidadas en la sección de correcciones de visitas para que el detalle compile completamente.',
+            'Alinea el esquema SQLite de las pruebas con producción y verifica la apertura completa del detalle de una jornada.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.27.450' => [
         'date' => '2026-08-27',
         'module' => 'Votaciones CCAF y Mutualidades',
