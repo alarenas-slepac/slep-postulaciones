@@ -60,6 +60,11 @@ class LicenciaMedicaImportacion extends Model
         return $this->hasMany(LicenciaMedicaHistorial::class, 'importacion_id');
     }
 
+    public function errores(): HasMany
+    {
+        return $this->hasMany(LicenciaMedicaImportacionError::class, 'importacion_id');
+    }
+
     public function revertidoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'revertido_por');

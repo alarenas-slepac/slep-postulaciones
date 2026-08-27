@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\LicenciaMedica;
 use App\Models\LicenciaMedicaImportacion;
+use App\Models\LicenciaMedicaImportacionError;
 use App\Services\LicenciasMedicas\LicenciaEstadoMasivoService;
 use App\Services\LicenciasMedicas\LicenciaEstadoService;
 use App\Services\LicenciasMedicas\LicenciaSeguimientoImportService;
@@ -24,6 +25,7 @@ class LicenciasMedicasModuleTest extends TestCase
         parent::setUp();
         Storage::fake('local');
 
+        Schema::dropIfExists('licencias_medicas_importacion_errores');
         Schema::dropIfExists('licencias_medicas_historial');
         Schema::dropIfExists('licencias_medicas');
         Schema::dropIfExists('licencias_medicas_importaciones');
@@ -58,12 +60,25 @@ class LicenciasMedicasModuleTest extends TestCase
             $table->string('cuerpo_licencia', 20)->nullable();
             $table->string('dv_licencia', 1)->nullable();
             $table->string('folio_licencia', 40)->nullable();
+            $table->string('rut_funcionario', 20)->nullable();
+            $table->string('dv_funcionario', 1)->nullable();
             $table->string('rut_normalizado', 20)->nullable();
+            $table->string('rut_formateado', 20)->nullable();
+            $table->string('nombre_funcionario')->nullable();
+            $table->string('tipo_dependencia')->nullable();
             $table->string('estado_actual')->nullable();
             $table->string('estado_compin')->nullable();
             $table->string('estado_administrativo_codigo')->nullable();
             $table->string('estado_compin_codigo')->nullable();
             $table->string('estado_recuperacion_codigo')->nullable();
+            $table->string('estado_notificacion')->nullable();
+            $table->string('estado_alerta')->nullable();
+            $table->string('origen_ingreso')->nullable();
+            $table->string('tipo_documento_ingreso')->nullable();
+            $table->string('fuente_asociacion_funcionario')->nullable();
+            $table->string('origen_planilla_anio')->nullable();
+            $table->unsignedBigInteger('importacion_id')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
         });
@@ -83,10 +98,34 @@ class LicenciasMedicasModuleTest extends TestCase
             $table->unsignedBigInteger('user_id')->nullable();
             $table->timestamp('created_at')->nullable();
         });
+
+        Schema::create('licencias_medicas_importacion_errores', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('importacion_id');
+            $table->string('hoja')->nullable();
+            $table->unsignedInteger('fila')->nullable();
+            $table->string('codigo_error');
+            $table->text('motivo');
+            $table->string('folio_recibido')->nullable();
+            $table->string('rut_recibido')->nullable();
+            $table->json('valores_originales')->nullable();
+            $table->json('valores_corregidos')->nullable();
+            $table->string('estado')->default('pendiente');
+            $table->unsignedSmallInteger('intentos_reproceso')->default(0);
+            $table->text('ultimo_error')->nullable();
+            $table->string('resultado_reproceso')->nullable();
+            $table->unsignedBigInteger('licencia_medica_id')->nullable();
+            $table->unsignedBigInteger('corregido_por')->nullable();
+            $table->timestamp('corregido_at')->nullable();
+            $table->unsignedBigInteger('reprocesado_por')->nullable();
+            $table->timestamp('reprocesado_at')->nullable();
+            $table->timestamps();
+        });
     }
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('licencias_medicas_importacion_errores');
         Schema::dropIfExists('licencias_medicas_historial');
         Schema::dropIfExists('licencias_medicas');
         Schema::dropIfExists('licencias_medicas_importaciones');
@@ -184,6 +223,95 @@ class LicenciasMedicasModuleTest extends TestCase
         } finally {
             @unlink($ruta);
         }
+    }
+
+    public function test_reconstruye_errores_historicos_sin_reaplicar_filas_validas(): void
+    {
+        $path = $this->crearPlanillaSeguimiento([
+            ['', '9', '12.345.678-5', 'Funcionario de prueba'],
+            ['12345', '9', '12.345.678-5', 'Funcionario válido'],
+        ]);
+        $importacion = LicenciaMedicaImportacion::create([
+            'tipo' => 'seguimiento_excel',
+            'nombre_archivo' => basename($path),
+            'archivo_path' => $path,
+            'total_filas' => 2,
+            'total_importadas' => 1,
+            'total_omitidas' => 1,
+            'total_inconsistencias' => 1,
+            'resumen_json' => ['tipo_ingreso_default' => '3'],
+            'estado' => 'procesado',
+            'subido_por' => 99,
+        ]);
+
+        $cantidad = app(LicenciaSeguimientoImportService::class)->indexarErrores($importacion);
+
+        $this->assertSame(1, $cantidad);
+        $this->assertDatabaseHas('licencias_medicas_importacion_errores', [
+            'importacion_id' => $importacion->id,
+            'hoja' => '2026',
+            'fila' => 2,
+            'codigo_error' => 'folio_invalido',
+            'estado' => 'pendiente',
+        ]);
+        $this->assertDatabaseCount('licencias_medicas', 0);
+    }
+
+    public function test_corrige_y_reprocesa_una_fila_rechazada_con_trazabilidad(): void
+    {
+        $importacion = LicenciaMedicaImportacion::create([
+            'tipo' => 'seguimiento_excel',
+            'nombre_archivo' => 'seguimiento_historico.xlsx',
+            'archivo_path' => 'licencias_medicas/importaciones/seguimiento_historico.xlsx',
+            'total_filas' => 1,
+            'total_omitidas' => 1,
+            'total_inconsistencias' => 1,
+            'resumen_json' => ['tipo_ingreso_default' => '3'],
+            'estado' => 'procesado',
+            'subido_por' => 99,
+        ]);
+        $error = LicenciaMedicaImportacionError::create([
+            'importacion_id' => $importacion->id,
+            'hoja' => '2026',
+            'fila' => 25,
+            'codigo_error' => 'rut_invalido',
+            'motivo' => 'RUT del funcionario inválido o vacío.',
+            'folio_recibido' => '12345-9',
+            'rut_recibido' => '12.345.678-0',
+            'valores_originales' => [
+                'licencia' => '12345',
+                'dv' => '9',
+                'rut' => '12.345.678-0',
+                'nombre' => 'Funcionario de prueba',
+            ],
+            'estado' => 'pendiente',
+        ]);
+        $servicio = app(LicenciaSeguimientoImportService::class);
+
+        $servicio->corregirError($error, ['rut' => '12.345.678-5'], 77);
+        $resuelto = $servicio->reprocesarError($error->fresh(), 77);
+
+        $this->assertSame('resuelto', $resuelto->estado);
+        $this->assertSame('importadas', $resuelto->resultado_reproceso);
+        $this->assertSame(1, $resuelto->intentos_reproceso);
+        $this->assertNotNull($resuelto->licencia_medica_id);
+        $this->assertDatabaseHas('licencias_medicas', [
+            'folio_licencia' => '3-12345-9',
+            'rut_normalizado' => '123456785',
+            'importacion_id' => $importacion->id,
+        ]);
+        $this->assertDatabaseHas('licencias_medicas_importaciones', [
+            'id' => $importacion->id,
+            'total_importadas' => 1,
+            'total_omitidas' => 0,
+            'total_inconsistencias' => 0,
+        ]);
+        $this->assertDatabaseHas('licencias_medicas_historial', [
+            'licencia_medica_id' => $resuelto->licencia_medica_id,
+            'origen' => 'importacion_excel',
+            'importacion_id' => $importacion->id,
+            'user_id' => 77,
+        ]);
     }
 
     public function test_actualizacion_masiva_prevalida_confirma_y_revierte_la_carga_completa(): void
@@ -309,6 +437,8 @@ class LicenciasMedicasModuleTest extends TestCase
         $digitacion = $this->middlewareDeRuta('tramites.licencias-medicas.create');
         $importacion = $this->middlewareDeRuta('tramites.licencias-medicas.importar-seguimiento');
         $actualizacionMasiva = $this->middlewareDeRuta('tramites.licencias-medicas.actualizaciones.index');
+        $erroresImportacion = $this->middlewareDeRuta('tramites.licencias-medicas.errores.index');
+        $reprocesoError = $this->middlewareDeRuta('tramites.licencias-medicas.errores.reprocesar');
         $confirmacionMasiva = $this->middlewareDeRuta('tramites.licencias-medicas.actualizaciones.confirmar');
         $reversionMasiva = $this->middlewareDeRuta('tramites.licencias-medicas.actualizaciones.revertir');
         $configuracion = $this->middlewareDeRuta('tramites.licencias-medicas.feriados.index');
@@ -323,6 +453,9 @@ class LicenciasMedicasModuleTest extends TestCase
         $this->assertStringContainsString('analista_smc', $importacion);
         $this->assertStringNotContainsString('digitador_licencias', $importacion);
         $this->assertStringContainsString('analista_smc', $actualizacionMasiva);
+        $this->assertStringContainsString('analista_smc', $erroresImportacion);
+        $this->assertStringContainsString('administrador_licencias', $reprocesoError);
+        $this->assertStringNotContainsString('digitador_licencias', $reprocesoError);
         $this->assertStringContainsString('administrador_licencias', $confirmacionMasiva);
         $this->assertStringNotContainsString('digitador_licencias', $reversionMasiva);
         $this->assertStringContainsString('administrador_licencias', $configuracion);
@@ -377,6 +510,23 @@ class LicenciasMedicasModuleTest extends TestCase
         $spreadsheet = new Spreadsheet();
         $spreadsheet->getActiveSheet()->fromArray([
             ['FOLIO_LICENCIA', 'RUT', 'ESTADO', 'OBSERVACION'],
+            ...$rows,
+        ]);
+        (new Xlsx($spreadsheet))->save(Storage::disk('local')->path($path));
+        $spreadsheet->disconnectWorksheets();
+
+        return $path;
+    }
+
+    private function crearPlanillaSeguimiento(array $rows): string
+    {
+        $path = 'licencias_medicas/pruebas/seguimiento_'.uniqid().'.xlsx';
+        Storage::disk('local')->makeDirectory(dirname($path));
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('2026');
+        $sheet->fromArray([
+            ['N LICENCIA', 'DV', 'RUT', 'NOMBRE'],
             ...$rows,
         ]);
         (new Xlsx($spreadsheet))->save(Storage::disk('local')->path($path));
