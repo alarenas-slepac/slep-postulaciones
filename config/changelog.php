@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.8.27.443' => [
+        'date' => '2026-08-27',
+        'module' => 'Dotación',
+        'title' => 'Cobertura normativa realizada por asistentes de la educación',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Descuenta de las horas docentes normativas la cobertura asignada a asistentes de la educación en funciones directivas, técnico-pedagógicas y planes normativos.',
+            'Aplica el descuento por necesidad y lo limita a sus horas requeridas para que un exceso no reduzca otra función normativa.',
+            'Mantiene sin descuentos las funciones declaradas por el establecimiento y las necesidades PIE.',
+            'La cobertura asignada mostrada frente a la necesidad docente normativa considera solamente asignaciones de docentes, evitando contar nuevamente las horas ya cubiertas por asistentes.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.27.442' => [
         'date' => '2026-08-27',
         'module' => 'Dotación',

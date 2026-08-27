@@ -125,9 +125,15 @@ class DotacionEstablecimientoCalculator
             data_get($asignacion, 'necesidades.pie_educadora_diferencial', [])
         );
         $bloquesContratoDotacion = self::bloquesSinContratoPieNecesario($bloques);
+        $bloquesContratoDotacion = self::descontarCoberturaAsistentesFuncionesNormativas(
+            $bloquesContratoDotacion,
+            data_get($asignacion, 'necesidades.funciones', [])
+        );
         $horasContratoPieNecesarias = (float) ($desgloseContratoPieNecesario['total'] ?? 0);
         $horasDotacionFunciones = collect($bloquesContratoDotacion)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
         $horasDotacionFuncionesNormativas = (float) collect($bloquesContratoDotacion)->sum(fn ($bloque) => (float) ($bloque['automaticas'] ?? 0));
+        $horasDotacionFuncionesNormativasAsistentes = (float) collect($bloquesContratoDotacion)
+            ->sum(fn ($bloque) => (float) ($bloque['horas_asistentes_cobertura'] ?? 0));
         $horasDotacionFuncionesDeclaradas = (float) collect($bloquesContratoDotacion)->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
         $desgloseHorasDotacion = self::desgloseContratoBloqueDotacion(
             $bloquesContratoDotacion,
@@ -182,6 +188,7 @@ class DotacionEstablecimientoCalculator
             'contrato_plan_mas_trabajo_colaborativo_pie_asignadas' => $coberturaPlanPie['contrato_plan_mas_trabajo_colaborativo_pie_asignadas'],
             'horas_dotacion_funciones' => $horasDotacionFunciones,
             'horas_dotacion_funciones_normativas' => $horasDotacionFuncionesNormativas,
+            'horas_dotacion_funciones_normativas_asistentes' => $horasDotacionFuncionesNormativasAsistentes,
             'horas_dotacion_funciones_declaradas' => $horasDotacionFuncionesDeclaradas,
             'horas_dotacion_desglose' => $desgloseHorasDotacion,
             'horas_contrato_pie_necesarias' => $horasContratoPieNecesarias,
@@ -1719,7 +1726,7 @@ class DotacionEstablecimientoCalculator
             return round((float) $necesidades
                 ->filter(fn ($item) => data_get($item, 'subtipo_asignacion') === $subtipo
                     && (int) data_get($item, 'dotacion_funcion_id', 0) <= 0)
-                ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2);
+                ->sum(fn ($item) => self::horasAsignadasNecesidadPorEstamento($item, 'docente')), 2);
         };
         $asignadasDeclaradas = function (string $subtipo) use ($necesidades): float {
             return round((float) $necesidades
@@ -1753,6 +1760,101 @@ class DotacionEstablecimientoCalculator
                 ->filter(fn ($item) => (int) data_get($item, 'dotacion_funcion_id', 0) > 0)
                 ->sum(fn ($item) => (float) data_get($item, 'horas_contrato_asignadas', 0)), 2),
         ];
+    }
+
+    private static function horasAsignadasNecesidadPorEstamento(object|array $necesidad, string $estamento): float
+    {
+        $asignaciones = data_get($necesidad, 'asignaciones');
+        if ($asignaciones === null) {
+            return $estamento === 'docente'
+                ? (float) data_get($necesidad, 'horas_contrato_asignadas', 0)
+                : 0.0;
+        }
+
+        return round((float) collect($asignaciones)
+            ->filter(fn ($asignacion) => DotacionAsignacionCalculator::coverageEstamento($asignacion) === $estamento)
+            ->sum(fn ($asignacion) => (float) data_get($asignacion, 'horas_contrato', 0)), 2);
+    }
+
+    private static function descontarCoberturaAsistentesFuncionesNormativas(
+        array $bloques,
+        iterable $necesidadesFunciones
+    ): array {
+        $bloquesPorSubtipo = [
+            'directiva' => 'directiva',
+            'tecnico_pedagogica' => 'tecnico_pedagogica',
+            'planes_programas' => 'planes_programas',
+        ];
+        $descuentos = collect($necesidadesFunciones)
+            ->filter(fn ($necesidad) => array_key_exists(
+                (string) data_get($necesidad, 'subtipo_asignacion'),
+                $bloquesPorSubtipo
+            ) && (int) data_get($necesidad, 'dotacion_funcion_id', 0) <= 0)
+            ->map(function ($necesidad): array {
+                $requeridas = max(0.0, (float) data_get($necesidad, 'horas_contrato_requeridas', 0));
+                $asistentes = self::horasAsignadasNecesidadPorEstamento($necesidad, 'asistente');
+
+                return [
+                    'subtipo' => (string) data_get($necesidad, 'subtipo_asignacion'),
+                    'nombre' => self::normalizeText((string) (
+                        data_get($necesidad, 'asignatura_nombre')
+                        ?? data_get($necesidad, 'titulo')
+                        ?? ''
+                    )),
+                    'horas' => min($requeridas, max(0.0, $asistentes)),
+                ];
+            })
+            ->filter(fn (array $descuento) => $descuento['horas'] > 0.01)
+            ->groupBy('subtipo');
+
+        foreach ($bloquesPorSubtipo as $subtipo => $bloqueKey) {
+            if (! isset($bloques[$bloqueKey])) {
+                continue;
+            }
+
+            $descuentosBloque = collect($descuentos->get($subtipo, []));
+            $automaticasBrutas = max(0.0, (float) ($bloques[$bloqueKey]['automaticas'] ?? 0));
+            $descuentoBloque = min(
+                $automaticasBrutas,
+                round((float) $descuentosBloque->sum('horas'), 2)
+            );
+            $bloques[$bloqueKey]['automaticas_brutas'] = $automaticasBrutas;
+            $bloques[$bloqueKey]['horas_asistentes_cobertura'] = $descuentoBloque;
+            $bloques[$bloqueKey]['automaticas'] = max(0.0, round($automaticasBrutas - $descuentoBloque, 2));
+            $bloques[$bloqueKey]['total'] = max(
+                0.0,
+                round((float) ($bloques[$bloqueKey]['total'] ?? 0) - $descuentoBloque, 2)
+            );
+
+            $descuentosPorNombre = $descuentosBloque
+                ->groupBy('nombre')
+                ->map(fn (Collection $items) => $items->pluck('horas')->values()->all())
+                ->all();
+
+            foreach ($bloques[$bloqueKey]['items'] as &$item) {
+                if ((int) ($item['dotacion_funcion_id'] ?? 0) > 0) {
+                    continue;
+                }
+
+                $nombre = self::normalizeText((string) ($item['nombre'] ?? ''));
+                if (empty($descuentosPorNombre[$nombre])) {
+                    continue;
+                }
+                $descuentoItem = (float) array_shift($descuentosPorNombre[$nombre]);
+                if ($descuentoItem <= 0.01) {
+                    continue;
+                }
+
+                $horasBrutas = max(0.0, (float) ($item['horas'] ?? 0));
+                $descuentoItem = min($horasBrutas, $descuentoItem);
+                $item['horas_brutas'] = $horasBrutas;
+                $item['horas_asistentes_cobertura'] = $descuentoItem;
+                $item['horas'] = max(0.0, round($horasBrutas - $descuentoItem, 2));
+            }
+            unset($item);
+        }
+
+        return $bloques;
     }
 
     /**
