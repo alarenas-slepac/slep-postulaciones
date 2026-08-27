@@ -15,6 +15,13 @@
         $horasContratoPlanAsignadas = (float) ($resumen['horas_plan_contrato_asignadas'] ?? 0);
         $trabajoColaborativoPieAsignadas = (float) ($resumen['trabajo_colaborativo_pie_asignadas'] ?? 0);
         $contratoPlanMasPieAsignadas = (float) ($resumen['contrato_plan_mas_trabajo_colaborativo_pie_asignadas'] ?? ($horasContratoPlanAsignadas + $trabajoColaborativoPieAsignadas));
+        $contratoPlanMasPieRequerido = (float) ($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0);
+        $grupoEducacionParvularia = data_get($cursos ?? [], 'grupos.parvularia', []);
+        $tieneEducacionParvularia = (int) data_get($grupoEducacionParvularia, 'totales.cursos', 0) > 0;
+        $contratoEducacionParvulariaMasPie = $tieneEducacionParvularia
+            ? (float) data_get($grupoEducacionParvularia, 'totales.contrato_mas_trabajo_colaborativo_pie', 0)
+            : 0.0;
+        $contratoPlanGeneralMasPie = max(0.0, round($contratoPlanMasPieRequerido - $contratoEducacionParvulariaMasPie, 2));
         $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
         $horasBloqueNormativas = (float) ($resumen['horas_dotacion_funciones_normativas'] ?? $desgloseContratoBloque['total_normativas'] ?? 0);
         $horasBloqueDeclaradas = (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? $desgloseContratoBloque['total_declaradas'] ?? 0);
@@ -59,7 +66,12 @@
             ['label' => 'Matrícula', 'value' => number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.'), 'hint' => 'Estudiantes con matrícula vigente.', 'tone' => 'dark', 'icon' => 'bi-people'],
             ['label' => 'Cursos', 'value' => number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.'), 'hint' => 'Cursos con matrícula.', 'tone' => 'primary', 'icon' => 'bi-grid-3x3-gap'],
             ['label' => 'Docentes', 'value' => number_format((int) ($resumen['docentes_total'] ?? 0), 0, ',', '.'), 'hint' => 'Base contractual vigente.', 'tone' => 'success', 'icon' => 'bi-person-workspace'],
-            ['label' => 'Contrato plan + PIE', 'value' => $fmt($contratoPlanMasPieAsignadas).' / '.$fmt($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0), 'hint' => 'Contrato asignado / requerido.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
+            ...($tieneEducacionParvularia ? [
+                ['label' => 'Contrato Educación Parvularia + PIE', 'value' => $fmt($contratoEducacionParvulariaMasPie), 'hint' => 'Horas requeridas: contrato equivalente + trabajo colaborativo PIE de NT1 y NT2.', 'tone' => 'info', 'icon' => 'bi-people-fill'],
+                ['label' => 'Contrato Plan General + PIE', 'value' => $fmt($contratoPlanGeneralMasPie), 'hint' => 'Horas requeridas: contrato equivalente + trabajo colaborativo PIE de los demás cursos.', 'tone' => 'primary', 'icon' => 'bi-plus-square'],
+            ] : [
+                ['label' => 'Contrato plan + PIE', 'value' => $fmt($contratoPlanMasPieAsignadas).' / '.$fmt($contratoPlanMasPieRequerido), 'hint' => 'Contrato asignado / requerido.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
+            ]),
             ['label' => 'Funciones directivas / técnico pedagógicas y planes normativos', 'value' => $fmt($horasBloqueNormativas), 'hint' => 'Horas calculadas por normativa.', 'tone' => 'warning', 'icon' => 'bi-shield-check'],
             ['label' => 'Otras funciones no normativas', 'value' => $fmt($horasBloqueDeclaradasAsignadas).' / '.$fmt($horasBloqueDeclaradas), 'hint' => 'Asignadas / declaradas por el establecimiento.', 'tone' => 'secondary', 'icon' => 'bi-building-add'],
             ['label' => 'Horas contrato PIE necesarias', 'value' => $fmt($horasContratoPieNecesariasAsignadas).' / '.$fmt($horasContratoPieNecesarias), 'hint' => 'Asignadas / necesarias para Coordinación PIE y Educadoras Diferenciales.', 'tone' => 'info', 'icon' => 'bi-universal-access'],

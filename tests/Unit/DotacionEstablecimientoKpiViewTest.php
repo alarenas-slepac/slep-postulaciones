@@ -12,11 +12,30 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
 
         $this->assertIsString($source);
         $this->assertStringContainsString("['label' => 'Contrato plan + PIE'", $source);
+        $this->assertStringContainsString("['label' => 'Contrato Educación Parvularia + PIE'", $source);
+        $this->assertStringContainsString("['label' => 'Contrato Plan General + PIE'", $source);
+        $this->assertStringContainsString('...($tieneEducacionParvularia ? [', $source);
         $this->assertStringContainsString("['label' => 'Funciones directivas / técnico pedagógicas y planes normativos'", $source);
         $this->assertStringContainsString("['label' => 'Otras funciones no normativas'", $source);
         $this->assertStringNotContainsString("['label' => 'Horas plan'", $source);
         $this->assertStringNotContainsString("['label' => 'Contrato plan',", $source);
         $this->assertStringNotContainsString("['label' => 'Trabajo colab. PIE'", $source);
+    }
+
+    public function test_separa_contrato_parvularia_y_plan_general_solo_si_existen_cursos_nt(): void
+    {
+        $source = file_get_contents(resource_path('views/admin/dotacion-establecimiento/show.blade.php'));
+        $pdfSource = file_get_contents(resource_path('views/admin/dotacion-establecimiento/pdf.blade.php'));
+
+        $this->assertIsString($source);
+        $this->assertIsString($pdfSource);
+        $this->assertStringContainsString("data_get(\$cursos ?? [], 'grupos.parvularia', [])", $source);
+        $this->assertStringContainsString('totales.contrato_mas_trabajo_colaborativo_pie', $source);
+        $this->assertStringContainsString('$contratoPlanMasPieRequerido - $contratoEducacionParvulariaMasPie', $source);
+        $this->assertStringContainsString('@if ($tieneEducacionParvularia)', $pdfSource);
+        $this->assertStringContainsString('Contrato plan + PIE por tipo de enseñanza', $pdfSource);
+        $this->assertStringContainsString('Educación Parvularia + PIE', $pdfSource);
+        $this->assertStringContainsString('Plan General + PIE', $pdfSource);
     }
 
     public function test_hace_colapsables_los_desgloses_de_funciones_y_pie(): void

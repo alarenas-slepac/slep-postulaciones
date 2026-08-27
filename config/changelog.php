@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.27.441' => [
+        'date' => '2026-08-27',
+        'module' => 'Dotación',
+        'title' => 'Separación contractual de Educación Parvularia y Plan General',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+        ],
+        'changes' => [
+            'En establecimientos con NT1 o NT2 reemplaza el indicador consolidado por horas requeridas de Educación Parvularia + PIE y Plan General + PIE.',
+            'Calcula Educación Parvularia desde los cursos NT1/NT2 y reserva para Plan General el contrato equivalente y trabajo colaborativo PIE de los demás cursos.',
+            'Mantiene el indicador consolidado asignado/requerido en establecimientos sin Educación Parvularia.',
+            'Replica el desglose condicional en el informe PDF de Dotación Establecimiento.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.26.440' => [
         'date' => '2026-08-26',
         'module' => 'Dotación',
