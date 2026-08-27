@@ -42,7 +42,7 @@
 
         @if ($esAula)
             <div class="alert {{ $resultadoEstructural['class'] }} border-0 rounded-4">
-                <div class="fw-bold mb-1">Brecha estructural de Dotación General</div>
+                <div class="fw-bold mb-1">Sobredotación estructural</div>
                 <div class="fs-4 fw-bold">{{ $resultadoEstructural['value'] }}</div>
             </div>
 

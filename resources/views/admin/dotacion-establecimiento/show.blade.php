@@ -26,8 +26,11 @@
         $horasBloqueNormativas = (float) ($resumen['horas_dotacion_funciones_normativas'] ?? $desgloseContratoBloque['total_normativas'] ?? 0);
         $horasBloqueDeclaradas = (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? $desgloseContratoBloque['total_declaradas'] ?? 0);
         $horasBloqueDeclaradasAsignadas = (float) ($desgloseContratoBloque['total_declaradas_asignadas'] ?? 0);
-        $brechaDotacionGeneral = (float) ($resumen['brecha_dotacion_general'] ?? ((($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + $horasBloqueNormativas + $horasBloqueDeclaradas) - $horasContratoAula));
-        $horasSobredotacionGeneral = (float) data_get($sobredotacion ?? [], 'aula.resumen.horas_sobredotacion_total', max(0, -$brechaDotacionGeneral));
+        $brechaDotacionGeneral = round(
+            ($contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie + $horasBloqueNormativas)
+            - $horasContratoAula,
+            2
+        );
         $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));
         $resultadoBrecha = static function (float $valor) use ($fmt): array {
             if ($valor < -0.01) {
@@ -40,9 +43,7 @@
 
             return ['label' => 'Dotación cuadrada', 'value' => '0', 'tone' => 'primary', 'icon' => 'bi-check-circle'];
         };
-        $resultadoGeneral = $horasSobredotacionGeneral > 0.01
-            ? $resultadoBrecha(-$horasSobredotacionGeneral)
-            : $resultadoBrecha(max(0, $brechaDotacionGeneral));
+        $resultadoGeneral = $resultadoBrecha($brechaDotacionGeneral);
         $resultadoPie = $resultadoBrecha($brechaDotacionPie);
         $desgloseNormativoItems = [
             ['label' => 'Funciones directivas', 'assigned' => $desgloseContratoBloque['funciones_directivas_normativas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['funciones_directivas_normativas'] ?? 0, 'tone' => 'primary', 'icon' => 'bi-person-badge'],
@@ -171,7 +172,7 @@
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
                                 <div>
-                                    <div class="text-muted small fw-semibold">Dotación general</div>
+                                    <div class="text-muted small fw-semibold">Sobredotación estructural</div>
                                     <div class="small text-muted">{{ $resultadoGeneral['label'] }}</div>
                                 </div>
                                 <span class="kpi-icon text-{{ $resultadoGeneral['tone'] }}"><i class="bi {{ $resultadoGeneral['icon'] }}"></i></span>

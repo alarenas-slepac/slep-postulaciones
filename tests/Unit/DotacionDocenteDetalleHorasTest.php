@@ -210,19 +210,18 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         ], $resultado);
     }
 
-    public function test_calcula_brechas_separadas_de_dotacion_general_y_pie(): void
+    public function test_calcula_brecha_estructural_sin_funciones_declaradas_y_separa_pie(): void
     {
         $resultado = $this->invokePrivate('brechasDotacionSeparadas', [
             500,
             101,
             620,
-            26,
             83,
             52,
         ]);
 
         $this->assertSame([
-            'general' => 7.0,
+            'general' => -19.0,
             'pie' => 31.0,
         ], $resultado);
     }

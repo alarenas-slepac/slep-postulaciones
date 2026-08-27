@@ -43,8 +43,7 @@ class DotacionSobredotacionCalculator
         $aulaObjetivo = self::numero($resumen, 'horas_contrato_docentes_aula');
         $necesidadAula = round(
             self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie')
-            + self::numero($resumen, 'horas_dotacion_funciones_normativas')
-            + $declaradasObjetivo,
+            + self::numero($resumen, 'horas_dotacion_funciones_normativas'),
             2
         );
 
