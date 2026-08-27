@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.8.27.450' => [
+        'date' => '2026-08-27',
+        'module' => 'Votaciones CCAF y Mutualidades',
+        'title' => 'Corrección al crear una jornada de votación',
+        'files' => [
+            'app/Http/Controllers/Votaciones/JornadaVotacionController.php',
+            'config/changelog.php',
+            'tests/Feature/VotacionesModuleTest.php',
+        ],
+        'changes' => [
+            'Corrige la variable utilizada para redirigir al detalle después de crear una jornada.',
+            'Mantiene la creación, asociación de procesos y bitácora dentro de una única transacción.',
+            'Agrega una prueba del endpoint completo que verifica la persistencia, la bitácora y el redireccionamiento final.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.27.449' => [
         'date' => '2026-08-27',
         'module' => 'Votaciones CCAF y Mutualidades',
