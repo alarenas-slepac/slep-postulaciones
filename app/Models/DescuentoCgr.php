@@ -14,6 +14,7 @@ class DescuentoCgr extends Model
     protected $fillable = [
         'rut',
         'nombre',
+        'origen_funcionario',
         'numero_resolucion',
         'numero_resolucion_clave',
         'fecha_resolucion',

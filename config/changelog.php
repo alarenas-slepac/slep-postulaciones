@@ -1,6 +1,46 @@
 <?php
 
 return [
+    '2026.8.27.446' => [
+        'date' => '2026-08-27',
+        'module' => 'Descuentos CGR',
+        'title' => 'Exportación mensual de descuentos aplicados',
+        'files' => [
+            'app/Exports/DescuentosCgrMensualExport.php',
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'config/changelog.php',
+            'resources/views/remuneraciones/descuentos-cgr/index.blade.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Agrega un selector de mes y la descarga de un Excel con todos los descuentos cuya cuota corresponde al período elegido.',
+            'Exporta RUT formateado, nombre, resolución, mes, valor UTM, saldos y capital en UTM, además de saldo, capital, interés y descuento total en pesos.',
+            'Utiliza el mismo servicio del cronograma visible para mantener idénticos los cálculos y deja vacíos los montos en pesos cuando falta el valor UTM.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
+    '2026.8.27.445' => [
+        'date' => '2026-08-27',
+        'module' => 'Descuentos CGR',
+        'title' => 'Filtro por tipo de funcionario',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Models/DescuentoCgr.php',
+            'app/Services/Remuneraciones/ReemplazoPersonalRutService.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_27_190000_add_origen_funcionario_to_descuentos_cgr_table.php',
+            'resources/views/remuneraciones/descuentos-cgr/index.blade.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Guarda la procedencia del funcionario al registrar el descuento, diferenciando Administración Central y establecimientos.',
+            'Clasifica los descuentos históricos mediante los padrones disponibles y conserva como Sin clasificar aquellos que ya no tienen una coincidencia verificable.',
+            'Agrega filtro por tipo de funcionario y muestra la procedencia en cada fila del listado.',
+            'Limita el buscador del listado a nombre y RUT, admitiendo el RUT con o sin puntos y guión.',
+            'Mantiene el filtro anual con una extracción portable de años, compatible con MySQL y el entorno SQLite de pruebas.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.8.27.444' => [
         'date' => '2026-08-27',
         'module' => 'Descuentos CGR',
