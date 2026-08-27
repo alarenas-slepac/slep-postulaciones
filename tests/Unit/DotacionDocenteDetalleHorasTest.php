@@ -210,6 +210,82 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         ], $resultado);
     }
 
+    public function test_descuenta_asistentes_solo_de_funciones_normativas_y_con_tope_por_necesidad(): void
+    {
+        $bloques = [
+            'directiva' => [
+                'automaticas' => 44,
+                'declaradas' => 0,
+                'total' => 44,
+                'items' => [['nombre' => 'Dirección', 'horas' => 44, 'dotacion_funcion_id' => null]],
+            ],
+            'tecnico_pedagogica' => [
+                'automaticas' => 38,
+                'declaradas' => 14,
+                'total' => 52,
+                'items' => [
+                    ['nombre' => 'UTP', 'horas' => 38, 'dotacion_funcion_id' => null],
+                    ['nombre' => 'Apoyo declarado', 'horas' => 14, 'dotacion_funcion_id' => 10],
+                ],
+            ],
+            'planes_programas' => [
+                'automaticas' => 19,
+                'declaradas' => 0,
+                'total' => 19,
+                'items' => [['nombre' => 'Plan normativo', 'horas' => 19, 'dotacion_funcion_id' => null]],
+            ],
+            'pie' => [
+                'automaticas' => 18,
+                'declaradas' => 0,
+                'total' => 18,
+                'items' => [['nombre' => 'Coordinación PIE', 'horas' => 18, 'dotacion_funcion_id' => null]],
+            ],
+        ];
+        $necesidades = [
+            $this->necesidadFuncion('directiva', 'Dirección', 44, null, [
+                $this->asignacion('funcion_directiva', 'Dirección', 20),
+                $this->asignacion('funcion_directiva', 'Dirección', 12, 'asistente'),
+            ]),
+            $this->necesidadFuncion('tecnico_pedagogica', 'UTP', 38, null, [
+                $this->asignacion('funcion_tecnico_pedagogica', 'UTP', 50, 'asistente'),
+            ]),
+            $this->necesidadFuncion('tecnico_pedagogica', 'Apoyo declarado', 14, 10, [
+                $this->asignacion('funcion_tecnico_pedagogica', 'Apoyo declarado', 8, 'asistente'),
+            ]),
+            $this->necesidadFuncion('planes_programas', 'Plan normativo', 19, null, [
+                $this->asignacion('plan_normativo', 'Plan normativo', 7),
+                $this->asignacion('plan_normativo', 'Plan normativo', 5, 'asistente'),
+            ]),
+            $this->necesidadFuncion('pie', 'Coordinación PIE', 18, null, [
+                $this->asignacion('funcion_tecnico_pedagogica', 'Coordinación PIE', 10, 'asistente'),
+            ]),
+        ];
+
+        $ajustados = $this->invokePrivate('descontarCoberturaAsistentesFuncionesNormativas', [
+            $bloques,
+            $necesidades,
+        ]);
+        $desglose = $this->invokePrivate('desgloseContratoBloqueDotacion', [
+            $ajustados,
+            $necesidades,
+        ]);
+
+        $this->assertSame(32.0, $ajustados['directiva']['automaticas']);
+        $this->assertSame(12.0, $ajustados['directiva']['horas_asistentes_cobertura']);
+        $this->assertSame(32.0, $ajustados['directiva']['items'][0]['horas']);
+        $this->assertSame(0.0, $ajustados['tecnico_pedagogica']['automaticas']);
+        $this->assertSame(14.0, $ajustados['tecnico_pedagogica']['total']);
+        $this->assertSame(14, $ajustados['tecnico_pedagogica']['items'][1]['horas']);
+        $this->assertArrayNotHasKey('horas_asistentes_cobertura', $ajustados['tecnico_pedagogica']['items'][1]);
+        $this->assertSame(14.0, $ajustados['planes_programas']['automaticas']);
+        $this->assertSame(18, $ajustados['pie']['automaticas']);
+        $this->assertSame(64.0, $desglose['total_normativas']);
+        $this->assertSame(20.0, $desglose['funciones_directivas_normativas_asignadas']);
+        $this->assertSame(0.0, $desglose['funciones_tecnico_pedagogicas_normativas_asignadas']);
+        $this->assertSame(7.0, $desglose['planes_normativos_asignadas']);
+        $this->assertSame(8.0, $desglose['funciones_tecnico_pedagogicas_declaradas_asignadas']);
+    }
+
     public function test_calcula_brecha_estructural_sin_funciones_declaradas_y_separa_pie(): void
     {
         $resultado = $this->invokePrivate('brechasDotacionSeparadas', [
@@ -280,13 +356,32 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         return $personal;
     }
 
-    private function asignacion(string $tipo, string $nombre, float $horas): DotacionDocenteAsignacion
+    private function asignacion(string $tipo, string $nombre, float $horas, string $estamento = 'docente'): DotacionDocenteAsignacion
     {
         return new DotacionDocenteAsignacion([
             'tipo_asignacion' => $tipo,
             'asignatura_nombre' => $nombre,
             'horas_contrato' => $horas,
+            'estamento_cobertura' => $estamento,
         ]);
+    }
+
+    /** @param array<int, DotacionDocenteAsignacion> $asignaciones */
+    private function necesidadFuncion(
+        string $subtipo,
+        string $nombre,
+        float $horas,
+        ?int $dotacionFuncionId,
+        array $asignaciones
+    ): array {
+        return [
+            'subtipo_asignacion' => $subtipo,
+            'asignatura_nombre' => $nombre,
+            'dotacion_funcion_id' => $dotacionFuncionId,
+            'horas_contrato_requeridas' => $horas,
+            'horas_contrato_asignadas' => round((float) collect($asignaciones)->sum('horas_contrato'), 2),
+            'asignaciones' => collect($asignaciones),
+        ];
     }
 
     private function docenteVista(): array
