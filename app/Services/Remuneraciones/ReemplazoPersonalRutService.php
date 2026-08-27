@@ -9,6 +9,18 @@ use Illuminate\Support\Facades\Schema;
 
 class ReemplazoPersonalRutService
 {
+    public const ORIGEN_ADMINISTRACION_CENTRAL = 'administracion_central';
+
+    public const ORIGEN_ESTABLECIMIENTO = 'establecimiento';
+
+    public static function opcionesOrigen(): array
+    {
+        return [
+            self::ORIGEN_ADMINISTRACION_CENTRAL => 'Administración Central',
+            self::ORIGEN_ESTABLECIMIENTO => 'Establecimiento',
+        ];
+    }
+
     public function normalizar(?string $rut): ?string
     {
         $normalizado = RutChile::normalize($rut);
@@ -64,6 +76,7 @@ class ReemplazoPersonalRutService
             'nombre' => $nombre,
             'periodo' => sprintf('%04d-%02d', $registro->anio, $registro->mes),
             'fuente' => 'el padrón de reemplazos personal',
+            'origen' => self::ORIGEN_ESTABLECIMIENTO,
         ];
     }
 
@@ -111,6 +124,7 @@ class ReemplazoPersonalRutService
             'nombre' => $nombre,
             'periodo' => $periodo !== '' ? $periodo : null,
             'fuente' => 'funcionarios autorizados de Administración Central',
+            'origen' => self::ORIGEN_ADMINISTRACION_CENTRAL,
         ];
     }
 }

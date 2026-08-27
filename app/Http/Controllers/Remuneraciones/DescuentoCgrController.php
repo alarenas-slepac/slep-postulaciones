@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Remuneraciones;
 
+use App\Exports\DescuentosCgrMensualExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
 use App\Services\Remuneraciones\DescuentoCgrPdfService;
 use App\Services\Remuneraciones\ReemplazoPersonalRutService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DescuentoCgrController extends Controller
 {
@@ -25,19 +28,46 @@ class DescuentoCgrController extends Controller
         $this->middleware(['auth', 'ensure.role:admin|funcionario_slep']);
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse
     {
+        if ($request->boolean('exportar')) {
+            $data = $request->validate([
+                'mes_exportacion' => ['required', 'date_format:Y-m'],
+            ], [
+                'mes_exportacion.required' => 'Selecciona el mes que deseas exportar.',
+                'mes_exportacion.date_format' => 'El mes de exportación no tiene un formato válido.',
+            ]);
+            $periodo = CarbonImmutable::createFromFormat('!Y-m', $data['mes_exportacion']);
+
+            return app(DescuentosCgrMensualExport::class)->download($periodo, $request->user());
+        }
+
         $buscar = trim((string) $request->get('buscar', ''));
+        $buscarRut = preg_match('/\d/', $buscar)
+            ? strtoupper((string) preg_replace('/[^0-9K]/i', '', $buscar))
+            : '';
         $anio = (int) $request->integer('anio');
+        $origenes = ReemplazoPersonalRutService::opcionesOrigen() + ['sin_clasificar' => 'Sin clasificar'];
+        $origen = trim((string) $request->get('origen', ''));
+        if (! array_key_exists($origen, $origenes)) {
+            $origen = '';
+        }
 
         $descuentos = DescuentoCgr::query()
-            ->when($buscar !== '', function ($query) use ($buscar) {
+            ->when($buscar !== '', function ($query) use ($buscar, $buscarRut) {
                 $termino = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $buscar).'%';
-                $query->where(fn ($subquery) => $subquery
-                    ->where('rut', 'like', $termino)
-                    ->orWhere('nombre', 'like', $termino)
-                    ->orWhere('numero_resolucion', 'like', $termino));
+                $query->where(function ($subquery) use ($termino, $buscarRut) {
+                    $subquery->where('nombre', 'like', $termino)
+                        ->orWhere('rut', 'like', $termino);
+
+                    if ($buscarRut !== '') {
+                        $rut = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $buscarRut).'%';
+                        $subquery->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(rut), '.', ''), '-', ''), ' ', '') LIKE ?", [$rut]);
+                    }
+                });
             })
+            ->when($origen === 'sin_clasificar', fn ($query) => $query->whereNull('origen_funcionario'))
+            ->when($origen !== '' && $origen !== 'sin_clasificar', fn ($query) => $query->where('origen_funcionario', $origen))
             ->when($anio > 0, fn ($query) => $query->whereYear('fecha_primer_descuento', $anio))
             ->orderByDesc('fecha_primer_descuento')
             ->latest('id')
@@ -45,12 +75,17 @@ class DescuentoCgrController extends Controller
             ->withQueryString();
 
         $anios = DescuentoCgr::query()
-            ->selectRaw('YEAR(fecha_primer_descuento) as anio')
+            ->whereNotNull('fecha_primer_descuento')
+            ->select('fecha_primer_descuento')
             ->distinct()
-            ->orderByDesc('anio')
-            ->pluck('anio');
+            ->pluck('fecha_primer_descuento')
+            ->map(fn ($fecha) => (int) substr((string) $fecha, 0, 4))
+            ->filter()
+            ->unique()
+            ->sortDesc()
+            ->values();
 
-        return view('remuneraciones.descuentos-cgr.index', compact('descuentos', 'buscar', 'anio', 'anios'));
+        return view('remuneraciones.descuentos-cgr.index', compact('descuentos', 'buscar', 'anio', 'anios', 'origen', 'origenes'));
     }
 
     public function create(): View
@@ -186,8 +221,13 @@ class DescuentoCgrController extends Controller
         $funcionario = $funcionarios->buscar($data['rut']);
 
         if ($funcionario) {
+            $mismoRut = $existente
+                && $funcionarios->normalizar($data['rut']) === $funcionarios->normalizar($existente->rut);
             $data['rut'] = $funcionario['rut'];
             $data['nombre'] = $funcionario['nombre'];
+            $data['origen_funcionario'] = $mismoRut && $existente->origen_funcionario
+                ? $existente->origen_funcionario
+                : $funcionario['origen'];
 
             return $data;
         }

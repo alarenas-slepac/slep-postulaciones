@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exports\DescuentosCgrMensualExport;
 use App\Http\Controllers\Remuneraciones\DescuentoCgrController;
 use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
@@ -12,13 +13,16 @@ use App\Services\Remuneraciones\ReemplazoPersonalRutService;
 use App\Services\Remuneraciones\UtmImportService;
 use App\Support\ModuleRegistry;
 use App\Support\SlepUiRegistry;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Tests\TestCase;
 
 class DescuentosCgrModuleTest extends TestCase
@@ -68,6 +72,7 @@ class DescuentosCgrModuleTest extends TestCase
             $table->id();
             $table->string('rut', 12);
             $table->string('nombre');
+            $table->string('origen_funcionario', 30)->nullable()->index();
             $table->string('numero_resolucion', 100);
             $table->string('numero_resolucion_clave', 100)->nullable()->unique();
             $table->date('fecha_resolucion')->nullable();
@@ -194,6 +199,7 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertSame('Persona Ejemplo Vigente', $resultado['nombre']);
         $this->assertSame('2026-08', $resultado['periodo']);
         $this->assertSame('el padrón de reemplazos personal', $resultado['fuente']);
+        $this->assertSame(ReemplazoPersonalRutService::ORIGEN_ESTABLECIMIENTO, $resultado['origen']);
     }
 
     public function test_busqueda_prioriza_funcionario_ac_y_admite_run_normalizado_historico(): void
@@ -219,6 +225,7 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertSame('Persona Administración Central Autorizada', $resultado['nombre']);
         $this->assertSame('2026-08', $resultado['periodo']);
         $this->assertSame('funcionarios autorizados de Administración Central', $resultado['fuente']);
+        $this->assertSame(ReemplazoPersonalRutService::ORIGEN_ADMINISTRACION_CENTRAL, $resultado['origen']);
     }
 
     public function test_busqueda_funcionario_ac_usa_rut_normalizado_del_esquema_actual(): void
@@ -260,6 +267,149 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertArrayHasKey('Remuneraciones', $grupos);
         $this->assertContains('Descuentos CGR', $labels);
         $this->assertContains('Valores UTM', $labels);
+    }
+
+    public function test_listado_filtra_tipo_de_funcionario_y_busca_por_nombre_o_rut(): void
+    {
+        $administracionCentral = $this->crearDescuento([
+            'nombre' => 'Ana Administración Central',
+            'rut' => '12345678-5',
+            'numero_resolucion' => 'CGR-AC-2026',
+            'origen_funcionario' => ReemplazoPersonalRutService::ORIGEN_ADMINISTRACION_CENTRAL,
+        ]);
+        $establecimiento = $this->crearDescuento([
+            'nombre' => 'Bruno Escuela Ejemplo',
+            'rut' => '11111111-1',
+            'numero_resolucion' => 'CGR-EST-2026',
+            'origen_funcionario' => ReemplazoPersonalRutService::ORIGEN_ESTABLECIMIENTO,
+        ]);
+        $this->crearDescuento([
+            'nombre' => 'Registro Histórico',
+            'rut' => '99999999-9',
+            'numero_resolucion' => 'CGR-HIST-2026',
+            'origen_funcionario' => null,
+        ]);
+
+        $vistaAc = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', [
+            'origen' => ReemplazoPersonalRutService::ORIGEN_ADMINISTRACION_CENTRAL,
+            'buscar' => 'Ana',
+        ]));
+        $this->assertSame([$administracionCentral->id], $vistaAc->getData()['descuentos']->pluck('id')->all());
+        $this->assertStringContainsString('Administración Central', $vistaAc->render());
+        $this->assertStringContainsString('Exportar Excel mensual', $vistaAc->render());
+
+        $vistaEstablecimiento = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', [
+            'origen' => ReemplazoPersonalRutService::ORIGEN_ESTABLECIMIENTO,
+            'buscar' => '11.111.111-1',
+        ]));
+        $this->assertSame([$establecimiento->id], $vistaEstablecimiento->getData()['descuentos']->pluck('id')->all());
+
+        $vistaSinClasificar = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', [
+            'origen' => 'sin_clasificar',
+        ]));
+        $this->assertSame(['Registro Histórico'], $vistaSinClasificar->getData()['descuentos']->pluck('nombre')->all());
+    }
+
+    public function test_migracion_clasifica_registros_historicos_sin_inventar_origenes(): void
+    {
+        DB::table('funcionarios_ac_autorizados')->insert([
+            'rut_normalizado' => '123456785',
+            'nombres' => 'Persona Central',
+        ]);
+        DB::table('reemplazos_personal')->insert([
+            'rut' => '11111111-1',
+            'nombre' => 'Persona Establecimiento',
+            'anio' => 2026,
+            'mes' => 8,
+        ]);
+
+        $administracionCentral = $this->crearDescuento([
+            'rut' => '12345678-5',
+            'numero_resolucion' => 'HIST-AC-2026',
+        ]);
+        $establecimiento = $this->crearDescuento([
+            'rut' => '11111111-1',
+            'numero_resolucion' => 'HIST-EST-2026',
+        ]);
+        $sinClasificar = $this->crearDescuento([
+            'rut' => '99999999-9',
+            'numero_resolucion' => 'HIST-SIN-2026',
+        ]);
+
+        Schema::table('descuentos_cgr', function (Blueprint $table) {
+            $table->dropIndex(['origen_funcionario']);
+            $table->dropColumn('origen_funcionario');
+        });
+        $migracion = require database_path('migrations/2026_08_27_190000_add_origen_funcionario_to_descuentos_cgr_table.php');
+        $migracion->up();
+
+        $this->assertDatabaseHas('descuentos_cgr', [
+            'id' => $administracionCentral->id,
+            'origen_funcionario' => ReemplazoPersonalRutService::ORIGEN_ADMINISTRACION_CENTRAL,
+        ]);
+        $this->assertDatabaseHas('descuentos_cgr', [
+            'id' => $establecimiento->id,
+            'origen_funcionario' => ReemplazoPersonalRutService::ORIGEN_ESTABLECIMIENTO,
+        ]);
+        $this->assertDatabaseHas('descuentos_cgr', [
+            'id' => $sinClasificar->id,
+            'origen_funcionario' => null,
+        ]);
+    }
+
+    public function test_exportador_mensual_incluye_solo_cuotas_del_periodo_y_formatea_excel(): void
+    {
+        UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
+        UtmValor::create(['anio' => 2026, 'mes' => 3, 'valor' => 69889]);
+        $incluido = $this->crearDescuento([
+            'rut' => '12345678-5',
+            'nombre' => 'Persona con descuento vigente',
+            'numero_resolucion' => 'EXPORT-2026',
+            'deuda_equivalente_utm' => 4.1120,
+            'cuota_utm' => 2.0560,
+            'numero_cuotas' => 2,
+            'tasa_interes_mensual' => 1,
+            'fecha_primer_descuento' => '2026-02-01',
+        ]);
+        $this->crearDescuento([
+            'rut' => '11111111-1',
+            'nombre' => 'Persona con descuento futuro',
+            'numero_resolucion' => 'FUTURO-2026',
+            'fecha_primer_descuento' => '2026-04-01',
+        ]);
+
+        $periodo = CarbonImmutable::create(2026, 3, 1);
+        $exportador = app(DescuentosCgrMensualExport::class);
+        $filas = $exportador->rowsForPeriod($periodo);
+
+        $this->assertCount(1, $filas);
+        $fila = $filas->first();
+        $this->assertSame($incluido->numero_resolucion, $fila['numero_resolucion']);
+        $this->assertSame('12.345.678-5', $fila['rut']);
+        $this->assertSame('03-2026', $fila['mes']);
+        $this->assertSame(69889.0, $fila['valor_utm']);
+        $this->assertEqualsWithDelta(2.056, $fila['saldo_inicial_utm'], 0.000001);
+        $this->assertEqualsWithDelta(2.056, $fila['capital_utm'], 0.000001);
+        $this->assertEqualsWithDelta(0.0, $fila['saldo_final_utm'], 0.000001);
+        $this->assertEqualsWithDelta(143691.784, $fila['saldo_inicial_pesos'], 0.000001);
+        $this->assertEqualsWithDelta(1436.91784, $fila['interes_pesos'], 0.000001);
+        $this->assertEqualsWithDelta(145128.70184, $fila['descuento_pesos'], 0.000001);
+
+        $libro = $exportador->workbook($filas, $periodo);
+        $hoja = $libro->getActiveSheet();
+        $this->assertSame('RUT', $hoja->getCell('A1')->getValue());
+        $this->assertSame('Descuento total', $hoja->getCell('L1')->getValue());
+        $this->assertSame('12.345.678-5', $hoja->getCell('A2')->getValue());
+        $this->assertSame('EXPORT-2026', $hoja->getCell('C2')->getValue());
+        $this->assertSame(145128.70184, $hoja->getCell('L2')->getValue());
+        $libro->disconnectWorksheets();
+
+        $respuesta = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', [
+            'exportar' => 1,
+            'mes_exportacion' => '2026-03',
+        ]));
+        $this->assertInstanceOf(StreamedResponse::class, $respuesta);
+        $this->assertStringContainsString('descuentos_cgr_2026_03_', (string) $respuesta->headers->get('content-disposition'));
     }
 
     public function test_resolucion_no_se_puede_duplicar_y_edicion_ignora_el_registro_actual(): void
@@ -361,6 +511,7 @@ class DescuentosCgrModuleTest extends TestCase
         $descuento = DescuentoCgr::create([
             'rut' => '12345678-5',
             'nombre' => 'Persona Ejemplo',
+            'origen_funcionario' => ReemplazoPersonalRutService::ORIGEN_ESTABLECIMIENTO,
             'numero_resolucion' => '4553-2026',
             'fecha_resolucion' => '2026-01-15',
             'deuda_definitiva_pesos' => 142000,
@@ -453,6 +604,7 @@ class DescuentosCgrModuleTest extends TestCase
         return DescuentoCgr::create(array_merge([
             'rut' => '12345678-5',
             'nombre' => 'Persona Ejemplo',
+            'origen_funcionario' => ReemplazoPersonalRutService::ORIGEN_ESTABLECIMIENTO,
             'numero_resolucion' => '4553-2026',
             'fecha_resolucion' => '2026-01-15',
             'deuda_definitiva_pesos' => 142000,
