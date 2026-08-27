@@ -64,6 +64,11 @@
                                 <td class="text-end text-nowrap">
                                     <a href="{{ route('descuentos-cgr.show', $descuento) }}" class="btn btn-sm btn-outline-primary" title="Ver cronograma"><i class="bi bi-calendar3"></i></a>
                                     <a href="{{ route('descuentos-cgr.edit', $descuento) }}" class="btn btn-sm btn-outline-secondary" title="Editar"><i class="bi bi-pencil"></i></a>
+                                    <form method="POST" action="{{ route('descuentos-cgr.destroy', $descuento) }}" class="d-inline" onsubmit="return confirm('Se eliminará el descuento CGR, su cronograma y la resolución PDF asociada. Esta acción no se puede deshacer. ¿Deseas continuar?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                    </form>
                                 </td>
                             </tr>
                         @empty

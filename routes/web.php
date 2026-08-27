@@ -1282,6 +1282,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::get('/{descuentoCgr}', [DescuentoCgrController::class, 'show'])->whereNumber('descuentoCgr')->name('show');
         Route::get('/{descuentoCgr}/editar', [DescuentoCgrController::class, 'edit'])->whereNumber('descuentoCgr')->name('edit');
         Route::put('/{descuentoCgr}', [DescuentoCgrController::class, 'update'])->whereNumber('descuentoCgr')->name('update');
+        Route::delete('/{descuentoCgr}', [DescuentoCgrController::class, 'destroy'])->whereNumber('descuentoCgr')->name('destroy');
         Route::get('/{descuentoCgr}/resolucion', [DescuentoCgrController::class, 'pdf'])->whereNumber('descuentoCgr')->name('pdf');
         Route::get('/{descuentoCgr}/informe-pdf', [DescuentoCgrController::class, 'informePdf'])->whereNumber('descuentoCgr')->name('informe.pdf');
         Route::get('/{descuentoCgr}/cronograma/{cuota}/pdf', [DescuentoCgrController::class, 'cronogramaPdf'])
