@@ -41,7 +41,7 @@ class JornadaVotacionController extends Controller
             return $j;
         });
 
-        return redirect()->route('votaciones.admin.jornadas.show', $j)->with('success', 'Jornada creada.');
+        return redirect()->route('votaciones.admin.jornadas.show', $jornada)->with('success', 'Jornada creada.');
     }
 
     public function edit(JornadaVotacion $jornada): View

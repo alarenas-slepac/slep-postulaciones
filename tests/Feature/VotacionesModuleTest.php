@@ -17,11 +17,14 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class VotacionesModuleTest extends TestCase
 {
     private object $migration;
+
+    private object $permissionMigration;
 
     private User $operator;
 
@@ -55,15 +58,19 @@ class VotacionesModuleTest extends TestCase
             $table->string('logo_path')->nullable();
             $table->timestamps();
         });
+        $this->permissionMigration = require database_path('migrations/2025_09_13_011857_create_permission_tables.php');
+        $this->permissionMigration->up();
         $this->migration = require database_path('migrations/2026_08_27_210000_create_votaciones_module_tables.php');
         $this->migration->up();
         $id = DB::table('users')->insertGetId(['name' => 'Operador de prueba', 'email' => 'operador@example.test', 'password' => 'x', 'created_at' => now(), 'updated_at' => now()]);
         $this->operator = User::findOrFail($id);
+        $this->operator->givePermissionTo(Permission::create(['name' => 'votaciones.manage-jornadas', 'guard_name' => 'web']));
     }
 
     protected function tearDown(): void
     {
         $this->migration->down();
+        $this->permissionMigration->down();
         Schema::dropIfExists('admision_establecimientos');
         Schema::dropIfExists('establecimientos');
         Schema::dropIfExists('users');
@@ -84,6 +91,29 @@ class VotacionesModuleTest extends TestCase
         $this->assertSame('en_traslado', $rutas[1]->visita()->first()->estado);
         $this->assertSame('en_traslado', $grupo->refresh()->estado);
         $this->assertDatabaseHas('bitacora_votacion', ['jornada_votacion_id' => $jornada->id, 'evento' => 'traslado_iniciado']);
+    }
+
+    public function test_crear_jornada_redirige_al_registro_persistido(): void
+    {
+        $this->withoutMiddleware();
+        $procesoId = DB::table('procesos_votacion')->where('codigo', 'CCAF')->value('id');
+
+        $response = $this->actingAs($this->operator)->post(route('votaciones.admin.jornadas.store'), [
+            'nombre' => 'Jornada creada desde endpoint',
+            'slug' => 'jornada-creada-endpoint',
+            'fecha' => '2026-08-28',
+            'descripcion' => 'Prueba de regresión del redireccionamiento.',
+            'procesos' => [$procesoId],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+        $jornada = JornadaVotacion::where('slug', 'jornada-creada-endpoint')->firstOrFail();
+        $response->assertRedirect(route('votaciones.admin.jornadas.show', $jornada));
+        $this->assertDatabaseHas('bitacora_votacion', [
+            'jornada_votacion_id' => $jornada->id,
+            'evento' => 'jornada_creada',
+        ]);
     }
 
     public function test_estado_publico_expone_solo_datos_operativos_y_conserva_orden(): void
