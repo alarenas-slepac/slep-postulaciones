@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Conversation;
+use App\Models\GrupoVotacion;
 use App\Policies\ConversationPolicy;
+use App\Policies\GrupoVotacionPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
 class AuthServiceProvider extends ServiceProvider
@@ -14,6 +16,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Conversation::class => ConversationPolicy::class,
+        GrupoVotacion::class => GrupoVotacionPolicy::class,
     ];
 
     /**

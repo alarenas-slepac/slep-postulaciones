@@ -101,6 +101,12 @@ use App\Http\Controllers\System\GlobalSearchController;
 use App\Http\Controllers\Certificados\CertificadoImportacionController;
 use App\Http\Controllers\Certificados\CertificadoLaboralController;
 use App\Http\Controllers\Certificados\CertificadoVerificacionController;
+use App\Http\Controllers\Votaciones\PublicVotacionController;
+use App\Http\Controllers\Votaciones\JornadaVotacionController;
+use App\Http\Controllers\Votaciones\GrupoVotacionController;
+use App\Http\Controllers\Votaciones\RutaVotacionController;
+use App\Http\Controllers\Votaciones\OperacionVotacionController;
+use App\Http\Controllers\Votaciones\IncidenciaVotacionController;
 
 
 Route::get('/', function () {
@@ -156,6 +162,12 @@ Route::get('/admision-escolar/establecimientos/{slug}', [AdmisionEscolarPublicCo
     ->where('slug', '[a-z0-9-]+')
     ->name('public.admision-escolar.show');
 
+Route::prefix('votaciones')->name('public.votaciones.')->middleware('throttle:120,1')->group(function () {
+    Route::get('/', [PublicVotacionController::class, 'index'])->name('index');
+    Route::get('/{jornada:slug}', [PublicVotacionController::class, 'show'])->name('show');
+    Route::get('/{jornada:slug}/estado', [PublicVotacionController::class, 'estado'])->name('estado');
+});
+
 Route::get('/validar-documento/{codigo}', [CometidoFuncionarioController::class, 'validarDocumentoPublico'])
     ->middleware('throttle:60,1')
     ->name('documentos.validar');
@@ -184,6 +196,36 @@ Route::get('/descuentos-cgr/verificar-mensual/{codigo}', VerificarDescuentoCgrMe
 //  RUTAS PROTEGIDAS POR MÓDULO
 // =========================
 Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
+
+    Route::prefix('gestion/votaciones')->name('votaciones.')->group(function () {
+        Route::prefix('admin')->name('admin.')->middleware('permission:votaciones.manage-jornadas')->group(function () {
+            Route::get('/jornadas', [JornadaVotacionController::class, 'index'])->name('jornadas.index');
+            Route::get('/jornadas/crear', [JornadaVotacionController::class, 'create'])->name('jornadas.create');
+            Route::post('/jornadas', [JornadaVotacionController::class, 'store'])->name('jornadas.store');
+            Route::get('/jornadas/{jornada:slug}', [JornadaVotacionController::class, 'show'])->name('jornadas.show');
+            Route::get('/jornadas/{jornada:slug}/editar', [JornadaVotacionController::class, 'edit'])->name('jornadas.edit');
+            Route::put('/jornadas/{jornada:slug}', [JornadaVotacionController::class, 'update'])->name('jornadas.update');
+            Route::post('/jornadas/{jornada:slug}/publicar', [JornadaVotacionController::class, 'publicar'])->name('jornadas.publicar');
+            Route::post('/jornadas/{jornada:slug}/suspender', [JornadaVotacionController::class, 'suspender'])->name('jornadas.suspender');
+            Route::post('/jornadas/{jornada:slug}/corregir', [JornadaVotacionController::class, 'corregir'])->middleware('permission:votaciones.admin')->name('jornadas.corregir');
+            Route::post('/visitas/{visita}/corregir', [JornadaVotacionController::class, 'corregirVisita'])->middleware('permission:votaciones.admin')->name('visitas.corregir');
+            Route::post('/jornadas/{jornada:slug}/grupos', [GrupoVotacionController::class, 'store'])->middleware('permission:votaciones.manage-grupos')->name('grupos.store');
+            Route::put('/grupos/{grupo}', [GrupoVotacionController::class, 'update'])->middleware('permission:votaciones.manage-grupos')->name('grupos.update');
+            Route::delete('/grupos/{grupo}', [GrupoVotacionController::class, 'destroy'])->middleware('permission:votaciones.manage-grupos')->name('grupos.destroy');
+            Route::post('/grupos/{grupo}/rutas', [RutaVotacionController::class, 'store'])->middleware('permission:votaciones.manage-rutas')->name('rutas.store');
+            Route::patch('/rutas/{ruta}/mover', [RutaVotacionController::class, 'mover'])->middleware('permission:votaciones.manage-rutas')->name('rutas.mover');
+            Route::delete('/rutas/{ruta}', [RutaVotacionController::class, 'destroy'])->middleware('permission:votaciones.manage-rutas')->name('rutas.destroy');
+            Route::patch('/incidencias/{incidencia}/resolver', [IncidenciaVotacionController::class, 'resolver'])->middleware('permission:votaciones.admin')->name('incidencias.resolver');
+        });
+        Route::prefix('operacion')->name('operacion.')->middleware('permission:votaciones.operate-group')->group(function () {
+            Route::get('/', [OperacionVotacionController::class, 'index'])->name('index');
+            Route::get('/grupos/{grupo}', [OperacionVotacionController::class, 'show'])->name('show');
+            Route::post('/grupos/{grupo}/iniciar', [OperacionVotacionController::class, 'iniciarGrupo'])->name('grupos.iniciar');
+            Route::post('/rutas/{ruta}/iniciar', [OperacionVotacionController::class, 'iniciarVisita'])->name('rutas.iniciar');
+            Route::post('/rutas/{ruta}/finalizar', [OperacionVotacionController::class, 'finalizarVisita'])->name('rutas.finalizar');
+            Route::post('/grupos/{grupo}/incidencias', [IncidenciaVotacionController::class, 'store'])->middleware('permission:votaciones.report-incidents')->name('incidencias.store');
+        });
+    });
 
     Route::prefix('centro-operaciones')->name('centro-operaciones.')->group(function () {
         Route::middleware('ensure.role:admin|director_ejecutivo|secretaria_direccion_ejecutiva|comunicaciones|gabinete_slep|funcionario_ac|funcionario_directivo_estab')->group(function () {

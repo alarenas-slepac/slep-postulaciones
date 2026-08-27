@@ -43,7 +43,7 @@ class ModuleRegistry
     {
         $section = match (true) {
             in_array($key, ['descuentos-cgr', 'endeudamiento'], true) => 'Remuneraciones',
-            in_array($key, ['centro-operaciones', 'reemplazos', 'reemplazos.personal', 'admin.permiso-sin-goce-excepciones', 'incumplimientos', 'declaracion', 'funcionario.solicitudes-reemplazo', 'gestion.solicitudes-reemplazo', 'gestion.estadisticas', 'gestion.informes'], true) => 'Operación',
+            in_array($key, ['votaciones', 'centro-operaciones', 'reemplazos', 'reemplazos.personal', 'admin.permiso-sin-goce-excepciones', 'incumplimientos', 'declaracion', 'funcionario.solicitudes-reemplazo', 'gestion.solicitudes-reemplazo', 'gestion.estadisticas', 'gestion.informes'], true) => 'Operación',
             Str::startsWith($key, 'admin.establecimientos') ||
                 Str::startsWith($key, 'admin.alumnos-prioritarios') ||
                 Str::startsWith($key, 'admin.cursos') ||
@@ -72,6 +72,7 @@ class ModuleRegistry
 
         $name = match ($key) {
             'centro-operaciones' => 'Centro de Operaciones',
+            'votaciones' => 'Votaciones CCAF y Mutualidades',
             'reemplazos.personal' => 'Carga Masiva Personal',
             'incumplimientos' => 'Incumplimiento Laboral',
             'endeudamiento' => 'Endeudamiento',
@@ -110,6 +111,7 @@ class ModuleRegistry
 
         $sort = match ($key) {
             'centro-operaciones' => 5,
+            'votaciones' => 18,
             'reemplazos' => 10,
             'reemplazos.personal' => 20,
             'admin.permiso-sin-goce-excepciones' => 22,
