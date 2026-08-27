@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.8.27.447' => [
+        'date' => '2026-08-27',
+        'module' => 'Licencias Médicas',
+        'title' => 'Corrección del detalle de licencia médica',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/tramites/licencias-medicas/show.blade.php',
+        ],
+        'changes' => [
+            'Corrige la directiva Blade que impedía compilar la vista de detalle y generaba un error 500 al abrir una licencia médica.',
+            'Mantiene sin cambios la información, los permisos y las acciones disponibles en el detalle.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP', 'Coordinador GDP', 'Digitador Licencias Médicas', 'Analista Licencias Médicas', 'Analista SMC', 'Administrador Licencias Médicas'],
+    ],
     '2026.8.27.446' => [
         'date' => '2026-08-27',
         'module' => 'Descuentos CGR',

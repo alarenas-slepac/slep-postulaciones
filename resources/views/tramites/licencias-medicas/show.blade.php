@@ -80,7 +80,9 @@
                 <div class="cf-section-title"><i class="bi bi-signpost-split"></i> Estados del proceso</div>
                 <div class="row g-3">
                     @foreach($nombresDimension as $dimension => $nombreDimension)
-                        @php($codigoActual = $estadoActualPorDimension[$dimension])
+                        @php
+                            $codigoActual = $estadoActualPorDimension[$dimension];
+                        @endphp
                         <div class="col-lg-4">
                             <div class="cf-data h-100">
                                 <div class="cf-data-label">{{ $nombreDimension }}</div>
