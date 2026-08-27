@@ -58,11 +58,10 @@ class DotacionSobredotacionEstablecimientosExportTest extends TestCase
         $this->assertContains('Educadora diferencial', $values);
         $this->assertNotContains('Fórmula', $values);
 
-        $dotacionGeneralRow = collect($sheetRows)->first(fn (array $row) => ($row[0] ?? null) === 'Dotación general');
-        $brechaEstructuralRow = collect($sheetRows)->first(fn (array $row) => ($row[0] ?? null) === 'Brecha estructural');
-        $this->assertSame('Horas de sobredotación', $dotacionGeneralRow[1] ?? null);
-        $this->assertSame(28.0, (float) ($dotacionGeneralRow[3] ?? 0));
-        $this->assertSame(22.0, (float) ($brechaEstructuralRow[3] ?? 0));
+        $brechaEstructuralRow = collect($sheetRows)->first(fn (array $row) => ($row[0] ?? null) === 'Sobredotación estructural' && ($row[2] ?? null) === 'Horas');
+        $this->assertSame('Sobredotación estructural', $brechaEstructuralRow[1] ?? null);
+        $this->assertSame(36.0, (float) ($brechaEstructuralRow[3] ?? 0));
+        $this->assertNull(collect($sheetRows)->first(fn (array $row) => ($row[0] ?? null) === 'Dotación general'));
 
         $ajusteHeader = collect($sheetRows)->search(fn (array $row) => in_array('Total declarado asignado', $row, true));
         $this->assertIsInt($ajusteHeader);

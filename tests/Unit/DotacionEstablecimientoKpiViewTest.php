@@ -58,20 +58,23 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
         $this->assertStringNotContainsString('id="dotacion-pie-necesarias-collapse" class="collapse show"', $source);
     }
 
-    public function test_dotacion_general_usa_sobredotacion_individual_y_no_muestra_formula(): void
+    public function test_muestra_sobredotacion_estructural_sin_sumar_horas_individuales_sin_asignar(): void
     {
         $source = file_get_contents(resource_path('views/admin/dotacion-establecimiento/show.blade.php'));
         $pdfSource = file_get_contents(resource_path('views/admin/dotacion-establecimiento/pdf.blade.php'));
 
         $this->assertIsString($source);
         $this->assertIsString($pdfSource);
-        $this->assertStringContainsString('aula.resumen.horas_sobredotacion_total', $source);
-        $this->assertStringContainsString('$resultadoBrecha(-$horasSobredotacionGeneral)', $source);
-        $this->assertStringNotContainsString('(Contrato plan + trabajo colaborativo PIE + funciones directivas', $source);
+        $this->assertStringContainsString('$contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie + $horasBloqueNormativas', $source);
+        $this->assertStringContainsString('- $horasContratoAula', $source);
+        $this->assertStringContainsString('$resultadoGeneral = $resultadoBrecha($brechaDotacionGeneral);', $source);
+        $this->assertStringContainsString('>Sobredotación estructural</div>', $source);
+        $this->assertStringNotContainsString("data_get(\$sobredotacion ?? [], 'aula.resumen.horas_sobredotacion_total'", $source);
         $this->assertStringNotContainsString('Resultado contractual final para comparación.', $source);
         $this->assertStringNotContainsString('$resultadoFinal', $source);
-        $this->assertStringContainsString('aula.resumen.horas_sobredotacion_total', $pdfSource);
-        $this->assertStringContainsString('Brecha estructural de Dotación General', $pdfSource);
-        $this->assertStringNotContainsString('(Contrato plan + trabajo colaborativo PIE + bloque normativo + bloque declarado)', $pdfSource);
+        $this->assertStringContainsString('$contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie + $horasBloqueNormativas', $pdfSource);
+        $this->assertStringContainsString('<strong>Sobredotación estructural</strong>', $pdfSource);
+        $this->assertStringNotContainsString('aula.resumen.horas_sobredotacion_total', $pdfSource);
+        $this->assertStringNotContainsString('$resultadoEstructuralGeneral', $pdfSource);
     }
 }

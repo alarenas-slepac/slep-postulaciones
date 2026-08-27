@@ -28,11 +28,11 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertSame(0.0, $aula['resumen']['horas_sobredotacion_planta']);
         $this->assertSame(24.0, $aula['resumen']['horas_sobredotacion_contrata']);
         $this->assertSame(33.0, $aula['resumen']['horas_potencial_ajuste']);
-        $this->assertSame(16.0, $aula['resumen']['horas_sobredotacion_estructural']);
+        $this->assertSame(28.0, $aula['resumen']['horas_sobredotacion_estructural']);
         $this->assertSame(12.0, $aula['resumen']['horas_declaradas_requeridas']);
         $this->assertSame(3.0, $aula['resumen']['horas_declaradas_pendientes']);
-        $this->assertSame(8.0, $aula['resumen']['horas_brecha_cobertura']);
-        $this->assertSame(8.0, $aula['resumen']['horas_diferencia_indicadores']);
+        $this->assertSame(-4.0, $aula['resumen']['horas_brecha_cobertura']);
+        $this->assertSame(-4.0, $aula['resumen']['horas_diferencia_indicadores']);
         $this->assertSame('Docente contrata Aula', $aula['items']->sole()['nombre']);
         $this->assertSame('Docente planta Aula', $aula['ajustes']->sole()['nombre']);
 
@@ -255,7 +255,7 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         ]);
 
         $aula = $resultado['aula']['resumen'];
-        $this->assertSame(312.0, $aula['horas_sobredotacion_estructural']);
+        $this->assertSame(660.0, $aula['horas_sobredotacion_estructural']);
         $this->assertSame(660.0, $aula['horas_sobredotacion_total']);
         $this->assertSame(348.0, $aula['horas_declaradas_ajustables']);
         $this->assertSame(1008.0, $aula['horas_potencial_ajuste']);
@@ -290,7 +290,7 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         ])->render();
         $this->assertStringContainsString('Horas contrato Aula', $htmlAula);
         $this->assertStringContainsString('Detalle sobredotación', $htmlAula);
-        $this->assertStringContainsString('Brecha estructural de Dotación General', $htmlAula);
+        $this->assertStringContainsString('Sobredotación estructural', $htmlAula);
         $this->assertStringNotContainsString('Conciliación de indicadores', $htmlAula);
         $this->assertStringNotContainsString('diferencia por cobertura y distribución individual', $htmlAula);
         $this->assertStringNotContainsString('(50 + 10 + 12)', $htmlAula);

@@ -278,7 +278,7 @@ class DotacionSobredotacionEstablecimientosExport
         array $pieFormula
     ): void {
         foreach ([
-            ['A6:D6', 'Dotación General', 'D9EAF7'],
+            ['A6:D6', 'Sobredotación estructural', 'D9EAF7'],
             ['E6:H6', 'Contrato Aula sin asignación', 'FCE4D6'],
             ['I6:L6', 'Dotación PIE', 'DDEBF7'],
         ] as [$range, $title, $color]) {
@@ -292,16 +292,13 @@ class DotacionSobredotacionEstablecimientosExport
         }
 
         $brecha = (float) ($aula['brecha_estructural'] ?? 0);
-        $sobredotacionGeneral = (float) ($aula['horas_sobredotacion_total'] ?? 0);
         $pieSobredotacion = (float) ($pie['horas_sobredotacion_total'] ?? 0);
         $pieNecesarias = (float) ($pie['horas_necesarias_pendientes'] ?? 0);
-        $generalEstado = $sobredotacionGeneral > 0.01 ? 'Horas de sobredotación' : ($brecha > 0.01 ? 'Horas necesarias' : 'Cuadrada');
         $estructuralEstado = $brecha < -0.01 ? 'Sobredotación estructural' : ($brecha > 0.01 ? 'Horas necesarias' : 'Cuadrada');
         $pieEstado = $pieSobredotacion > 0.01 ? 'Sobredotación PIE' : ($pieNecesarias > 0.01 ? 'Horas necesarias' : 'Cuadrada');
 
         $general = [
-            ['Dotación general', $generalEstado, 'Horas', $this->hours($sobredotacionGeneral ?: max(0, $brecha))],
-            ['Brecha estructural', $estructuralEstado, 'Horas', round(abs($brecha), 2)],
+            ['Sobredotación estructural', $estructuralEstado, 'Horas', round(abs($brecha), 2)],
         ];
         $aulaRows = [
             ['Contrato Aula individualizado', $this->hours($aula['horas_dotacion_total'] ?? 0), 'Asignaciones protegidas', $this->hours($aula['horas_asignadas_protegidas'] ?? 0)],

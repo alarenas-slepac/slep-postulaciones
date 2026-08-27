@@ -1,6 +1,31 @@
 <?php
 
 return [
+    '2026.8.27.442' => [
+        'date' => '2026-08-27',
+        'module' => 'Dotación',
+        'title' => 'Sobredotación estructural según contratos requeridos',
+        'files' => [
+            'app/Exports/DotacionSobredotacionEstablecimientosExport.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+            'tests/Unit/DotacionSobredotacionEstablecimientosExportTest.php',
+        ],
+        'changes' => [
+            'Calcula la sobredotación estructural como Contrato Educación Parvularia + PIE, más Contrato Plan General + PIE, más funciones directivas, técnico-pedagógicas y planes normativos, menos Horas contrato aula.',
+            'Excluye del indicador las funciones declaradas no normativas y las horas contractuales individuales sin asignación.',
+            'Cuando el resultado es negativo muestra su valor absoluto en rojo bajo el nombre Sobredotación estructural.',
+            'Alinea el mismo criterio en la vista web, el detalle, el PDF y la exportación territorial Excel.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador GDP', 'Supervisor Planificación', 'Coordinador UATP'],
+    ],
     '2026.8.27.441' => [
         'date' => '2026-08-27',
         'module' => 'Dotación',
