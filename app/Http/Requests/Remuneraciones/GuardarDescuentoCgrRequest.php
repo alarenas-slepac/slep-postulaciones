@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests\Remuneraciones;
 
+use App\Models\DescuentoCgr;
 use App\Support\RutChile;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class GuardarDescuentoCgrRequest extends FormRequest
@@ -20,18 +22,32 @@ class GuardarDescuentoCgrRequest extends FormRequest
 
         $this->merge([
             'rut' => $rut['rut'] ?? $this->input('rut'),
+            'numero_resolucion' => DescuentoCgr::normalizarNumeroResolucion((string) $this->input('numero_resolucion')),
             'fecha_primer_descuento' => preg_match('/^\d{4}-\d{2}$/', $periodo) ? $periodo.'-01' : $periodo,
         ]);
     }
 
     public function rules(): array
     {
-        $pdf = $this->route('descuentoCgr') ? 'nullable' : 'required';
+        $descuentoCgr = $this->route('descuentoCgr');
+        $pdf = $descuentoCgr ? 'nullable' : 'required';
+        $reglasResolucion = ['required', 'string', 'max:100'];
+        $resolucionSinCambios = $descuentoCgr instanceof DescuentoCgr
+            && DescuentoCgr::normalizarNumeroResolucion((string) $this->input('numero_resolucion'))
+                === DescuentoCgr::normalizarNumeroResolucion((string) $descuentoCgr->numero_resolucion);
+
+        if (! $resolucionSinCambios) {
+            $resolucionUnica = Rule::unique('descuentos_cgr', 'numero_resolucion_clave');
+            if ($descuentoCgr instanceof DescuentoCgr) {
+                $resolucionUnica->ignore($descuentoCgr);
+            }
+            $reglasResolucion[] = $resolucionUnica;
+        }
 
         return [
             'rut' => ['required', 'string', 'max:12'],
             'nombre' => ['nullable', 'string', 'max:255'],
-            'numero_resolucion' => ['required', 'string', 'max:100'],
+            'numero_resolucion' => $reglasResolucion,
             'fecha_resolucion' => ['nullable', 'date'],
             'deuda_definitiva_pesos' => ['required', 'integer', 'min:1'],
             'deuda_equivalente_utm' => ['required', 'numeric', 'gt:0', 'decimal:0,4'],
@@ -73,6 +89,13 @@ class GuardarDescuentoCgrRequest extends FormRequest
             'tasa_interes_mensual' => 'tasa de interés mensual',
             'fecha_primer_descuento' => 'fecha del primer descuento',
             'resolucion_pdf' => 'resolución PDF',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'numero_resolucion.unique' => 'La resolución ingresada ya está registrada en Descuentos CGR.',
         ];
     }
 }

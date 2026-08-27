@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Remuneraciones\DescuentoCgrController;
+use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
 use App\Models\UtmValor;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
@@ -15,6 +17,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -66,6 +69,7 @@ class DescuentosCgrModuleTest extends TestCase
             $table->string('rut', 12);
             $table->string('nombre');
             $table->string('numero_resolucion', 100);
+            $table->string('numero_resolucion_clave', 100)->nullable()->unique();
             $table->date('fecha_resolucion')->nullable();
             $table->unsignedBigInteger('deuda_definitiva_pesos');
             $table->decimal('deuda_equivalente_utm', 14, 4);
@@ -234,7 +238,7 @@ class DescuentosCgrModuleTest extends TestCase
 
     public function test_rutas_permisos_y_navegacion_del_modulo(): void
     {
-        foreach (['descuentos-cgr.index', 'descuentos-cgr.create', 'descuentos-cgr.funcionario.buscar', 'descuentos-cgr.informe.pdf', 'descuentos-cgr.cronograma.pdf', 'descuentos-cgr.utm.index', 'descuentos-cgr.utm.importar'] as $nombre) {
+        foreach (['descuentos-cgr.index', 'descuentos-cgr.create', 'descuentos-cgr.funcionario.buscar', 'descuentos-cgr.destroy', 'descuentos-cgr.informe.pdf', 'descuentos-cgr.cronograma.pdf', 'descuentos-cgr.utm.index', 'descuentos-cgr.utm.importar'] as $nombre) {
             $ruta = app('router')->getRoutes()->getByName($nombre);
             $middlewares = implode('|', $ruta?->gatherMiddleware() ?? []);
             $this->assertNotNull($ruta, "No se encontró la ruta {$nombre}.");
@@ -256,6 +260,96 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertArrayHasKey('Remuneraciones', $grupos);
         $this->assertContains('Descuentos CGR', $labels);
         $this->assertContains('Valores UTM', $labels);
+    }
+
+    public function test_resolucion_no_se_puede_duplicar_y_edicion_ignora_el_registro_actual(): void
+    {
+        $descuento = $this->crearDescuento();
+        $this->assertSame('4553-2026', $descuento->numero_resolucion_clave);
+        DB::table('descuentos_cgr')->insert([
+            'rut' => '11111111-1',
+            'nombre' => 'Registro Histórico Duplicado',
+            'numero_resolucion' => $descuento->numero_resolucion,
+            'numero_resolucion_clave' => null,
+            'deuda_definitiva_pesos' => 100000,
+            'deuda_equivalente_utm' => 2,
+            'cuota_utm' => 1,
+            'numero_cuotas' => 2,
+            'tasa_interes_anual' => 0,
+            'tasa_interes_mensual' => 0,
+            'fecha_primer_descuento' => '2026-02-01',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $datos = [
+            'rut' => '12345678-5',
+            'numero_resolucion' => $descuento->numero_resolucion,
+            'deuda_definitiva_pesos' => 142000,
+            'deuda_equivalente_utm' => 2.0560,
+            'cuota_utm' => 2.0560,
+            'numero_cuotas' => 1,
+            'tasa_interes_anual' => 12,
+            'tasa_interes_mensual' => 1,
+            'fecha_primer_descuento' => '2026-02-01',
+            'resolucion_pdf' => UploadedFile::fake()->create('resolucion.pdf', 10, 'application/pdf'),
+        ];
+
+        $crear = GuardarDescuentoCgrRequest::create('/descuentos-cgr', 'POST', $datos);
+        $crear->setRouteResolver(fn () => null);
+        $validadorCrear = Validator::make($datos, $crear->rules(), $crear->messages(), $crear->attributes());
+
+        $this->assertTrue($validadorCrear->fails());
+        $this->assertSame(
+            'La resolución ingresada ya está registrada en Descuentos CGR.',
+            $validadorCrear->errors()->first('numero_resolucion')
+        );
+
+        $rutaEdicion = new class($descuento)
+        {
+            public function __construct(private readonly DescuentoCgr $descuento) {}
+
+            public function parameter(string $nombre): mixed
+            {
+                return $nombre === 'descuentoCgr' ? $this->descuento : null;
+            }
+        };
+        $editar = GuardarDescuentoCgrRequest::create('/descuentos-cgr/'.$descuento->id, 'PUT', $datos);
+        $editar->setRouteResolver(fn () => $rutaEdicion);
+        $validadorEditar = Validator::make($datos, $editar->rules(), $editar->messages(), $editar->attributes());
+
+        $this->assertFalse($validadorEditar->fails());
+    }
+
+    public function test_eliminacion_borra_descuento_cronograma_persistido_y_resolucion_pdf(): void
+    {
+        Storage::fake('local');
+        $descuento = $this->crearDescuento();
+        Storage::disk('local')->put($descuento->resolucion_pdf_path, '%PDF-resolucion');
+        $documento = $descuento->documentosMensuales()->create([
+            'numero_cuota' => 1,
+            'periodo' => '2026-02-01',
+            'codigo_verificacion' => 'CGR-M-PRUEBA-ELIMINACION',
+            'documento_hash' => str_repeat('a', 64),
+            'documento_emitido_en' => now(),
+        ]);
+
+        $respuesta = app(DescuentoCgrController::class)->destroy($descuento);
+
+        $this->assertSame(route('descuentos-cgr.index'), $respuesta->getTargetUrl());
+        $this->assertDatabaseMissing('descuentos_cgr', ['id' => $descuento->id]);
+        $this->assertDatabaseMissing('descuentos_cgr_documentos_mensuales', ['id' => $documento->id]);
+        Storage::disk('local')->assertMissing($descuento->resolucion_pdf_path);
+    }
+
+    public function test_vistas_ofrecen_eliminacion_con_confirmacion(): void
+    {
+        foreach (['index', 'show'] as $vista) {
+            $contenido = file_get_contents(resource_path("views/remuneraciones/descuentos-cgr/{$vista}.blade.php"));
+
+            $this->assertStringContainsString("route('descuentos-cgr.destroy'", $contenido);
+            $this->assertStringContainsString("@method('DELETE')", $contenido);
+            $this->assertStringContainsString('Esta acción no se puede deshacer', $contenido);
+        }
     }
 
     public function test_informe_pdf_genera_verificacion_y_detecta_cambios_posteriores(): void
@@ -352,5 +446,25 @@ class DescuentosCgrModuleTest extends TestCase
             $this->assertStringContainsString('.logo { height: auto; width: 80px; }', $contenido);
             $this->assertStringNotContainsString('max-height:', $contenido);
         }
+    }
+
+    private function crearDescuento(array $atributos = []): DescuentoCgr
+    {
+        return DescuentoCgr::create(array_merge([
+            'rut' => '12345678-5',
+            'nombre' => 'Persona Ejemplo',
+            'numero_resolucion' => '4553-2026',
+            'fecha_resolucion' => '2026-01-15',
+            'deuda_definitiva_pesos' => 142000,
+            'deuda_equivalente_utm' => 2.0560,
+            'cuota_utm' => 2.0560,
+            'numero_cuotas' => 1,
+            'tasa_interes_anual' => 12,
+            'tasa_interes_mensual' => 1,
+            'fecha_primer_descuento' => '2026-02-01',
+            'resolucion_pdf_path' => 'descuentos-cgr/resoluciones/2026/resolucion.pdf',
+            'resolucion_pdf_nombre' => 'resolucion.pdf',
+            'resolucion_pdf_tamano' => 15,
+        ], $atributos));
     }
 }

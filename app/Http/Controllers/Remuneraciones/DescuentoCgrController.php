@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -118,6 +119,25 @@ class DescuentoCgrController extends Controller
 
         return redirect()->route('descuentos-cgr.show', $descuentoCgr)
             ->with('status', 'Descuento CGR actualizado y cronograma recalculado.');
+    }
+
+    public function destroy(DescuentoCgr $descuentoCgr): RedirectResponse
+    {
+        $resolucionPdfPath = $descuentoCgr->resolucion_pdf_path;
+
+        DB::transaction(function () use ($descuentoCgr): void {
+            // La eliminación explícita conserva el comportamiento en instalaciones
+            // históricas donde la llave foránea pudiera no tener ON DELETE CASCADE.
+            $descuentoCgr->documentosMensuales()->delete();
+            $descuentoCgr->delete();
+        });
+
+        if ($resolucionPdfPath) {
+            Storage::disk('local')->delete($resolucionPdfPath);
+        }
+
+        return redirect()->route('descuentos-cgr.index')
+            ->with('status', 'Descuento CGR eliminado junto con su cronograma asociado.');
     }
 
     public function pdf(DescuentoCgr $descuentoCgr): mixed

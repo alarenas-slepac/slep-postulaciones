@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class DescuentoCgr extends Model
 {
@@ -14,6 +15,7 @@ class DescuentoCgr extends Model
         'rut',
         'nombre',
         'numero_resolucion',
+        'numero_resolucion_clave',
         'fecha_resolucion',
         'deuda_definitiva_pesos',
         'deuda_equivalente_utm',
@@ -47,6 +49,23 @@ class DescuentoCgr extends Model
             'resolucion_pdf_tamano' => 'integer',
             'documento_emitido_en' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $descuento): void {
+            $claveNueva = self::normalizarNumeroResolucion((string) $descuento->numero_resolucion);
+            $claveOriginal = self::normalizarNumeroResolucion((string) $descuento->getOriginal('numero_resolucion'));
+
+            if (! $descuento->exists || $claveOriginal !== $claveNueva || $descuento->numero_resolucion_clave !== null) {
+                $descuento->numero_resolucion_clave = $claveNueva;
+            }
+        });
+    }
+
+    public static function normalizarNumeroResolucion(string $numero): string
+    {
+        return Str::upper(Str::squish($numero));
     }
 
     public function creadoPor(): BelongsTo

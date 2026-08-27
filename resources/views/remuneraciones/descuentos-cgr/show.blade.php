@@ -12,10 +12,15 @@
                 <h1 class="h3 mb-1">Descuento CGR: {{ $descuentoCgr->nombre }}</h1>
                 <p class="text-muted mb-0">{{ \App\Support\Rut::format($descuentoCgr->rut) }} · Resolución {{ $descuentoCgr->numero_resolucion }}</p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
                 <a href="{{ route('descuentos-cgr.informe.pdf', $descuentoCgr) }}" class="btn btn-danger"><i class="bi bi-file-earmark-arrow-down me-1"></i>Exportar informe PDF</a>
                 <a href="{{ route('descuentos-cgr.pdf', $descuentoCgr) }}" target="_blank" rel="noopener" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>Ver resolución</a>
                 <a href="{{ route('descuentos-cgr.edit', $descuentoCgr) }}" class="btn btn-outline-primary"><i class="bi bi-pencil me-1"></i>Editar</a>
+                <form method="POST" action="{{ route('descuentos-cgr.destroy', $descuentoCgr) }}" onsubmit="return confirm('Se eliminará el descuento CGR, su cronograma y la resolución PDF asociada. Esta acción no se puede deshacer. ¿Deseas continuar?');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Eliminar</button>
+                </form>
                 <a href="{{ route('descuentos-cgr.index') }}" class="btn btn-outline-secondary">Volver</a>
             </div>
         </div>

@@ -1,6 +1,29 @@
 <?php
 
 return [
+    '2026.8.27.444' => [
+        'date' => '2026-08-27',
+        'module' => 'Descuentos CGR',
+        'title' => 'Eliminación integral y resoluciones sin duplicados',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Http/Requests/Remuneraciones/GuardarDescuentoCgrRequest.php',
+            'app/Models/DescuentoCgr.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_27_180000_add_unique_numero_resolucion_to_descuentos_cgr_table.php',
+            'resources/views/remuneraciones/descuentos-cgr/form.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/index.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Incorpora la opción de eliminar un descuento desde el listado y desde su cronograma, con confirmación explícita.',
+            'Elimina en una transacción el ingreso y los documentos mensuales asociados, y retira del almacenamiento la resolución PDF cargada.',
+            'Impide registrar números de resolución duplicados mediante validación y una clave normalizada única, conservando posibles registros duplicados históricos.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.8.27.443' => [
         'date' => '2026-08-27',
         'module' => 'Dotación',

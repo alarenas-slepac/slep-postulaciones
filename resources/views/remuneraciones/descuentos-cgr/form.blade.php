@@ -44,7 +44,8 @@
                     </div>
                     <div class="col-md-4">
                         <label for="numero_resolucion" class="form-label">N° dictamen o resolución <span class="text-danger">*</span></label>
-                        <input id="numero_resolucion" name="numero_resolucion" class="form-control" value="{{ $valor('numero_resolucion') }}" required maxlength="100">
+                        <input id="numero_resolucion" name="numero_resolucion" class="form-control @error('numero_resolucion') is-invalid @enderror" value="{{ $valor('numero_resolucion') }}" required maxlength="100">
+                        @error('numero_resolucion') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-md-4">
                         <label for="fecha_resolucion" class="form-label">Fecha resolución</label>
