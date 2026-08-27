@@ -81,6 +81,8 @@ class SlepUiRegistry
                 self::entry('Mantenedor de riesgo IRTE', 'centro-operaciones.riesgos.configuracion', 'bi-ui-checks-grid', ['admin', 'comunicaciones', 'gabinete_slep']),
             ],
             'Trámites y operación' => [
+                self::entry('Votaciones CCAF y Mutualidades', 'votaciones.admin.jornadas.index', 'bi-geo-alt-fill', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'votaciones'),
+                self::entry('Operación de votaciones', 'votaciones.operacion.index', 'bi-sign-turn-right-fill', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac'], 'votaciones'),
                 self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario', 'funcionario_ac'], 'certificados'),
                 self::entry('Cometidos funcionarios', 'tramites.cometidos-funcionarios.index', 'bi-briefcase', ['admin', 'director_ejecutivo', 'funcionario_estab', 'funcionario_ac', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_daf_compra', 'funcionario_juridica']),
                 self::entry('Licencias Médicas', 'tramites.licencias-medicas.index', 'bi-file-medical', ['admin', 'coordinador_gdp', 'funcionario_slep', 'digitador_licencias', 'analista_licencias', 'analista_smc', 'administrador_licencias']),

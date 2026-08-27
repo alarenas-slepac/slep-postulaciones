@@ -1,4 +1,20 @@
 {
+  "_leaflet-Bu0uVQ8k.js": {
+    "file": "assets/leaflet-Bu0uVQ8k.js",
+    "name": "leaflet",
+    "css": [
+      "assets/leaflet-CLLlcC51.css"
+    ],
+    "assets": [
+      "assets/layers-BWBAp2CZ.png",
+      "assets/layers-2x-Bpkbi35X.png",
+      "assets/marker-icon-hN30_KVU.png"
+    ]
+  },
+  "_leaflet-CLLlcC51.css": {
+    "file": "assets/leaflet-CLLlcC51.css",
+    "src": "_leaflet-CLLlcC51.css"
+  },
   "node_modules/flag-icons/flags/1x1/ad.svg": {
     "file": "assets/ad-Blhdm5jl.svg",
     "src": "node_modules/flag-icons/flags/1x1/ad.svg"
@@ -2188,6 +2204,15 @@
       "centro-operaciones.css"
     ]
   },
+  "resources/css/votaciones-publicas.css": {
+    "file": "assets/votaciones-publicas-C7huXRnE.css",
+    "src": "resources/css/votaciones-publicas.css",
+    "isEntry": true,
+    "name": "votaciones-publicas",
+    "names": [
+      "votaciones-publicas.css"
+    ]
+  },
   "resources/fonts/Gilmer-Bold.otf": {
     "file": "assets/Gilmer-Bold-DZRjtHOG.otf",
     "src": "resources/fonts/Gilmer-Bold.otf"
@@ -2211,17 +2236,24 @@
     "isEntry": true
   },
   "resources/js/centro-operaciones.js": {
-    "file": "assets/centro-operaciones-CfpfUu1G.js",
+    "file": "assets/centro-operaciones-DecAUpDk.js",
     "name": "centro-operaciones",
     "src": "resources/js/centro-operaciones.js",
     "isEntry": true,
-    "css": [
-      "assets/centro-operaciones-hTRphxZi.css"
+    "imports": [
+      "_leaflet-Bu0uVQ8k.js"
     ],
-    "assets": [
-      "assets/layers-BWBAp2CZ.png",
-      "assets/layers-2x-Bpkbi35X.png",
-      "assets/marker-icon-hN30_KVU.png"
+    "css": [
+      "assets/centro-operaciones-BKK0pH8C.css"
+    ]
+  },
+  "resources/js/votaciones-publicas.js": {
+    "file": "assets/votaciones-publicas-DAnoSMWN.js",
+    "name": "votaciones-publicas",
+    "src": "resources/js/votaciones-publicas.js",
+    "isEntry": true,
+    "imports": [
+      "_leaflet-Bu0uVQ8k.js"
     ]
   },
   "resources/scss/app.scss": {
