@@ -1,6 +1,35 @@
 <?php
 
 return [
+    '2026.8.27.448' => [
+        'date' => '2026-08-27',
+        'module' => 'Licencias Médicas',
+        'title' => 'Corrección y reproceso de errores históricos de importación',
+        'files' => [
+            'AUDITORIA_MODULO_LICENCIAS_MEDICAS.md',
+            'app/Http/Controllers/Tramites/LicenciaMedicaImportacionErrorController.php',
+            'app/Models/LicenciaMedicaImportacion.php',
+            'app/Models/LicenciaMedicaImportacionError.php',
+            'app/Services/LicenciasMedicas/LicenciaSeguimientoImportService.php',
+            'config/changelog.php',
+            'database/migrations/2026_08_27_200000_create_licencias_medicas_importacion_errores_table.php',
+            'resources/views/tramites/licencias-medicas/actualizar-estados.blade.php',
+            'resources/views/tramites/licencias-medicas/errores-importacion/index.blade.php',
+            'resources/views/tramites/licencias-medicas/errores-importacion/show.blade.php',
+            'resources/views/tramites/licencias-medicas/importar-seguimiento.blade.php',
+            'resources/views/tramites/licencias-medicas/index.blade.php',
+            'routes/web.php',
+            'tests/Feature/LicenciasMedicasModuleTest.php',
+        ],
+        'changes' => [
+            'Registra cada fila rechazada con importación, hoja, fila, folio, RUT, motivo y valores originales, sin limitarse a una muestra en el resumen de carga.',
+            'Agrega una bandeja con filtros, corrección controlada de folio, DV, RUT y nombre, y reproceso individual con estado final y vínculo a la licencia resultante.',
+            'Permite reconstruir los errores de cargas históricas leyendo el archivo original sin volver a aplicar las filas válidas.',
+            'Ejecuta cada reproceso en una transacción, conserva los valores originales y registra usuario, fecha, intentos, resultado e historial de estados.',
+            'Corrige directivas Blade abreviadas inválidas en las pantallas de importación y actualización masiva.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP', 'Coordinador GDP', 'Analista SMC', 'Administrador Licencias Médicas'],
+    ],
     '2026.8.27.447' => [
         'date' => '2026-08-27',
         'module' => 'Licencias Médicas',

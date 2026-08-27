@@ -67,7 +67,9 @@
             <thead><tr><th>Archivo</th><th>Fecha</th><th>Estado</th><th>Filas</th><th>Actualizables/aplicadas</th><th>Inconsistencias</th><th></th></tr></thead>
             <tbody>
             @forelse($importaciones as $importacion)
-                @php($resumen = (array) $importacion->resumen_json)
+                @php
+                    $resumen = (array) $importacion->resumen_json;
+                @endphp
                 <tr>
                     <td><strong>{{ $importacion->nombre_archivo }}</strong><br><small class="text-muted">{{ optional($importacion->usuario)->name ?: 'Sistema' }}</small></td>
                     <td>{{ optional($importacion->created_at)->format('d-m-Y H:i') }}</td>

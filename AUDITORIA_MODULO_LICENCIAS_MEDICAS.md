@@ -490,3 +490,5 @@ El 26 de agosto de 2026 se confirmaron ambas decisiones:
 El primer parche de estabilización implementa esas decisiones mediante catálogos canónicos, una migración aditiva compatible con los textos históricos, trazabilidad de cambios, validación del DV del RUT, control de importaciones fallidas y pruebas automatizadas. Los riesgos y pendientes restantes de esta auditoría continúan vigentes para los incrementos posteriores.
 
 El segundo incremento agrega actualización masiva de la resolución COMPIN mediante Excel, con prevalidación de folio y RUT, detección de duplicados y conflictos, confirmación transaccional, historial por licencia y reversa completa condicionada a que no existan cambios posteriores.
+
+El tercer incremento incorpora persistencia por fila para los errores de importación histórica, una bandeja filtrable, corrección controlada y reproceso individual transaccional. También permite reconstruir los rechazos de cargas anteriores desde el archivo original sin reaplicar las filas válidas, conservando valores originales, intentos, usuario, fecha, resultado y licencia asociada.

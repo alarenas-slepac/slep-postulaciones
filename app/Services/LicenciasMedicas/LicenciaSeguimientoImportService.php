@@ -5,8 +5,11 @@ namespace App\Services\LicenciasMedicas;
 use App\Models\LicenciaMedica;
 use App\Models\LicenciaMedicaHistorial;
 use App\Models\LicenciaMedicaImportacion;
+use App\Models\LicenciaMedicaImportacionError;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use ZipArchive;
@@ -115,14 +118,231 @@ class LicenciaSeguimientoImportService
                 'resumen_json' => ['error' => 'La importación no pudo completarse.'],
             ]);
 
+            $this->registrarErrorImportacion(
+                $importacion->id,
+                null,
+                null,
+                'archivo_no_procesable',
+                'La importación no pudo completarse. Revise que el archivo corresponda a la plantilla esperada.',
+                []
+            );
+
             throw $e;
         }
     }
 
-    private function procesarHoja($sheet, string $sheetName, string $tipoIngresoDefault, array $datosFuncionarios, int $importacionId, int $userId): array
+    public function indexarErrores(LicenciaMedicaImportacion $importacion): int
+    {
+        if ($importacion->tipo !== 'seguimiento_excel') {
+            throw ValidationException::withMessages([
+                'importacion' => 'Sólo se pueden reconstruir errores de importaciones de seguimiento histórico.',
+            ]);
+        }
+
+        if ($importacion->errores()->exists()) {
+            throw ValidationException::withMessages([
+                'importacion' => 'Esta carga ya tiene errores detallados registrados.',
+            ]);
+        }
+
+        if (! $importacion->archivo_path || ! Storage::disk('local')->exists($importacion->archivo_path)) {
+            throw ValidationException::withMessages([
+                'importacion' => 'El archivo original de esta carga no está disponible para reconstruir sus errores.',
+            ]);
+        }
+
+        $this->prepareLongRunningImport();
+        $path = Storage::disk('local')->path($importacion->archivo_path);
+        $tipoIngresoDefault = LicenciaFolio::normalizeTipo(
+            data_get($importacion->resumen_json, 'tipo_ingreso_default')
+        ) ?: '3';
+
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'xlsx' && class_exists(ZipArchive::class) && class_exists(XMLReader::class)) {
+            $zip = new ZipArchive();
+            if ($zip->open($path) !== true) {
+                throw ValidationException::withMessages(['importacion' => 'No se pudo abrir el archivo XLSX original.']);
+            }
+
+            try {
+                $sharedStrings = $this->xlsxSharedStrings($zip);
+                $sheets = $this->xlsxSheets($zip);
+                $datosFuncionarios = isset($sheets['datos'])
+                    ? $this->leerDatosFuncionariosStreaming($zip, $sheets['datos'], $sharedStrings)
+                    : [];
+
+                foreach (['2026', '2025'] as $sheetName) {
+                    if (isset($sheets[$sheetName])) {
+                        $this->procesarHojaStreaming(
+                            $zip,
+                            $sheets[$sheetName],
+                            $sheetName,
+                            $sharedStrings,
+                            $tipoIngresoDefault,
+                            $datosFuncionarios,
+                            $importacion->id,
+                            (int) ($importacion->subido_por ?: 0),
+                            false
+                        );
+                    }
+                }
+            } finally {
+                $zip->close();
+            }
+
+            return $importacion->errores()->count();
+        }
+
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        if (method_exists($reader, 'setReadEmptyCells')) {
+            $reader->setReadEmptyCells(false);
+        }
+        if (method_exists($reader, 'setLoadSheetsOnly')) {
+            $reader->setLoadSheetsOnly(['2026', '2025', 'datos']);
+        }
+
+        $spreadsheet = $reader->load($path);
+        try {
+            $datosFuncionarios = $this->leerDatosFuncionarios($spreadsheet);
+            foreach (['2026', '2025'] as $sheetName) {
+                $sheet = $spreadsheet->getSheetByName($sheetName);
+                if ($sheet) {
+                    $this->procesarHoja(
+                        $sheet,
+                        $sheetName,
+                        $tipoIngresoDefault,
+                        $datosFuncionarios,
+                        $importacion->id,
+                        (int) ($importacion->subido_por ?: 0),
+                        false
+                    );
+                }
+            }
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+
+        return $importacion->errores()->count();
+    }
+
+    public function corregirError(LicenciaMedicaImportacionError $error, array $correcciones, int $userId): LicenciaMedicaImportacionError
+    {
+        return DB::transaction(function () use ($error, $correcciones, $userId) {
+            $registro = LicenciaMedicaImportacionError::query()->lockForUpdate()->findOrFail($error->id);
+            if ($registro->estado === LicenciaMedicaImportacionError::ESTADO_RESUELTO) {
+                throw ValidationException::withMessages(['error_importacion' => 'El error ya fue resuelto y no admite nuevas correcciones.']);
+            }
+
+            $permitidos = ['licencia', 'dv', 'rut', 'nombre'];
+            $valores = [];
+            foreach ($permitidos as $campo) {
+                if (! array_key_exists($campo, $correcciones)) {
+                    continue;
+                }
+
+                $valor = trim((string) $correcciones[$campo]);
+                if ($valor !== '') {
+                    $valores[$campo] = $valor;
+                }
+            }
+
+            if ($valores === []) {
+                throw ValidationException::withMessages(['correcciones' => 'Debe ingresar al menos un valor corregido.']);
+            }
+
+            $registro->update([
+                'valores_corregidos' => array_replace((array) $registro->valores_corregidos, $valores),
+                'estado' => LicenciaMedicaImportacionError::ESTADO_CORREGIDO,
+                'corregido_por' => $userId,
+                'corregido_at' => now(),
+                'ultimo_error' => null,
+            ]);
+
+            return $registro->fresh();
+        });
+    }
+
+    public function reprocesarError(LicenciaMedicaImportacionError $error, int $userId): LicenciaMedicaImportacionError
+    {
+        $resultado = DB::transaction(function () use ($error, $userId) {
+            $registro = LicenciaMedicaImportacionError::query()
+                ->with('importacion')
+                ->lockForUpdate()
+                ->findOrFail($error->id);
+
+            if ($registro->estado === LicenciaMedicaImportacionError::ESTADO_RESUELTO) {
+                throw ValidationException::withMessages(['error_importacion' => 'El error ya fue resuelto anteriormente.']);
+            }
+
+            if ($registro->fila === null || $registro->valoresEfectivos() === []) {
+                throw ValidationException::withMessages(['error_importacion' => 'Este error no contiene una fila recuperable del archivo original.']);
+            }
+
+            $importacion = $registro->importacion;
+            $tipoIngresoDefault = LicenciaFolio::normalizeTipo(
+                data_get($importacion->resumen_json, 'tipo_ingreso_default')
+            ) ?: '3';
+            $valores = $registro->valoresEfectivos();
+            $map = array_combine(array_keys($valores), array_keys($valores));
+            $parsed = $this->parsearFila(
+                $valores,
+                $map,
+                (string) ($registro->hoja ?: 'historico'),
+                $tipoIngresoDefault,
+                []
+            );
+
+            if (! empty($parsed['error'])) {
+                $registro->update([
+                    'intentos_reproceso' => $registro->intentos_reproceso + 1,
+                    'ultimo_error' => $parsed['error'],
+                ]);
+
+                return ['error' => $parsed['error'], 'registro' => $registro->fresh()];
+            }
+
+            $tipoResultado = $this->guardarLicencia($parsed['data'], $importacion->id, $userId);
+            $licencia = LicenciaMedica::query()
+                ->where('tipo_ingreso_licencia', $parsed['data']['tipo_ingreso_licencia'])
+                ->where('cuerpo_licencia', $parsed['data']['cuerpo_licencia'])
+                ->where('dv_licencia', $parsed['data']['dv_licencia'])
+                ->firstOrFail();
+
+            $registro->update([
+                'estado' => LicenciaMedicaImportacionError::ESTADO_RESUELTO,
+                'intentos_reproceso' => $registro->intentos_reproceso + 1,
+                'ultimo_error' => null,
+                'resultado_reproceso' => $tipoResultado,
+                'licencia_medica_id' => $licencia->id,
+                'reprocesado_por' => $userId,
+                'reprocesado_at' => now(),
+            ]);
+
+            $this->actualizarTotalesTrasReproceso($importacion, $tipoResultado);
+
+            return ['error' => null, 'registro' => $registro->fresh()];
+        });
+
+        if ($resultado['error']) {
+            throw ValidationException::withMessages(['error_importacion' => $resultado['error']]);
+        }
+
+        return $resultado['registro'];
+    }
+
+    private function procesarHoja($sheet, string $sheetName, string $tipoIngresoDefault, array $datosFuncionarios, int $importacionId, int $userId, bool $aplicarFilasValidas = true): array
     {
         $headerRow = $this->detectarFilaCabecera($sheet);
         if (! $headerRow) {
+            $this->registrarErrorImportacion(
+                $importacionId,
+                $sheetName,
+                null,
+                'cabecera_no_encontrada',
+                'No se encontró cabecera válida.',
+                []
+            );
+
             return [
                 'estado' => 'sin_cabecera',
                 'filas' => 0,
@@ -177,6 +397,18 @@ class LicenciaSeguimientoImportService
                     $stats['omitidas']++;
                     $stats['inconsistencias']++;
                     $this->addInconsistencia($stats, $sheetName, $row, $parsed['error']);
+                    $this->registrarErrorImportacion(
+                        $importacionId,
+                        $sheetName,
+                        $row,
+                        $parsed['codigo_error'] ?? 'fila_invalida',
+                        $parsed['error'],
+                        $parsed['valores_originales'] ?? []
+                    );
+                    continue;
+                }
+
+                if (! $aplicarFilasValidas) {
                     continue;
                 }
 
@@ -194,6 +426,7 @@ class LicenciaSeguimientoImportService
 
     private function parsearFila(array $row, array $map, string $sheetName, string $tipoIngresoDefault, array $datosFuncionarios): array
     {
+        $valoresOriginales = $this->valoresSemanticos($row, $map);
         $licenciaRaw = $this->value($row, $map, 'licencia');
         $dvRaw = $this->value($row, $map, 'dv');
 
@@ -204,18 +437,30 @@ class LicenciaSeguimientoImportService
         $folio = LicenciaFolio::build($tipo, $cuerpo, $dv);
 
         if (! $folio) {
-            return ['error' => 'Folio inválido o incompleto.'];
+            return [
+                'error' => 'Folio inválido o incompleto.',
+                'codigo_error' => 'folio_invalido',
+                'valores_originales' => $valoresOriginales,
+            ];
         }
 
         $rut = RutNormalizer::normalize((string) $this->value($row, $map, 'rut'));
         if (! $rut['valido']) {
-            return ['error' => 'RUT del funcionario inválido o vacío.'];
+            return [
+                'error' => 'RUT del funcionario inválido o vacío.',
+                'codigo_error' => 'rut_invalido',
+                'valores_originales' => $valoresOriginales,
+            ];
         }
 
         $datos = $datosFuncionarios[$rut['normalizado']] ?? [];
         $nombre = $this->clean($this->value($row, $map, 'nombre')) ?: ($datos['nombre'] ?? null);
         if (! $nombre) {
-            return ['error' => 'Nombre del funcionario vacío.'];
+            return [
+                'error' => 'Nombre del funcionario vacío.',
+                'codigo_error' => 'nombre_vacio',
+                'valores_originales' => $valoresOriginales,
+            ];
         }
 
         $establecimientoManual = $this->clean($this->value($row, $map, 'dependencia')) ?: ($datos['ubicacion'] ?? null);
@@ -341,6 +586,7 @@ class LicenciaSeguimientoImportService
             return 'actualizadas';
         }
 
+        $data = array_filter($data, fn ($value) => ! is_null($value));
         $data['importacion_id'] = $importacionId;
         $data['updated_by'] = $userId;
         $data['created_by'] = $userId;
@@ -470,7 +716,7 @@ class LicenciaSeguimientoImportService
         ];
     }
 
-    private function procesarHojaStreaming(ZipArchive $zip, string $entry, string $sheetName, array $sharedStrings, string $tipoIngresoDefault, array $datosFuncionarios, int $importacionId, int $userId): array
+    private function procesarHojaStreaming(ZipArchive $zip, string $entry, string $sheetName, array $sharedStrings, string $tipoIngresoDefault, array $datosFuncionarios, int $importacionId, int $userId, bool $aplicarFilasValidas = true): array
     {
         $stats = [
             'estado' => 'procesado_streaming',
@@ -507,6 +753,14 @@ class LicenciaSeguimientoImportService
                 $stats['estado'] = 'sin_cabecera';
                 $stats['inconsistencias'] = 1;
                 $this->addInconsistencia($stats, $sheetName, null, 'No se encontró cabecera válida en las primeras 20 filas.');
+                $this->registrarErrorImportacion(
+                    $importacionId,
+                    $sheetName,
+                    null,
+                    'cabecera_no_encontrada',
+                    'No se encontró cabecera válida en las primeras 20 filas.',
+                    []
+                );
                 return $stats;
             }
 
@@ -529,11 +783,37 @@ class LicenciaSeguimientoImportService
                 $stats['omitidas']++;
                 $stats['inconsistencias']++;
                 $this->addInconsistencia($stats, $sheetName, $rowNumber, $parsed['error']);
+                $this->registrarErrorImportacion(
+                    $importacionId,
+                    $sheetName,
+                    $rowNumber,
+                    $parsed['codigo_error'] ?? 'fila_invalida',
+                    $parsed['error'],
+                    $parsed['valores_originales'] ?? []
+                );
+                continue;
+            }
+
+            if (! $aplicarFilasValidas) {
                 continue;
             }
 
             $resultado = $this->guardarLicencia($parsed['data'], $importacionId, $userId);
             $stats[$resultado]++;
+        }
+
+        if ($headerRow === null) {
+            $stats['estado'] = 'sin_cabecera';
+            $stats['inconsistencias'] = 1;
+            $this->addInconsistencia($stats, $sheetName, null, 'No se encontró cabecera válida en las primeras 20 filas.');
+            $this->registrarErrorImportacion(
+                $importacionId,
+                $sheetName,
+                null,
+                'cabecera_no_encontrada',
+                'No se encontró cabecera válida en las primeras 20 filas.',
+                []
+            );
         }
 
         return $stats;
@@ -986,6 +1266,84 @@ class LicenciaSeguimientoImportService
             $cursor->addDay();
         }
         return $dias;
+    }
+
+    private function valoresSemanticos(array $row, array $map): array
+    {
+        $valores = [];
+        foreach (array_keys($map) as $campo) {
+            $valor = $this->value($row, $map, $campo);
+            if ($valor instanceof \DateTimeInterface) {
+                $valor = $valor->format('Y-m-d');
+            }
+
+            if ($valor === null || trim((string) $valor) === '') {
+                continue;
+            }
+
+            $valores[$campo] = is_scalar($valor) ? (string) $valor : null;
+        }
+
+        return array_filter($valores, fn ($valor) => $valor !== null);
+    }
+
+    private function registrarErrorImportacion(
+        int $importacionId,
+        ?string $hoja,
+        ?int $fila,
+        string $codigo,
+        string $motivo,
+        array $valoresOriginales
+    ): LicenciaMedicaImportacionError {
+        $licencia = $this->clean($valoresOriginales['licencia'] ?? null);
+        $dv = $this->clean($valoresOriginales['dv'] ?? null);
+        $folioRecibido = trim(implode('-', array_filter([$licencia, $dv], fn ($valor) => $valor !== null)), '-');
+
+        return LicenciaMedicaImportacionError::updateOrCreate(
+            [
+                'importacion_id' => $importacionId,
+                'hoja' => $hoja,
+                'fila' => $fila,
+            ],
+            [
+                'codigo_error' => $codigo,
+                'motivo' => $motivo,
+                'folio_recibido' => $folioRecibido !== '' ? $folioRecibido : null,
+                'rut_recibido' => $this->clean($valoresOriginales['rut'] ?? null),
+                'valores_originales' => $valoresOriginales ?: null,
+                'estado' => LicenciaMedicaImportacionError::ESTADO_PENDIENTE,
+            ]
+        );
+    }
+
+    private function actualizarTotalesTrasReproceso(LicenciaMedicaImportacion $importacion, string $resultado): void
+    {
+        $registro = LicenciaMedicaImportacion::query()->lockForUpdate()->findOrFail($importacion->id);
+        $columnaResultado = match ($resultado) {
+            'importadas' => 'total_importadas',
+            'actualizadas' => 'total_actualizadas',
+            'duplicadas' => 'total_duplicadas',
+            default => null,
+        };
+
+        $cambios = [
+            'total_omitidas' => max(0, $registro->total_omitidas - 1),
+            'total_inconsistencias' => max(0, $registro->total_inconsistencias - 1),
+        ];
+
+        if ($columnaResultado) {
+            $cambios[$columnaResultado] = ((int) $registro->{$columnaResultado}) + 1;
+        }
+
+        $resumen = (array) $registro->resumen_json;
+        $resumen['reprocesos'] = [
+            'resueltos' => $registro->errores()->where('estado', LicenciaMedicaImportacionError::ESTADO_RESUELTO)->count(),
+            'pendientes' => $registro->errores()->where('estado', '<>', LicenciaMedicaImportacionError::ESTADO_RESUELTO)->count(),
+            'actualizado_at' => now()->toIso8601String(),
+        ];
+        $cambios['resumen_json'] = $resumen;
+
+        $registro->update($cambios);
     }
 
     private function addInconsistencia(array &$stats, string $sheetName, ?int $row, string $motivo): void

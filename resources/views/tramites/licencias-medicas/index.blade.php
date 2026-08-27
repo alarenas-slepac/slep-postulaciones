@@ -18,6 +18,7 @@
             <div class="d-flex gap-2 flex-wrap">
                 @if($permisos['importacion'])
                     <a href="{{ route('tramites.licencias-medicas.importar-seguimiento') }}" class="cf-btn-secondary"><i class="bi bi-file-earmark-spreadsheet"></i> Importar seguimiento</a>
+                    <a href="{{ route('tramites.licencias-medicas.errores.index') }}" class="cf-btn-secondary"><i class="bi bi-exclamation-triangle"></i> Errores de importación</a>
                     <a href="{{ route('tramites.licencias-medicas.actualizaciones.index') }}" class="cf-btn-secondary"><i class="bi bi-arrow-repeat"></i> Actualización masiva</a>
                 @endif
                 @if($permisos['configuracion'])

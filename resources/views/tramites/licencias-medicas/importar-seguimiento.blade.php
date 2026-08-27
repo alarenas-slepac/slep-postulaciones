@@ -7,7 +7,9 @@
 @endpush
 
 @section('content')
-@php($result = session('import_result'))
+@php
+    $result = session('import_result');
+@endphp
 <div class="container-fluid py-4">
     <div class="cf-page-header mb-4">
         <div class="cf-page-header__top">
@@ -16,7 +18,10 @@
                 <h1 class="cf-page-header__title">Importar seguimiento histórico</h1>
                 <p class="cf-page-header__subtitle">Carga las hojas 2026, 2025 y datos del Excel de seguimiento actual, normalizando RUT, folio de licencia y asociación con Administración Central o establecimientos.</p>
             </div>
-            <a href="{{ route('tramites.licencias-medicas.index') }}" class="cf-btn-outline"><i class="bi bi-arrow-left"></i> Volver al listado</a>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ route('tramites.licencias-medicas.errores.index') }}" class="cf-btn-secondary"><i class="bi bi-exclamation-triangle"></i> Revisar errores</a>
+                <a href="{{ route('tramites.licencias-medicas.index') }}" class="cf-btn-outline"><i class="bi bi-arrow-left"></i> Volver al listado</a>
+            </div>
         </div>
     </div>
 
@@ -68,7 +73,9 @@
     </div>
 
     @if($result)
-        @php($totales = $result['totales'] ?? [])
+        @php
+            $totales = $result['totales'] ?? [];
+        @endphp
         <div class="cf-panel mt-4">
             <div class="cf-section-title"><i class="bi bi-clipboard-check"></i> Resultado de importación</div>
             <div class="cf-summary-grid mb-4">
@@ -112,6 +119,9 @@
                         </tbody>
                     </table>
                 </div>
+            @endif
+            @if(($totales['inconsistencias'] ?? 0) > 0)
+                <div class="mt-3"><a href="{{ route('tramites.licencias-medicas.errores.index', ['estado' => 'pendiente']) }}" class="cf-btn-secondary"><i class="bi bi-exclamation-triangle"></i> Corregir registros rechazados</a></div>
             @endif
         </div>
     @endif
