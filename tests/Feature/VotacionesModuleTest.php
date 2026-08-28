@@ -132,6 +132,17 @@ class VotacionesModuleTest extends TestCase
         ]);
     }
 
+    public function test_formulario_de_nueva_jornada_no_genera_enlaces_sin_slug(): void
+    {
+        $this->withoutAccessMiddleware();
+
+        $this->actingAs($this->operator)
+            ->get(route('votaciones.admin.jornadas.create'))
+            ->assertOk()
+            ->assertSee('Nueva jornada')
+            ->assertSee('Incidencias');
+    }
+
     public function test_usuario_sin_permiso_no_puede_crear_jornada(): void
     {
         $sinPermiso = $this->crearUsuario('222222222', 'Usuario', 'Sin', 'Permiso', 'sin-permiso@example.test');
