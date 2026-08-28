@@ -73,6 +73,16 @@ class DotacionCursosPlanesResumenCalculator
                         (int) data_get($detalle, 'establecimiento_curso_id', 0)
                     ))
                     ->values();
+                $horasPlanPorCursoDetalle = $detallesGrupo
+                    ->map(fn ($detalle) => [
+                        'curso' => (string) data_get($detalle, 'nombre_seccion', 'Curso'),
+                        'horas' => round((float) data_get($detalle, 'horas', 0), 2),
+                    ])
+                    ->values();
+                $horasPlanPorCursoValores = $horasPlanPorCursoDetalle
+                    ->pluck('horas')
+                    ->unique()
+                    ->values();
                 $horasPlanRefuerzo = (float) $detallesGrupo->sum(
                     fn ($detalle) => (float) data_get($detalle, 'horas_plan_refuerzo_ld_otro_docente', 0)
                 );
@@ -97,6 +107,11 @@ class DotacionCursosPlanesResumenCalculator
                     'miembros_label' => $miembros->pluck('label')->filter()->implode(' + '),
                     'matricula' => (int) $miembros->sum(fn ($miembro) => (int) data_get($miembro, 'matricula', 0)),
                     'cursos' => $miembroIds->count(),
+                    'horas_plan_por_curso' => $horasPlanPorCursoValores->count() === 1
+                        ? (float) $horasPlanPorCursoValores->first()
+                        : null,
+                    'horas_plan_por_curso_variable' => $horasPlanPorCursoValores->count() > 1,
+                    'horas_plan_por_curso_detalle' => $horasPlanPorCursoDetalle->all(),
                     'total_horas' => $horasPlan,
                     'total_horas_contrato_equivalente' => $horasContrato,
                     'total_trabajo_colaborativo_pie' => $trabajoColaborativoPie,

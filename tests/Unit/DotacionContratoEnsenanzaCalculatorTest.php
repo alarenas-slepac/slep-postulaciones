@@ -21,7 +21,7 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
         $this->assertSame(83.0, $resultado['contrato_general_mas_pie']);
     }
 
-    public function test_reemplaza_contratos_individuales_por_contrato_de_grupo_combinado_parvularia(): void
+    public function test_reemplaza_la_suma_individual_por_la_necesidad_del_grupo_combinado_parvularia(): void
     {
         $resultado = DotacionContratoEnsenanzaCalculator::split(
             $this->cursos(),
@@ -39,7 +39,7 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
         );
     }
 
-    public function test_mantiene_parvularia_y_asigna_a_plan_general_el_ajuste_de_otro_nivel(): void
+    public function test_asigna_a_plan_general_la_necesidad_consolidada_de_su_grupo_combinado(): void
     {
         $resultado = DotacionContratoEnsenanzaCalculator::split(
             $this->cursos(),
@@ -53,7 +53,7 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
         $this->assertSame(53.0, $resultado['contrato_general_mas_pie']);
     }
 
-    public function test_conserva_refuerzo_de_libre_disposicion_nt_al_combinar_cursos(): void
+    public function test_no_duplica_el_refuerzo_nt_ya_incluido_en_el_contrato_equivalente_del_curso(): void
     {
         $cursos = $this->cursos(53, 53, 3, 3);
 
@@ -84,6 +84,13 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
                         'trabajo_colaborativo_pie' => 6,
                     ],
                 ],
+                'basica' => [
+                    'niveles' => ['1B'],
+                    'totales' => [
+                        'horas_contrato_equivalente' => 80,
+                        'trabajo_colaborativo_pie' => 3,
+                    ],
+                ],
             ],
             'rows' => [
                 'NT1' => [
@@ -98,6 +105,13 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
                         'establecimiento_curso_id' => 2,
                         'horas_contrato_equivalente_redondeado' => $contratoNt2,
                         'horas_contrato_refuerzo_ld_otro_docente' => $refuerzoNt2,
+                    ]],
+                ],
+                '1B' => [
+                    'detalles' => [[
+                        'establecimiento_curso_id' => 10,
+                        'horas_contrato_equivalente_redondeado' => 80,
+                        'horas_contrato_refuerzo_ld_otro_docente' => 0,
                     ]],
                 ],
             ],

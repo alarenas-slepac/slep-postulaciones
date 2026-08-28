@@ -243,7 +243,17 @@
                                 </td>
                                 <td class="text-end">{{ number_format((int) ($row['matricula'] ?? 0), 0, ',', '.') }}</td>
                                 <td class="text-end">{{ number_format((int) ($row['cursos'] ?? 0), 0, ',', '.') }}</td>
-                                <td class="text-end"><span class="badge text-bg-primary">Consolidado</span></td>
+                                <td class="text-end">
+                                    @if (!($row['horas_plan_por_curso_variable'] ?? false))
+                                        <span class="fw-semibold">{{ $fmt($row['horas_plan_por_curso'] ?? 0) }} h</span>
+                                        <div class="small text-muted">por curso</div>
+                                    @else
+                                        <span class="badge text-bg-warning">Variable</span>
+                                        @foreach (($row['horas_plan_por_curso_detalle'] ?? []) as $detalleCurso)
+                                            <div class="small text-muted">{{ $detalleCurso['curso'] }}: {{ $fmt($detalleCurso['horas']) }} h</div>
+                                        @endforeach
+                                    @endif
+                                </td>
                                 <td class="text-end fw-semibold text-primary">{{ $fmt($row['total_horas'] ?? 0) }}</td>
                                 <td class="text-center"><span class="badge dotacion-badge-soft">{{ $row['proporcion_docente_label'] ?? '—' }}</span><div class="small text-muted mt-1">Configuración del grupo</div></td>
                                 <td class="text-end fw-semibold text-info">{{ $fmt($row['total_horas_contrato_equivalente'] ?? 0) }}</td>

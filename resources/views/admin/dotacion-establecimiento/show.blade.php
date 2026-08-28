@@ -70,8 +70,8 @@
             ['label' => 'Cursos', 'value' => number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.'), 'hint' => 'Cursos con matrícula.', 'tone' => 'primary', 'icon' => 'bi-grid-3x3-gap'],
             ['label' => 'Docentes', 'value' => number_format((int) ($resumen['docentes_total'] ?? 0), 0, ',', '.'), 'hint' => 'Base contractual vigente.', 'tone' => 'success', 'icon' => 'bi-person-workspace'],
             ...($tieneEducacionParvularia ? [
-                ['label' => 'Contrato Educación Parvularia + PIE', 'value' => $fmt($contratoEducacionParvulariaMasPie), 'hint' => 'Horas requeridas de NT1 y NT2, ajustadas por cursos combinados, más trabajo colaborativo PIE.', 'tone' => 'info', 'icon' => 'bi-people-fill'],
-                ['label' => 'Contrato Plan General + PIE', 'value' => $fmt($contratoPlanGeneralMasPie), 'hint' => 'Horas requeridas de los demás cursos, ajustadas por cursos combinados, más trabajo colaborativo PIE.', 'tone' => 'primary', 'icon' => 'bi-plus-square'],
+                ['label' => 'Contrato Educación Parvularia + PIE', 'value' => $fmt($contratoEducacionParvulariaMasPie), 'hint' => 'Necesidad para cubrir NT1 y NT2; los grupos combinados reemplazan la suma individual y aplican la regla especial correspondiente.', 'tone' => 'info', 'icon' => 'bi-people-fill'],
+                ['label' => 'Contrato Plan General + PIE', 'value' => $fmt($contratoPlanGeneralMasPie), 'hint' => 'Necesidad para cubrir los demás niveles; los grupos combinados reemplazan la suma individual y aplican 65/35 o 60/40.', 'tone' => 'primary', 'icon' => 'bi-plus-square'],
             ] : [
                 ['label' => 'Contrato plan + PIE', 'value' => $fmt($contratoPlanMasPieAsignadas).' / '.$fmt($contratoPlanMasPieRequerido), 'hint' => 'Contrato asignado / requerido.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
             ]),

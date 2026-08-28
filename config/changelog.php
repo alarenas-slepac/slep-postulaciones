@@ -1,6 +1,47 @@
 <?php
 
 return [
+    '2026.8.28.460' => [
+        'date' => '2026-08-28',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Necesidad contractual por tipo de enseñanza',
+        'files' => [
+            'app/Support/DotacionContratoEnsenanzaCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionContratoEnsenanzaCalculatorTest.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+        ],
+        'changes' => [
+            'Calcula los cursos individuales con la regla especial de parvularia o la proporción 65/35 o 60/40 correspondiente.',
+            'En los indicadores de contrato, reemplaza la suma individual de cursos combinados por la necesidad consolidada del grupo.',
+            'Separa correctamente la necesidad consolidada entre Educación Parvularia + PIE y Plan General + PIE.',
+            'Mantiene ambos indicadores alineados con la necesidad real utilizada por la brecha estructural.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
+    '2026.8.28.459' => [
+        'date' => '2026-08-28',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Conciliación por bloque y horas individuales en cursos combinados',
+        'files' => [
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionCursosPlanesResumenCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'tests/Unit/DotacionCursosPlanesResumenCalculatorTest.php',
+            'tests/Unit/DotacionPlanHorasCompletasTest.php',
+        ],
+        'changes' => [
+            'Clasifica las horas faltantes del plan como libre disposición antes de usar el respaldo genérico de plan común.',
+            'Evita que la libre disposición incompleta se convierta en una necesidad adicional al consolidar cursos combinados.',
+            'Muestra las horas completas de plan por cada curso integrante en la vista web y en el informe PDF.',
+            'Concilia la reducción de los grupos contra la suma individual completa de sus planes de estudio.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.8.28.458' => [
         'date' => '2026-08-28',
         'module' => 'Dotación Establecimiento',

@@ -7,10 +7,11 @@ use Illuminate\Support\Collection;
 class DotacionContratoEnsenanzaCalculator
 {
     /**
-     * Separa el contrato plan ajustado y el trabajo colaborativo PIE entre
-     * Educacion Parvularia y el resto de los niveles. Los grupos combinados
-     * reemplazan el contrato individual de sus cursos antes de distribuir el
-     * total, de modo que ambos segmentos siempre cuadren con el total real.
+     * Separa el contrato necesario y el trabajo colaborativo PIE entre
+     * Educacion Parvularia y el resto de los niveles. Los cursos individuales
+     * se convierten mediante 65/35, 60/40 o la regla especial de parvularia.
+     * En cursos combinados, la necesidad consolidada del grupo reemplaza la
+     * suma individual de sus integrantes para no sobreestimar la cobertura.
      *
      * @return array{
      *     contrato_plan_parvularia: float,
@@ -38,7 +39,6 @@ class DotacionContratoEnsenanzaCalculator
             ->filter()
             ->unique()
             ->values();
-
         $gruposActivos = collect($gruposCombinados)
             ->where('activo', true)
             ->values();
