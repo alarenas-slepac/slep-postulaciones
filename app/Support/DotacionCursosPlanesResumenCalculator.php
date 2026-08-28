@@ -97,9 +97,9 @@ class DotacionCursosPlanesResumenCalculator
                     (float) data_get($grupo, 'totales.horas_contrato', 0) + $horasContratoRefuerzo,
                     2
                 );
-                $trabajoColaborativoPie = round((float) $detallesGrupo->sum(
+                $trabajoColaborativoPie = round((float) ($detallesGrupo->max(
                     fn ($detalle) => (float) data_get($detalle, 'trabajo_colaborativo_pie', 0)
-                ), 2);
+                ) ?? 0), 2);
 
                 return [
                     'id' => (int) data_get($grupo, 'id', 0),

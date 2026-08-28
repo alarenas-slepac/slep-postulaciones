@@ -43,16 +43,17 @@ class DotacionCursosPlanesResumenCalculatorTest extends TestCase
         $this->assertCount(2, $combinado['horas_plan_por_curso_detalle']);
         $this->assertSame(32.0, $combinado['total_horas']);
         $this->assertSame(50.0, $combinado['total_horas_contrato_equivalente']);
-        $this->assertSame(6.0, $combinado['total_trabajo_colaborativo_pie']);
-        $this->assertSame(56.0, $combinado['total_contrato_mas_trabajo_colaborativo_pie']);
+        $this->assertSame(3.0, $combinado['total_trabajo_colaborativo_pie']);
+        $this->assertSame(53.0, $combinado['total_contrato_mas_trabajo_colaborativo_pie']);
+        $this->assertSame(2, $combinado['trabajo_colaborativo_pie_cursos']);
         $this->assertSame(32.0, $combinado['horas_plan_reduccion']);
 
         $this->assertSame(65, $resultado['totales']['matricula']);
         $this->assertSame(3, $resultado['totales']['cursos']);
         $this->assertSame(70.0, $resultado['totales']['horas']);
         $this->assertSame(109.0, $resultado['totales']['horas_contrato_equivalente']);
-        $this->assertSame(6.0, $resultado['totales']['trabajo_colaborativo_pie']);
-        $this->assertSame(115.0, $resultado['totales']['contrato_mas_trabajo_colaborativo_pie']);
+        $this->assertSame(3.0, $resultado['totales']['trabajo_colaborativo_pie']);
+        $this->assertSame(112.0, $resultado['totales']['contrato_mas_trabajo_colaborativo_pie']);
     }
 
     public function test_conserva_el_refuerzo_nt_y_el_pie_en_la_fila_combinada(): void
@@ -71,7 +72,7 @@ class DotacionCursosPlanesResumenCalculatorTest extends TestCase
 
         $this->assertSame(38.0, $combinado['total_horas']);
         $this->assertSame(53.0, $combinado['total_horas_contrato_equivalente']);
-        $this->assertSame(6.0, $combinado['total_trabajo_colaborativo_pie']);
+        $this->assertSame(3.0, $combinado['total_trabajo_colaborativo_pie']);
         $this->assertSame(6.0, $combinado['horas_plan_refuerzo_ld_otro_docente']);
         $this->assertSame(3.0, $combinado['horas_contrato_refuerzo_ld_otro_docente']);
     }
@@ -88,10 +89,12 @@ class DotacionCursosPlanesResumenCalculatorTest extends TestCase
         $this->assertStringContainsString("'resumen_cursos_planes'", $calculator);
         $this->assertStringContainsString('Cursos combinados activos', $resumen);
         $this->assertStringContainsString('Grupo combinado', $resumen);
+        $this->assertStringContainsString('una sola necesidad de 3 h por grupo', $resumen);
         $this->assertStringContainsString("horas_plan_por_curso", $resumen);
         $this->assertStringContainsString('Total cursos combinados', $resumen);
         $this->assertStringContainsString('$totalesCursosPlanes', $resumen);
         $this->assertStringContainsString('Cursos combinados activos', $pdf);
+        $this->assertStringContainsString('una sola necesidad de 3 horas por grupo combinado', $pdf);
         $this->assertStringContainsString("horas_plan_por_curso", $pdf);
         $this->assertStringContainsString('Total cursos combinados', $pdf);
         $this->assertStringContainsString('$totalesCursosPlanes', $pdf);

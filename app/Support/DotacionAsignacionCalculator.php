@@ -307,7 +307,12 @@ class DotacionAsignacionCalculator
     {
         $needs = [
             'plan_estudio' => self::necesidadesPlanEstudio($establecimiento, $anio, $asignaciones),
-            'pie_colaborativo' => self::necesidadesTrabajoColaborativo($cursos, $asignaciones),
+            'pie_colaborativo' => self::necesidadesTrabajoColaborativo(
+                $cursos,
+                $asignaciones,
+                $establecimiento,
+                $anio
+            ),
             'pie_educadora_diferencial' => self::necesidadesEducadorasDiferenciales($bloques, $asignaciones),
             'funciones' => self::necesidadesFunciones($bloques, $asignaciones),
         ];
@@ -703,7 +708,12 @@ class DotacionAsignacionCalculator
         });
     }
 
-    private static function necesidadesTrabajoColaborativo(array $cursos, Collection $asignaciones): Collection
+    private static function necesidadesTrabajoColaborativo(
+        array $cursos,
+        Collection $asignaciones,
+        Establecimiento $establecimiento,
+        int $anio
+    ): Collection
     {
         $items = collect();
         foreach (($cursos['rows'] ?? []) as $row) {
@@ -724,7 +734,12 @@ class DotacionAsignacionCalculator
                 ], $asignaciones));
             }
         }
-        return $items->values();
+        return DotacionCursoCombinadoCalculator::applyCollaborativePie(
+            $items->values(),
+            $asignaciones,
+            $establecimiento,
+            $anio
+        );
     }
 
     private static function necesidadesEducadorasDiferenciales(array $bloques, Collection $asignaciones): Collection
@@ -822,7 +837,10 @@ class DotacionAsignacionCalculator
             ->values();
 
         $keysVigentes = $necesidadesVigentes
-            ->pluck('key')
+            ->flatMap(fn ($item) => [
+                data_get($item, 'key'),
+                ...collect(data_get($item, 'necesidad_keys_historicas', []))->all(),
+            ])
             ->filter()
             ->map(fn ($value) => (string) $value)
             ->unique()

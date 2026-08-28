@@ -6,6 +6,7 @@ use App\Models\DotacionDocenteAsignacion;
 use App\Models\DotacionDocenteExclusion;
 use App\Models\Establecimiento;
 use App\Models\ReemplazoPersonal;
+use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use Illuminate\Support\Collection;
 use ReflectionMethod;
@@ -13,6 +14,28 @@ use Tests\TestCase;
 
 class DotacionDocenteDetalleHorasTest extends TestCase
 {
+    public function test_asignacion_pie_historica_sigue_vigente_al_consolidar_el_grupo(): void
+    {
+        $asignacion = new DotacionDocenteAsignacion([
+            'tipo_asignacion' => 'pie_colaborativo',
+            'necesidad_key' => 'pie_colab|1',
+            'horas_contrato' => 3,
+        ]);
+        $reflection = new ReflectionMethod(DotacionAsignacionCalculator::class, 'asignacionesHuerfanas');
+
+        $resultado = $reflection->invoke(null, collect([$asignacion]), [
+            'plan_estudio' => collect(),
+            'pie_colaborativo' => collect([[
+                'key' => 'pie_colab_combinado|10',
+                'necesidad_keys_historicas' => ['pie_colab|1', 'pie_colab|2'],
+            ]]),
+            'pie_educadora_diferencial' => collect(),
+            'funciones' => collect(),
+        ]);
+
+        $this->assertCount(0, $resultado);
+    }
+
     public function test_consolida_todas_las_lineas_del_ultimo_mes_y_separa_planta_contrata(): void
     {
         $personal = collect([

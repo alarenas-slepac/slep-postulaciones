@@ -31,10 +31,11 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
 
         $this->assertSame(50.0, $resultado['contrato_plan_parvularia']);
         $this->assertSame(80.0, $resultado['contrato_plan_general']);
-        $this->assertSame(56.0, $resultado['contrato_parvularia_mas_pie']);
+        $this->assertSame(3.0, $resultado['trabajo_colaborativo_pie_parvularia']);
+        $this->assertSame(53.0, $resultado['contrato_parvularia_mas_pie']);
         $this->assertSame(83.0, $resultado['contrato_general_mas_pie']);
         $this->assertSame(
-            139.0,
+            136.0,
             $resultado['contrato_parvularia_mas_pie'] + $resultado['contrato_general_mas_pie']
         );
     }
@@ -65,7 +66,7 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
 
         $this->assertSame(56.0, $resultado['contrato_plan_parvularia']);
         $this->assertSame(80.0, $resultado['contrato_plan_general']);
-        $this->assertSame(62.0, $resultado['contrato_parvularia_mas_pie']);
+        $this->assertSame(59.0, $resultado['contrato_parvularia_mas_pie']);
         $this->assertSame(83.0, $resultado['contrato_general_mas_pie']);
     }
 
@@ -98,6 +99,7 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
                         'establecimiento_curso_id' => 1,
                         'horas_contrato_equivalente_redondeado' => $contratoNt1,
                         'horas_contrato_refuerzo_ld_otro_docente' => $refuerzoNt1,
+                        'trabajo_colaborativo_pie' => 3,
                     ]],
                 ],
                 'NT2' => [
@@ -105,6 +107,7 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
                         'establecimiento_curso_id' => 2,
                         'horas_contrato_equivalente_redondeado' => $contratoNt2,
                         'horas_contrato_refuerzo_ld_otro_docente' => $refuerzoNt2,
+                        'trabajo_colaborativo_pie' => 3,
                     ]],
                 ],
                 '1B' => [
@@ -112,6 +115,7 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
                         'establecimiento_curso_id' => 10,
                         'horas_contrato_equivalente_redondeado' => 80,
                         'horas_contrato_refuerzo_ld_otro_docente' => 0,
+                        'trabajo_colaborativo_pie' => 3,
                     ]],
                 ],
             ],

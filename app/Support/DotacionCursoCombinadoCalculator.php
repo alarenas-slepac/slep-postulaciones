@@ -166,6 +166,123 @@ class DotacionCursoCombinadoCalculator
             ->values();
     }
 
+    public static function applyCollaborativePie(
+        Collection $items,
+        Collection $asignaciones,
+        Establecimiento $establecimiento,
+        int $anio
+    ): Collection {
+        if (! self::tablesReady()) {
+            return $items->values();
+        }
+
+        $grupos = DotacionCursoCombinado::query()
+            ->with(['miembros.curso.curso'])
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
+
+        return self::consolidateCollaborativePie($items, $grupos, $asignaciones);
+    }
+
+    public static function consolidateCollaborativePie(
+        Collection|array $items,
+        Collection|array $grupos,
+        Collection|array $asignaciones = []
+    ): Collection {
+        $items = collect($items)->values();
+        $grupos = collect($grupos)
+            ->filter(fn ($grupo) => (bool) data_get($grupo, 'activo', true))
+            ->values();
+        $asignaciones = collect($asignaciones);
+
+        if ($items->isEmpty() || $grupos->isEmpty()) {
+            return $items;
+        }
+
+        $cursoIdsCombinados = $grupos
+            ->flatMap(fn ($grupo) => self::groupCourseIds($grupo))
+            ->unique()
+            ->values();
+        $resultado = $items
+            ->reject(fn (array $item) => $cursoIdsCombinados->contains(
+                (int) data_get($item, 'establecimiento_curso_id', 0)
+            ))
+            ->values();
+
+        foreach ($grupos as $grupo) {
+            $grupoId = (int) data_get($grupo, 'id', 0);
+            $cursoIds = self::groupCourseIds($grupo);
+            $itemsGrupo = $items
+                ->filter(fn (array $item) => $cursoIds->contains(
+                    (int) data_get($item, 'establecimiento_curso_id', 0)
+                ))
+                ->values();
+            if ($grupoId <= 0 || $itemsGrupo->isEmpty()) {
+                continue;
+            }
+
+            $key = self::collaborativePieNeedKey($grupoId);
+            $keysHistoricas = $itemsGrupo->pluck('key')->filter()->values();
+            $asignacionesGrupo = $asignaciones
+                ->filter(fn ($asignacion) => (string) data_get($asignacion, 'tipo_asignacion', '') === 'pie_colaborativo'
+                    && ($key === (string) data_get($asignacion, 'necesidad_key', '')
+                        || $keysHistoricas->contains((string) data_get($asignacion, 'necesidad_key', ''))))
+                ->unique(function ($asignacion): string {
+                    $id = (int) data_get($asignacion, 'id', 0);
+                    if ($id > 0) {
+                        return 'id:'.$id;
+                    }
+
+                    return is_object($asignacion)
+                        ? 'object:'.spl_object_id($asignacion)
+                        : 'array:'.md5(serialize($asignacion));
+                })
+                ->values();
+            $horasRequeridas = (float) $itemsGrupo->max(
+                fn (array $item) => (float) data_get($item, 'horas_contrato_requeridas', 0)
+            );
+            $horasAsignadas = round((float) $asignacionesGrupo->sum(
+                fn ($asignacion) => (float) data_get($asignacion, 'horas_contrato', 0)
+            ), 2);
+            $representante = $itemsGrupo->first();
+
+            $resultado->push(array_merge($representante, [
+                'key' => $key,
+                'titulo' => 'Trabajo colaborativo PIE',
+                'curso_label' => (string) data_get($grupo, 'nombre', 'Curso combinado'),
+                'establecimiento_curso_id' => (int) data_get($representante, 'establecimiento_curso_id', 0),
+                'dotacion_curso_combinado_id' => $grupoId,
+                'horas_contrato_requeridas' => $horasRequeridas,
+                'horas_contrato_asignadas' => $horasAsignadas,
+                'horas_contrato_pendientes' => max(0.0, round($horasRequeridas - $horasAsignadas, 2)),
+                'estado' => self::status($horasRequeridas, $horasAsignadas),
+                'asignaciones' => $asignacionesGrupo,
+                'fuente' => '3 horas de trabajo colaborativo PIE por grupo combinado con estudiantes NEE',
+                'curso_combinado' => true,
+                'curso_combinado_nombre' => (string) data_get($grupo, 'nombre', 'Curso combinado'),
+                'curso_combinado_curso_ids' => $cursoIds->all(),
+                'trabajo_colaborativo_pie_cursos' => $itemsGrupo->count(),
+                'necesidad_keys_historicas' => $keysHistoricas->all(),
+            ]));
+        }
+
+        return $resultado
+            ->sortBy(fn (array $item) => sprintf(
+                '%s|%s',
+                (string) data_get($item, 'curso_label', ''),
+                (string) data_get($item, 'titulo', '')
+            ))
+            ->values();
+    }
+
+    public static function collaborativePieNeedKey(int $groupId): string
+    {
+        return 'pie_colab_combinado|'.$groupId;
+    }
+
     public static function summary(
         Establecimiento $establecimiento,
         int $anio,
@@ -378,6 +495,18 @@ class DotacionCursoCombinadoCalculator
                 + collect($rule?->horas_exclusivas ?? [])->sum(fn ($value) => max(0.0, (float) $value)),
             default => max(0.0, (float) ($rule?->horas_conjuntas ?? $defaultJoint)),
         }, 2);
+    }
+
+    private static function groupCourseIds(mixed $grupo): Collection
+    {
+        return collect(data_get($grupo, 'miembros', []))
+            ->map(fn ($miembro) => (int) (
+                data_get($miembro, 'establecimiento_curso_id')
+                ?? data_get($miembro, 'id', 0)
+            ))
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     private static function resolvedProportion(string $configured, Collection $items): array

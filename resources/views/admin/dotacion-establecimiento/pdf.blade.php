@@ -864,7 +864,7 @@
         <li>Las equivalencias 65/35 y 60/40 se calculan sobre el total consolidado de horas aula asignadas a cada docente.</li>
         <li>Para cursos independientes, el contrato equivalente del plan se calcula por curso. En cursos combinados, primero se consolidan las horas aula según la modalidad configurada, luego se aplica la proporción contractual del grupo y el resultado se redondea una sola vez hacia arriba.</li>
         <li>NT1 y NT2 aplican regla especial de conversión contractual según régimen JEC o sin JEC.</li>
-        <li>El trabajo colaborativo PIE considera 3 horas por curso con estudiantes NEE.</li>
+        <li>El trabajo colaborativo PIE considera 3 horas por curso independiente o una sola necesidad de 3 horas por grupo combinado con estudiantes NEE.</li>
         <li>Las horas PROF EDUC. DIF se convierten a horas de contrato según la proporción 65/35 o 60/40 de cada curso; la bolsa total se redondea una sola vez hacia arriba.</li>
         <li>Las funciones directivas, técnico-pedagógicas, PIE, planes y otras funciones provienen del módulo Dotación funciones y planes.</li>
         <li>Las asignaturas y funciones pueden ser cubiertas por asistentes de la educación. Estas horas se identifican separadamente y no se someten a la proporción docente 65/35 o 60/40.</li>
