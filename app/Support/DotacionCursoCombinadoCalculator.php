@@ -347,7 +347,7 @@ class DotacionCursoCombinadoCalculator
 
     private static function contractForRows(Collection $rows): float
     {
-        return round((float) $rows
+        $contract = (float) $rows
             ->groupBy(fn (array $row) => (string) ($row['proporcion_key'] ?? '65_35'))
             ->map(function (Collection $proportionRows, string $proportion): float {
                 $hours = round((float) $proportionRows->sum(
@@ -357,7 +357,12 @@ class DotacionCursoCombinadoCalculator
 
                 return (float) ($conversion['horas_contrato'] ?? 0);
             })
-            ->sum(), 2);
+            ->sum();
+
+        // La jornada se contrata en horas enteras. Se consolida primero toda la
+        // necesidad del grupo y se redondea una sola vez hacia arriba para no
+        // inflar el resultado por cada asignatura o bloque del plan.
+        return $contract > 0 ? (float) ceil($contract) : 0.0;
     }
 
     private static function resolvedHours(

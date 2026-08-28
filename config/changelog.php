@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.8.28.461' => [
+        'date' => '2026-08-28',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Redondeo contractual de cursos combinados',
+        'files' => [
+            'app/Support/DotacionCursoCombinadoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'tests/Unit/DotacionCursoCombinadoCalculatorTest.php',
+        ],
+        'changes' => [
+            'Redondea hacia arriba la necesidad contractual total de cada grupo combinado porque las jornadas no se contratan en fracciones de hora.',
+            'Aplica el redondeo una sola vez después de consolidar todas las horas del grupo para evitar inflar el resultado por asignatura.',
+            'Para un grupo NT1/NT2 con JEC y 38 horas, convierte 56,9231 horas a 57 horas de contrato antes de sumar trabajo colaborativo PIE.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.8.28.460' => [
         'date' => '2026-08-28',
         'module' => 'Dotación Establecimiento',

@@ -171,7 +171,7 @@
             <i class="bi bi-info-circle"></i>
             Para NT1 y NT2 se aplica regla especial sobre las primeras 32 h del plan: Con JEC equivale a 50 h de contrato y Sin JEC equivale a 47 h. Solo en cursos con JEC se agregan las horas de libre disposición efectivamente asignadas a docentes distintos de una Educadora de Párvulos, con un máximo de 6 h plan por curso; su contrato equivalente se calcula mediante 65/35. El resto de cursos usa 65/35 o 60/40 según corresponda. Las 3 h de trabajo colaborativo PIE se muestran aquí y no se duplican en el bloque PIE.
             @if ($tieneCursosCombinadosResumen)
-                <span class="d-block mt-1"><i class="bi bi-intersect"></i> Los cursos combinados se presentan en filas consolidadas: sus horas plan y contrato reemplazan la suma individual de los cursos integrantes; la matrícula, cantidad de cursos y trabajo colaborativo PIE se conservan.</span>
+                <span class="d-block mt-1"><i class="bi bi-intersect"></i> Los cursos combinados se presentan en filas consolidadas: sus horas plan y contrato reemplazan la suma individual de los cursos integrantes; el contrato equivalente se redondea una sola vez hacia arriba después de consolidar el grupo. La matrícula, cantidad de cursos y trabajo colaborativo PIE se conservan.</span>
             @endif
         </div>
         <div class="table-responsive border rounded-4">
