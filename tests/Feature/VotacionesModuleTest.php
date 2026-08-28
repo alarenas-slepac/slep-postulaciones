@@ -13,9 +13,12 @@ use App\Models\VisitaVotacion;
 use App\Services\Votaciones\EstadoPublicoVotacionService;
 use App\Services\Votaciones\OperacionVotacionService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -65,13 +68,17 @@ class VotacionesModuleTest extends TestCase
         $this->permissionMigration->up();
         $this->migration = require database_path('migrations/2026_08_27_210000_create_votaciones_module_tables.php');
         $this->migration->up();
-        $id = DB::table('users')->insertGetId(['rut' => '111111111', 'nombres' => 'Operador', 'apellido_paterno' => 'de', 'apellido_materno' => 'Prueba', 'email' => 'operador@example.test', 'password' => 'x', 'created_at' => now(), 'updated_at' => now()]);
-        $this->operator = User::findOrFail($id);
-        $this->operator->givePermissionTo([
-            Permission::create(['name' => 'votaciones.manage-jornadas', 'guard_name' => 'web']),
-            Permission::create(['name' => 'votaciones.operate-group', 'guard_name' => 'web']),
-        ]);
-        Permission::create(['name' => 'votaciones.admin', 'guard_name' => 'web']);
+        $this->operator = $this->crearUsuario('111111111', 'Operador', 'de', 'Prueba', 'operador@example.test');
+        $permissions = collect([
+            'votaciones.manage-jornadas',
+            'votaciones.manage-grupos',
+            'votaciones.manage-rutas',
+            'votaciones.operate-group',
+            'votaciones.report-incidents',
+            'votaciones.view-history',
+            'votaciones.admin',
+        ])->map(fn ($name) => Permission::create(['name' => $name, 'guard_name' => 'web']));
+        $this->operator->givePermissionTo($permissions->where('name', '!=', 'votaciones.admin'));
     }
 
     protected function tearDown(): void
@@ -123,20 +130,157 @@ class VotacionesModuleTest extends TestCase
         ]);
     }
 
+    public function test_usuario_sin_permiso_no_puede_crear_jornada(): void
+    {
+        $sinPermiso = $this->crearUsuario('222222222', 'Usuario', 'Sin', 'Permiso', 'sin-permiso@example.test');
+        $procesoId = DB::table('procesos_votacion')->where('codigo', 'CCAF')->value('id');
+        $this->withoutMiddleware();
+
+        $this->actingAs($sinPermiso)->post(route('votaciones.admin.jornadas.store'), [
+            'nombre' => 'Jornada no autorizada',
+            'slug' => 'jornada-no-autorizada',
+            'fecha' => '2026-08-29',
+            'procesos' => [$procesoId],
+        ])->assertForbidden();
+
+        $this->assertDatabaseMissing('jornadas_votacion', ['slug' => 'jornada-no-autorizada']);
+    }
+
+    public function test_slug_de_jornada_no_se_puede_duplicar(): void
+    {
+        JornadaVotacion::create(['nombre' => 'Original', 'slug' => 'slug-unico', 'fecha' => '2026-08-29', 'estado' => 'borrador']);
+        $procesoId = DB::table('procesos_votacion')->where('codigo', 'CCAF')->value('id');
+        $this->withoutMiddleware();
+
+        $this->actingAs($this->operator)->post(route('votaciones.admin.jornadas.store'), [
+            'nombre' => 'Duplicada',
+            'slug' => 'slug-unico',
+            'fecha' => '2026-08-30',
+            'procesos' => [$procesoId],
+        ])->assertSessionHasErrors('slug');
+
+        $this->assertSame(1, JornadaVotacion::where('slug', 'slug-unico')->count());
+    }
+
     public function test_detalle_jornada_usa_el_nombre_completo_del_esquema_real_de_usuarios(): void
     {
         [$jornada] = $this->escenario();
+        $jornada->update(['estado' => JornadaVotacion::BORRADOR, 'publica' => false]);
 
-        $this->withoutMiddleware([
-            \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-            \App\Http\Middleware\EnsureModuleAccess::class,
-            \App\Http\Middleware\TouchLastSeen::class,
-            \Spatie\Permission\Middleware\PermissionMiddleware::class,
-        ]);
+        $this->withoutAccessMiddleware();
         $this->actingAs($this->operator)
             ->get(route('votaciones.admin.jornadas.show', $jornada))
             ->assertOk()
-            ->assertSee('Operador de Prueba');
+            ->assertSee('Operador de Prueba')
+            ->assertSee('data-votaciones-admin-map', false)
+            ->assertSee('data-votacion-establecimiento-search', false);
+    }
+
+    public function test_ruta_rechaza_un_establecimiento_duplicado(): void
+    {
+        [, $grupo, $rutas] = $this->escenario();
+        $grupo->jornada->update(['estado' => JornadaVotacion::BORRADOR, 'publica' => false]);
+        $this->withoutAccessMiddleware();
+
+        $this->actingAs($this->operator)->post(route('votaciones.admin.rutas.store', $grupo), [
+            'establecimiento_id' => $rutas[0]->establecimiento_id,
+        ])->assertSessionHasErrors('establecimiento_id');
+
+        $this->assertSame(2, $grupo->rutas()->count());
+    }
+
+    public function test_orden_de_ruta_es_unico_dentro_del_grupo(): void
+    {
+        [, $grupo] = $this->escenario();
+        $establecimiento = Establecimiento::create(['cod_estab' => 9010, 'rbd' => 8010, 'nombre_establecimiento' => 'RBD adicional', 'comuna' => 'Comuna de prueba']);
+
+        $this->expectException(QueryException::class);
+        RutaVotacion::create([
+            'grupo_votacion_id' => $grupo->id,
+            'establecimiento_id' => $establecimiento->id,
+            'orden' => 1,
+            'activa' => true,
+        ]);
+    }
+
+    public function test_publicacion_rechaza_coordenadas_fuera_de_rango(): void
+    {
+        [$jornada, , $rutas] = $this->escenario();
+        $jornada->update(['estado' => JornadaVotacion::BORRADOR, 'publica' => false]);
+        $rutas[0]->establecimiento->update(['latitud' => -120, 'longitud' => -73]);
+        $this->withoutAccessMiddleware();
+
+        $this->actingAs($this->operator)
+            ->post(route('votaciones.admin.jornadas.publicar', $jornada))
+            ->assertSessionHasErrors('publicacion');
+
+        $this->assertSame(JornadaVotacion::BORRADOR, $jornada->refresh()->estado);
+        $this->assertFalse($jornada->publica);
+    }
+
+    public function test_solo_usuarios_asignados_pueden_operar_un_grupo(): void
+    {
+        [, $grupo] = $this->escenario();
+        $otro = $this->crearUsuario('333333333', 'Otro', 'Operador', 'Prueba', 'otro-operador@example.test');
+        $otro->givePermissionTo(['votaciones.operate-group', 'votaciones.report-incidents']);
+
+        $this->assertTrue(Gate::forUser($this->operator)->allows('operate', $grupo));
+        $this->assertFalse(Gate::forUser($otro)->allows('operate', $grupo));
+        $this->assertFalse(Gate::forUser($otro)->allows('reportIncident', $grupo));
+    }
+
+    public function test_no_se_puede_finalizar_una_visita_sin_iniciarla(): void
+    {
+        [, , $rutas] = $this->escenario();
+
+        $this->expectException(ValidationException::class);
+        app(OperacionVotacionService::class)->finalizarVisita($rutas[0], $this->operator);
+    }
+
+    public function test_no_se_pueden_iniciar_dos_visitas_simultaneas(): void
+    {
+        [, $grupo, $rutas] = $this->escenario();
+        $service = app(OperacionVotacionService::class);
+        $service->iniciarGrupo($grupo, $this->operator);
+        $service->iniciarVisita($rutas[0], $this->operator);
+
+        $this->expectException(ValidationException::class);
+        $service->iniciarVisita($rutas[1], $this->operator);
+    }
+
+    public function test_no_se_acepta_un_horario_futuro(): void
+    {
+        [, $grupo, $rutas] = $this->escenario();
+        $service = app(OperacionVotacionService::class);
+        $service->iniciarGrupo($grupo, $this->operator);
+
+        $this->expectException(ValidationException::class);
+        $service->iniciarVisita($rutas[0], $this->operator, now(config('votaciones.timezone'))->addMinutes(10)->toDateTimeString());
+    }
+
+    public function test_incidencia_autorizada_se_reporta_y_resuelve_con_bitacora(): void
+    {
+        [$jornada, $grupo] = $this->escenario();
+        $this->withoutAccessMiddleware();
+
+        $this->actingAs($this->operator)->post(route('votaciones.operacion.incidencias.store', $grupo), [
+            'tipo' => 'retraso',
+            'detalle_interno' => 'Detalle reservado para coordinación.',
+            'publica' => true,
+            'mensaje_publico' => 'El recorrido presenta un retraso.',
+        ])->assertSessionHasNoErrors();
+
+        $incidencia = IncidenciaVotacion::where('grupo_votacion_id', $grupo->id)->firstOrFail();
+        $this->assertSame(IncidenciaVotacion::ABIERTA, $incidencia->estado);
+        $this->assertDatabaseHas('bitacora_votacion', ['jornada_votacion_id' => $jornada->id, 'evento' => 'incidencia_reportada']);
+
+        $this->operator->givePermissionTo('votaciones.admin');
+        $this->actingAs($this->operator)->patch(route('votaciones.admin.incidencias.resolver', $incidencia), [
+            'resolucion' => 'Coordinación completada.',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(IncidenciaVotacion::RESUELTA, $incidencia->refresh()->estado);
+        $this->assertDatabaseHas('bitacora_votacion', ['jornada_votacion_id' => $jornada->id, 'evento' => 'incidencia_resuelta']);
     }
 
     public function test_estado_publico_expone_solo_datos_operativos_y_conserva_orden(): void
@@ -148,10 +292,37 @@ class VotacionesModuleTest extends TestCase
 
         $this->assertSame([1, 2], $payload['grupos'][0]['rutas']->pluck('orden')->all());
         $this->assertStringNotContainsString('operador@example.test', $json);
+        $this->assertStringNotContainsString('111111111', $json);
+        $this->assertStringNotContainsString('Operador de Prueba', $json);
         $this->assertStringNotContainsString('encargado_id', $json);
         $this->assertStringNotContainsString('Nombre privado de prueba', $json);
         $this->assertStringContainsString('El recorrido presenta un retraso.', $json);
         $this->assertSame('RBD de prueba 1', $payload['grupos'][0]['rutas'][0]['nombre']);
+    }
+
+    public function test_estado_publico_normaliza_coordenadas_invalidas_y_reutiliza_logo_de_admision(): void
+    {
+        Storage::fake('public');
+        config(['admision.media_disk' => 'public']);
+        [$jornada, , $rutas] = $this->escenario();
+        $rutas[0]->establecimiento->update(['latitud' => 95, 'longitud' => -73]);
+        DB::table('admision_establecimientos')->insert([
+            'establecimiento_id' => $rutas[1]->establecimiento_id,
+            'logo_path' => 'admision/logos/establecimiento.webp',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        Cache::flush();
+
+        $payload = app(EstadoPublicoVotacionService::class)->obtener($jornada);
+        $primera = $payload['grupos'][0]['rutas'][0];
+        $segunda = $payload['grupos'][0]['rutas'][1];
+
+        $this->assertFalse($primera['coordenadas_validas']);
+        $this->assertNull($primera['latitud']);
+        $this->assertNull($primera['longitud']);
+        $this->assertTrue($segunda['coordenadas_validas']);
+        $this->assertStringContainsString('admision/logos/establecimiento.webp', $segunda['logo_url']);
     }
 
     public function test_no_permite_saltar_el_orden_de_la_ruta(): void
@@ -202,8 +373,36 @@ class VotacionesModuleTest extends TestCase
         $this->assertStringContainsString("from 'leaflet'", $script);
         $this->assertStringContainsString('setInterval(refresh', $script);
         $this->assertStringContainsString('document.hidden', $script);
+        $this->assertStringContainsString('Posición en ruta', $script);
+        $this->assertStringContainsString('coordenadas_validas', $script);
         $this->assertStringContainsString('data-vp-commune', file_get_contents(resource_path('views/public/votaciones/show.blade.php')));
         $this->assertStringContainsString('data-vp-search', file_get_contents(resource_path('views/public/votaciones/show.blade.php')));
+    }
+
+    private function withoutAccessMiddleware(): void
+    {
+        $this->withoutMiddleware([
+            \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+            \App\Http\Middleware\EnsureModuleAccess::class,
+            \App\Http\Middleware\TouchLastSeen::class,
+            \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        ]);
+    }
+
+    private function crearUsuario(string $rut, string $nombres, string $apellidoPaterno, string $apellidoMaterno, string $email): User
+    {
+        $id = DB::table('users')->insertGetId([
+            'rut' => $rut,
+            'nombres' => $nombres,
+            'apellido_paterno' => $apellidoPaterno,
+            'apellido_materno' => $apellidoMaterno,
+            'email' => $email,
+            'password' => 'x',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return User::findOrFail($id);
     }
 
     private function escenario(): array

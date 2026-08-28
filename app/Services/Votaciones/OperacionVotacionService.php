@@ -49,6 +49,9 @@ class OperacionVotacionService
             if (! in_array($ruta->grupo->jornada->estado, [JornadaVotacion::PUBLICADA, JornadaVotacion::EN_CURSO], true)) {
                 throw ValidationException::withMessages(['estado' => 'La jornada no está habilitada para operar.']);
             }
+            if (! $ruta->activa) {
+                throw ValidationException::withMessages(['estado' => 'El establecimiento no pertenece a la ruta activa.']);
+            }
             if ($grupo->estado !== GrupoVotacion::EN_TRASLADO) {
                 throw ValidationException::withMessages(['estado' => 'El grupo no está en traslado.']);
             }
@@ -84,6 +87,9 @@ class OperacionVotacionService
             if (! in_array($ruta->grupo->jornada->estado, [JornadaVotacion::PUBLICADA, JornadaVotacion::EN_CURSO], true)) {
                 throw ValidationException::withMessages(['estado' => 'La jornada no está habilitada para operar.']);
             }
+            if ($grupo->estado !== GrupoVotacion::EN_VOTACION) {
+                throw ValidationException::withMessages(['estado' => 'El grupo no tiene una votación en curso.']);
+            }
             $visita = VisitaVotacion::query()->where('ruta_votacion_id', $ruta->id)->lockForUpdate()->first();
             if (! $visita || $visita->estado !== VisitaVotacion::EN_VOTACION) {
                 throw ValidationException::withMessages(['estado' => 'La visita no está en votación.']);
@@ -117,7 +123,7 @@ class OperacionVotacionService
     {
         $ahora = CarbonImmutable::now(config('votaciones.timezone'));
         $momento = $value ? CarbonImmutable::parse($value, config('votaciones.timezone')) : $ahora;
-        if ($momento->gt($ahora->addMinute())) {
+        if ($momento->gt($ahora)) {
             throw ValidationException::withMessages(['fecha_hora' => 'La hora no puede estar en el futuro.']);
         }
 
