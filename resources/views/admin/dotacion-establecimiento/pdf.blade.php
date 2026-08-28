@@ -862,7 +862,7 @@
         <li>El informe excluye establecimientos de sala cuna desde el módulo de Dotación Establecimiento.</li>
         <li>La asignación de asignaturas se controla en horas aula pedagógicas, sin mostrar contrato requerido en la distribución por asignatura.</li>
         <li>Las equivalencias 65/35 y 60/40 se calculan sobre el total consolidado de horas aula asignadas a cada docente.</li>
-        <li>Para cursos independientes, el contrato equivalente del plan se calcula por curso. En cursos combinados, primero se consolidan las horas aula según la modalidad configurada y luego se aplica la proporción contractual del grupo.</li>
+        <li>Para cursos independientes, el contrato equivalente del plan se calcula por curso. En cursos combinados, primero se consolidan las horas aula según la modalidad configurada, luego se aplica la proporción contractual del grupo y el resultado se redondea una sola vez hacia arriba.</li>
         <li>NT1 y NT2 aplican regla especial de conversión contractual según régimen JEC o sin JEC.</li>
         <li>El trabajo colaborativo PIE considera 3 horas por curso con estudiantes NEE.</li>
         <li>Las horas PROF EDUC. DIF se convierten a horas de contrato según la proporción 65/35 o 60/40 de cada curso; la bolsa total se redondea una sola vez hacia arriba.</li>
