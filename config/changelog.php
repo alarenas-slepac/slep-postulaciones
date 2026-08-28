@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.8.28.464' => [
+        'date' => '2026-08-28',
+        'module' => 'Votaciones CCAF y Mutualidades',
+        'title' => 'Corrección de navegación al crear jornadas',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/votaciones/partials/admin-nav.blade.php',
+            'tests/Feature/VotacionesModuleTest.php',
+        ],
+        'changes' => [
+            'Evita generar enlaces de Grupos y Rutas cuando el formulario utiliza una jornada nueva que todavía no posee slug.',
+            'Mantiene disponibles Incidencias y Bitácora sin filtro contextual durante la creación de una jornada.',
+            'Agrega cobertura de regresión para comprobar que la pantalla Nueva jornada responda correctamente.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.8.28.463' => [
         'date' => '2026-08-28',
         'module' => 'Votaciones CCAF y Mutualidades',
