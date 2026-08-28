@@ -18,6 +18,8 @@ export default defineConfig({
                 'resources/js/centro-operaciones.js',
                 'resources/css/votaciones-publicas.css',
                 'resources/js/votaciones-publicas.js',
+                'resources/css/votaciones-admin.css',
+                'resources/js/votaciones-admin.js',
                 'resources/js/votaciones-admin-rutas.js',
             ],
             refresh: true,

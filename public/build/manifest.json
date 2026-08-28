@@ -2204,6 +2204,15 @@
       "centro-operaciones.css"
     ]
   },
+  "resources/css/votaciones-admin.css": {
+    "file": "assets/votaciones-admin-Bufya2o9.css",
+    "src": "resources/css/votaciones-admin.css",
+    "isEntry": true,
+    "name": "votaciones-admin",
+    "names": [
+      "votaciones-admin.css"
+    ]
+  },
   "resources/css/votaciones-publicas.css": {
     "file": "assets/votaciones-publicas-DnJw3dX2.css",
     "src": "resources/css/votaciones-publicas.css",
@@ -2258,6 +2267,12 @@
     "css": [
       "assets/votaciones-admin-rutas-EiWOEaVb.css"
     ]
+  },
+  "resources/js/votaciones-admin.js": {
+    "file": "assets/votaciones-admin-BMiNEswi.js",
+    "name": "votaciones-admin",
+    "src": "resources/js/votaciones-admin.js",
+    "isEntry": true
   },
   "resources/js/votaciones-publicas.js": {
     "file": "assets/votaciones-publicas-DLPHkm8u.js",

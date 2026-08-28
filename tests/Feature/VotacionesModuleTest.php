@@ -13,8 +13,8 @@ use App\Models\VisitaVotacion;
 use App\Services\Votaciones\EstadoPublicoVotacionService;
 use App\Services\Votaciones\OperacionVotacionService;
 use App\Services\Votaciones\RutaVialVotacionService;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -176,6 +176,74 @@ class VotacionesModuleTest extends TestCase
             ->assertSee('Operador de Prueba')
             ->assertSee('data-votaciones-admin-map', false)
             ->assertSee('data-votacion-establecimiento-search', false);
+    }
+
+    public function test_centro_de_control_operacion_incidencias_y_bitacora_renderizan(): void
+    {
+        [$jornada, $grupo, $rutas] = $this->escenario();
+        IncidenciaVotacion::create([
+            'jornada_votacion_id' => $jornada->id,
+            'grupo_votacion_id' => $grupo->id,
+            'ruta_votacion_id' => $rutas[0]->id,
+            'tipo' => 'retraso',
+            'detalle_interno' => 'Detalle operacional de prueba.',
+            'mensaje_publico' => 'Demora informada.',
+            'publica' => true,
+            'estado' => 'abierta',
+            'reportada_por' => $this->operator->id,
+        ]);
+        BitacoraVotacion::create([
+            'jornada_votacion_id' => $jornada->id,
+            'grupo_votacion_id' => $grupo->id,
+            'ruta_votacion_id' => $rutas[0]->id,
+            'user_id' => $this->operator->id,
+            'evento' => 'evento_prueba',
+            'descripcion' => 'Evento visible en la línea de tiempo.',
+        ]);
+
+        $this->withoutAccessMiddleware();
+
+        $this->actingAs($this->operator)
+            ->get(route('votaciones.admin.dashboard', ['jornada' => $jornada->slug]))
+            ->assertOk()
+            ->assertSee('Centro de control operativo')
+            ->assertSee('Rutas con problemas');
+        $this->get(route('votaciones.admin.incidencias.index', ['jornada' => $jornada->slug]))
+            ->assertOk()
+            ->assertSee('Información pública')
+            ->assertSee('Detalle operacional de prueba.');
+        $this->get(route('votaciones.admin.bitacora.index', ['jornada' => $jornada->slug]))
+            ->assertOk()
+            ->assertSee('Trazabilidad inmutable')
+            ->assertSee('Evento visible en la línea de tiempo.');
+        $this->get(route('votaciones.operacion.show', $grupo))
+            ->assertOk()
+            ->assertSee('INICIAR JORNADA');
+    }
+
+    public function test_administrador_puede_crear_y_desactivar_procesos_sin_eliminar_historicos(): void
+    {
+        $this->operator->givePermissionTo('votaciones.admin');
+        $this->withoutAccessMiddleware();
+
+        $this->actingAs($this->operator)
+            ->post(route('votaciones.admin.procesos.store'), [
+                'codigo' => 'CONSULTA_PRUEBA',
+                'nombre' => 'Consulta de prueba',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $proceso = \App\Models\ProcesoVotacion::where('codigo', 'CONSULTA_PRUEBA')->firstOrFail();
+        $this->put(route('votaciones.admin.procesos.update', $proceso), [
+            'codigo' => 'CONSULTA_PRUEBA',
+            'nombre' => 'Consulta de prueba actualizada',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('procesos_votacion', [
+            'id' => $proceso->id,
+            'nombre' => 'Consulta de prueba actualizada',
+            'activo' => false,
+        ]);
     }
 
     public function test_ruta_rechaza_un_establecimiento_duplicado(): void

@@ -1,6 +1,37 @@
 <?php
 
 return [
+    '2026.8.28.463' => [
+        'date' => '2026-08-28',
+        'module' => 'Votaciones CCAF y Mutualidades',
+        'title' => 'Centro de control administrativo y operación móvil',
+        'files' => [
+            'app/Http/Controllers/Votaciones/JornadaVotacionController.php',
+            'app/Http/Controllers/Votaciones/OperacionVotacionController.php',
+            'app/Http/Controllers/Votaciones/PanelVotacionController.php',
+            'app/Http/Controllers/Votaciones/ProcesoVotacionController.php',
+            'app/Models/BitacoraVotacion.php',
+            'app/Models/GrupoVotacion.php',
+            'app/Models/IncidenciaVotacion.php',
+            'app/Support/SlepUiRegistry.php',
+            'resources/css/votaciones-admin.css',
+            'resources/js/votaciones-admin.js',
+            'resources/views/votaciones/admin/',
+            'resources/views/votaciones/operacion/',
+            'resources/views/votaciones/partials/admin-nav.blade.php',
+            'routes/web.php',
+            'tests/Feature/VotacionesModuleTest.php',
+            'vite.config.js',
+        ],
+        'changes' => [
+            'Incorpora dashboard con indicadores, avance por grupo, establecimientos atendidos y alertas de rutas.',
+            'Rediseña jornadas, equipos y constructor de rutas con navegación interna, logos institucionales y mapa vial existente.',
+            'Convierte la operación del encargado en una experiencia mobile-first con una única acción principal por estado.',
+            'Agrega vistas filtrables de incidencias y bitácora, diferenciando la información pública del detalle interno.',
+            'Añade configuración no destructiva del catálogo de procesos y conserva la compatibilidad con jornadas históricas.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Funcionario AC'],
+    ],
     '2026.8.28.462' => [
         'date' => '2026-08-28',
         'module' => 'Dotación Establecimiento',
