@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.8.28.454' => [
+        'date' => '2026-08-28',
+        'module' => 'Votaciones CCAF y Mutualidades',
+        'title' => 'Centro público de seguimiento territorial',
+        'files' => [
+            'config/changelog.php',
+            'resources/css/votaciones-publicas.css',
+            'resources/js/votaciones-publicas.js',
+            'resources/views/layouts/votaciones-public.blade.php',
+            'resources/views/public/votaciones/index.blade.php',
+            'resources/views/public/votaciones/show.blade.php',
+            'tests/Feature/VotacionesModuleTest.php',
+        ],
+        'changes' => [
+            'Rediseña la experiencia pública como un centro institucional de seguimiento territorial, con composición adaptable para teléfonos y pantallas grandes.',
+            'Prioriza la búsqueda de establecimientos, el resumen ejecutivo y las tarjetas de avance de cada grupo.',
+            'Distingue en el mapa y en la línea de tiempo los tramos completados, actuales y pendientes mediante color, iconografía y texto.',
+            'Incorpora panel de grupo, progreso, popups modernos, estados de carga, microinteracciones accesibles y aviso explícito de que no existe seguimiento GPS personal.',
+            'Conserva Leaflet, OpenStreetMap, el polling parcial, las rutas viales y los logos administrados por el módulo de Admisión Escolar.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.8.28.453' => [
         'date' => '2026-08-28',
         'module' => 'Votaciones CCAF y Mutualidades',
