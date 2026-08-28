@@ -2205,7 +2205,7 @@
     ]
   },
   "resources/css/votaciones-publicas.css": {
-    "file": "assets/votaciones-publicas-C7huXRnE.css",
+    "file": "assets/votaciones-publicas-VMyQZjVp.css",
     "src": "resources/css/votaciones-publicas.css",
     "isEntry": true,
     "name": "votaciones-publicas",
@@ -2247,8 +2247,20 @@
       "assets/centro-operaciones-BKK0pH8C.css"
     ]
   },
+  "resources/js/votaciones-admin-rutas.js": {
+    "file": "assets/votaciones-admin-rutas-4tSFLaYk.js",
+    "name": "votaciones-admin-rutas",
+    "src": "resources/js/votaciones-admin-rutas.js",
+    "isEntry": true,
+    "imports": [
+      "_leaflet-Bu0uVQ8k.js"
+    ],
+    "css": [
+      "assets/votaciones-admin-rutas-CCC0HSbd.css"
+    ]
+  },
   "resources/js/votaciones-publicas.js": {
-    "file": "assets/votaciones-publicas-DAnoSMWN.js",
+    "file": "assets/votaciones-publicas-Z1_bGZ4Q.js",
     "name": "votaciones-publicas",
     "src": "resources/js/votaciones-publicas.js",
     "isEntry": true,

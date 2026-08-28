@@ -1,6 +1,34 @@
 <?php
 
 return [
+    '2026.8.27.452' => [
+        'date' => '2026-08-27',
+        'module' => 'Votaciones CCAF y Mutualidades',
+        'title' => 'Estabilización operativa, territorial y de seguridad',
+        'files' => [
+            'app/Http/Controllers/Votaciones/JornadaVotacionController.php',
+            'app/Services/Votaciones/EstadoPublicoVotacionService.php',
+            'app/Services/Votaciones/OperacionVotacionService.php',
+            'app/Support/Votaciones/CoordenadasEstablecimiento.php',
+            'config/changelog.php',
+            'resources/css/votaciones-admin-rutas.css',
+            'resources/css/votaciones-publicas.css',
+            'resources/js/votaciones-admin-rutas.js',
+            'resources/js/votaciones-publicas.js',
+            'resources/views/public/votaciones/show.blade.php',
+            'resources/views/votaciones/admin/show.blade.php',
+            'tests/Feature/VotacionesModuleTest.php',
+            'vite.config.js',
+        ],
+        'changes' => [
+            'Refuerza las transiciones operativas para impedir inicios sobre rutas inactivas, cierres fuera de estado y horas de término futuras.',
+            'Valida coordenadas por rango antes de publicar y evita exponer o dibujar ubicaciones inválidas en el tablero público.',
+            'Incorpora previsualización cartográfica de rutas y búsqueda de establecimientos por nombre, RBD o comuna en la administración.',
+            'Amplía el buscador público con posición, atención actual, siguiente destino y cantidad de paradas pendientes.',
+            'Agrega cobertura automatizada de permisos, políticas, restricciones de estado, incidencias, privacidad y compatibilidad con datos históricos.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Funcionario Administración Central'],
+    ],
     '2026.8.27.451' => [
         'date' => '2026-08-27',
         'module' => 'Votaciones CCAF y Mutualidades',

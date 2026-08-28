@@ -10,6 +10,7 @@ use App\Models\ProcesoVotacion;
 use App\Models\User;
 use App\Models\VisitaVotacion;
 use App\Services\Votaciones\BitacoraVotacionService;
+use App\Support\Votaciones\CoordenadasEstablecimiento;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,8 +72,29 @@ class JornadaVotacionController extends Controller
         $jornada->load(['procesos', 'grupos.encargado', 'grupos.miembros', 'grupos.rutas.establecimiento', 'grupos.rutas.visita', 'incidencias.grupo', 'bitacora.usuario']);
         $usuarios = User::permission('votaciones.operate-group')->orderBy('nombres')->orderBy('apellido_paterno')->get(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email']);
         $establecimientos = Establecimiento::orderBy('comuna')->orderBy('nombre_establecimiento')->get(['id', 'rbd', 'nombre_establecimiento', 'comuna', 'latitud', 'longitud']);
+        $coordenadasValidas = $establecimientos->mapWithKeys(fn ($establecimiento) => [
+            $establecimiento->id => CoordenadasEstablecimiento::sonValidas($establecimiento->latitud, $establecimiento->longitud),
+        ]);
+        $mapaRutas = $jornada->grupos->map(fn ($grupo) => [
+            'id' => $grupo->id,
+            'nombre' => $grupo->nombre,
+            'rutas' => $grupo->rutas->map(function ($ruta) {
+                $coordenadas = CoordenadasEstablecimiento::normalizar($ruta->establecimiento->latitud, $ruta->establecimiento->longitud);
 
-        return view('votaciones.admin.show', compact('jornada', 'usuarios', 'establecimientos'));
+                return [
+                    'id' => $ruta->id,
+                    'orden' => $ruta->orden,
+                    'nombre' => $ruta->establecimiento->nombre_establecimiento,
+                    'rbd' => $ruta->establecimiento->rbd,
+                    'comuna' => $ruta->establecimiento->comuna,
+                    'latitud' => $coordenadas['latitud'],
+                    'longitud' => $coordenadas['longitud'],
+                    'coordenadas_validas' => $coordenadas['validas'],
+                ];
+            })->values(),
+        ])->values();
+
+        return view('votaciones.admin.show', compact('jornada', 'usuarios', 'establecimientos', 'coordenadasValidas', 'mapaRutas'));
     }
 
     public function publicar(Request $request, JornadaVotacion $jornada, BitacoraVotacionService $bitacora): RedirectResponse
@@ -94,8 +116,8 @@ class JornadaVotacionController extends Controller
                 $errores[] = "{$g->nombre} no tiene ruta.";
             }
             foreach ($g->rutas as $r) {
-                if ($r->establecimiento->latitud === null || $r->establecimiento->longitud === null) {
-                    $errores[] = "Faltan coordenadas para RBD {$r->establecimiento->rbd}.";
+                if (! CoordenadasEstablecimiento::sonValidas($r->establecimiento->latitud, $r->establecimiento->longitud)) {
+                    $errores[] = "Faltan coordenadas válidas para RBD {$r->establecimiento->rbd}.";
                 }
             }
         }

@@ -3,6 +3,7 @@
 namespace App\Services\Votaciones;
 
 use App\Models\JornadaVotacion;
+use App\Support\Votaciones\CoordenadasEstablecimiento;
 use Illuminate\Support\Facades\Cache;
 
 class EstadoPublicoVotacionService
@@ -19,8 +20,9 @@ class EstadoPublicoVotacionService
                     'rutas' => $grupo->rutas->map(function ($ruta) {
                         $e = $ruta->establecimiento;
                         $v = $ruta->visita;
+                        $coordenadas = CoordenadasEstablecimiento::normalizar($e->latitud, $e->longitud);
 
-                        return ['id' => $ruta->id, 'orden' => $ruta->orden, 'rbd' => $e->rbd, 'nombre' => $e->nombre_establecimiento, 'comuna' => $e->comuna, 'latitud' => $e->latitud !== null ? (float) $e->latitud : null, 'longitud' => $e->longitud !== null ? (float) $e->longitud : null, 'logo_url' => $e->admisionPerfil?->logoUrl() ?? asset(config('brand.logo_principal', 'branding/01_logo_principal.png')), 'estado' => $v?->estado ?? 'pendiente', 'inicio_votacion' => $v?->inicio_votacion_at?->timezone(config('votaciones.timezone'))->format('H:i'), 'fin_votacion' => $v?->fin_votacion_at?->timezone(config('votaciones.timezone'))->format('H:i')];
+                        return ['id' => $ruta->id, 'orden' => $ruta->orden, 'rbd' => $e->rbd, 'nombre' => $e->nombre_establecimiento, 'comuna' => $e->comuna, 'latitud' => $coordenadas['latitud'], 'longitud' => $coordenadas['longitud'], 'coordenadas_validas' => $coordenadas['validas'], 'logo_url' => $e->admisionPerfil?->logoUrl() ?? asset(config('brand.logo_principal', 'branding/01_logo_principal.png')), 'estado' => $v?->estado ?? 'pendiente', 'inicio_votacion' => $v?->inicio_votacion_at?->timezone(config('votaciones.timezone'))->format('H:i'), 'fin_votacion' => $v?->fin_votacion_at?->timezone(config('votaciones.timezone'))->format('H:i')];
                     })->values(),
                 ])->values(),
                 'incidencias' => $jornada->incidencias->map(fn ($i) => ['id' => $i->id, 'grupo_id' => $i->grupo_votacion_id, 'tipo' => $i->tipo, 'mensaje' => $i->mensaje_publico, 'creada_at' => $i->created_at->timezone(config('votaciones.timezone'))->format('H:i')])->values(),
