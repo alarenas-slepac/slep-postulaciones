@@ -11,8 +11,25 @@
 </head>
 <body>
 <a class="vp-skip" href="#contenido">Saltar al contenido</a>
-<header class="vp-header"><div class="vp-container vp-header__inner"><a href="{{ route('public.votaciones.index') }}" class="vp-brand"><img src="{{ asset(config('brand.logo_slep', config('brand.logo_principal', 'branding/01_logo_principal.png'))) }}" alt="SLEP Andalién Costa"><span>Votaciones CCAF y Mutualidades</span></a><a href="https://slepandaliencosta.gob.cl/" target="_blank" rel="noopener">Sitio institucional</a></div></header>
+<header class="vp-header">
+    <div class="vp-container vp-header__inner">
+        <a href="{{ route('public.votaciones.index') }}" class="vp-brand">
+            <span class="vp-brand__logo"><img src="{{ asset(config('brand.logo_slep', config('brand.logo_principal', 'branding/01_logo_principal.png'))) }}" alt="SLEP Andalién Costa"></span>
+            <span class="vp-brand__copy"><strong>Votaciones institucionales</strong><small>Seguimiento territorial público</small></span>
+        </a>
+        <a class="vp-institutional-link" href="{{ config('brand.org_url', 'https://slepandaliencosta.gob.cl/') }}" target="_blank" rel="noopener">
+            <span>Sitio institucional</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-9 9M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+        </a>
+    </div>
+</header>
 <main id="contenido">@yield('content')</main>
-<footer class="vp-footer"><div class="vp-container">SLEP Andalién Costa · Seguimiento informativo de recorridos</div></footer>
+<footer class="vp-footer">
+    <div class="vp-container vp-footer__inner">
+        <div class="vp-footer__brand"><img src="{{ asset(config('brand.logo_slep', 'branding/logo-andaliencosta.png')) }}" alt="SLEP Andalién Costa"><p>Centro público de seguimiento territorial para jornadas institucionales.</p></div>
+        <div class="vp-footer__notice"><strong>Información pública y operativa</strong><p>Esta plataforma muestra el avance de los grupos y sus recorridos planificados. No realiza seguimiento GPS de funcionarios.</p></div>
+    </div>
+    <div class="vp-container vp-footer__bottom"><span>© {{ now()->year }} SLEP Andalién Costa</span><span>Servicio público, información clara y oportuna</span></div>
+</footer>
 </body>
 </html>

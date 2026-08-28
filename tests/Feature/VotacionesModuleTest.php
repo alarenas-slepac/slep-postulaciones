@@ -464,6 +464,9 @@ class VotacionesModuleTest extends TestCase
     public function test_frontend_publico_usa_leaflet_polling_filtros_y_pausa_por_visibilidad(): void
     {
         $script = file_get_contents(resource_path('js/votaciones-publicas.js'));
+        $view = file_get_contents(resource_path('views/public/votaciones/show.blade.php'));
+        $layout = file_get_contents(resource_path('views/layouts/votaciones-public.blade.php'));
+        $styles = file_get_contents(resource_path('css/votaciones-publicas.css'));
         $this->assertStringContainsString("from 'leaflet'", $script);
         $this->assertStringContainsString('setInterval(refresh', $script);
         $this->assertStringContainsString('document.hidden', $script);
@@ -472,9 +475,17 @@ class VotacionesModuleTest extends TestCase
         $this->assertStringContainsString('loadRoadRoutes', $script);
         $this->assertStringContainsString('formatKm', $script);
         $this->assertStringContainsString('segment.trazado', $script);
-        $this->assertStringContainsString('data-vp-commune', file_get_contents(resource_path('views/public/votaciones/show.blade.php')));
-        $this->assertStringContainsString('data-vp-search', file_get_contents(resource_path('views/public/votaciones/show.blade.php')));
-        $this->assertStringContainsString('data-routing-url', file_get_contents(resource_path('views/public/votaciones/show.blade.php')));
+        $this->assertStringContainsString('segmentStage', $script);
+        $this->assertStringContainsString("window.addEventListener('resize'", $script);
+        $this->assertStringContainsString('data-vp-commune', $view);
+        $this->assertStringContainsString('data-vp-search', $view);
+        $this->assertStringContainsString('data-routing-url', $view);
+        $this->assertStringContainsString('data-vp-group-cards', $view);
+        $this->assertStringContainsString('data-vp-route-panel', $view);
+        $this->assertStringContainsString('Recorridos planificados, no ubicación GPS personal', $view);
+        $this->assertStringContainsString('Información pública y operativa', $layout);
+        $this->assertStringContainsString('.vp-map-marker--en_votacion', $styles);
+        $this->assertStringContainsString('@media (prefers-reduced-motion: reduce)', $styles);
         $this->assertStringContainsString('data-votaciones-admin-distance-summary', file_get_contents(resource_path('views/votaciones/admin/show.blade.php')));
     }
 
