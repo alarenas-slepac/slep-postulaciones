@@ -11,6 +11,7 @@ use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
+use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionProfesionDocenteResolver;
 use Illuminate\Http\RedirectResponse;
@@ -297,6 +298,30 @@ class DotacionAsignacionController extends Controller
                     $fuente = 'Conversión automática desde horas aula · '.($calc['origen_proporcion_label'] ?? 'Regla general').' · consolidado contractual en pestaña Docentes';
                 }
             }
+        }
+
+        if ($tipo === 'pie_colaborativo' && (int) ($data['dotacion_curso_combinado_id'] ?? 0) > 0) {
+            $cursoCombinadoId = (int) $data['dotacion_curso_combinado_id'];
+            $cursoId = (int) ($data['establecimiento_curso_id'] ?? 0);
+            $cursoCombinado = DotacionCursoCombinado::query()
+                ->with('miembros')
+                ->whereKey($cursoCombinadoId)
+                ->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', (int) ($data['anio'] ?? 0))
+                ->where('activo', true)
+                ->first();
+
+            if (! $cursoCombinado
+                || $cursoId <= 0
+                || ! $cursoCombinado->miembros->contains('establecimiento_curso_id', $cursoId)
+                || (string) ($data['necesidad_key'] ?? '') !== DotacionCursoCombinadoCalculator::collaborativePieNeedKey($cursoCombinadoId)) {
+                throw ValidationException::withMessages([
+                    'necesidad_key' => 'La necesidad de trabajo colaborativo PIE del grupo combinado ya no se encuentra vigente. Actualice la página e intente nuevamente.',
+                ]);
+            }
+
+            $cursoCombinadoIdValidado = $cursoCombinadoId;
+            $fuente = 'Asignación manual de trabajo colaborativo PIE consolidado por grupo combinado';
         }
 
         return [

@@ -1,6 +1,34 @@
 <?php
 
 return [
+    '2026.8.28.462' => [
+        'date' => '2026-08-28',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Trabajo colaborativo PIE consolidado por curso combinado',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionContratoEnsenanzaCalculator.php',
+            'app/Support/DotacionCursoCombinadoCalculator.php',
+            'app/Support/DotacionCursosPlanesResumenCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'tests/Unit/DotacionContratoEnsenanzaCalculatorTest.php',
+            'tests/Unit/DotacionCursoCombinadoCalculatorTest.php',
+            'tests/Unit/DotacionCursosPlanesResumenCalculatorTest.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Reemplaza la suma individual de trabajo colaborativo PIE por una sola necesidad de 3 horas para cada grupo combinado con estudiantes NEE.',
+            'Propaga la consolidación a Cursos y planes, indicadores por tipo de enseñanza, brecha estructural, PDF y asignación de horas.',
+            'Conserva las asignaciones históricas de los cursos integrantes y las muestra como cobertura del grupo; si superan 3 horas, informa la necesidad como excedida.',
+            'Mantiene 3 horas por cada curso que no pertenece a una combinación activa.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.8.28.461' => [
         'date' => '2026-08-28',
         'module' => 'Dotación Establecimiento',

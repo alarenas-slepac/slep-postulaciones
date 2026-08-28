@@ -33,6 +33,9 @@ class DotacionContratoEnsenanzaCalculator
         $detallesParvularia = $nivelKeys
             ->flatMap(fn ($nivelKey) => collect(data_get($cursos, 'rows.'.$nivelKey.'.detalles', [])))
             ->values();
+        $detalles = collect(data_get($cursos, 'rows', []))
+            ->flatMap(fn ($row) => collect(data_get($row, 'detalles', [])))
+            ->values();
         $cursoIdsParvularia = $detallesParvularia
             ->pluck('establecimiento_curso_id')
             ->map(fn ($id) => (int) $id)
@@ -86,16 +89,66 @@ class DotacionContratoEnsenanzaCalculator
         $contratoPlanParvularia = min($contratoPlanAjustado, $contratoPlanParvularia);
         $contratoPlanGeneral = max(0.0, round($contratoPlanAjustado - $contratoPlanParvularia, 2));
 
-        $trabajoColaborativoPieTotal = max(0.0, round((float) data_get(
+        $trabajoColaborativoPieTotalBruto = max(0.0, round((float) data_get(
             $cursos,
             'totales.trabajo_colaborativo_pie',
             0
         ), 2));
-        $trabajoColaborativoPieParvularia = max(0.0, round((float) data_get(
+        $trabajoColaborativoPieReemplazado = (float) $detalles
+            ->filter(fn ($detalle) => $cursoIdsCombinados->contains(
+                (int) data_get($detalle, 'establecimiento_curso_id', 0)
+            ))
+            ->sum(fn ($detalle) => (float) data_get($detalle, 'trabajo_colaborativo_pie', 0));
+        $trabajoColaborativoPieGrupos = (float) $gruposActivos
+            ->sum(function ($grupo) use ($detalles): float {
+                $miembroIds = collect(data_get($grupo, 'miembros', []))
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->filter();
+
+                return (float) ($detalles
+                    ->filter(fn ($detalle) => $miembroIds->contains(
+                        (int) data_get($detalle, 'establecimiento_curso_id', 0)
+                    ))
+                    ->max(fn ($detalle) => (float) data_get($detalle, 'trabajo_colaborativo_pie', 0)) ?? 0);
+            });
+        $trabajoColaborativoPieTotal = max(0.0, round(
+            $trabajoColaborativoPieTotalBruto
+                - $trabajoColaborativoPieReemplazado
+                + $trabajoColaborativoPieGrupos,
+            2
+        ));
+
+        $trabajoColaborativoPieParvulariaBruto = max(0.0, round((float) data_get(
             $grupoParvularia,
             'totales.trabajo_colaborativo_pie',
             0
         ), 2));
+        $trabajoColaborativoPieParvulariaReemplazado = (float) $detallesParvularia
+            ->filter(fn ($detalle) => $cursoIdsCombinados->contains(
+                (int) data_get($detalle, 'establecimiento_curso_id', 0)
+            ))
+            ->sum(fn ($detalle) => (float) data_get($detalle, 'trabajo_colaborativo_pie', 0));
+        $trabajoColaborativoPieGruposParvularia = (float) $gruposActivos
+            ->filter(fn ($grupo) => self::grupoCorrespondeParvularia($grupo, $cursoIdsParvularia))
+            ->sum(function ($grupo) use ($detallesParvularia): float {
+                $miembroIds = collect(data_get($grupo, 'miembros', []))
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->filter();
+
+                return (float) ($detallesParvularia
+                    ->filter(fn ($detalle) => $miembroIds->contains(
+                        (int) data_get($detalle, 'establecimiento_curso_id', 0)
+                    ))
+                    ->max(fn ($detalle) => (float) data_get($detalle, 'trabajo_colaborativo_pie', 0)) ?? 0);
+            });
+        $trabajoColaborativoPieParvularia = max(0.0, round(
+            $trabajoColaborativoPieParvulariaBruto
+                - $trabajoColaborativoPieParvulariaReemplazado
+                + $trabajoColaborativoPieGruposParvularia,
+            2
+        ));
         $trabajoColaborativoPieParvularia = min(
             $trabajoColaborativoPieTotal,
             $trabajoColaborativoPieParvularia

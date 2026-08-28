@@ -108,14 +108,19 @@ class DotacionEstablecimientoCalculator
                 + $contratoRefuerzoNtCursosCombinados,
                 2
             );
+        $cursosPlanesResumen = DotacionCursosPlanesResumenCalculator::build(
+            $cursos,
+            $gruposCombinadosActivos
+        );
         $contratoPlanPorEnsenanza = DotacionContratoEnsenanzaCalculator::split(
             $cursos,
             $gruposCombinadosActivos,
             $horasContratoPlanAjustadas
         );
-        $cursosPlanesResumen = DotacionCursosPlanesResumenCalculator::build(
-            $cursos,
-            $gruposCombinadosActivos
+        $cursos['totales']['trabajo_colaborativo_pie'] = (float) data_get(
+            $cursosPlanesResumen,
+            'totales.trabajo_colaborativo_pie',
+            data_get($cursos, 'totales.trabajo_colaborativo_pie', 0)
         );
 
         $reduccionCursosCombinados = max(0.0, round($horasPlanBrutas - $horasPlanAjustadas, 2));

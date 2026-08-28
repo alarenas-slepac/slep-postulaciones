@@ -111,7 +111,7 @@
 @php
     $groups = [
         'plan_estudio' => ['title' => 'Plan de estudios y libre disposición', 'help' => 'Asignación individual por asignatura, agrupada por curso y por bloque del plan. Permite dividir una misma asignatura entre varios docentes.', 'icon' => 'bi-journal-text'],
-        'pie_colaborativo' => ['title' => 'Trabajo colaborativo PIE por curso', 'help' => '3 horas por curso con estudiantes NEE. No permite asignar a Educadora Diferencial ni Coordinador/a PIE.', 'icon' => 'bi-people'],
+        'pie_colaborativo' => ['title' => 'Trabajo colaborativo PIE por curso o grupo combinado', 'help' => '3 horas por curso independiente o por grupo combinado con estudiantes NEE. No permite asignar a Educadora Diferencial ni Coordinador/a PIE.', 'icon' => 'bi-people'],
         'pie_educadora_diferencial' => ['title' => 'Bolsa Educadoras Diferenciales PIE', 'help' => 'Horas de contrato calculadas desde PROF EDUC. DIF según la proporción 65/35 o 60/40 de cada curso; el total exacto se redondea una sola vez hacia arriba.', 'icon' => 'bi-universal-access'],
         'funciones' => ['title' => 'Funciones directivas, técnico-pedagógicas, planes y otras funciones', 'help' => 'Horas de contrato provenientes de Dotación funciones y planes.', 'icon' => 'bi-diagram-3'],
     ];
