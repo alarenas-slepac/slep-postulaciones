@@ -10,6 +10,49 @@
     font-size: .85rem;
 }
 
+.votaciones-admin-routing-status {
+    color: #536477;
+    font-size: .88rem;
+}
+
+.votaciones-admin-distance-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.votaciones-admin-distance-summary > div {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid #dbe4f0;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.votaciones-admin-distance-summary > div > span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--votaciones-route-color, #0b3d91);
+}
+
+.votaciones-admin-distance-summary b {
+    color: #0b3d91;
+}
+
+.votaciones-admin-distance-summary small {
+    grid-column: 2 / -1;
+    color: #64748b;
+}
+
+.votaciones-admin-distance-summary .is-fallback b {
+    color: #8a5a00;
+}
+
 .votaciones-admin-marker {
     border: 0;
     background: transparent;
@@ -31,5 +74,9 @@
 @media (max-width: 767.98px) {
     .votaciones-admin-map {
         min-height: 310px;
+    }
+
+    .votaciones-admin-distance-summary {
+        grid-template-columns: 1fr;
     }
 }

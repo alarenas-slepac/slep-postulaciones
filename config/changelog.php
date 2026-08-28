@@ -1,6 +1,32 @@
 <?php
 
 return [
+    '2026.8.28.453' => [
+        'date' => '2026-08-28',
+        'module' => 'Votaciones CCAF y Mutualidades',
+        'title' => 'Rutas por calles y estimación de distancias',
+        'files' => [
+            'app/Http/Controllers/Votaciones/RutaVialVotacionController.php',
+            'app/Services/Votaciones/RutaVialVotacionService.php',
+            'config/changelog.php',
+            'config/votaciones.php',
+            'resources/css/votaciones-admin-rutas.css',
+            'resources/css/votaciones-publicas.css',
+            'resources/js/votaciones-admin-rutas.js',
+            'resources/js/votaciones-publicas.js',
+            'resources/views/public/votaciones/show.blade.php',
+            'resources/views/votaciones/admin/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/VotacionesModuleTest.php',
+        ],
+        'changes' => [
+            'Traza cada recorrido sobre calles y carreteras respetando el orden configurado de los establecimientos.',
+            'Informa kilómetros y tiempo estimado para cada tramo y para el recorrido completo de cada grupo.',
+            'Centraliza la consulta vial en el servidor, aplica caché y evita exponer datos personales al proveedor cartográfico.',
+            'Mantiene una línea referencial entre establecimientos cuando el servicio vial no está disponible.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Funcionario Administración Central', 'Público'],
+    ],
     '2026.8.27.452' => [
         'date' => '2026-08-27',
         'module' => 'Votaciones CCAF y Mutualidades',
