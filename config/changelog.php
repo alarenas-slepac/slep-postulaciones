@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.8.28.455' => [
+        'date' => '2026-08-28',
+        'module' => 'Votaciones CCAF y Mutualidades',
+        'title' => 'Centrado de iconos en el resumen público',
+        'files' => [
+            'config/changelog.php',
+            'resources/css/votaciones-publicas.css',
+        ],
+        'changes' => [
+            'Centra horizontal y verticalmente los iconos de las tarjetas del resumen ejecutivo público.',
+            'Limita los estilos tipográficos a las etiquetas descriptivas para que no alteren el contenedor de los iconos.',
+            'Mantiene el centrado y las proporciones de los SVG tanto en escritorio como en dispositivos móviles.',
+        ],
+        'roles' => ['Público'],
+    ],
     '2026.8.28.454' => [
         'date' => '2026-08-28',
         'module' => 'Votaciones CCAF y Mutualidades',
