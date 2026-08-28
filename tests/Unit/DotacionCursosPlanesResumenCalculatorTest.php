@@ -38,6 +38,9 @@ class DotacionCursosPlanesResumenCalculatorTest extends TestCase
         $this->assertSame('NT1 A + NT2 A', $combinado['miembros_label']);
         $this->assertSame(35, $combinado['matricula']);
         $this->assertSame(2, $combinado['cursos']);
+        $this->assertSame(32.0, $combinado['horas_plan_por_curso']);
+        $this->assertFalse($combinado['horas_plan_por_curso_variable']);
+        $this->assertCount(2, $combinado['horas_plan_por_curso_detalle']);
         $this->assertSame(32.0, $combinado['total_horas']);
         $this->assertSame(50.0, $combinado['total_horas_contrato_equivalente']);
         $this->assertSame(6.0, $combinado['total_trabajo_colaborativo_pie']);
@@ -85,9 +88,11 @@ class DotacionCursosPlanesResumenCalculatorTest extends TestCase
         $this->assertStringContainsString("'resumen_cursos_planes'", $calculator);
         $this->assertStringContainsString('Cursos combinados activos', $resumen);
         $this->assertStringContainsString('Grupo combinado', $resumen);
+        $this->assertStringContainsString("horas_plan_por_curso", $resumen);
         $this->assertStringContainsString('Total cursos combinados', $resumen);
         $this->assertStringContainsString('$totalesCursosPlanes', $resumen);
         $this->assertStringContainsString('Cursos combinados activos', $pdf);
+        $this->assertStringContainsString("horas_plan_por_curso", $pdf);
         $this->assertStringContainsString('Total cursos combinados', $pdf);
         $this->assertStringContainsString('$totalesCursosPlanes', $pdf);
     }

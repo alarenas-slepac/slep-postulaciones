@@ -32,14 +32,15 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
         $this->assertStringContainsString("data_get(\$cursos ?? [], 'grupos.parvularia', [])", $source);
         $this->assertStringContainsString('contrato_educacion_parvularia_mas_trabajo_colaborativo_pie', $source);
         $this->assertStringContainsString('contrato_plan_general_mas_trabajo_colaborativo_pie', $source);
-        $this->assertStringContainsString('ajustadas por cursos combinados', $source);
+        $this->assertStringContainsString('los grupos combinados reemplazan la suma individual', $source);
+        $this->assertStringContainsString('aplican 65/35 o 60/40', $source);
         $this->assertStringContainsString('@if ($tieneEducacionParvularia)', $pdfSource);
         $this->assertStringContainsString('Contrato plan + PIE por tipo de enseñanza', $pdfSource);
         $this->assertStringContainsString('Educación Parvularia + PIE', $pdfSource);
         $this->assertStringContainsString('Plan General + PIE', $pdfSource);
         $this->assertStringContainsString('contrato_educacion_parvularia_mas_trabajo_colaborativo_pie', $pdfSource);
         $this->assertStringContainsString('contrato_plan_general_mas_trabajo_colaborativo_pie', $pdfSource);
-        $this->assertStringContainsString('Contrato equivalente ajustado por cursos combinados', $pdfSource);
+        $this->assertStringContainsString('Necesidad para cubrir NT1 y NT2', $pdfSource);
     }
 
     public function test_hace_colapsables_los_desgloses_de_funciones_y_pie(): void

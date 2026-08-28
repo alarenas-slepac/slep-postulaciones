@@ -494,49 +494,109 @@ class DotacionAsignacionCalculator
             }
 
             // El desglose puede estar incompleto aunque el catálogo defina el
-            // total semanal. Sólo se agrega la diferencia para no duplicar las
-            // asignaturas o la libre disposición que ya tienen detalle.
+            // total semanal. La diferencia se concilia primero contra libre
+            // disposición para que los cursos combinados agrupen esas horas en
+            // el mismo bloque curricular y no como una necesidad adicional.
             $horasPlanTotal = max(0.0, round((float) ($plan->horas_semanales_total ?? 0), 2));
-            $horasPlanDesglosadas = round((float) $items
-                ->where('establecimiento_curso_id', $curso->id)
+            $itemsCurso = $items->where('establecimiento_curso_id', $curso->id);
+            $horasPlanDesglosadas = round((float) $itemsCurso
                 ->sum(fn ($item) => (float) ($item['horas_plan_requeridas'] ?? 0)), 2);
             $horasPlanFaltantes = max(0.0, round($horasPlanTotal - $horasPlanDesglosadas, 2));
+            $horasLibreDisposicionTotal = max(
+                0.0,
+                round((float) ($plan->horas_semanales_libre_disposicion ?? 0), 2)
+            );
+            $horasLibreDisposicionDesglosadas = round(
+                (float) $itemsCurso
+                    ->where('subtipo_asignacion', 'libre_disposicion')
+                    ->sum(fn ($item) => (float) ($item['horas_plan_requeridas'] ?? 0))
+                + (float) $itemsCurso
+                    ->sum(fn ($item) => (float) ($item['horas_libre_disposicion_consolidada'] ?? 0)),
+                2
+            );
+            $horasLibreDisposicionFaltantes = min(
+                $horasPlanFaltantes,
+                max(0.0, round($horasLibreDisposicionTotal - $horasLibreDisposicionDesglosadas, 2))
+            );
 
-            if ($horasPlanFaltantes > 0.01) {
-                $subtipo = 'plan_sin_desglose';
+            $agregarRespaldo = function (
+                string $subtipo,
+                string $titulo,
+                string $bloque,
+                string $subvencion,
+                float $horas,
+                float $horasDesglosadas,
+                string $detalleFuente,
+                bool $usarClaveRespaldoAnterior = false
+            ) use ($curso, $porcentaje, $plan, $planEsReferencial, $fuentePlan, $asignaciones, $horasPlanTotal, $items): void {
+                if ($horas <= 0.01) {
+                    return;
+                }
+
                 $calc = DotacionEstablecimientoCalculator::contratoEquivalenteAsignacion(
                     $curso,
-                    $horasPlanFaltantes,
+                    $horas,
                     $porcentaje,
                     $subtipo
                 );
-                $key = self::key('plan', [$curso->id, $subtipo, $plan->id]);
+                $key = $usarClaveRespaldoAnterior
+                    ? self::key('plan', [$curso->id, 'plan_sin_desglose', $plan->id])
+                    : self::key('plan', [$curso->id, $subtipo, $titulo, $plan->id]);
                 $items->push(self::needRow($key, 'plan_estudio', $subtipo, [
                     'curso' => $curso,
                     'establecimiento_curso_id' => $curso->id,
                     'curso_label' => self::cursoLabel($curso),
-                    'titulo' => 'Horas del plan sin desglose',
-                    'bloque' => 'Total plan',
-                    'horas_plan' => $horasPlanFaltantes,
+                    'titulo' => $titulo,
+                    'bloque' => $bloque,
+                    'horas_plan' => $horas,
                     'horas_contrato' => (float) ($calc['horas_contrato_equivalente_redondeado'] ?? 0),
                     'horas_aula_cronologicas' => (float) ($calc['horas_aula_cronologicas'] ?? 0),
                     'proporcion' => $calc['proporcion_label'] ?? null,
                     'origen_proporcion' => $calc['origen_proporcion'] ?? 'regla_general',
                     'origen_proporcion_label' => $calc['origen_proporcion_label'] ?? 'Regla general',
                     'motivo_proporcion' => $calc['motivo'] ?? null,
-                    'subvencion' => 'General',
+                    'subvencion' => $subvencion,
                     'plan_estudio_id' => $plan->id,
-                    'asignatura_nombre' => 'Horas del plan sin desglose',
+                    'asignatura_nombre' => $titulo,
                     'plan_referencial_estimado' => $planEsReferencial,
                     'horas_plan_total' => $horasPlanTotal,
-                    'horas_plan_desglosadas' => $horasPlanDesglosadas,
+                    'horas_plan_desglosadas' => $horasDesglosadas,
                     'fuente' => sprintf(
-                        'Diferencia para completar %.2f h del %s; el desglose disponible suma %.2f h',
+                        '%s para completar %.2f h del %s; el desglose disponible suma %.2f h',
+                        $detalleFuente,
                         $horasPlanTotal,
                         $fuentePlan,
-                        $horasPlanDesglosadas
+                        $horasDesglosadas
                     ),
                 ], $asignaciones));
+            };
+
+            $agregarRespaldo(
+                'libre_disposicion',
+                'Horas de libre disposición',
+                'Libre disposición',
+                'Libre disposición',
+                $horasLibreDisposicionFaltantes,
+                $horasPlanDesglosadas,
+                'Diferencia de libre disposición',
+                $horasPlanFaltantes - $horasLibreDisposicionFaltantes <= 0.01
+            );
+
+            $horasPlanDesglosadas = round((float) $items
+                ->where('establecimiento_curso_id', $curso->id)
+                ->sum(fn ($item) => (float) ($item['horas_plan_requeridas'] ?? 0)), 2);
+            $horasPlanComunFaltantes = max(0.0, round($horasPlanTotal - $horasPlanDesglosadas, 2));
+            if ($horasPlanComunFaltantes > 0.01) {
+                $agregarRespaldo(
+                    'plan_sin_desglose',
+                    'Horas del plan común sin desglose',
+                    'Plan común',
+                    'General',
+                    $horasPlanComunFaltantes,
+                    $horasPlanDesglosadas,
+                    'Diferencia del plan común',
+                    true
+                );
             }
         }
 

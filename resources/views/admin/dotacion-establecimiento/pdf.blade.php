@@ -258,8 +258,8 @@
                 <td class="text-right primary">{{ $fmt($contratoPlanGeneralMasPie) }}</td>
             </tr>
             <tr>
-                <td class="small">Contrato equivalente ajustado por cursos combinados y trabajo colaborativo PIE de los cursos NT1 y NT2.</td>
-                <td class="small">Contrato equivalente ajustado por cursos combinados y trabajo colaborativo PIE de todos los demás cursos.</td>
+                <td class="small">Necesidad para cubrir NT1 y NT2: los grupos combinados reemplazan la suma individual y aplican la regla especial correspondiente, más PIE.</td>
+                <td class="small">Necesidad para cubrir los demás niveles: los grupos combinados reemplazan la suma individual y aplican 65/35 o 60/40, más PIE.</td>
             </tr>
         </tbody>
     </table>
@@ -594,7 +594,16 @@
                     <td><strong>{{ $row['label'] }}</strong><br><span class="small muted">{{ $row['miembros_label'] }}</span><br><span class="badge badge-blue">Grupo combinado</span></td>
                     <td class="text-right">{{ number_format((int) ($row['matricula'] ?? 0), 0, ',', '.') }}</td>
                     <td class="text-right">{{ number_format((int) ($row['cursos'] ?? 0), 0, ',', '.') }}</td>
-                    <td class="text-right">Consolidado</td>
+                    <td class="text-right">
+                        @if (!($row['horas_plan_por_curso_variable'] ?? false))
+                            {{ $fmt($row['horas_plan_por_curso'] ?? 0) }} h por curso
+                        @else
+                            Variable
+                            @foreach (($row['horas_plan_por_curso_detalle'] ?? []) as $detalleCurso)
+                                <br><span class="small muted">{{ $detalleCurso['curso'] }}: {{ $fmt($detalleCurso['horas']) }} h</span>
+                            @endforeach
+                        @endif
+                    </td>
                     <td class="text-right primary">{{ $fmt($row['total_horas'] ?? 0) }}</td>
                     <td><span class="badge badge-gray">{{ $row['proporcion_docente_label'] ?? '—' }}</span></td>
                     <td class="text-right primary">{{ $fmt($row['total_horas_contrato_equivalente'] ?? 0) }}</td>

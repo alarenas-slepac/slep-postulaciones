@@ -70,6 +70,10 @@ class DotacionPlanHorasCompletasTest extends TestCase
         $this->assertFalse($respaldo['plan_referencial_estimado']);
         $this->assertSame((int) $plan->id, (int) $respaldo['plan_estudio_id']);
         $this->assertSame((int) $plan->id, (int) $curso->plan_estudio_id);
+        $this->assertSame(
+            'plan:'.md5($curso->id.'|plan_sin_desglose|'.$plan->id),
+            $respaldo['key']
+        );
     }
 
     public function test_usa_el_plan_referencial_sin_persistirlo_si_el_curso_no_tiene_asociacion(): void
@@ -94,9 +98,37 @@ class DotacionPlanHorasCompletasTest extends TestCase
         $this->assertStringContainsString('referencial', $horas['fuente']);
     }
 
+    public function test_clasifica_como_libre_disposicion_la_diferencia_de_ese_bloque(): void
+    {
+        [$establecimiento, $curso, $plan] = $this->createCourseWithPlan('Con JEC', true, 38, 'Con JEC', 6.5);
+        PlanEstudioAsignatura::query()->create([
+            'plan_estudio_id' => $plan->id,
+            'asignatura' => 'Plan común configurado',
+            'horas_semanales' => 31.5,
+            'tipo_bloque' => 'tiempo_minimo',
+            'orden' => 1,
+        ]);
+
+        $necesidades = $this->planNeeds($establecimiento);
+        $libreDisposicion = $necesidades->firstWhere('subtipo_asignacion', 'libre_disposicion');
+
+        $this->assertSame(38.0, round((float) $necesidades->sum('horas_plan_requeridas'), 2));
+        $this->assertNotNull($libreDisposicion);
+        $this->assertSame('Horas de libre disposición', $libreDisposicion['titulo']);
+        $this->assertSame(6.5, (float) $libreDisposicion['horas_plan_requeridas']);
+        $this->assertFalse($necesidades->contains(
+            fn ($item) => ($item['subtipo_asignacion'] ?? null) === 'plan_sin_desglose'
+        ));
+        $this->assertSame((int) $curso->id, (int) $libreDisposicion['establecimiento_curso_id']);
+        $this->assertSame(
+            'plan:'.md5($curso->id.'|plan_sin_desglose|'.$plan->id),
+            $libreDisposicion['key']
+        );
+    }
+
     public function test_las_horas_estimadas_se_consolidan_en_un_grupo_combinado(): void
     {
-        [$establecimiento, $primerCurso] = $this->createCourseWithPlan('No aplica', false, 32, 'Sin JEC');
+        [$establecimiento, $primerCurso] = $this->createCourseWithPlan('No aplica', false, 38, 'Sin JEC', 6);
         $segundoCurso = EstablecimientoCurso::query()->create([
             'establecimiento_id' => $establecimiento->id,
             'rbd' => $establecimiento->rbd,
@@ -126,11 +158,17 @@ class DotacionPlanHorasCompletasTest extends TestCase
 
         $necesidades = $this->planNeeds($establecimiento);
 
-        $this->assertCount(1, $necesidades);
-        $this->assertSame((int) $grupo->id, (int) $necesidades->first()['dotacion_curso_combinado_id']);
-        $this->assertSame(32.0, (float) $necesidades->first()['horas_plan_requeridas']);
-        $this->assertSame(64.0, (float) $necesidades->first()['horas_plan_brutas']);
-        $this->assertSame(32.0, (float) $necesidades->first()['horas_plan_reduccion']);
+        $this->assertCount(2, $necesidades);
+        $this->assertTrue($necesidades->every(
+            fn ($item) => (int) $item['dotacion_curso_combinado_id'] === (int) $grupo->id
+        ));
+        $this->assertSame(38.0, round((float) $necesidades->sum('horas_plan_requeridas'), 2));
+        $this->assertSame(76.0, round((float) $necesidades->sum('horas_plan_brutas'), 2));
+        $this->assertSame(38.0, round((float) $necesidades->sum('horas_plan_reduccion'), 2));
+        $this->assertSame(
+            ['Horas de libre disposición', 'Horas del plan común sin desglose'],
+            $necesidades->pluck('titulo')->sort()->values()->all()
+        );
     }
 
     private function planNeeds(Establecimiento $establecimiento)
@@ -144,7 +182,8 @@ class DotacionPlanHorasCompletasTest extends TestCase
         string $regimenCurso,
         bool $associatePlan,
         float $total,
-        string $regimenPlan = 'Con JEC'
+        string $regimenPlan = 'Con JEC',
+        ?float $libreDisposicion = null
     ): array {
         $establecimiento = Establecimiento::query()->create([
             'rbd' => random_int(1000, 9999),
@@ -162,6 +201,8 @@ class DotacionPlanHorasCompletasTest extends TestCase
             'anio' => 2026,
             'nombre_plan' => 'Plan de prueba',
             'regimen_jec' => $regimenPlan,
+            'horas_semanales_subtotal' => $libreDisposicion !== null ? $total - $libreDisposicion : null,
+            'horas_semanales_libre_disposicion' => $libreDisposicion,
             'horas_semanales_total' => $total,
             'activo' => true,
         ]);
