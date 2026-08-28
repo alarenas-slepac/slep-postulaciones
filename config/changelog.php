@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.8.28.458' => [
+        'date' => '2026-08-28',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Horas completas del plan en cursos individuales y combinados',
+        'files' => [
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionPlanEstudioResolver.php',
+            'config/changelog.php',
+            'tests/Unit/DotacionPlanHorasCompletasTest.php',
+        ],
+        'changes' => [
+            'Usa como respaldo el plan activo del catálogo para el mismo curso, año y régimen cuando el curso del establecimiento no tiene un plan asociado.',
+            'Completa la diferencia entre el desglose disponible y el total semanal del plan, incluyendo plan común y libre disposición, sin duplicar horas configuradas.',
+            'Aplica las horas completas antes de consolidar cursos combinados para que sus necesidades, contratos equivalentes y totales reflejen el plan efectivo.',
+            'Mantiene intactas las asociaciones históricas: el plan referencial se utiliza solamente durante el cálculo.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.8.28.457' => [
         'date' => '2026-08-28',
         'module' => 'Dotación Establecimiento',

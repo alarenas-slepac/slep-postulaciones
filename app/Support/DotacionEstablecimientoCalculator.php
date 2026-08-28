@@ -1561,46 +1561,65 @@ class DotacionEstablecimientoCalculator
 
     private static function horasCurso(EstablecimientoCurso $curso): array
     {
+        $plan = DotacionPlanEstudioResolver::resolve($curso);
+        $planEsReferencial = DotacionPlanEstudioResolver::isReferential($curso, $plan);
+
         // Para dotación, las horas del curso deben corresponder al total del plan
         // de estudio asociado, no sólo a las asignaturas personalizadas del EE.
         // Ej.: si el EE sólo configura 6,50 h de libre disposición en 1° básico,
         // el plan sigue totalizando 38 h semanales porque el tiempo mínimo
         // obligatorio viene definido por el plan oficial.
-        if ($curso->planEstudio) {
-            $total = $curso->planEstudio->horas_semanales_total;
+        if ($plan) {
+            $total = $plan->horas_semanales_total;
             if ($total !== null && (float) $total > 0) {
-                return ['horas' => (float) $total, 'fuente' => 'Plan asociado'];
+                return [
+                    'horas' => (float) $total,
+                    'fuente' => $planEsReferencial
+                        ? 'Plan referencial estimado por curso y régimen'
+                        : 'Plan asociado',
+                ];
             }
         }
 
-        if ($curso->plan_estudio_id && self::schemaHasTable('planes_estudio_bloques')) {
+        $planEstudioId = $plan?->id ?? $curso->plan_estudio_id;
+
+        if ($planEstudioId && self::schemaHasTable('planes_estudio_bloques')) {
             $totalBlock = (float) DB::table('planes_estudio_bloques')
-                ->where('plan_estudio_id', $curso->plan_estudio_id)
+                ->where('plan_estudio_id', $planEstudioId)
                 ->where('activo', true)
                 ->where('tipo_bloque', 'total')
                 ->max('horas_semanales');
             if ($totalBlock > 0) {
-                return ['horas' => $totalBlock, 'fuente' => 'Bloque total plan'];
+                return [
+                    'horas' => $totalBlock,
+                    'fuente' => $planEsReferencial ? 'Bloque total del plan referencial estimado' : 'Bloque total plan',
+                ];
             }
         }
 
-        if ($curso->plan_estudio_id && self::schemaHasTable('planes_estudio_asignaturas')) {
+        if ($planEstudioId && self::schemaHasTable('planes_estudio_asignaturas')) {
             $sum = (float) DB::table('planes_estudio_asignaturas')
-                ->where('plan_estudio_id', $curso->plan_estudio_id)
+                ->where('plan_estudio_id', $planEstudioId)
                 ->sum('horas_semanales');
             if ($sum > 0) {
-                return ['horas' => $sum, 'fuente' => 'Asignaturas plan oficial'];
+                return [
+                    'horas' => $sum,
+                    'fuente' => $planEsReferencial ? 'Asignaturas del plan referencial estimado' : 'Asignaturas plan oficial',
+                ];
             }
         }
 
-        if ($curso->plan_estudio_id && self::schemaHasTable('planes_estudio_bloques')) {
+        if ($planEstudioId && self::schemaHasTable('planes_estudio_bloques')) {
             $sum = (float) DB::table('planes_estudio_bloques')
-                ->where('plan_estudio_id', $curso->plan_estudio_id)
+                ->where('plan_estudio_id', $planEstudioId)
                 ->where('activo', true)
                 ->where('tipo_bloque', '<>', 'total')
                 ->sum('horas_semanales');
             if ($sum > 0) {
-                return ['horas' => $sum, 'fuente' => 'Bloques plan oficial'];
+                return [
+                    'horas' => $sum,
+                    'fuente' => $planEsReferencial ? 'Bloques del plan referencial estimado' : 'Bloques plan oficial',
+                ];
             }
         }
 

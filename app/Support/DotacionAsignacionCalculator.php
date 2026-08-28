@@ -330,12 +330,15 @@ class DotacionAsignacionCalculator
 
         $items = collect();
         foreach ($cursos as $curso) {
-            if (! $curso->planEstudio) {
+            $plan = DotacionPlanEstudioResolver::resolve($curso);
+            if (! $plan) {
                 continue;
             }
 
-            $oficiales = $curso->planEstudio->asignaturas ?? collect();
-            $personalizadas = self::asignaturasPersonalizadas($curso);
+            $planEsReferencial = DotacionPlanEstudioResolver::isReferential($curso, $plan);
+            $fuentePlan = $planEsReferencial ? 'plan referencial estimado' : 'plan asociado';
+            $oficiales = $plan->asignaturas ?? collect();
+            $personalizadas = self::asignaturasPersonalizadas($curso, (int) $plan->id);
             $tieneLibreDisposicionPersonalizada = $personalizadas
                 ->filter(fn ($custom) => ($custom['tipo_bloque'] ?? null) === 'libre_disposicion')
                 ->isNotEmpty();
@@ -399,7 +402,8 @@ class DotacionAsignacionCalculator
                     'origen_proporcion_label' => $calc['origen_proporcion_label'] ?? 'Regla general',
                     'motivo_proporcion' => $calc['motivo'] ?? null,
                     'subvencion' => $subvencion,
-                    'plan_estudio_id' => $curso->plan_estudio_id,
+                    'plan_estudio_id' => $plan->id,
+                    'plan_referencial_estimado' => $planEsReferencial,
                     'asignatura_nombre' => $asig->asignatura,
                     'fuente' => $fuente,
                     'horas_plan_oficial' => $esOrientacionOficial && $horasLibreDisposicionOrientacion > 0 ? $horasPlanOriginal : null,
@@ -437,7 +441,8 @@ class DotacionAsignacionCalculator
                     'origen_proporcion_label' => $calc['origen_proporcion_label'] ?? 'Regla general',
                     'motivo_proporcion' => $calc['motivo'] ?? null,
                     'subvencion' => 'Libre disposición',
-                    'plan_estudio_id' => $curso->plan_estudio_id,
+                    'plan_estudio_id' => $plan->id,
+                    'plan_referencial_estimado' => $planEsReferencial,
                     'plan_bloque_id' => $custom['plan_bloque_id'] ?? null,
                     'asignatura_id' => $custom['asignatura_id'] ?? null,
                     'asignatura_nombre' => $custom['nombre'],
@@ -451,7 +456,7 @@ class DotacionAsignacionCalculator
             }
 
             if ($oficiales->isEmpty() && $items->where('establecimiento_curso_id', $curso->id)->isEmpty()) {
-                foreach (($curso->planEstudio->bloques ?? collect())->where('activo', true) as $bloque) {
+                foreach (($plan->bloques ?? collect())->where('activo', true) as $bloque) {
                     if (($bloque->tipo_bloque ?? null) === 'total') {
                         continue;
                     }
@@ -479,12 +484,59 @@ class DotacionAsignacionCalculator
                         'origen_proporcion_label' => $calc['origen_proporcion_label'] ?? 'Regla general',
                         'motivo_proporcion' => $calc['motivo'] ?? null,
                         'subvencion' => $subtipo === 'libre_disposicion' ? 'Libre disposición' : 'General',
-                        'plan_estudio_id' => $curso->plan_estudio_id,
+                        'plan_estudio_id' => $plan->id,
+                        'plan_referencial_estimado' => $planEsReferencial,
                         'plan_bloque_id' => $bloque->id,
                         'asignatura_nombre' => $bloque->nombre,
                         'fuente' => 'Bloque del plan',
                     ], $asignaciones));
                 }
+            }
+
+            // El desglose puede estar incompleto aunque el catálogo defina el
+            // total semanal. Sólo se agrega la diferencia para no duplicar las
+            // asignaturas o la libre disposición que ya tienen detalle.
+            $horasPlanTotal = max(0.0, round((float) ($plan->horas_semanales_total ?? 0), 2));
+            $horasPlanDesglosadas = round((float) $items
+                ->where('establecimiento_curso_id', $curso->id)
+                ->sum(fn ($item) => (float) ($item['horas_plan_requeridas'] ?? 0)), 2);
+            $horasPlanFaltantes = max(0.0, round($horasPlanTotal - $horasPlanDesglosadas, 2));
+
+            if ($horasPlanFaltantes > 0.01) {
+                $subtipo = 'plan_sin_desglose';
+                $calc = DotacionEstablecimientoCalculator::contratoEquivalenteAsignacion(
+                    $curso,
+                    $horasPlanFaltantes,
+                    $porcentaje,
+                    $subtipo
+                );
+                $key = self::key('plan', [$curso->id, $subtipo, $plan->id]);
+                $items->push(self::needRow($key, 'plan_estudio', $subtipo, [
+                    'curso' => $curso,
+                    'establecimiento_curso_id' => $curso->id,
+                    'curso_label' => self::cursoLabel($curso),
+                    'titulo' => 'Horas del plan sin desglose',
+                    'bloque' => 'Total plan',
+                    'horas_plan' => $horasPlanFaltantes,
+                    'horas_contrato' => (float) ($calc['horas_contrato_equivalente_redondeado'] ?? 0),
+                    'horas_aula_cronologicas' => (float) ($calc['horas_aula_cronologicas'] ?? 0),
+                    'proporcion' => $calc['proporcion_label'] ?? null,
+                    'origen_proporcion' => $calc['origen_proporcion'] ?? 'regla_general',
+                    'origen_proporcion_label' => $calc['origen_proporcion_label'] ?? 'Regla general',
+                    'motivo_proporcion' => $calc['motivo'] ?? null,
+                    'subvencion' => 'General',
+                    'plan_estudio_id' => $plan->id,
+                    'asignatura_nombre' => 'Horas del plan sin desglose',
+                    'plan_referencial_estimado' => $planEsReferencial,
+                    'horas_plan_total' => $horasPlanTotal,
+                    'horas_plan_desglosadas' => $horasPlanDesglosadas,
+                    'fuente' => sprintf(
+                        'Diferencia para completar %.2f h del %s; el desglose disponible suma %.2f h',
+                        $horasPlanTotal,
+                        $fuentePlan,
+                        $horasPlanDesglosadas
+                    ),
+                ], $asignaciones));
             }
         }
 
@@ -500,7 +552,7 @@ class DotacionAsignacionCalculator
         );
     }
 
-    private static function asignaturasPersonalizadas(EstablecimientoCurso $curso): Collection
+    private static function asignaturasPersonalizadas(EstablecimientoCurso $curso, int $planEstudioId): Collection
     {
         if (! self::schemaHasTable('establecimiento_planes_estudio') || ! self::schemaHasTable('establecimiento_planes_estudio_asignaturas')) {
             return collect();
@@ -547,7 +599,7 @@ class DotacionAsignacionCalculator
 
         $rows = $buildQuery()
             ->where('config.establecimiento_curso_id', $curso->id)
-            ->when($curso->plan_estudio_id, fn ($query) => $query->where('config.plan_estudio_id', $curso->plan_estudio_id))
+            ->where('config.plan_estudio_id', $planEstudioId)
             ->get();
 
         // Respaldo para instalaciones donde la configuracion exista por establecimiento/curso/anio,
@@ -557,7 +609,7 @@ class DotacionAsignacionCalculator
                 ->where('config.establecimiento_id', $curso->establecimiento_id)
                 ->where('config.curso_id', $curso->curso_id)
                 ->where('config.anio', $curso->anio)
-                ->when($curso->plan_estudio_id, fn ($query) => $query->where('config.plan_estudio_id', $curso->plan_estudio_id))
+                ->where('config.plan_estudio_id', $planEstudioId)
                 ->get();
         }
 
