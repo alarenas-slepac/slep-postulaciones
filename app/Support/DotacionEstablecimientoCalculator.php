@@ -108,6 +108,11 @@ class DotacionEstablecimientoCalculator
                 + $contratoRefuerzoNtCursosCombinados,
                 2
             );
+        $contratoPlanPorEnsenanza = DotacionContratoEnsenanzaCalculator::split(
+            $cursos,
+            $gruposCombinadosActivos,
+            $horasContratoPlanAjustadas
+        );
 
         $reduccionCursosCombinados = max(0.0, round($horasPlanBrutas - $horasPlanAjustadas, 2));
         $reduccionContratoCursosCombinados = max(0.0, round($horasContratoPlanBrutas - $horasContratoPlanAjustadas, 2));
@@ -186,6 +191,9 @@ class DotacionEstablecimientoCalculator
             'trabajo_colaborativo_pie_asignadas' => $coberturaPlanPie['trabajo_colaborativo_pie_asignadas'],
             'contrato_plan_mas_trabajo_colaborativo_pie' => $contratoPlanMasTrabajoColaborativoPie,
             'contrato_plan_mas_trabajo_colaborativo_pie_asignadas' => $coberturaPlanPie['contrato_plan_mas_trabajo_colaborativo_pie_asignadas'],
+            'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => $contratoPlanPorEnsenanza['contrato_parvularia_mas_pie'],
+            'contrato_plan_general_mas_trabajo_colaborativo_pie' => $contratoPlanPorEnsenanza['contrato_general_mas_pie'],
+            'contrato_plan_por_ensenanza_desglose' => $contratoPlanPorEnsenanza,
             'horas_dotacion_funciones' => $horasDotacionFunciones,
             'horas_dotacion_funciones_normativas' => $horasDotacionFuncionesNormativas,
             'horas_dotacion_funciones_normativas_asistentes' => $horasDotacionFuncionesNormativasAsistentes,
