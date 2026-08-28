@@ -12,11 +12,13 @@ use App\Models\User;
 use App\Models\VisitaVotacion;
 use App\Services\Votaciones\EstadoPublicoVotacionService;
 use App\Services\Votaciones\OperacionVotacionService;
+use App\Services\Votaciones\RutaVialVotacionService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -359,6 +361,98 @@ class VotacionesModuleTest extends TestCase
         $this->get(route('public.votaciones.show', $jornada))->assertNotFound();
     }
 
+    public function test_servicio_vial_entrega_geometria_distancia_tramos_y_cache(): void
+    {
+        config([
+            'votaciones.routing.enabled' => true,
+            'votaciones.routing.base_url' => 'https://routing.example.test',
+            'votaciones.routing.profile' => 'driving',
+        ]);
+        Http::fake([
+            'routing.example.test/*' => Http::response([
+                'code' => 'Ok',
+                'routes' => [[
+                    'distance' => 2500.4,
+                    'duration' => 360.2,
+                    'geometry' => [
+                        'type' => 'LineString',
+                        'coordinates' => [[-73.01, -36.99], [-73.015, -36.985], [-73.02, -36.98]],
+                    ],
+                    'legs' => [[
+                        'distance' => 2500.4,
+                        'duration' => 360.2,
+                        'steps' => [[
+                            'geometry' => [
+                                'type' => 'LineString',
+                                'coordinates' => [[-73.01, -36.99], [-73.015, -36.985], [-73.02, -36.98]],
+                            ],
+                        ]],
+                    ]],
+                ]],
+            ]),
+        ]);
+        [$jornada, $grupo, $rutas] = $this->escenario();
+
+        $service = app(RutaVialVotacionService::class);
+        $payload = $service->obtener($jornada);
+        $roadGroup = $payload['grupos'][0];
+
+        $this->assertTrue($roadGroup['disponible']);
+        $this->assertSame('vial', $roadGroup['tipo']);
+        $this->assertSame(2500.4, $roadGroup['distancia_m']);
+        $this->assertSame([-36.99, -73.01], $roadGroup['trazado'][0]);
+        $this->assertSame($rutas[0]->id, $roadGroup['tramos'][0]['desde_ruta_id']);
+        $this->assertSame($rutas[1]->id, $roadGroup['tramos'][0]['hasta_ruta_id']);
+        $this->assertSame($grupo->id, $roadGroup['grupo_id']);
+
+        $service->obtener($jornada);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/route/v1/driving/-73.01,-36.99;-73.02,-36.98')
+            && $request['geometries'] === 'geojson'
+            && $request['steps'] === 'true');
+    }
+
+    public function test_servicio_vial_conserva_linea_directa_si_el_proveedor_falla(): void
+    {
+        config([
+            'votaciones.routing.enabled' => true,
+            'votaciones.routing.base_url' => 'https://routing-failure.example.test',
+        ]);
+        Http::fake(['routing-failure.example.test/*' => Http::response(['code' => 'NoRoute'], 500)]);
+        [$jornada] = $this->escenario();
+
+        $roadGroup = app(RutaVialVotacionService::class)->obtener($jornada)['grupos'][0];
+
+        $this->assertFalse($roadGroup['disponible']);
+        $this->assertSame('linea_directa', $roadGroup['tipo']);
+        $this->assertNull($roadGroup['distancia_m']);
+        $this->assertCount(2, $roadGroup['trazado']);
+    }
+
+    public function test_endpoints_viales_respetan_publicacion_y_permisos(): void
+    {
+        config(['votaciones.routing.enabled' => false]);
+        [$jornada] = $this->escenario();
+
+        $this->getJson(route('public.votaciones.ruta-vial', $jornada))
+            ->assertOk()
+            ->assertJsonPath('grupos.0.tipo', 'linea_directa');
+
+        $this->withoutAccessMiddleware();
+        $this->actingAs($this->operator)
+            ->getJson(route('votaciones.admin.jornadas.ruta-vial', $jornada))
+            ->assertOk()
+            ->assertJsonPath('grupos.0.grupo_id', $jornada->grupos()->value('id'));
+
+        $sinPermiso = $this->crearUsuario('444444444', 'Usuario', 'Sin', 'Ruta', 'sin-ruta@example.test');
+        $this->actingAs($sinPermiso)
+            ->getJson(route('votaciones.admin.jornadas.ruta-vial', $jornada))
+            ->assertForbidden();
+
+        $jornada->update(['publica' => false]);
+        $this->getJson(route('public.votaciones.ruta-vial', $jornada))->assertNotFound();
+    }
+
     public function test_bitacora_no_admite_edicion_ni_eliminacion(): void
     {
         [$jornada] = $this->escenario();
@@ -375,8 +469,13 @@ class VotacionesModuleTest extends TestCase
         $this->assertStringContainsString('document.hidden', $script);
         $this->assertStringContainsString('Posición en ruta', $script);
         $this->assertStringContainsString('coordenadas_validas', $script);
+        $this->assertStringContainsString('loadRoadRoutes', $script);
+        $this->assertStringContainsString('formatKm', $script);
+        $this->assertStringContainsString('segment.trazado', $script);
         $this->assertStringContainsString('data-vp-commune', file_get_contents(resource_path('views/public/votaciones/show.blade.php')));
         $this->assertStringContainsString('data-vp-search', file_get_contents(resource_path('views/public/votaciones/show.blade.php')));
+        $this->assertStringContainsString('data-routing-url', file_get_contents(resource_path('views/public/votaciones/show.blade.php')));
+        $this->assertStringContainsString('data-votaciones-admin-distance-summary', file_get_contents(resource_path('views/votaciones/admin/show.blade.php')));
     }
 
     private function withoutAccessMiddleware(): void

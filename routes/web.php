@@ -107,6 +107,7 @@ use App\Http\Controllers\Votaciones\GrupoVotacionController;
 use App\Http\Controllers\Votaciones\RutaVotacionController;
 use App\Http\Controllers\Votaciones\OperacionVotacionController;
 use App\Http\Controllers\Votaciones\IncidenciaVotacionController;
+use App\Http\Controllers\Votaciones\RutaVialVotacionController;
 
 
 Route::get('/', function () {
@@ -166,6 +167,7 @@ Route::prefix('votaciones')->name('public.votaciones.')->middleware('throttle:12
     Route::get('/', [PublicVotacionController::class, 'index'])->name('index');
     Route::get('/{jornada:slug}', [PublicVotacionController::class, 'show'])->name('show');
     Route::get('/{jornada:slug}/estado', [PublicVotacionController::class, 'estado'])->name('estado');
+    Route::get('/{jornada:slug}/ruta-vial', [RutaVialVotacionController::class, 'publica'])->name('ruta-vial');
 });
 
 Route::get('/validar-documento/{codigo}', [CometidoFuncionarioController::class, 'validarDocumentoPublico'])
@@ -203,6 +205,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::get('/jornadas/crear', [JornadaVotacionController::class, 'create'])->name('jornadas.create');
             Route::post('/jornadas', [JornadaVotacionController::class, 'store'])->name('jornadas.store');
             Route::get('/jornadas/{jornada:slug}', [JornadaVotacionController::class, 'show'])->name('jornadas.show');
+            Route::get('/jornadas/{jornada:slug}/ruta-vial', [RutaVialVotacionController::class, 'admin'])->name('jornadas.ruta-vial');
             Route::get('/jornadas/{jornada:slug}/editar', [JornadaVotacionController::class, 'edit'])->name('jornadas.edit');
             Route::put('/jornadas/{jornada:slug}', [JornadaVotacionController::class, 'update'])->name('jornadas.update');
             Route::post('/jornadas/{jornada:slug}/publicar', [JornadaVotacionController::class, 'publicar'])->name('jornadas.publicar');
