@@ -76,9 +76,11 @@
     $grupoEducacionParvularia = data_get($cursos ?? [], 'grupos.parvularia', []);
     $tieneEducacionParvularia = (int) data_get($grupoEducacionParvularia, 'totales.cursos', 0) > 0;
     $contratoEducacionParvulariaMasPie = $tieneEducacionParvularia
-        ? (float) data_get($grupoEducacionParvularia, 'totales.contrato_mas_trabajo_colaborativo_pie', 0)
+        ? (float) ($resumen['contrato_educacion_parvularia_mas_trabajo_colaborativo_pie']
+            ?? data_get($grupoEducacionParvularia, 'totales.contrato_mas_trabajo_colaborativo_pie', 0))
         : 0.0;
-    $contratoPlanGeneralMasPie = max(0.0, round($contratoPlanMasPieRequerido - $contratoEducacionParvulariaMasPie, 2));
+    $contratoPlanGeneralMasPie = (float) ($resumen['contrato_plan_general_mas_trabajo_colaborativo_pie']
+        ?? max(0.0, round($contratoPlanMasPieRequerido - $contratoEducacionParvulariaMasPie, 2)));
     $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
     $horasContratoAula = (float) ($resumen['horas_contrato_docentes_aula'] ?? $horasContratoActuales);
     $horasContratoDocentePie = (float) ($resumen['horas_contrato_docente_pie'] ?? 0);
@@ -245,8 +247,8 @@
                 <td class="text-right primary">{{ $fmt($contratoPlanGeneralMasPie) }}</td>
             </tr>
             <tr>
-                <td class="small">Contrato equivalente y trabajo colaborativo PIE de los cursos NT1 y NT2.</td>
-                <td class="small">Contrato equivalente y trabajo colaborativo PIE de todos los demás cursos.</td>
+                <td class="small">Contrato equivalente ajustado por cursos combinados y trabajo colaborativo PIE de los cursos NT1 y NT2.</td>
+                <td class="small">Contrato equivalente ajustado por cursos combinados y trabajo colaborativo PIE de todos los demás cursos.</td>
             </tr>
         </tbody>
     </table>

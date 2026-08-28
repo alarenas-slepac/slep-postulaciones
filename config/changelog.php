@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.8.28.456' => [
+        'date' => '2026-08-28',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Contrato por enseñanza ajustado a cursos combinados',
+        'files' => [
+            'app/Support/DotacionContratoEnsenanzaCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionContratoEnsenanzaCalculatorTest.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+        ],
+        'changes' => [
+            'Recalcula el contrato de Educación Parvularia reemplazando los contratos individuales de NT1 y NT2 por el contrato consolidado del grupo combinado configurado.',
+            'Obtiene el contrato de Plan General como diferencia exacta respecto del contrato plan total ajustado, evitando duplicar cursos integrantes de combinaciones.',
+            'Mantiene el trabajo colaborativo PIE por curso y conserva las horas de refuerzo de libre disposición de NT cuando corresponden.',
+            'Aplica los mismos valores conciliados en la vista del establecimiento y en su informe PDF, con compatibilidad para resúmenes históricos.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.8.28.455' => [
         'date' => '2026-08-28',
         'module' => 'Votaciones CCAF y Mutualidades',
