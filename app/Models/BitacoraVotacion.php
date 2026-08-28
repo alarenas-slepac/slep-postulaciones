@@ -23,6 +23,21 @@ class BitacoraVotacion extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    public function jornada(): BelongsTo
+    {
+        return $this->belongsTo(JornadaVotacion::class, 'jornada_votacion_id');
+    }
+
+    public function grupo(): BelongsTo
+    {
+        return $this->belongsTo(GrupoVotacion::class, 'grupo_votacion_id');
+    }
+
+    public function ruta(): BelongsTo
+    {
+        return $this->belongsTo(RutaVotacion::class, 'ruta_votacion_id');
+    }
+
     protected static function booted(): void
     {
         static::updating(fn () => throw new \LogicException('La bitácora de votaciones es inmutable.'));

@@ -108,6 +108,8 @@ use App\Http\Controllers\Votaciones\RutaVotacionController;
 use App\Http\Controllers\Votaciones\OperacionVotacionController;
 use App\Http\Controllers\Votaciones\IncidenciaVotacionController;
 use App\Http\Controllers\Votaciones\RutaVialVotacionController;
+use App\Http\Controllers\Votaciones\PanelVotacionController;
+use App\Http\Controllers\Votaciones\ProcesoVotacionController;
 
 
 Route::get('/', function () {
@@ -201,6 +203,12 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
     Route::prefix('gestion/votaciones')->name('votaciones.')->group(function () {
         Route::prefix('admin')->name('admin.')->middleware('permission:votaciones.manage-jornadas')->group(function () {
+            Route::get('/', [PanelVotacionController::class, 'index'])->name('dashboard');
+            Route::get('/incidencias', [PanelVotacionController::class, 'incidencias'])->name('incidencias.index');
+            Route::get('/bitacora', [PanelVotacionController::class, 'bitacora'])->name('bitacora.index');
+            Route::get('/procesos', [ProcesoVotacionController::class, 'index'])->middleware('permission:votaciones.admin')->name('procesos.index');
+            Route::post('/procesos', [ProcesoVotacionController::class, 'store'])->middleware('permission:votaciones.admin')->name('procesos.store');
+            Route::put('/procesos/{proceso}', [ProcesoVotacionController::class, 'update'])->middleware('permission:votaciones.admin')->name('procesos.update');
             Route::get('/jornadas', [JornadaVotacionController::class, 'index'])->name('jornadas.index');
             Route::get('/jornadas/crear', [JornadaVotacionController::class, 'create'])->name('jornadas.create');
             Route::post('/jornadas', [JornadaVotacionController::class, 'store'])->name('jornadas.store');

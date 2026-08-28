@@ -20,9 +20,24 @@ use Illuminate\View\View;
 
 class JornadaVotacionController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        return view('votaciones.admin.index', ['jornadas' => JornadaVotacion::withCount('grupos')->latest('fecha')->paginate(20)]);
+        $query = JornadaVotacion::query()
+            ->with('procesos:id,codigo,nombre')
+            ->withCount([
+                'grupos',
+                'incidencias as incidencias_abiertas_count' => fn ($q) => $q->where('estado', 'abierta'),
+            ])
+            ->with(['grupos.rutas.visita']);
+
+        $query->when($request->filled('q'), function ($q) use ($request) {
+            $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $request->string('q')).'%';
+            $q->where(fn ($filter) => $filter->where('nombre', 'like', $term)->orWhere('slug', 'like', $term));
+        })->when($request->filled('estado'), fn ($q) => $q->where('estado', (string) $request->string('estado')));
+
+        return view('votaciones.admin.index', [
+            'jornadas' => $query->latest('fecha')->paginate(20)->withQueryString(),
+        ]);
     }
 
     public function create(): View
@@ -69,9 +84,21 @@ class JornadaVotacionController extends Controller
 
     public function show(JornadaVotacion $jornada): View
     {
-        $jornada->load(['procesos', 'grupos.encargado', 'grupos.miembros', 'grupos.rutas.establecimiento', 'grupos.rutas.visita', 'incidencias.grupo', 'bitacora.usuario']);
+        $jornada->load([
+            'procesos',
+            'grupos.encargado',
+            'grupos.miembros',
+            'grupos.rutas.establecimiento.admisionPerfil',
+            'grupos.rutas.visita',
+            'incidencias.grupo',
+            'incidencias.ruta.establecimiento',
+            'incidencias.reportadaPor',
+            'bitacora.usuario',
+            'bitacora.grupo',
+            'bitacora.ruta.establecimiento',
+        ]);
         $usuarios = User::permission('votaciones.operate-group')->orderBy('nombres')->orderBy('apellido_paterno')->get(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email']);
-        $establecimientos = Establecimiento::orderBy('comuna')->orderBy('nombre_establecimiento')->get(['id', 'rbd', 'nombre_establecimiento', 'comuna', 'latitud', 'longitud']);
+        $establecimientos = Establecimiento::with('admisionPerfil')->orderBy('comuna')->orderBy('nombre_establecimiento')->get(['id', 'rbd', 'nombre_establecimiento', 'comuna', 'latitud', 'longitud']);
         $coordenadasValidas = $establecimientos->mapWithKeys(fn ($establecimiento) => [
             $establecimiento->id => CoordenadasEstablecimiento::sonValidas($establecimiento->latitud, $establecimiento->longitud),
         ]);

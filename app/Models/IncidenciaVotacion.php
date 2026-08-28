@@ -30,6 +30,21 @@ class IncidenciaVotacion extends Model
         return $this->belongsTo(GrupoVotacion::class, 'grupo_votacion_id');
     }
 
+    public function ruta(): BelongsTo
+    {
+        return $this->belongsTo(RutaVotacion::class, 'ruta_votacion_id');
+    }
+
+    public function reportadaPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reportada_por');
+    }
+
+    public function resueltaPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'resuelta_por');
+    }
+
     public function getDescripcionAttribute(): string
     {
         return (string) $this->detalle_interno;

@@ -49,4 +49,9 @@ class GrupoVotacion extends Model
     {
         return $this->hasMany(RutaVotacion::class)->orderBy('orden');
     }
+
+    public function incidencias(): HasMany
+    {
+        return $this->hasMany(IncidenciaVotacion::class, 'grupo_votacion_id');
+    }
 }
