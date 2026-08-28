@@ -5,6 +5,18 @@
     $totalBloquesDotacion = collect($bloquesResumenDotacion)->sum(fn ($bloque) => (float) ($bloque['total'] ?? 0));
     $totalAutomaticas = collect($bloquesResumenDotacion)->sum(fn ($bloque) => (float) ($bloque['automaticas'] ?? 0));
     $totalDeclaradas = collect($bloquesResumenDotacion)->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
+    $cursosPlanesResumen = $cursos['resumen_cursos_planes'] ?? [
+        'grupos' => $cursos['grupos'] ?? [],
+        'rows' => $cursos['rows'] ?? [],
+        'combinados' => [],
+        'totales' => $cursos['totales'] ?? [],
+        'tiene_cursos_combinados' => false,
+    ];
+    $gruposCursosPlanes = $cursosPlanesResumen['grupos'] ?? [];
+    $rowsCursosPlanes = $cursosPlanesResumen['rows'] ?? [];
+    $cursosCombinadosResumen = collect($cursosPlanesResumen['combinados'] ?? []);
+    $totalesCursosPlanes = $cursosPlanesResumen['totales'] ?? ($cursos['totales'] ?? []);
+    $tieneCursosCombinadosResumen = (bool) ($cursosPlanesResumen['tiene_cursos_combinados'] ?? false);
     $estadoSteps = [
         ['label' => 'Cursos', 'detail' => ((int) ($resumen['cursos_total'] ?? 0) > 0) ? 'Cursos con matrícula' : 'Sin cursos', 'ok' => (int) ($resumen['cursos_total'] ?? 0) > 0, 'icon' => 'bi-grid-3x3-gap'],
         ['label' => 'Planes', 'detail' => ((float) ($resumen['horas_plan_total'] ?? 0) > 0) ? 'Plan asociado' : 'Sin horas plan', 'ok' => (float) ($resumen['horas_plan_total'] ?? 0) > 0, 'icon' => 'bi-journal-check'],
@@ -142,20 +154,25 @@
         <div>
             <div class="dotacion-eyebrow">Cursos y planes</div>
             <h2 class="h5 fw-bold mb-1">Cantidad de cursos por nivel</h2>
-            <div class="text-muted small">Horas plan, contrato equivalente y trabajo colaborativo PIE por nivel.</div>
+            <div class="text-muted small">Horas plan, contrato equivalente y trabajo colaborativo PIE por nivel y grupo combinado.</div>
         </div>
-        <span class="badge rounded-pill text-bg-light border">Contrato redondeado por curso</span>
+        <span class="badge rounded-pill {{ $tieneCursosCombinadosResumen ? 'text-bg-primary' : 'text-bg-light border' }}">
+            {{ $tieneCursosCombinadosResumen ? $cursosCombinadosResumen->count().' grupo(s) combinado(s)' : 'Contrato redondeado por curso' }}
+        </span>
     </div>
     <div class="card-body">
         <div class="row g-3 mb-3">
-            <div class="col-md-3"><div class="p-3 rounded-4 bg-light"><div class="small text-muted">Horas plan</div><div class="h4 fw-bold text-primary mb-0">{{ $fmt($cursos['totales']['horas'] ?? 0) }}</div></div></div>
-            <div class="col-md-3"><div class="p-3 rounded-4 bg-light"><div class="small text-muted">Contrato equivalente</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($cursos['totales']['horas_contrato_equivalente'] ?? 0) }}</div></div></div>
-            <div class="col-md-3"><div class="p-3 rounded-4 bg-light"><div class="small text-muted">Trabajo colab. PIE</div><div class="h4 fw-bold text-success mb-0">{{ $fmt($cursos['totales']['trabajo_colaborativo_pie'] ?? 0) }}</div></div></div>
-            <div class="col-md-3"><div class="p-3 rounded-4 bg-light"><div class="small text-muted">Contrato + colab.</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($cursos['totales']['contrato_mas_trabajo_colaborativo_pie'] ?? (($cursos['totales']['horas_contrato_equivalente'] ?? 0) + ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0))) }}</div></div></div>
+            <div class="col-md-3"><div class="p-3 rounded-4 bg-light"><div class="small text-muted">Horas plan</div><div class="h4 fw-bold text-primary mb-0">{{ $fmt($totalesCursosPlanes['horas'] ?? 0) }}</div></div></div>
+            <div class="col-md-3"><div class="p-3 rounded-4 bg-light"><div class="small text-muted">Contrato equivalente</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($totalesCursosPlanes['horas_contrato_equivalente'] ?? 0) }}</div></div></div>
+            <div class="col-md-3"><div class="p-3 rounded-4 bg-light"><div class="small text-muted">Trabajo colab. PIE</div><div class="h4 fw-bold text-success mb-0">{{ $fmt($totalesCursosPlanes['trabajo_colaborativo_pie'] ?? 0) }}</div></div></div>
+            <div class="col-md-3"><div class="p-3 rounded-4 bg-light"><div class="small text-muted">Contrato + colab.</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($totalesCursosPlanes['contrato_mas_trabajo_colaborativo_pie'] ?? 0) }}</div></div></div>
         </div>
         <div class="alert alert-info border-0 rounded-4 small">
             <i class="bi bi-info-circle"></i>
             Para NT1 y NT2 se aplica regla especial sobre las primeras 32 h del plan: Con JEC equivale a 50 h de contrato y Sin JEC equivale a 47 h. Solo en cursos con JEC se agregan las horas de libre disposición efectivamente asignadas a docentes distintos de una Educadora de Párvulos, con un máximo de 6 h plan por curso; su contrato equivalente se calcula mediante 65/35. El resto de cursos usa 65/35 o 60/40 según corresponda. Las 3 h de trabajo colaborativo PIE se muestran aquí y no se duplican en el bloque PIE.
+            @if ($tieneCursosCombinadosResumen)
+                <span class="d-block mt-1"><i class="bi bi-intersect"></i> Los cursos combinados se presentan en filas consolidadas: sus horas plan y contrato reemplazan la suma individual de los cursos integrantes; la matrícula, cantidad de cursos y trabajo colaborativo PIE se conservan.</span>
+            @endif
         </div>
         <div class="table-responsive border rounded-4">
             <table class="table table-sm align-middle mb-0">
@@ -174,13 +191,13 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($cursos['grupos'] as $grupoKey => $grupo)
+                    @foreach ($gruposCursosPlanes as $grupoKey => $grupo)
                         @continue((int) ($grupo['totales']['matricula'] ?? 0) <= 0)
                         <tr class="table-success">
-                            <th colspan="10">{{ $grupo['label'] }}</th>
+                            <th colspan="10">{{ $grupo['label'] }} @if ($tieneCursosCombinadosResumen)<span class="badge text-bg-light border ms-1">Cursos independientes</span>@endif</th>
                         </tr>
                         @foreach ($grupo['niveles'] as $nivelKey)
-                            @php($row = $cursos['rows'][$nivelKey] ?? null)
+                            @php($row = $rowsCursosPlanes[$nivelKey] ?? null)
                             @continue(! $row || (int) ($row['matricula'] ?? 0) <= 0)
                             <tr>
                                 <td class="fw-semibold">{{ $row['label'] }}</td>
@@ -201,7 +218,7 @@
                             </tr>
                         @endforeach
                         <tr class="fw-semibold">
-                            <td>Total {{ $grupo['label'] }}</td>
+                            <td>{{ $tieneCursosCombinadosResumen ? 'Subtotal' : 'Total' }} {{ $grupo['label'] }}{{ $tieneCursosCombinadosResumen ? ' independiente' : '' }}</td>
                             <td class="text-end">{{ number_format((int) ($grupo['totales']['matricula'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end">{{ number_format((int) ($grupo['totales']['cursos'] ?? 0), 0, ',', '.') }}</td>
                             <td></td>
@@ -212,21 +229,66 @@
                             <td class="text-end text-info">{{ $fmt($grupo['totales']['contrato_mas_trabajo_colaborativo_pie'] ?? (($grupo['totales']['horas_contrato_equivalente'] ?? 0) + ($grupo['totales']['trabajo_colaborativo_pie'] ?? 0))) }}</td>
                             <td></td>
                         </tr>
-                    @empty
+                    @endforeach
+                    @if ($cursosCombinadosResumen->isNotEmpty())
+                        <tr class="table-primary">
+                            <th colspan="10"><i class="bi bi-intersect"></i> Cursos combinados activos</th>
+                        </tr>
+                        @foreach ($cursosCombinadosResumen as $row)
+                            <tr class="table-primary-subtle">
+                                <td>
+                                    <div class="fw-semibold">{{ $row['label'] }}</div>
+                                    <div class="small text-muted">{{ $row['miembros_label'] }}</div>
+                                    <span class="badge text-bg-primary mt-1">Grupo combinado</span>
+                                </td>
+                                <td class="text-end">{{ number_format((int) ($row['matricula'] ?? 0), 0, ',', '.') }}</td>
+                                <td class="text-end">{{ number_format((int) ($row['cursos'] ?? 0), 0, ',', '.') }}</td>
+                                <td class="text-end"><span class="badge text-bg-primary">Consolidado</span></td>
+                                <td class="text-end fw-semibold text-primary">{{ $fmt($row['total_horas'] ?? 0) }}</td>
+                                <td class="text-center"><span class="badge dotacion-badge-soft">{{ $row['proporcion_docente_label'] ?? '—' }}</span><div class="small text-muted mt-1">Configuración del grupo</div></td>
+                                <td class="text-end fw-semibold text-info">{{ $fmt($row['total_horas_contrato_equivalente'] ?? 0) }}</td>
+                                <td class="text-end fw-semibold text-success">@if (($row['total_trabajo_colaborativo_pie'] ?? 0) > 0){{ $fmt($row['total_trabajo_colaborativo_pie']) }}@else<span class="text-muted">—</span>@endif</td>
+                                <td class="text-end fw-semibold text-info">{{ $fmt($row['total_contrato_mas_trabajo_colaborativo_pie'] ?? 0) }}</td>
+                                <td class="small">
+                                    <span class="text-primary d-block"><i class="bi bi-intersect"></i> Reemplaza la suma individual de {{ (int) ($row['cursos'] ?? 0) }} cursos.</span>
+                                    @if (($row['horas_plan_reduccion'] ?? 0) > 0)
+                                        <span class="text-success d-block">Reducción: {{ $fmt($row['horas_plan_reduccion']) }} h plan no duplicadas.</span>
+                                    @endif
+                                    @if (($row['horas_plan_refuerzo_ld_otro_docente'] ?? 0) > 0)
+                                        <span class="text-primary d-block">+{{ $fmt($row['horas_plan_refuerzo_ld_otro_docente']) }} h plan / +{{ $fmt($row['horas_contrato_refuerzo_ld_otro_docente'] ?? 0) }} h contrato por libre disposición.</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                        @php($totalesCombinados = $cursosPlanesResumen['totales_combinados'] ?? [])
+                        <tr class="fw-semibold table-primary-subtle">
+                            <td>Total cursos combinados</td>
+                            <td class="text-end">{{ number_format((int) ($totalesCombinados['matricula'] ?? 0), 0, ',', '.') }}</td>
+                            <td class="text-end">{{ number_format((int) ($totalesCombinados['cursos'] ?? 0), 0, ',', '.') }}</td>
+                            <td></td>
+                            <td class="text-end text-primary">{{ $fmt($totalesCombinados['horas'] ?? 0) }}</td>
+                            <td></td>
+                            <td class="text-end text-info">{{ $fmt($totalesCombinados['horas_contrato_equivalente'] ?? 0) }}</td>
+                            <td class="text-end text-success">{{ $fmt($totalesCombinados['trabajo_colaborativo_pie'] ?? 0) }}</td>
+                            <td class="text-end text-info">{{ $fmt($totalesCombinados['contrato_mas_trabajo_colaborativo_pie'] ?? 0) }}</td>
+                            <td></td>
+                        </tr>
+                    @endif
+                    @if (empty($gruposCursosPlanes) && $cursosCombinadosResumen->isEmpty())
                         <tr><td colspan="10" class="text-center text-muted py-4">No existen cursos con matrícula vigente para el año seleccionado.</td></tr>
-                    @endforelse
+                    @endif
                 </tbody>
                 <tfoot>
                     <tr class="table-light fw-bold">
                         <td>Total establecimiento</td>
-                        <td class="text-end">{{ number_format((int) ($cursos['totales']['matricula'] ?? 0), 0, ',', '.') }}</td>
-                        <td class="text-end">{{ number_format((int) ($cursos['totales']['cursos'] ?? 0), 0, ',', '.') }}</td>
+                        <td class="text-end">{{ number_format((int) ($totalesCursosPlanes['matricula'] ?? 0), 0, ',', '.') }}</td>
+                        <td class="text-end">{{ number_format((int) ($totalesCursosPlanes['cursos'] ?? 0), 0, ',', '.') }}</td>
                         <td></td>
-                        <td class="text-end text-primary">{{ $fmt($cursos['totales']['horas'] ?? 0) }}</td>
+                        <td class="text-end text-primary">{{ $fmt($totalesCursosPlanes['horas'] ?? 0) }}</td>
                         <td></td>
-                        <td class="text-end text-info">{{ $fmt($cursos['totales']['horas_contrato_equivalente'] ?? 0) }}</td>
-                        <td class="text-end text-success">{{ $fmt($cursos['totales']['trabajo_colaborativo_pie'] ?? 0) }}</td>
-                        <td class="text-end text-info">{{ $fmt($cursos['totales']['contrato_mas_trabajo_colaborativo_pie'] ?? (($cursos['totales']['horas_contrato_equivalente'] ?? 0) + ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0))) }}</td>
+                        <td class="text-end text-info">{{ $fmt($totalesCursosPlanes['horas_contrato_equivalente'] ?? 0) }}</td>
+                        <td class="text-end text-success">{{ $fmt($totalesCursosPlanes['trabajo_colaborativo_pie'] ?? 0) }}</td>
+                        <td class="text-end text-info">{{ $fmt($totalesCursosPlanes['contrato_mas_trabajo_colaborativo_pie'] ?? 0) }}</td>
                         <td></td>
                     </tr>
                 </tfoot>

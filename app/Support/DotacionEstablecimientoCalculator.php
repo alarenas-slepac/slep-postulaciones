@@ -113,6 +113,10 @@ class DotacionEstablecimientoCalculator
             $gruposCombinadosActivos,
             $horasContratoPlanAjustadas
         );
+        $cursosPlanesResumen = DotacionCursosPlanesResumenCalculator::build(
+            $cursos,
+            $gruposCombinadosActivos
+        );
 
         $reduccionCursosCombinados = max(0.0, round($horasPlanBrutas - $horasPlanAjustadas, 2));
         $reduccionContratoCursosCombinados = max(0.0, round($horasContratoPlanBrutas - $horasContratoPlanAjustadas, 2));
@@ -120,8 +124,13 @@ class DotacionEstablecimientoCalculator
         $cursos['totales']['horas_contrato_brutas_sin_combinar'] = $horasContratoPlanBrutas;
         $cursos['totales']['horas'] = $horasPlanAjustadas;
         $cursos['totales']['horas_contrato_equivalente'] = $horasContratoPlanAjustadas;
+        $cursos['totales']['contrato_mas_trabajo_colaborativo_pie'] = round(
+            $horasContratoPlanAjustadas + (float) ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0),
+            2
+        );
         $cursos['totales']['reduccion_cursos_combinados'] = $reduccionCursosCombinados;
         $cursos['totales']['reduccion_contrato_cursos_combinados'] = $reduccionContratoCursosCombinados;
+        $cursos['resumen_cursos_planes'] = $cursosPlanesResumen;
 
         $coberturaPlanPie = self::coberturaPlanYTrabajoColaborativo($asignacion);
         $desgloseContratoPieNecesario = self::desgloseContratoPieNecesario(

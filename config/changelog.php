@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.8.28.457' => [
+        'date' => '2026-08-28',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Cursos combinados en el resumen de cursos y planes',
+        'files' => [
+            'app/Support/DotacionCursosPlanesResumenCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'tests/Unit/DotacionCursosPlanesResumenCalculatorTest.php',
+        ],
+        'changes' => [
+            'Separa del resumen por nivel los cursos independientes y los grupos de cursos combinados activos para evitar duplicar sus horas.',
+            'Incorpora una fila consolidada por grupo combinado con cursos integrantes, matrícula, cantidad de cursos, horas plan, contrato equivalente y trabajo colaborativo PIE.',
+            'Mantiene las horas PIE por curso y los refuerzos de libre disposición NT, informando además la reducción de horas obtenida por la combinación.',
+            'Alinea los subtotales, el total del establecimiento y el informe PDF con las horas efectivas utilizadas por el cálculo de dotación.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.8.28.456' => [
         'date' => '2026-08-28',
         'module' => 'Dotación Establecimiento',
