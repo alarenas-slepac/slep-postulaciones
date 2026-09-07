@@ -177,173 +177,52 @@ class DocumentReviewController extends Controller
             });
         }
 
-        // -------------------------
-        // Orden: pendientes primero (más antiguo)
-        // -------------------------
-        $usersQuery->addSelect([
-            'oldest_pending_at' => UserDocument::query()
-                ->selectRaw('MIN(updated_at)')
-                ->whereColumn('user_id', 'users.id')
-                ->where('status', 'pending'),
-            'pending_count_all' => UserDocument::query()
-                ->selectRaw('COUNT(*)')
-                ->whereColumn('user_id', 'users.id')
-                ->where('status', 'pending'),
-        ]);
-
-        $usersQuery->orderByRaw('oldest_pending_at IS NULL, oldest_pending_at ASC');
-
-        // Fallback estable
-        if (Schema::hasColumn('users', 'apellido_paterno') && Schema::hasColumn('users', 'nombres')) {
-            $usersQuery->orderBy('apellido_paterno')->orderBy('apellido_materno')->orderBy('nombres');
-        } elseif (Schema::hasColumn('users', 'name')) {
-            $usersQuery->orderBy('name');
-        } elseif (Schema::hasColumn('users', 'full_name')) {
-            $usersQuery->orderBy('full_name');
-        } elseif (Schema::hasColumn('users', 'last_name') && Schema::hasColumn('users', 'first_name')) {
-            $usersQuery->orderBy('last_name')->orderBy('first_name');
-        } else {
-            $usersQuery->orderBy('email');
-        }
-
-        // Paginación
-        $perPage = (int) $request->query('per_page', 25);
-        if ($perPage < 10) $perPage = 10;
-        if ($perPage > 100) $perPage = 100;
-
-        $users = $usersQuery
-            ->with(['postulantProfile', 'documents:id,user_id,document_type_id,status,path,original_name,updated_at'])
-            ->paginate($perPage)
-            ->withQueryString();
-
+        // Un único criterio de visibilidad para ordenar, mostrar y contar.
+        // Solo se retienen métricas por usuario; los modelos se cargan por lotes.
         $types = DocumentType::query()
             ->orderByRaw('sort_order IS NULL, sort_order ASC')
-            ->orderBy('label')
-            ->get();
-
-        // Ventana para considerar "nuevo"
+            ->orderBy('label')->get();
         $freshSince = Carbon::now()->subHours(72);
+        $summaries = collect();
+        User::query()
+            ->whereHas('roles', fn ($rq) => $rq->whereIn('name', ['postulante', 'funcionario']))
+            ->select('users.id')
+            ->with(['postulantProfile.areaDesempeno', 'documents:id,user_id,document_type_id,status,updated_at,created_at'])
+            ->chunkById(500, function ($users) use ($summaries, $types, $freshSince) {
+                foreach ($users as $user) {
+                    $summaries->put($user->id, \App\Support\DocumentReviewSummary::forUser($user, $types, $freshSince));
+                }
+            });
 
-        // -------------------------
-        // Contadores globales (pendientes)
-        // -------------------------
-        $postulantsIds = User::query()
-            ->select('id');
+        // Desempate alfabético y por ID, estable incluso entre páginas.
+        foreach (['apellido_paterno', 'apellido_materno', 'nombres', 'name', 'full_name', 'last_name', 'first_name', 'email'] as $column) {
+            if (Schema::hasColumn('users', $column)) {
+                $usersQuery->orderBy($column);
+            }
+        }
+        $ids = \App\Support\DocumentReviewSummary::orderedIds(
+            $usersQuery->orderBy('users.id')->pluck('users.id'),
+            $summaries
+        );
+        $perPage = max(10, min(100, (int) $request->query('per_page', 25)));
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $pageIds = $ids->forPage($page, $perPage);
+        $users = User::query()->whereIn('id', $pageIds)->get()->keyBy('id');
+        $items = $pageIds->map(fn ($id) => ['user' => $users[$id]] + $summaries[$id])->values();
+        $rows = new LengthAwarePaginator($items, $ids->count(), $perPage, $page, [
+            'path' => $request->url(),
+            'query' => $request->query(),
+        ]);
 
-        // Mismo criterio que el listado: postulante o funcionario
-        $postulantsIds->whereHas('roles', function ($rq) {
-            $rq->whereIn('name', ['postulante', 'funcionario']);
-        });
+        // Los contadores siguen siendo globales, independientes del buscador.
+        $globalPendingCount = $summaries->sum('pending_count');
+        $globalNew72hCount = $summaries->sum('new_count');
+        $globalPendingPeopleCount = $summaries->where('pending_count', '>', 0)->count();
+        $globalNew72hPeopleCount = $summaries->where('new_count', '>', 0)->count();
+        $globalReviewedPeopleCount = $summaries->where('reviewed', true)->count();
 
-        // ✅ Pendientes globales (todos los pendientes del sistema para postulantes)
-        $globalPendingCount = UserDocument::query()
-            ->where('status', 'pending')
-            ->whereIn('user_id', $postulantsIds)
-            ->count();
-
-        // ✅ Pendientes nuevos globales (últimas 72 horas)
-        $globalNew72hCount = UserDocument::query()
-            ->where('status', 'pending')
-            ->where('updated_at', '>=', $freshSince)
-            ->whereIn('user_id', $postulantsIds)
-            ->count();
-
-        // -------------------------
-        // Contadores globales por PERSONAS (postulantes)
-        // -------------------------
-
-        // Subquery de postulantes (IDs)
-        $postulantsSub = User::query()->select('users.id');
-
-        $postulantsSub->whereHas('roles', function ($rq) {
-            $rq->whereIn('name', ['postulante', 'funcionario']);
-        });
-
-        // IMPORTANTÍSIMO: pasar a Query Builder base para usarlo en whereIn sin problemas
-        $postulantsSub = $postulantsSub->toBase();
-
-        // ✅ Personas con al menos 1 pendiente (global)
-        $globalPendingPeopleCount = UserDocument::query()
-            ->where('status', 'pending')
-            ->whereIn('user_id', $postulantsSub)
-            ->distinct()
-            ->count('user_id');
-
-        // ✅ Personas con al menos 1 pendiente nuevo (últimas 72h)
-        $globalNew72hPeopleCount = UserDocument::query()
-            ->where('status', 'pending')
-            ->where('updated_at', '>=', $freshSince)
-            ->whereIn('user_id', $postulantsSub)
-            ->distinct()
-            ->count('user_id');
-
-        // ✅ Personas revisadas: tienen documentos pero ninguno pendiente
-        // (equivale a: existe user_documents, y SUM(pending)=0)
-        $reviewedPeopleSub = UserDocument::query()
-            ->select('user_id')
-            ->whereIn('user_id', $postulantsSub)
-            ->groupBy('user_id')
-            ->havingRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) = 0");
-
-        $totalPostulants = User::query()
-            ->whereHas('roles', function ($rq) {
-                $rq->whereIn('name', ['postulante', 'funcionario']);
-            })
-            ->count();
-
-        $globalReviewedPeopleCount = $totalPostulants - $globalPendingPeopleCount;
-            
-        // Mantener el paginator pero transformando cada item en "row"
-        $rows = $users->through(function (User $u) use ($types, $freshSince) {
-            $required    = $types->filter(fn($t) => (new DocumentType($t->toArray()))->isRequiredForUser($u))->values();
-            $requiredIds = $required->pluck('id')->all();
-            $visibleIds  = DocumentRules::visibleTypesFromCatalog($u, $types)->pluck('id')->all();
-
-            $uploaded = $u->documents
-                ? $u->documents->whereIn('document_type_id', $requiredIds)->count()
-                : 0;
-
-            $total   = max(0, count($requiredIds));
-            $percent = $total > 0 ? (int) round($uploaded * 100 / $total) : 0;
-
-            // Nuevos pendientes (últimas 72h)
-            $newCount = $u->documents
-                ? $u->documents
-                    ->where('status', 'pending')
-                    ->whereIn('document_type_id', $visibleIds)
-                    ->filter(fn($d) => $d->updated_at && $d->updated_at->gte($freshSince))
-                    ->count()
-                : 0;
-
-            // Pendientes totales (no revisados), sin ventana de tiempo
-            $pendingCount = $u->documents
-                ? $u->documents
-                    ->where('status', 'pending')
-                    ->whereIn('document_type_id', $visibleIds)
-                    ->count()
-                : 0;
-
-            // Fecha del pendiente más antiguo (para mostrar)
-            $oldestPendingAt = $u->documents
-                ? $u->documents
-                    ->where('status', 'pending')
-                    ->whereIn('document_type_id', $visibleIds)
-                    ->min('updated_at')
-                : null;
-
-            return [
-                'user'              => $u,
-                'uploaded'          => $uploaded,
-                'total'             => $total,
-                'percent'           => $percent,
-                'new_count'         => $newCount,
-                'pending_count'     => $pendingCount,
-                'oldest_pending_at' => $oldestPendingAt,
-            ];
-        });
-
-        return view('admin.documents.index', compact('rows', 'globalPendingCount', 'globalNew72hCount','globalPendingPeopleCount','globalNew72hPeopleCount','globalReviewedPeopleCount', 'q', 'perPage'));
-	}
+        return view('admin.documents.index', compact('rows', 'globalPendingCount', 'globalNew72hCount', 'globalPendingPeopleCount', 'globalNew72hPeopleCount', 'globalReviewedPeopleCount', 'q', 'perPage'));
+    }
 
 
     public function show(UserDocument $document)

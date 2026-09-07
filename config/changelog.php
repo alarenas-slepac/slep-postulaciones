@@ -4110,8 +4110,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.7.467',
+    'current_version' => '2026.9.7.468',
     'entries' => [
+        [
+            'version' => '2026.9.7.468',
+            'title' => 'Documentos: prioridad por pendiente más antiguo',
+            'summary' => 'Ordena el resumen por usuario según sus documentos pendientes aplicables antes de paginar.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp'],
+            'items' => [
+                'Prioriza pendientes del más antiguo al más reciente, luego revisados y finalmente usuarios sin documentos aplicables cargados.',
+                'Unifica la visibilidad por perfil para el orden, las fechas y los contadores; conserva el buscador y desempates estables.',
+            ],
+            'published_at' => '2026-09-07 11:30:00',
+        ],
         [
             'version' => '2026.9.7.467',
             'title' => 'Dotación: sobredotación estructural sin Parvularia',
