@@ -4110,8 +4110,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.7.466',
+    'current_version' => '2026.9.7.467',
     'entries' => [
+        [
+            'version' => '2026.9.7.467',
+            'title' => 'Dotación: sobredotación estructural sin Parvularia',
+            'summary' => 'Excluye la necesidad y los contratos de Educación Parvularia del indicador estructural general.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'directivo_establecimiento'],
+            'items' => [
+                'Calcula Plan General + PIE más funciones normativas menos contrato aula general, sin compensar la brecha independiente de Parvularia.',
+                'Aplica el mismo criterio en resumen, detalle de sobredotación y PDF, conservando el análisis individual de horas sin asignación.',
+            ],
+            'published_at' => '2026-09-07 11:00:00',
+        ],
         [
             'version' => '2026.9.7.466',
             'title' => 'Dotación: contrato y sobredotación de Educación Parvularia',

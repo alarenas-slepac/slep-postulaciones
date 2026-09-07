@@ -70,14 +70,17 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
 
         $this->assertIsString($source);
         $this->assertIsString($pdfSource);
-        $this->assertStringContainsString('$contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie + $horasBloqueNormativas', $source);
-        $this->assertStringContainsString('- $horasContratoAula', $source);
+        $this->assertStringContainsString('($contratoPlanGeneralMasPie + $horasBloqueNormativas)', $source);
+        $this->assertStringNotContainsString('$contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie', $source);
+        $this->assertStringContainsString('- $horasContratoAulaGeneral,', $source);
         $this->assertStringContainsString('$resultadoGeneral = $resultadoBrecha($brechaDotacionGeneral);', $source);
         $this->assertStringContainsString('>Sobredotación estructural</div>', $source);
         $this->assertStringNotContainsString("data_get(\$sobredotacion ?? [], 'aula.resumen.horas_sobredotacion_total'", $source);
         $this->assertStringNotContainsString('Resultado contractual final para comparación.', $source);
         $this->assertStringNotContainsString('$resultadoFinal', $source);
-        $this->assertStringContainsString('$contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie + $horasBloqueNormativas', $pdfSource);
+        $this->assertStringContainsString('($contratoPlanGeneralMasPie + $horasBloqueNormativas)', $pdfSource);
+        $this->assertStringNotContainsString('$contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie', $pdfSource);
+        $this->assertStringContainsString('- $horasContratoAulaGeneral,', $pdfSource);
         $this->assertStringContainsString('<strong>Sobredotación estructural</strong>', $pdfSource);
         $this->assertStringNotContainsString('aula.resumen.horas_sobredotacion_total', $pdfSource);
         $this->assertStringNotContainsString('$resultadoEstructuralGeneral', $pdfSource);

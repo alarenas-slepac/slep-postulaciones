@@ -31,8 +31,8 @@
         $horasBloqueDeclaradas = (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? $desgloseContratoBloque['total_declaradas'] ?? 0);
         $horasBloqueDeclaradasAsignadas = (float) ($desgloseContratoBloque['total_declaradas_asignadas'] ?? 0);
         $brechaDotacionGeneral = round(
-            ($contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie + $horasBloqueNormativas)
-            - $horasContratoAula,
+            ($contratoPlanGeneralMasPie + $horasBloqueNormativas)
+            - $horasContratoAulaGeneral,
             2
         );
         $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));

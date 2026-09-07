@@ -173,9 +173,9 @@ class DotacionEstablecimientoCalculator
         );
         $horasContratoDocentePieExceso = max(0.0, round($horasContratoDocentePie - $horasContratoDocentes, 2));
         $brechasDotacion = self::brechasDotacionSeparadas(
-            $contratoPlanMasTrabajoColaborativoPie,
+            (float) $contratoPlanPorEnsenanza['contrato_general_mas_pie'],
             $horasDotacionFuncionesNormativas,
-            $horasContratoDocentesAula,
+            $contratoParvularia['horas_contrato_docentes_aula_general'],
             $horasContratoPieNecesarias,
             $horasContratoDocentePie
         );
