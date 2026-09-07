@@ -27,6 +27,10 @@
             </span>
         </div>
         {{-- Buscador / paginación server-side --}}
+        <p class="small text-muted mb-3">
+            Orden: pendientes de revisión del más antiguo al más reciente; luego usuarios con todos sus documentos revisados.
+            Los usuarios sin documentos aplicables cargados aparecen al final. La antigüedad corresponde a la última carga o actualización del documento pendiente.
+        </p>
         <form id="summarySearchForm" method="GET" action="{{ route('admin.documents.index') }}"
               class="d-flex justify-content-end gap-2 mb-3">
             <div class="input-group" style="max-width:420px;">
