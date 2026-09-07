@@ -83,6 +83,9 @@
         ?? max(0.0, round($contratoPlanMasPieRequerido - $contratoEducacionParvulariaMasPie, 2)));
     $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
     $horasContratoAula = (float) ($resumen['horas_contrato_docentes_aula'] ?? $horasContratoActuales);
+    $horasContratoParvularia = (float) ($resumen['horas_contrato_docentes_parvularia'] ?? 0);
+    $horasContratoAulaGeneral = (float) ($resumen['horas_contrato_docentes_aula_general'] ?? max(0, $horasContratoAula - $horasContratoParvularia));
+    $brechaDotacionParvularia = round($contratoEducacionParvulariaMasPie - $horasContratoParvularia, 2);
     $horasContratoDocentePie = (float) ($resumen['horas_contrato_docente_pie'] ?? 0);
     $horasContratoCoordinacionPie = (float) ($resumen['horas_contrato_docente_pie_coordinacion'] ?? 0);
     $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
@@ -106,6 +109,10 @@
         return ['label' => 'Dotación cuadrada', 'value' => '0', 'badge' => 'badge-blue', 'text' => 'primary'];
     };
     $resultadoGeneral = $resultadoBrecha($brechaDotacionGeneral);
+    $resultadoParvularia = $resultadoBrecha($brechaDotacionParvularia);
+    if ($brechaDotacionParvularia > 0) {
+        $resultadoParvularia['label'] = 'Horas por contratar';
+    }
     $resultadoPie = $resultadoBrecha($brechaDotacionPie);
     $resultadoFinal = $resultadoBrecha($brechaContratoFinal);
     $horasAulaAsignadas = (float) ($resumen['horas_aula_asignadas'] ?? $resumen['horas_aula_docentes'] ?? 0);
@@ -286,6 +293,16 @@
             <td>Horas de contrato PIE necesarias − horas contrato docente PIE.<br><span class="muted">{{ $fmt($horasContratoPieNecesarias) }} − {{ $fmt($horasContratoDocentePie) }}</span></td>
             <td class="text-right {{ $resultadoPie['text'] }}">{{ $resultadoPie['value'] }} - {{ $resultadoPie['label'] }}</td>
         </tr>
+        @if ($tieneEducacionParvularia || $horasContratoParvularia > 0)
+            <tr data-brecha="parvularia">
+                <td><strong>Sobredotación Parvularia</strong></td>
+                <td>Contrato Educación Parvularia + PIE − Horas contrato parvularia.<br>
+                    {{ $fmt($contratoEducacionParvulariaMasPie) }} − {{ $fmt($horasContratoParvularia) }}
+                    @if ($brechaDotacionParvularia > 0)<br>Se requiere contratación adicional de Educadora de Párvulos por {{ $fmt($brechaDotacionParvularia) }} horas.@endif
+                </td>
+                <td class="text-right {{ $resultadoParvularia['text'] }}">{{ $fmt(abs($brechaDotacionParvularia)) }} - {{ $resultadoParvularia['label'] }}</td>
+            </tr>
+        @endif
         <tr class="total-row">
             <td>Resultado contractual final</td>
             <td>Se mantiene como referencia para comparar con las dos brechas separadas.</td>
@@ -299,6 +316,7 @@
     <thead>
         <tr>
             <th>Contrato aula</th>
+            @if ($tieneEducacionParvularia || $horasContratoParvularia > 0)<th>Horas contrato parvularia</th>@endif
             <th>Coordinación PIE asignada</th>
             <th>Bolsa Educadoras Diferenciales asignada</th>
             <th>Contrato docente PIE</th>
@@ -307,7 +325,8 @@
     </thead>
     <tbody>
         <tr>
-            <td class="text-right">{{ $fmt($horasContratoAula) }}</td>
+            <td class="text-right">{{ $fmt($horasContratoAulaGeneral) }}</td>
+            @if ($tieneEducacionParvularia || $horasContratoParvularia > 0)<td class="text-right">{{ $fmt($horasContratoParvularia) }}</td>@endif
             <td class="text-right">{{ $fmt($horasContratoCoordinacionPie) }}</td>
             <td class="text-right">{{ $fmt($horasContratoEducadorasDiferenciales) }}</td>
             <td class="text-right primary">{{ $fmt($horasContratoDocentePie) }}</td>
@@ -498,9 +517,16 @@
         </tr>
         <tr>
             <td>Horas contrato aula</td>
-            <td class="text-right">{{ $fmt($horasContratoAula) }}</td>
-            <td>Base contractual docente vigente menos las horas asignadas a Coordinación PIE y Bolsa Educadoras Diferenciales PIE.</td>
+            <td class="text-right">{{ $fmt($horasContratoAulaGeneral) }}</td>
+            <td>Base contractual docente vigente descontando PIE y el contrato de Educadoras de Párvulos.</td>
         </tr>
+        @if ($tieneEducacionParvularia || $horasContratoParvularia > 0)
+            <tr>
+                <td>Horas contrato parvularia</td>
+                <td class="text-right">{{ $fmt($horasContratoParvularia) }}</td>
+                <td>Suma de contratos vigentes de Educadoras de Párvulos, según título declarado.</td>
+            </tr>
+        @endif
         <tr>
             <td>Horas contrato docente PIE</td>
             <td class="text-right primary">{{ $fmt($horasContratoDocentePie) }}</td>

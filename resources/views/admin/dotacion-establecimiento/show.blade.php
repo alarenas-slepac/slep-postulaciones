@@ -6,6 +6,8 @@
         $activeTab = $tab ?? 'resumen';
         $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
         $horasContratoAula = (float) ($resumen['horas_contrato_docentes_aula'] ?? $horasContratoActuales);
+        $horasContratoParvularia = (float) ($resumen['horas_contrato_docentes_parvularia'] ?? 0);
+        $horasContratoAulaGeneral = (float) ($resumen['horas_contrato_docentes_aula_general'] ?? max(0, $horasContratoAula - $horasContratoParvularia));
         $horasContratoDocentePie = (float) ($resumen['horas_contrato_docente_pie'] ?? 0);
         $horasContratoCoordinacionPie = (float) ($resumen['horas_contrato_docente_pie_coordinacion'] ?? 0);
         $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
@@ -79,7 +81,10 @@
             ['label' => 'Otras funciones no normativas', 'value' => $fmt($horasBloqueDeclaradasAsignadas).' / '.$fmt($horasBloqueDeclaradas), 'hint' => 'Asignadas / declaradas por el establecimiento.', 'tone' => 'secondary', 'icon' => 'bi-building-add'],
             ['label' => 'Horas contrato PIE necesarias', 'value' => $fmt($horasContratoPieNecesariasAsignadas).' / '.$fmt($horasContratoPieNecesarias), 'hint' => 'Asignadas / necesarias para Coordinación PIE y Educadoras Diferenciales.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
             ['label' => 'Horas contrato docentes', 'value' => $fmt($horasContratoActuales), 'hint' => 'Horas contratadas vigentes.', 'tone' => 'dark', 'icon' => 'bi-briefcase'],
-            ['label' => 'Horas contrato aula', 'value' => $fmt($horasContratoAula), 'hint' => 'Contrato vigente descontando las asignaciones docentes PIE.', 'tone' => 'primary', 'icon' => 'bi-easel2'],
+            ['label' => 'Horas contrato aula', 'value' => $fmt($horasContratoAulaGeneral), 'hint' => 'Contrato vigente descontando PIE y el contrato de Educadoras de Párvulos.', 'tone' => 'primary', 'icon' => 'bi-easel2'],
+            ...(($tieneEducacionParvularia || $horasContratoParvularia > 0) ? [
+                ['label' => 'Horas contrato parvularia', 'value' => $fmt($horasContratoParvularia), 'hint' => 'Suma de contratos vigentes de Educadoras de Párvulos, según título declarado.', 'tone' => 'info', 'icon' => 'bi-people-fill'],
+            ] : []),
             ['label' => 'Horas contrato docente PIE', 'value' => $fmt($horasContratoDocentePie), 'hint' => 'Coordinación PIE: '.$fmt($horasContratoCoordinacionPie).' · Bolsa Educ. Diferenciales: '.$fmt($horasContratoEducadorasDiferenciales).'.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
         ];
     @endphp
@@ -169,7 +174,7 @@
         @endforeach
         <div class="col-12">
             <div class="row g-3">
-                <div class="col-lg-6">
+                <div class="{{ ($tieneEducacionParvularia || $horasContratoParvularia > 0) ? 'col-lg-4' : 'col-lg-6' }}">
                     <div class="card dotacion-kpi border-0 border-{{ $resultadoGeneral['tone'] }}">
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
@@ -183,7 +188,12 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-6">
+                @if ($tieneEducacionParvularia || $horasContratoParvularia > 0)
+                    <div class="col-lg-4">
+                        @include('admin.dotacion-establecimiento.partials._brecha_parvularia')
+                    </div>
+                @endif
+                <div class="{{ ($tieneEducacionParvularia || $horasContratoParvularia > 0) ? 'col-lg-4' : 'col-lg-6' }}">
                     <div class="card dotacion-kpi border-0 border-{{ $resultadoPie['tone'] }}">
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between gap-2 mb-2">

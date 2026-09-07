@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.7.465',
+    'current_version' => '2026.9.7.466',
     'entries' => [
+        [
+            'version' => '2026.9.7.466',
+            'title' => 'Dotación: contrato y sobredotación de Educación Parvularia',
+            'summary' => 'Separa las horas contratadas de Educadoras de Párvulos del indicador de contrato aula y muestra su brecha específica.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'directivo_establecimiento'],
+            'items' => [
+                'Suma los contratos vigentes de las Educadoras de Párvulos identificadas por su título declarado, respetando las exclusiones de dotación.',
+                'Agrega Sobredotación Parvularia: necesidad de Parvularia + PIE menos contrato parvularia; muestra excedentes absolutos en rojo y horas por contratar si hay déficit.',
+                'Refleja la separación en el PDF y conserva la comparación estructural global con el total de contrato aula.',
+            ],
+            'published_at' => '2026-09-07 10:30:00',
+        ],
         [
             'version' => '2026.9.7.465',
             'title' => 'Dotación: libre disposición de otros docentes en Plan General',
