@@ -16,6 +16,7 @@
     $rowsCursosPlanes = $cursosPlanesResumen['rows'] ?? [];
     $cursosCombinadosResumen = collect($cursosPlanesResumen['combinados'] ?? []);
     $totalesCursosPlanes = $cursosPlanesResumen['totales'] ?? ($cursos['totales'] ?? []);
+    $refuerzoPlanGeneral = $cursosPlanesResumen['refuerzo_plan_general'] ?? [];
     $tieneCursosCombinadosResumen = (bool) ($cursosPlanesResumen['tiene_cursos_combinados'] ?? false);
     $estadoSteps = [
         ['label' => 'Cursos', 'detail' => ((int) ($resumen['cursos_total'] ?? 0) > 0) ? 'Cursos con matrícula' : 'Sin cursos', 'ok' => (int) ($resumen['cursos_total'] ?? 0) > 0, 'icon' => 'bi-grid-3x3-gap'],
@@ -169,7 +170,7 @@
         </div>
         <div class="alert alert-info border-0 rounded-4 small">
             <i class="bi bi-info-circle"></i>
-            Para NT1 y NT2 se aplica regla especial sobre las primeras 32 h del plan: Con JEC equivale a 50 h de contrato y Sin JEC equivale a 47 h. Solo en cursos con JEC se agregan las horas de libre disposición efectivamente asignadas a docentes distintos de una Educadora de Párvulos, con un máximo de 6 h plan por curso; su contrato equivalente se calcula mediante 65/35. El resto de cursos usa 65/35 o 60/40 según corresponda. Las 3 h de trabajo colaborativo PIE se muestran aquí y no se duplican en el bloque PIE.
+            Para NT1 y NT2 se aplica regla especial sobre las primeras 32 h del plan: Con JEC equivale a 50 h de contrato y Sin JEC equivale a 47 h. Las horas del plan sobre esa base se convierten mediante 65/35. En cursos con JEC, las horas adicionales de libre disposición asignadas a docentes distintos de una Educadora de Párvulos se contabilizan por separado en Contrato Plan General + PIE, con un máximo de 6 h plan por curso; su contrato equivalente se calcula mediante 65/35. El resto de cursos usa 65/35 o 60/40 según corresponda. Las 3 h de trabajo colaborativo PIE permanecen en el curso y no se duplican en el bloque PIE.
             @if ($tieneCursosCombinadosResumen)
                 <span class="d-block mt-1"><i class="bi bi-intersect"></i> Los cursos combinados se presentan en filas consolidadas: sus horas plan y contrato reemplazan la suma individual de los cursos integrantes; el contrato equivalente se redondea una sola vez hacia arriba después de consolidar el grupo. El trabajo colaborativo PIE también se consolida en una sola necesidad de 3 h por grupo.</span>
             @endif
@@ -211,7 +212,7 @@
                                 <td class="text-end fw-semibold text-info">{{ $fmt($row['total_contrato_mas_trabajo_colaborativo_pie'] ?? (($row['total_horas_contrato_equivalente'] ?? 0) + ($row['total_trabajo_colaborativo_pie'] ?? 0))) }}</td>
                                 <td class="small">
                                     @if ((int) ($row['cursos_refuerzo_ld_otro_docente'] ?? 0) > 0)
-                                        <span class="text-primary d-block"><i class="bi bi-person-plus"></i> {{ (int) $row['cursos_refuerzo_ld_otro_docente'] }} curso(s) JEC: +{{ $fmt($row['horas_plan_refuerzo_ld_otro_docente'] ?? 0) }} h plan / +{{ $fmt($row['horas_contrato_refuerzo_ld_otro_docente'] ?? 0) }} h contrato por libre disposición</span>
+                                        <span class="text-primary d-block"><i class="bi bi-person-plus"></i> LD de otro docente: {{ $fmt($row['horas_contrato_refuerzo_ld_otro_docente'] ?? 0) }} h de contrato contabilizadas en Plan General, fuera de esta fila.</span>
                                     @endif
                                     @if ((int) $row['sin_horas_plan'] > 0)<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> {{ (int) $row['sin_horas_plan'] }} curso(s) sin horas de plan</span>@elseif ((int) $row['cursos'] > 0)<span class="text-muted">Plan asociado</span>@else<span class="text-muted">—</span>@endif
                                 </td>
@@ -265,7 +266,7 @@
                                         <span class="text-success d-block">Reducción: {{ $fmt($row['horas_plan_reduccion']) }} h plan no duplicadas.</span>
                                     @endif
                                     @if (($row['horas_plan_refuerzo_ld_otro_docente'] ?? 0) > 0)
-                                        <span class="text-primary d-block">+{{ $fmt($row['horas_plan_refuerzo_ld_otro_docente']) }} h plan / +{{ $fmt($row['horas_contrato_refuerzo_ld_otro_docente'] ?? 0) }} h contrato por libre disposición.</span>
+                                        <span class="text-primary d-block">LD de otro docente: {{ $fmt($row['horas_contrato_refuerzo_ld_otro_docente'] ?? 0) }} h de contrato contabilizadas en Plan General, fuera de este grupo.</span>
                                     @endif
                                 </td>
                             </tr>
@@ -282,6 +283,20 @@
                             <td class="text-end text-success">{{ $fmt($totalesCombinados['trabajo_colaborativo_pie'] ?? 0) }}</td>
                             <td class="text-end text-info">{{ $fmt($totalesCombinados['contrato_mas_trabajo_colaborativo_pie'] ?? 0) }}</td>
                             <td></td>
+                        </tr>
+                    @endif
+                    @if (($refuerzoPlanGeneral['horas'] ?? 0) > 0)
+                        <tr class="table-info">
+                            <td class="fw-semibold">Plan General · Libre disposición NT1/NT2 de otros docentes</td>
+                            <td class="text-end">—</td>
+                            <td class="text-end">—</td>
+                            <td class="text-end">—</td>
+                            <td class="text-end fw-semibold">{{ $fmt($refuerzoPlanGeneral['horas']) }}</td>
+                            <td class="text-center">65/35</td>
+                            <td class="text-end fw-semibold">{{ $fmt($refuerzoPlanGeneral['horas_contrato_equivalente']) }}</td>
+                            <td class="text-end">—</td>
+                            <td class="text-end fw-semibold">{{ $fmt($refuerzoPlanGeneral['contrato_mas_trabajo_colaborativo_pie']) }}</td>
+                            <td class="small">Incluido en Contrato Plan General + PIE. No agrega cursos ni horas de colaboración PIE.</td>
                         </tr>
                     @endif
                     @if (empty($gruposCursosPlanes) && $cursosCombinadosResumen->isEmpty())

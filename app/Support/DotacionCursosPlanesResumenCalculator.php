@@ -12,6 +12,14 @@ class DotacionCursosPlanesResumenCalculator
      */
     public static function build(array $cursos, Collection|array $gruposCombinados): array
     {
+        // Las horas adicionales de otro docente se presentan en Plan General,
+        // separadas del plan base y del PIE de los cursos NT1/NT2.
+        foreach (($cursos['rows'] ?? []) as $nivelKey => $row) {
+            $cursos['rows'][$nivelKey]['detalles'] = collect($row['detalles'] ?? [])
+                ->map(fn ($detalle) => self::detalleSinRefuerzo($detalle))
+                ->all();
+        }
+
         $gruposCombinados = collect($gruposCombinados)
             ->where('activo', true)
             ->values();
@@ -90,11 +98,11 @@ class DotacionCursosPlanesResumenCalculator
                     fn ($detalle) => (float) data_get($detalle, 'horas_contrato_refuerzo_ld_otro_docente', 0)
                 );
                 $horasPlan = round(
-                    (float) data_get($grupo, 'totales.horas_requeridas', 0) + $horasPlanRefuerzo,
+                    (float) data_get($grupo, 'totales.horas_requeridas', 0),
                     2
                 );
                 $horasContrato = round(
-                    (float) data_get($grupo, 'totales.horas_contrato', 0) + $horasContratoRefuerzo,
+                    (float) data_get($grupo, 'totales.horas_contrato', 0),
                     2
                 );
                 $trabajoColaborativoPie = round((float) ($detallesGrupo->max(
@@ -132,7 +140,19 @@ class DotacionCursosPlanesResumenCalculator
 
         $totalesIndependientes = self::sumRows(collect($rows));
         $totalesCombinados = self::sumRows($combinados);
-        $totales = self::sumTotals($totalesIndependientes, $totalesCombinados);
+        $contratoRefuerzo = round((float) $detalles->sum('horas_contrato_refuerzo_ld_otro_docente'), 2);
+        $refuerzoPlanGeneral = [
+            'matricula' => 0,
+            'cursos' => 0,
+            'horas' => round((float) $detalles->sum('horas_plan_refuerzo_ld_otro_docente'), 2),
+            'horas_contrato_equivalente' => $contratoRefuerzo,
+            'trabajo_colaborativo_pie' => 0.0,
+            'contrato_mas_trabajo_colaborativo_pie' => $contratoRefuerzo,
+        ];
+        $totales = self::sumTotals(
+            self::sumTotals($totalesIndependientes, $totalesCombinados),
+            $refuerzoPlanGeneral
+        );
 
         return [
             'grupos' => $grupos,
@@ -140,9 +160,29 @@ class DotacionCursosPlanesResumenCalculator
             'combinados' => $combinados,
             'totales_independientes' => $totalesIndependientes,
             'totales_combinados' => $totalesCombinados,
+            'refuerzo_plan_general' => $refuerzoPlanGeneral,
             'totales' => $totales,
             'tiene_cursos_combinados' => $combinados->isNotEmpty(),
         ];
+    }
+
+    private static function detalleSinRefuerzo(array $detalle): array
+    {
+        $horasRefuerzo = (float) ($detalle['horas_plan_refuerzo_ld_otro_docente'] ?? 0);
+        $contratoRefuerzo = (float) ($detalle['horas_contrato_refuerzo_ld_otro_docente'] ?? 0);
+        $detalle['horas'] = round(max(0.0, (float) ($detalle['horas'] ?? 0) - $horasRefuerzo), 2);
+        $detalle['horas_contrato_equivalente_redondeado'] = round(max(
+            0.0,
+            (float) ($detalle['horas_contrato_equivalente_redondeado'] ?? 0) - $contratoRefuerzo
+        ), 2);
+        $detalle['proporcion_docente_label'] = str_replace(
+            ' + 65/35 LD otro docente', '', (string) ($detalle['proporcion_docente_label'] ?? '')
+        );
+        $detalle['origen_proporcion_label'] = str_replace(
+            ' + libre disposición asignada', '', (string) ($detalle['origen_proporcion_label'] ?? '')
+        );
+
+        return $detalle;
     }
 
     private static function rowIndependiente(array $row, Collection $detalles): array

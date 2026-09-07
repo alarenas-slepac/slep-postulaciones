@@ -54,7 +54,7 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
         $this->assertSame(53.0, $resultado['contrato_general_mas_pie']);
     }
 
-    public function test_no_duplica_el_refuerzo_nt_ya_incluido_en_el_contrato_equivalente_del_curso(): void
+    public function test_traslada_a_general_el_refuerzo_nt_del_grupo_combinado(): void
     {
         $cursos = $this->cursos(53, 53, 3, 3);
 
@@ -64,10 +64,54 @@ class DotacionContratoEnsenanzaCalculatorTest extends TestCase
             136
         );
 
-        $this->assertSame(56.0, $resultado['contrato_plan_parvularia']);
-        $this->assertSame(80.0, $resultado['contrato_plan_general']);
-        $this->assertSame(59.0, $resultado['contrato_parvularia_mas_pie']);
-        $this->assertSame(83.0, $resultado['contrato_general_mas_pie']);
+        $this->assertSame(50.0, $resultado['contrato_plan_parvularia']);
+        $this->assertSame(86.0, $resultado['contrato_plan_general']);
+        $this->assertSame(53.0, $resultado['contrato_parvularia_mas_pie']);
+        $this->assertSame(89.0, $resultado['contrato_general_mas_pie']);
+    }
+
+    public function test_traslada_las_catorce_horas_a_general_y_conserva_el_pie_en_parvularia(): void
+    {
+        $resultado = DotacionContratoEnsenanzaCalculator::split($this->cursos(64, 64, 7, 7), [], 208);
+
+        $this->assertSame(114.0, $resultado['contrato_plan_parvularia']);
+        $this->assertSame(94.0, $resultado['contrato_plan_general']);
+        $this->assertSame(120.0, $resultado['contrato_parvularia_mas_pie']);
+        $this->assertSame(97.0, $resultado['contrato_general_mas_pie']);
+        $this->assertSame(217.0, $resultado['contrato_parvularia_mas_pie'] + $resultado['contrato_general_mas_pie']);
+    }
+
+    public function test_traslada_refuerzos_de_cursos_independientes_y_combinados_sin_restar_dos_veces(): void
+    {
+        $cursos = $this->cursos(64, 64, 7, 7);
+        $independiente = $cursos['rows']['NT1']['detalles'][0];
+        $independiente['establecimiento_curso_id'] = 3;
+        $cursos['rows']['NT1']['detalles'][] = $independiente;
+        $cursos['grupos']['parvularia']['totales']['horas_contrato_equivalente'] += 64;
+        $cursos['grupos']['parvularia']['totales']['trabajo_colaborativo_pie'] += 3;
+        $cursos['totales']['trabajo_colaborativo_pie'] += 3;
+        $resultado = DotacionContratoEnsenanzaCalculator::split(
+            $cursos,
+            [$this->grupoCombinado([1, 2], 57, 'nt_jec')],
+            215
+        );
+
+        $this->assertSame(114.0, $resultado['contrato_plan_parvularia']);
+        $this->assertSame(101.0, $resultado['contrato_plan_general']);
+        $this->assertSame(6.0, $resultado['trabajo_colaborativo_pie_parvularia']);
+    }
+
+    public function test_establecimiento_solo_parvularia_puede_tener_contrato_plan_general_por_refuerzo(): void
+    {
+        $cursos = $this->cursos(64, 64, 7, 7);
+        unset($cursos['grupos']['basica'], $cursos['rows']['1B']);
+        $cursos['totales']['trabajo_colaborativo_pie'] = 6;
+
+        $resultado = DotacionContratoEnsenanzaCalculator::split($cursos, [], 128);
+
+        $this->assertSame(120.0, $resultado['contrato_parvularia_mas_pie']);
+        $this->assertSame(14.0, $resultado['contrato_general_mas_pie']);
+        $this->assertSame(0.0, $resultado['trabajo_colaborativo_pie_general']);
     }
 
     private function cursos(
