@@ -4,6 +4,12 @@
     <div class="container">
         <div class="d-flex align-items-center justify-content-between mb-3">
             <h3 class="m-0">Documentos — Resumen por Usuario</h3>
+            @can('viewAny', \App\Models\UserDocument::class)
+                <a class="btn btn-success" href="{{ route('admin.documents.index', ['export' => 'pending-xlsx']) }}"
+                   title="Exporta todos los pendientes aplicables, sin limitar a la búsqueda ni a la página actual; una fila por RUT">
+                    <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Exportar todos los pendientes
+                </a>
+            @endcan
         </div>
         {{-- Resumen global --}}
         <div class="d-flex flex-wrap gap-2 mb-3">
