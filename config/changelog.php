@@ -4110,8 +4110,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.7.469',
+    'current_version' => '2026.9.7.470',
     'entries' => [
+        [
+            'version' => '2026.9.7.470',
+            'title' => 'Dotación: indicadores organizados por filas',
+            'summary' => 'Reordena las tarjetas del resumen en datos generales, necesidades, contratos y sobredotación.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'directivo_establecimiento'],
+            'items' => [
+                'Distribuye los indicadores en filas independientes de 3, 4, 5 y 3 tarjetas cuando existe Parvularia, con adaptación a pantallas pequeñas.',
+                'Renombra las tarjetas a Sobredotación plan de estudio + funciones normativas y Sobredotación PIE, sin cambiar cálculos ni valores.',
+            ],
+            'published_at' => '2026-09-07 12:30:00',
+        ],
         [
             'version' => '2026.9.7.469',
             'title' => 'Documentos: exportación de pendientes consolidada por RUT',

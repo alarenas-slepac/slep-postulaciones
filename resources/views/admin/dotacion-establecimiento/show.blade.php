@@ -67,10 +67,12 @@
         if ((float) ($desgloseContratoBloque['otras_funciones_pie'] ?? 0) > 0) {
             $desgloseDeclaradoItems[] = ['label' => 'Otras funciones PIE declaradas', 'assigned' => $desgloseContratoBloque['otras_funciones_pie_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['otras_funciones_pie'], 'tone' => 'info', 'icon' => 'bi-universal-access'];
         }
-        $kpis = [
+        $kpisGenerales = [
             ['label' => 'Matrícula', 'value' => number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.'), 'hint' => 'Estudiantes con matrícula vigente.', 'tone' => 'dark', 'icon' => 'bi-people'],
             ['label' => 'Cursos', 'value' => number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.'), 'hint' => 'Cursos con matrícula.', 'tone' => 'primary', 'icon' => 'bi-grid-3x3-gap'],
             ['label' => 'Docentes', 'value' => number_format((int) ($resumen['docentes_total'] ?? 0), 0, ',', '.'), 'hint' => 'Base contractual vigente.', 'tone' => 'success', 'icon' => 'bi-person-workspace'],
+        ];
+        $kpisNecesidades = [
             ...($tieneEducacionParvularia ? [
                 ['label' => 'Contrato Educación Parvularia + PIE', 'value' => $fmt($contratoEducacionParvulariaMasPie), 'hint' => 'Necesidad para cubrir NT1 y NT2; los grupos combinados reemplazan la suma individual y aplican la regla especial correspondiente. Las horas adicionales de otro docente se contabilizan en Plan General.', 'tone' => 'info', 'icon' => 'bi-people-fill'],
                 ['label' => 'Contrato Plan General + PIE', 'value' => $fmt($contratoPlanGeneralMasPie), 'hint' => 'Necesidad para cubrir los demás niveles; los grupos combinados reemplazan la suma individual y aplican 65/35 o 60/40. Incluye las horas adicionales de libre disposición de otros docentes en NT1/NT2.', 'tone' => 'primary', 'icon' => 'bi-plus-square'],
@@ -79,6 +81,8 @@
             ]),
             ['label' => 'Funciones directivas / técnico pedagógicas y planes normativos', 'value' => $fmt($horasBloqueNormativas), 'hint' => 'Horas calculadas por normativa.', 'tone' => 'warning', 'icon' => 'bi-shield-check'],
             ['label' => 'Otras funciones no normativas', 'value' => $fmt($horasBloqueDeclaradasAsignadas).' / '.$fmt($horasBloqueDeclaradas), 'hint' => 'Asignadas / declaradas por el establecimiento.', 'tone' => 'secondary', 'icon' => 'bi-building-add'],
+        ];
+        $kpisContratos = [
             ['label' => 'Horas contrato PIE necesarias', 'value' => $fmt($horasContratoPieNecesariasAsignadas).' / '.$fmt($horasContratoPieNecesarias), 'hint' => 'Asignadas / necesarias para Coordinación PIE y Educadoras Diferenciales.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
             ['label' => 'Horas contrato docentes', 'value' => $fmt($horasContratoActuales), 'hint' => 'Horas contratadas vigentes.', 'tone' => 'dark', 'icon' => 'bi-briefcase'],
             ['label' => 'Horas contrato aula', 'value' => $fmt($horasContratoAulaGeneral), 'hint' => 'Contrato vigente descontando PIE y el contrato de Educadoras de Párvulos.', 'tone' => 'primary', 'icon' => 'bi-easel2'],
@@ -87,13 +91,18 @@
             ] : []),
             ['label' => 'Horas contrato docente PIE', 'value' => $fmt($horasContratoDocentePie), 'hint' => 'Coordinación PIE: '.$fmt($horasContratoCoordinacionPie).' · Bolsa Educ. Diferenciales: '.$fmt($horasContratoEducadorasDiferenciales).'.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
         ];
+        $kpiFilas = [
+            'generales' => ['items' => $kpisGenerales, 'columns' => 'row-cols-md-3'],
+            'necesidades' => ['items' => $kpisNecesidades, 'columns' => 'row-cols-md-2 row-cols-xl-'.count($kpisNecesidades)],
+            'contratos' => ['items' => $kpisContratos, 'columns' => 'row-cols-md-2 row-cols-xl-'.count($kpisContratos)],
+        ];
     @endphp
 
     <style>
         .dotacion-hero { background: linear-gradient(135deg, #ffffff 0%, #f7fbff 55%, #eef5ff 100%); border: 1px solid #dbe8fb; border-radius: 1.25rem; box-shadow: 0 10px 30px rgba(15, 23, 42, .06); }
         .dotacion-icon { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: #0d6efd; color: #fff; box-shadow: 0 10px 20px rgba(13, 110, 253, .22); }
         .dotacion-kpi { border: 1px solid #e5ecf6; border-radius: 1rem; box-shadow: 0 8px 20px rgba(15, 23, 42, .045); height: 100%; }
-        .dotacion-kpi .kpi-icon { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: .85rem; background: #f2f6ff; }
+        .dotacion-kpi .kpi-icon { width: 34px; height: 34px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: .85rem; background: #f2f6ff; }
         .dotacion-breakdown { background: linear-gradient(135deg, #fffaf0 0%, #ffffff 55%, #f8fbff 100%); }
         .dotacion-breakdown-item { border: 1px solid #e5ecf6; border-radius: .85rem; background: rgba(255, 255, 255, .9); height: 100%; }
         .dotacion-section { border: 1px solid #dce7f5; border-radius: 1rem; box-shadow: 0 8px 20px rgba(15, 23, 42, .045); overflow: hidden; }
@@ -157,9 +166,11 @@
 
     @include('admin.dotacion-establecimiento.partials._proporcion_excepcion')
 
-    <div class="row g-3 mb-3">
-        @foreach ($kpis as $kpi)
-            <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
+    {{-- Inicio de filas de indicadores --}}
+    @foreach ($kpiFilas as $filaKey => $fila)
+        <div class="row row-cols-1 {{ $fila['columns'] }} g-3 mb-3" data-kpi-row="{{ $filaKey }}">
+        @foreach ($fila['items'] as $kpi)
+            <div class="col">
                 <div class="card dotacion-kpi border-0">
                     <div class="card-body">
                         <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
@@ -172,14 +183,17 @@
                 </div>
             </div>
         @endforeach
+        </div>
+    @endforeach
+    <div class="row g-3 mb-3">
         <div class="col-12">
-            <div class="row g-3">
+            <div class="row g-3" data-kpi-row="sobredotacion">
                 <div class="{{ ($tieneEducacionParvularia || $horasContratoParvularia > 0) ? 'col-lg-4' : 'col-lg-6' }}">
                     <div class="card dotacion-kpi border-0 border-{{ $resultadoGeneral['tone'] }}">
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
                                 <div>
-                                    <div class="text-muted small fw-semibold">Sobredotación estructural</div>
+                                    <div class="text-muted small fw-semibold">Sobredotación plan de estudio + funciones normativas</div>
                                     <div class="small text-muted">{{ $resultadoGeneral['label'] }}</div>
                                 </div>
                                 <span class="kpi-icon text-{{ $resultadoGeneral['tone'] }}"><i class="bi {{ $resultadoGeneral['icon'] }}"></i></span>
@@ -198,7 +212,7 @@
                         <div class="card-body">
                             <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
                                 <div>
-                                    <div class="text-muted small fw-semibold">Dotación PIE</div>
+                                    <div class="text-muted small fw-semibold">Sobredotación PIE</div>
                                     <div class="small text-muted">{{ $resultadoPie['label'] }}</div>
                                 </div>
                                 <span class="kpi-icon text-{{ $resultadoPie['tone'] }}"><i class="bi {{ $resultadoPie['icon'] }}"></i></span>
@@ -213,6 +227,7 @@
                 </div>
             </div>
         </div>
+        {{-- Fin de filas de indicadores --}}
         <div class="col-12">
             <div class="card dotacion-kpi dotacion-breakdown border-0">
                 <div class="card-body">
