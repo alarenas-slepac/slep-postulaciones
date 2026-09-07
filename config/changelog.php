@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.8.11.372',
+    'current_version' => '2026.9.7.465',
     'entries' => [
+        [
+            'version' => '2026.9.7.465',
+            'title' => 'Dotación: libre disposición de otros docentes en Plan General',
+            'summary' => 'Traslada a Contrato Plan General + PIE las horas adicionales de libre disposición de otros docentes en NT1/NT2 con JEC.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'directivo_establecimiento'],
+            'items' => [
+                'Excluye esas horas de Contrato Educación Parvularia + PIE en cursos independientes y combinados, conservando la necesidad contractual total.',
+                'Presenta el refuerzo por separado en Cursos y planes y en el PDF, sin aumentar la matrícula, la cantidad de cursos ni el trabajo colaborativo PIE.',
+                'Mantiene las reglas de conversión contractual, el redondeo y las horas PIE propias del curso o grupo combinado.',
+            ],
+            'published_at' => '2026-09-07 00:00:00',
+        ],
 
         [
             'version' => '2026.8.11.372',

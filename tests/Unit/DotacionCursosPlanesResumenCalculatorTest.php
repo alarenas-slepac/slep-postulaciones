@@ -56,7 +56,7 @@ class DotacionCursosPlanesResumenCalculatorTest extends TestCase
         $this->assertSame(112.0, $resultado['totales']['contrato_mas_trabajo_colaborativo_pie']);
     }
 
-    public function test_conserva_el_refuerzo_nt_y_el_pie_en_la_fila_combinada(): void
+    public function test_separa_el_refuerzo_nt_de_la_fila_combinada_y_conserva_el_pie(): void
     {
         $cursos = $this->cursos();
         $cursos['rows']['NT1']['detalles'][0]['horas'] = 38;
@@ -70,11 +70,99 @@ class DotacionCursosPlanesResumenCalculatorTest extends TestCase
         );
         $combinado = $resultado['combinados']->first();
 
-        $this->assertSame(38.0, $combinado['total_horas']);
-        $this->assertSame(53.0, $combinado['total_horas_contrato_equivalente']);
+        $this->assertSame(32.0, $combinado['total_horas']);
+        $this->assertSame(50.0, $combinado['total_horas_contrato_equivalente']);
+        $this->assertSame(32.0, $combinado['horas_plan_por_curso']);
         $this->assertSame(3.0, $combinado['total_trabajo_colaborativo_pie']);
         $this->assertSame(6.0, $combinado['horas_plan_refuerzo_ld_otro_docente']);
         $this->assertSame(3.0, $combinado['horas_contrato_refuerzo_ld_otro_docente']);
+        $this->assertSame(6.0, $resultado['refuerzo_plan_general']['horas']);
+        $this->assertSame(3.0, $resultado['refuerzo_plan_general']['horas_contrato_equivalente']);
+        $this->assertSame(0.0, $resultado['refuerzo_plan_general']['trabajo_colaborativo_pie']);
+        $this->assertSame(76.0, $resultado['totales']['horas']);
+        $this->assertSame(115.0, $resultado['totales']['contrato_mas_trabajo_colaborativo_pie']);
+    }
+
+    public function test_separa_refuerzo_de_nt_independientes_sin_alterar_total_matricula_cursos_ni_pie(): void
+    {
+        $cursos = $this->cursos();
+        foreach (['NT1', 'NT2'] as $nivel) {
+            $cursos['rows'][$nivel]['detalles'][0] = array_merge($cursos['rows'][$nivel]['detalles'][0], [
+                'horas' => 44,
+                'horas_contrato_equivalente_redondeado' => 64,
+                'horas_plan_refuerzo_ld_otro_docente' => 6,
+                'horas_contrato_refuerzo_ld_otro_docente' => 7,
+                'proporcion_docente_label' => 'NT Con JEC especial + 65/35 LD + 65/35 LD otro docente',
+                'origen_proporcion_label' => 'Regla especial Educación Parvularia + libre disposición asignada',
+            ]);
+        }
+
+        $resultado = DotacionCursosPlanesResumenCalculator::build($cursos, []);
+
+        foreach (['NT1', 'NT2'] as $nivel) {
+            $this->assertSame(38.0, $resultado['rows'][$nivel]['horas_por_nivel']);
+            $this->assertSame(57.0, $resultado['rows'][$nivel]['total_horas_contrato_equivalente']);
+            $this->assertSame(60.0, $resultado['rows'][$nivel]['total_contrato_mas_trabajo_colaborativo_pie']);
+            $this->assertSame('NT Con JEC especial + 65/35 LD', $resultado['rows'][$nivel]['proporcion_docente_label']);
+            $this->assertSame('Regla especial Educación Parvularia', $resultado['rows'][$nivel]['origen_proporcion_label']);
+        }
+        $this->assertSame(120.0, $resultado['grupos']['parvularia']['totales']['contrato_mas_trabajo_colaborativo_pie']);
+        $this->assertSame(12.0, $resultado['refuerzo_plan_general']['horas']);
+        $this->assertSame(14.0, $resultado['refuerzo_plan_general']['horas_contrato_equivalente']);
+        $this->assertSame(0, $resultado['refuerzo_plan_general']['cursos']);
+        $this->assertSame(0, $resultado['refuerzo_plan_general']['matricula']);
+        $this->assertSame(65, $resultado['totales']['matricula']);
+        $this->assertSame(3, $resultado['totales']['cursos']);
+        $this->assertSame(6.0, $resultado['totales']['trabajo_colaborativo_pie']);
+        $this->assertSame(193.0, $resultado['totales']['contrato_mas_trabajo_colaborativo_pie']);
+        $this->assertSame(44, $cursos['rows']['NT1']['detalles'][0]['horas']);
+    }
+
+    public function test_renderiza_resumen_y_pdf_con_refuerzo_separado_de_parvularia(): void
+    {
+        $cursos = $this->cursos();
+        foreach (['NT1', 'NT2'] as $nivel) {
+            $detalle = &$cursos['rows'][$nivel]['detalles'][0];
+            $detalle['horas'] = 44;
+            $detalle['horas_contrato_equivalente_redondeado'] = 64;
+            $detalle['horas_plan_refuerzo_ld_otro_docente'] = 6;
+            $detalle['horas_contrato_refuerzo_ld_otro_docente'] = 7;
+            unset($detalle);
+        }
+        $cursos['resumen_cursos_planes'] = DotacionCursosPlanesResumenCalculator::build($cursos, []);
+        $datos = [
+            'cursos' => $cursos,
+            'establecimiento' => (object) ['rbd' => 'TEST', 'nombre_establecimiento' => 'Escuela de prueba', 'comuna' => 'Prueba'],
+            'anio' => 2026,
+            'resumen' => [],
+            'bloques' => [],
+            'docentes' => collect(),
+            'generatedBy' => null,
+            'generatedAt' => now(),
+        ];
+
+        foreach (['admin.dotacion-establecimiento.partials._resumen', 'admin.dotacion-establecimiento.pdf'] as $vista) {
+            $html = view($vista, $datos)->render();
+            $dom = new \DOMDocument;
+            $prev = libxml_use_internal_errors(true);
+            try {
+                $dom->loadHTML('<meta charset="UTF-8">'.$html);
+            } finally {
+                libxml_clear_errors();
+                libxml_use_internal_errors($prev);
+            }
+            $xpath = new \DOMXPath($dom);
+            foreach (['NT1', 'NT2'] as $nivel) {
+                $fila = '//tr[normalize-space(td[1])="'.$nivel.'"]';
+                $this->assertSame('38', $xpath->evaluate('normalize-space('.$fila.'/td[4])'), $vista);
+                $this->assertSame('57', $xpath->evaluate('normalize-space('.$fila.'/td[7])'), $vista);
+                $this->assertSame('60', $xpath->evaluate('normalize-space('.$fila.'/td[9])'), $vista);
+            }
+            $refuerzo = '//tr[contains(normalize-space(td[1]), "Plan General · Libre disposición NT1/NT2")]';
+            $this->assertSame(1, $xpath->query($refuerzo)->length, $vista);
+            $this->assertSame('14', $xpath->evaluate('normalize-space('.$refuerzo.'/td[7])'), $vista);
+            $this->assertSame('—', $xpath->evaluate('normalize-space('.$refuerzo.'/td[8])'), $vista);
+        }
     }
 
     public function test_vistas_muestran_filas_y_totales_de_cursos_combinados(): void

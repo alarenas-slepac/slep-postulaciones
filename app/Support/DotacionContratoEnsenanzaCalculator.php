@@ -66,8 +66,10 @@ class DotacionContratoEnsenanzaCalculator
                 'horas_contrato_equivalente_redondeado',
                 0
             ));
-        $contratoRefuerzoParvulariaCombinado = (float) $detallesParvularia
-            ->filter(fn ($detalle) => $cursoIdsCombinados->contains(
+        // El refuerzo de otro docente pertenece a Plan General. En combinados
+        // ya se retiró al reemplazar el contrato completo de sus integrantes.
+        $contratoRefuerzoParvulariaIndependiente = (float) $detallesParvularia
+            ->reject(fn ($detalle) => $cursoIdsCombinados->contains(
                 (int) data_get($detalle, 'establecimiento_curso_id', 0)
             ))
             ->sum(fn ($detalle) => (float) data_get(
@@ -84,7 +86,7 @@ class DotacionContratoEnsenanzaCalculator
             $contratoParvulariaBruto
                 - $contratoParvulariaReemplazado
                 + $contratoGruposParvularia
-                + $contratoRefuerzoParvulariaCombinado
+                - $contratoRefuerzoParvulariaIndependiente
         ), 2);
         $contratoPlanParvularia = min($contratoPlanAjustado, $contratoPlanParvularia);
         $contratoPlanGeneral = max(0.0, round($contratoPlanAjustado - $contratoPlanParvularia, 2));
