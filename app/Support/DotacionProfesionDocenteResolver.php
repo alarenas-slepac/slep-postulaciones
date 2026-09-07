@@ -82,6 +82,10 @@ class DotacionProfesionDocenteResolver
             'titulo_declarado' => $titulo,
             'titulo_normalizado' => $normalizado,
             'es_educacion_parvulos' => $normalizado === self::TITULO_EDUCACION_PARVULOS,
+            'es_educacion_diferencial' => (bool) preg_match(
+                '/^(?:(?:PEDAGOGIA EN |PROFESOR(?:A)? (?:DE |EN )?|LICENCIATURA EN )?EDUCACION DIFERENCIAL|EDUCADOR(?:A| A)? DIFERENCIAL)(?: |$)/',
+                $normalizado
+            ),
             'fuente_titulo' => $declaracion ? 'Declaración de Sostenedores' : 'Sin declaración',
         ];
     }

@@ -76,7 +76,7 @@ class DotacionAsignacionCalculator
         $totalAulaAsignadas = (float) $necesidadesPlan->sum(fn ($item) => (float) ($item['horas_plan_asignadas'] ?? 0));
         $aulaPendientes = max(0.0, round($totalAulaRequeridas - $totalAulaAsignadas, 2));
         $aulaExcedidas = max(0.0, round($totalAulaAsignadas - $totalAulaRequeridas, 2));
-        $contratoDocentePie = self::resumenContratoDocentePie($asignaciones);
+        $contratoDocentePie = self::resumenContratoDocentePie($asignaciones, $docentes);
 
         return [
             'necesidades' => $necesidades,
@@ -156,22 +156,51 @@ class DotacionAsignacionCalculator
     /**
      * @return array{coordinacion_pie: float, educadoras_diferenciales: float, total: float}
      */
-    private static function resumenContratoDocentePie(Collection $asignaciones): array
+    private static function resumenContratoDocentePie(Collection $asignaciones, Collection $docentes): array
     {
+        // La nómina recibida ya está consolidada por RUT, establecimiento y año,
+        // con el último período contractual y las exclusiones aplicadas.
+        $diferenciales = $docentes->filter(fn (array $docente) => self::esDocenteDiferencial($docente));
+        $rutsDiferenciales = $diferenciales
+            ->map(fn (array $docente) => DotacionEstablecimientoCalculator::normalizeRut(
+                ($docente['rut_normalizado'] ?? null) ?: ($docente['rut'] ?? '')
+            ))->filter()->unique();
         $asignacionesDocentes = $asignaciones
             ->filter(fn ($row) => self::coverageEstamento($row) === 'docente');
+        // La coordinación de un diferencial ya forma parte de su contrato completo.
         $coordinacionPie = (float) $asignacionesDocentes
             ->filter(fn ($row) => self::esAsignacionCoordinacionPie($row))
+            ->reject(fn ($row) => $rutsDiferenciales->contains(DotacionEstablecimientoCalculator::normalizeRut(
+                data_get($row, 'docente_rut_normalizado') ?: data_get($row, 'docente_rut', '')
+            )))
             ->sum(fn ($row) => (float) data_get($row, 'horas_contrato', 0));
-        $educadorasDiferenciales = (float) $asignacionesDocentes
-            ->filter(fn ($row) => data_get($row, 'tipo_asignacion') === 'pie_educadora_diferencial')
-            ->sum(fn ($row) => (float) data_get($row, 'horas_contrato', 0));
+        $educadorasDiferenciales = (float) $diferenciales
+            ->sum(fn (array $docente) => max(0.0, (float) ($docente['horas_contrato'] ?? 0)));
 
         return [
             'coordinacion_pie' => round($coordinacionPie, 2),
             'educadoras_diferenciales' => round($educadorasDiferenciales, 2),
             'total' => round($coordinacionPie + $educadorasDiferenciales, 2),
         ];
+    }
+
+    private static function esDocenteDiferencial(array $docente): bool
+    {
+        return self::coverageEstamento($docente) === 'docente'
+            && DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_diferencial'];
+    }
+
+    /** Misma base contractual PIE para el detalle individual y el resumen. */
+    public static function contratoPiePorDocente(array $docente): float
+    {
+        if (self::esDocenteDiferencial($docente)) {
+            return round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2);
+        }
+
+        return round((float) collect($docente['asignaciones'] ?? [])
+            ->filter(fn ($row) => self::coverageEstamento($row) === 'docente'
+                && self::esAsignacionCoordinacionPie($row))
+            ->sum(fn ($row) => max(0.0, (float) data_get($row, 'horas_contrato', 0))), 2);
     }
 
     private static function esAsignacionCoordinacionPie(object|array $asignacion): bool

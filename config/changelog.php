@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.7.471',
+    'current_version' => '2026.9.7.472',
     'entries' => [
+        [
+            'version' => '2026.9.7.472',
+            'title' => 'Dotación: contratos completos de Educación Diferencial en PIE',
+            'summary' => 'El contrato docente PIE utiliza la nómina contractual vigente según título declarado, independientemente de sus asignaciones.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'directivo_establecimiento'],
+            'items' => [
+                'Suma los contratos efectivos de Educación Diferencial, respetando la consolidación por RUT y las exclusiones existentes.',
+                'Mantiene la coordinación PIE de otros docentes sin duplicar la incluida en contratos completos de Educación Diferencial.',
+                'Aplica la misma base al detalle individual, horas aula, sobredotación, PDF y Excel; conserva separadas las horas efectivamente asignadas.',
+            ],
+            'published_at' => '2026-09-07 14:00:00',
+        ],
         [
             'version' => '2026.9.7.471',
             'title' => 'Dotación: Excel consolidado de sobredotación',
