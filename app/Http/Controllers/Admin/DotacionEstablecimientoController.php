@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\DotacionEstablecimientoAvanceExport;
 use App\Exports\DotacionSobredotacionEstablecimientosExport;
+use App\Exports\DotacionResumenSobredotacionExport;
 use App\Http\Controllers\Controller;
 use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionProporcionExcepcion;
@@ -51,6 +52,14 @@ class DotacionEstablecimientoController extends Controller
             ->when($comuna !== '', fn ($query) => $query->where('comuna', $comuna))
             ->orderBy('comuna')
             ->orderBy('nombre_establecimiento');
+
+        if ($request->boolean('export_resumen_sobredotacion')) {
+            abort_unless(DotacionResumenSobredotacionExport::canExport($activeRole), 403);
+
+            return app(DotacionResumenSobredotacionExport::class)->download(
+                (clone $establecimientosQuery)->get(), $anio, ['q' => $q, 'comuna' => $comuna]
+            );
+        }
 
         if ($request->boolean('export_sobredotacion')) {
             abort_unless(DotacionSobredotacionCalculator::canView($activeRole), 403);

@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.7.470',
+    'current_version' => '2026.9.7.471',
     'entries' => [
+        [
+            'version' => '2026.9.7.471',
+            'title' => 'Dotación: Excel consolidado de sobredotación',
+            'summary' => 'Agrega un resumen en una sola hoja con indicadores por establecimiento y totales de excedentes.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp'],
+            'items' => [
+                'Exporta 17 columnas respetando año y filtros, sin limitar a la página actual.',
+                'Suma por separado solo las brechas negativas de plan + funciones normativas, Parvularia y PIE; muestra los totales absolutos en rojo.',
+                'Colorea las celdas de brechas negativas en rojo claro y las no negativas en verde claro, manteniendo el exportador detallado existente.',
+            ],
+            'published_at' => '2026-09-07 13:00:00',
+        ],
         [
             'version' => '2026.9.7.470',
             'title' => 'Dotación: indicadores organizados por filas',

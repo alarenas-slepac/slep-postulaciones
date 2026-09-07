@@ -43,6 +43,12 @@
                         <i class="bi bi-file-earmark-spreadsheet"></i> Excel sobredotación
                     </a>
                 @endif
+                @if (\App\Exports\DotacionResumenSobredotacionExport::canExport($activeRole))
+                    <a class="btn btn-success rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['export_resumen_sobredotacion' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}"
+                       title="Una hoja con todos los establecimientos de los filtros actuales y totales de excedentes">
+                        <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Excel resumen sobredotación
+                    </a>
+                @endif
                 @if (Route::has('admin.dotacion-funciones.index') && $activeRole !== 'supervisor_plani')
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.index', ['anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Dotación funciones y planes
@@ -55,6 +61,9 @@
     @if (session('status'))
         <div class="alert alert-success rounded-4 shadow-sm border-0">{{ session('status') }}</div>
     @endif
+    @error('export_resumen_sobredotacion')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
 
     <div class="row g-3 mb-4">
         <div class="col-xl-3 col-md-6"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Establecimientos visibles</div><div class="fs-3 fw-bold text-primary">{{ number_format($establecimientos->total(), 0, ',', '.') }}</div><div class="small text-muted">Según filtros y rol activo.</div></div></div></div>
