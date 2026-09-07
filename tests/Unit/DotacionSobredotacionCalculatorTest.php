@@ -11,6 +11,38 @@ use Tests\TestCase;
 
 class DotacionSobredotacionCalculatorTest extends TestCase
 {
+    public function test_brecha_estructural_excluye_parvularia_sin_alterar_nomina_factual_ni_pie(): void
+    {
+        $docentes = [
+            $this->docente('11111111-1', 'Contrato general de prueba', 683, 683, 0, 607, 0, 0, true),
+            $this->docente('22222222-2', 'Contrato parvularia de prueba', 88, 88, 0, 88, 0, 0, true),
+        ];
+        $resumen = [
+            'contrato_plan_mas_trabajo_colaborativo_pie' => 510,
+            'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 120,
+            'horas_dotacion_funciones_normativas' => 217,
+            'horas_contrato_docentes_aula' => 771,
+            'horas_contrato_docentes_parvularia' => 88,
+        ];
+        // Compatibilidad con resúmenes que aún no traen los campos generales.
+        $historico = DotacionSobredotacionCalculator::build($docentes, $resumen);
+        $resultado = DotacionSobredotacionCalculator::build($docentes, $resumen + [
+            'contrato_plan_general_mas_trabajo_colaborativo_pie' => 390,
+            'horas_contrato_docentes_aula_general' => 683,
+        ]);
+        $this->assertEquals($historico, $resultado);
+        $this->assertSame(-76.0, $resultado['aula']['resumen']['brecha_estructural']);
+        $this->assertSame(76.0, $resultado['aula']['resumen']['horas_sobredotacion_estructural']);
+        $this->assertSame(771.0, $resultado['aula']['resumen']['horas_dotacion_total']);
+        $this->assertSame(2, $resultado['aula']['resumen']['docentes_analizados']);
+        $this->assertSame(0.0, $resultado['pie']['resumen']['horas_sobredotacion_total']);
+
+        // Cambiar solo la necesidad parvularia no debe modificar la brecha general.
+        $resumen['contrato_plan_mas_trabajo_colaborativo_pie'] = 550;
+        $resumen['contrato_educacion_parvularia_mas_trabajo_colaborativo_pie'] = 160;
+        $this->assertSame(-76.0, DotacionSobredotacionCalculator::build($docentes, $resumen)['aula']['resumen']['brecha_estructural']);
+    }
+
     public function test_separa_sobredotacion_sin_asignacion_y_horas_declaradas_ajustables(): void
     {
         $resultado = DotacionSobredotacionCalculator::build([

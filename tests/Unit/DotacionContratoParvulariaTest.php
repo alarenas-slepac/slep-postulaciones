@@ -92,8 +92,9 @@ class DotacionContratoParvulariaTest extends TestCase
         $this->assertStringContainsString('Horas contrato parvularia', $pdfHtml);
         $this->assertStringContainsString('Sobredotación Parvularia', $pdfHtml);
         $this->assertStringContainsString(abs($brecha).' - '.$label, $pdfHtml);
-        // Separar las tarjetas no cambia la sobredotación estructural global.
-        $this->assertStringContainsString('44 - Horas de sobredotación', $pdfHtml);
+        // La brecha general no compensa el déficit/excedente de Parvularia.
+        $excesoGeneral = (771 - $contrato) - (390 + 217);
+        $this->assertStringContainsString($excesoGeneral.' - Horas de sobredotación', $pdfHtml);
     }
 
     public function test_sin_parvularia_conserva_el_contrato_aula(): void

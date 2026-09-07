@@ -54,9 +54,12 @@ class DotacionSobredotacionCalculator
 
         return [
             'aula' => self::analizarAula($base, $necesidadAula, $aulaObjetivo, [
-                'contrato_plan_pie' => self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie'),
+                'contrato_plan_pie' => (float) ($resumen['contrato_plan_general_mas_trabajo_colaborativo_pie']
+                    ?? max(0.0, self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie')
+                        - self::numero($resumen, 'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie'))),
                 'bloque_normativo' => self::numero($resumen, 'horas_dotacion_funciones_normativas'),
-                'contrato_aula' => self::numero($resumen, 'horas_contrato_docentes_aula'),
+                'contrato_aula' => (float) ($resumen['horas_contrato_docentes_aula_general']
+                    ?? max(0.0, $aulaObjetivo - self::numero($resumen, 'horas_contrato_docentes_parvularia'))),
                 'bloque_declarado' => $declaradasObjetivo,
             ]),
             'pie' => self::distribuirNecesidad($pie, $necesidadPie, [
@@ -193,7 +196,9 @@ class DotacionSobredotacionCalculator
             ])
             ->values();
         $contratoAulaIndividualizado = self::sumar($analizados, 'horas_contrato_categoria');
-        $brechaEstructural = round($horasNecesarias - $contratoAulaResumen, 2);
+        // La brecha estructural excluye Parvularia; la nómina factual conserva
+        // todas las horas individuales para no ocultar contratos sin asignación.
+        $brechaEstructural = round($formula['contrato_plan_pie'] + $formula['bloque_normativo'] - $formula['contrato_aula'], 2);
         $sobredotacionReal = self::sumar($sobredotados, 'horas_sobredotacion_total');
         $declaradasAjustables = self::sumar($ajustes, 'horas_declaradas_ajustables');
         $asignadasTotal = self::sumar($analizados, 'horas_asignadas_total');

@@ -91,8 +91,8 @@
     $horasContratoEducadorasDiferenciales = (float) ($resumen['horas_contrato_docente_pie_educadoras_diferenciales'] ?? 0);
     $horasContratoRequeridas = (float) ($resumen['horas_contrato_requeridas'] ?? (($resumen['contrato_plan_mas_trabajo_colaborativo_pie'] ?? 0) + ($resumen['horas_dotacion_funciones'] ?? 0) + $horasContratoPieNecesarias));
     $brechaDotacionGeneral = round(
-        ($contratoEducacionParvulariaMasPie + $contratoPlanGeneralMasPie + $horasBloqueNormativas)
-        - $horasContratoAula,
+        ($contratoPlanGeneralMasPie + $horasBloqueNormativas)
+        - $horasContratoAulaGeneral,
         2
     );
     $brechaDotacionPie = (float) ($resumen['brecha_dotacion_pie'] ?? ($horasContratoPieNecesarias - $horasContratoDocentePie));
