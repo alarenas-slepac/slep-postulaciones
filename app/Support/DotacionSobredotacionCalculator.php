@@ -77,9 +77,7 @@ class DotacionSobredotacionCalculator
         $asignaciones = collect($docente['asignaciones'] ?? []);
         $contratoPie = array_key_exists('horas_contrato_pie', $docente)
             ? max(0.0, (float) $docente['horas_contrato_pie'])
-            : (float) $asignaciones
-                ->filter(fn ($asignacion) => self::esContratoPie($asignacion))
-                ->sum(fn ($asignacion) => self::horasAsignacion($asignacion));
+            : DotacionAsignacionCalculator::contratoPiePorDocente($docente);
 
         // La porción PIE se reserva primero desde Contrata para mantener la
         // mayor cantidad posible de horas titulares en la dotación de Aula.
@@ -119,7 +117,12 @@ class DotacionSobredotacionCalculator
             'asignadas_protegidas' => round($asignadasProtegidas, 2),
             'declaradas_ajustables' => round($declaradasAjustables, 2),
             'declaradas_detalle' => $declaradasDetalle,
-            'asignadas_pie' => round($contratoPie, 2),
+            'asignadas_pie' => array_key_exists('horas_contrato_pie', $docente)
+                ? round($contratoPie, 2)
+                : round((float) $asignaciones
+                    ->filter(fn ($asignacion) => self::esContratoPie($asignacion)
+                        && DotacionAsignacionCalculator::coverageEstamento($asignacion) === 'docente')
+                    ->sum(fn ($asignacion) => self::horasAsignacion($asignacion)), 2),
         ];
     }
 

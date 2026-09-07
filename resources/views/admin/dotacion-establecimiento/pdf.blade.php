@@ -317,8 +317,8 @@
         <tr>
             <th>Contrato aula</th>
             @if ($tieneEducacionParvularia || $horasContratoParvularia > 0)<th>Horas contrato parvularia</th>@endif
-            <th>Coordinación PIE asignada</th>
-            <th>Bolsa Educadoras Diferenciales asignada</th>
+            <th>Coordinación PIE de otros docentes</th>
+            <th>Contratos completos de Educación Diferencial</th>
             <th>Contrato docente PIE</th>
             <th>Total contrato docentes vigente</th>
         </tr>
@@ -530,7 +530,7 @@
         <tr>
             <td>Horas contrato docente PIE</td>
             <td class="text-right primary">{{ $fmt($horasContratoDocentePie) }}</td>
-            <td>Coordinación PIE: {{ $fmt($horasContratoCoordinacionPie) }} h + Bolsa Educadoras Diferenciales PIE: {{ $fmt($horasContratoEducadorasDiferenciales) }} h.</td>
+            <td>Contratos completos de Educación Diferencial: {{ $fmt($horasContratoEducadorasDiferenciales) }} h + Coordinación PIE de otros docentes: {{ $fmt($horasContratoCoordinacionPie) }} h. Según título declarado, sin duplicar coordinación incluida en esos contratos.</td>
         </tr>
         <tr class="total-row">
             <td>Horas contrato docentes vigentes</td>

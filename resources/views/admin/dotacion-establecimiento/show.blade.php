@@ -89,7 +89,7 @@
             ...(($tieneEducacionParvularia || $horasContratoParvularia > 0) ? [
                 ['label' => 'Horas contrato parvularia', 'value' => $fmt($horasContratoParvularia), 'hint' => 'Suma de contratos vigentes de Educadoras de Párvulos, según título declarado.', 'tone' => 'info', 'icon' => 'bi-people-fill'],
             ] : []),
-            ['label' => 'Horas contrato docente PIE', 'value' => $fmt($horasContratoDocentePie), 'hint' => 'Coordinación PIE: '.$fmt($horasContratoCoordinacionPie).' · Bolsa Educ. Diferenciales: '.$fmt($horasContratoEducadorasDiferenciales).'.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
+            ['label' => 'Horas contrato docente PIE', 'value' => $fmt($horasContratoDocentePie), 'hint' => 'Contratos completos de Educación Diferencial: '.$fmt($horasContratoEducadorasDiferenciales).' · Coordinación PIE de otros docentes: '.$fmt($horasContratoCoordinacionPie).'. Según título declarado, sin duplicar coordinación incluida en esos contratos.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
         ];
         $kpiFilas = [
             'generales' => ['items' => $kpisGenerales, 'columns' => 'row-cols-md-3'],
