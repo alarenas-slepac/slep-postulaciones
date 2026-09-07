@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.7.468',
+    'current_version' => '2026.9.7.469',
     'entries' => [
+        [
+            'version' => '2026.9.7.469',
+            'title' => 'Documentos: exportación de pendientes consolidada por RUT',
+            'summary' => 'Agrega Excel de usuarios con documentos pendientes, ordenado por la fecha del pendiente más antiguo.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp'],
+            'items' => [
+                'Consolida las cuentas del mismo RUT válido, sumando pendientes aplicables y conservando nombres, correos e identificadores de origen.',
+                'Exporta todos los pendientes sin paginación; señala RUT ausentes o inválidos y mantiene sus registros separados.',
+                'Restringe la descarga a los roles con acceso de lectura documental y protege los valores de texto contra fórmulas de Excel.',
+            ],
+            'published_at' => '2026-09-07 12:00:00',
+        ],
         [
             'version' => '2026.9.7.468',
             'title' => 'Documentos: prioridad por pendiente más antiguo',

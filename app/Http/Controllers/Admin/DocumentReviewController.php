@@ -129,6 +129,13 @@ class DocumentReviewController extends Controller
 
     public function index(Request $request)
     {
+        // Exportación global, sin el límite de página ni el filtro del buscador.
+        if ($request->query('export') === 'pending-xlsx') {
+            $this->authorize('viewAny', UserDocument::class);
+
+            return app(\App\Exports\DocumentosPendientesExport::class)->download();
+        }
+
         $usersQuery = User::query();
 
         // Usuarios elegibles para revisión documental: postulante o funcionario
