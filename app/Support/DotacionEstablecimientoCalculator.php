@@ -166,6 +166,11 @@ class DotacionEstablecimientoCalculator
         $horasContratoDocentePieEducadoras = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie_educadoras_diferenciales', 0);
         $horasContratoDocentePie = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie', 0);
         $horasContratoDocentesAula = max(0.0, round($horasContratoDocentes - $horasContratoDocentePie, 2));
+        $contratoParvularia = self::contratoParvularia(
+            $docentes,
+            $horasContratoDocentesAula,
+            (float) $contratoPlanPorEnsenanza['contrato_parvularia_mas_pie']
+        );
         $horasContratoDocentePieExceso = max(0.0, round($horasContratoDocentePie - $horasContratoDocentes, 2));
         $brechasDotacion = self::brechasDotacionSeparadas(
             $contratoPlanMasTrabajoColaborativoPie,
@@ -219,6 +224,7 @@ class DotacionEstablecimientoCalculator
             'horas_contrato_docentes_excluidas' => $horasContratoDocentesExcluidas,
             'horas_contrato_docentes' => $horasContratoDocentes,
             'horas_contrato_docentes_aula' => $horasContratoDocentesAula,
+            ...$contratoParvularia,
             'horas_contrato_docente_pie_coordinacion' => $horasContratoDocentePieCoordinacion,
             'horas_contrato_docente_pie_educadoras_diferenciales' => $horasContratoDocentePieEducadoras,
             'horas_contrato_docente_pie' => $horasContratoDocentePie,
@@ -277,6 +283,25 @@ class DotacionEstablecimientoCalculator
             'cursos_combinados' => $cursosCombinados,
             'proporcion_excepcion' => $proporcionExcepcion,
             'alertas' => $alertas,
+        ];
+    }
+
+    /**
+     * Separa el contrato vigente de las Educadoras de Párvulos. La colección
+     * docentes ya consolida el último período y aplica exclusiones de dotación.
+     * El total aula histórico se conserva para las comparaciones globales.
+     */
+    public static function contratoParvularia(iterable $docentes, float $contratoAulaTotal, float $necesidadParvularia): array
+    {
+        $horasParvularia = round((float) collect($docentes)
+            ->filter(fn (array $docente) => ($docente['estamento_cobertura'] ?? 'docente') === 'docente'
+                && DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos'])
+            ->sum(fn (array $docente) => max(0.0, (float) ($docente['horas_contrato'] ?? 0))), 2);
+
+        return [
+            'horas_contrato_docentes_parvularia' => $horasParvularia,
+            'horas_contrato_docentes_aula_general' => round(max(0.0, $contratoAulaTotal - $horasParvularia), 2),
+            'brecha_dotacion_parvularia' => round($necesidadParvularia - $horasParvularia, 2),
         ];
     }
 
