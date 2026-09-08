@@ -126,9 +126,22 @@ class PadronConciliador
                 $this->match($rows[$pending[0]], $candidate);
                 $matched[$candidate['id']] = true;
             } else {
+                $redistribucion = ! $hasInvalid && count($pending) === 1 && count($periods) === 1
+                    && ! $group->contains(fn ($r) => $r['accion'] === PadronReemplazosVigentes::OMITIDO)
+                    ? (new PadronRedistribucionService)->proponer($rows[$pending[0]]['datos'], $remaining->values()->all(), $group->pluck('datos')->all(), $old->values()->all())
+                    : null;
                 foreach ($pending as $index) {
                     $rows[$index]['accion'] = $old->isEmpty() ? 'nueva_incorporacion' : 'revision_manual';
                     $rows[$index]['candidatos'] = $remaining->values()->all();
+                    if ($redistribucion) {
+                        foreach ($rows[$index]['candidatos'] as &$candidato) {
+                            if ((int) $candidato['id'] === $redistribucion['receptor_id']) {
+                                $candidato['_redistribucion'] = $redistribucion;
+                            }
+                        }
+                        unset($candidato);
+                        $rows[$index]['observaciones'][] = 'Posible redistribución sin aumento total: conservar ID '.$redistribucion['receptor_id'].' y revisar baja del ID '.$redistribucion['absorbido_id'].'. Requiere confirmar ambas decisiones por separado; no se aplica automáticamente.';
+                    }
                     if ($old->isNotEmpty()) {
                         $rows[$index]['observaciones'][] = 'Varias líneas, cambio de composición o coincidencia incierta. No se propone reemplazar ningún ID.';
                     }

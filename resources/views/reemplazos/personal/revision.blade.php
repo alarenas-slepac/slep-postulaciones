@@ -199,7 +199,7 @@
                                         <select id="decision-{{ $fila->id }}" name="personal_id" class="form-select form-select-sm" required>
                                             <option value="">Seleccione explícitamente</option>
                                             @foreach ($fila->candidatos as $candidato)
-                                                <option value="{{ $candidato['id'] }}">ID {{ $candidato['id'] }} · RBD {{ $candidato['rbd'] ?? '—' }} · {{ $candidato['jornada'] ?? '—' }} h</option>
+                                                <option value="{{ $candidato['id'] }}">ID {{ $candidato['id'] }} · RBD {{ $candidato['rbd'] ?? '—' }} · {{ $candidato['jornada'] ?? '—' }} h · {{ $candidato['financiamiento'] ?? '—' }}{{ isset($candidato['_redistribucion']) ? ' · Receptor sugerido (requiere confirmación)' : '' }}</option>
                                             @endforeach
                                             <option value="0">{{ $fila->fila_excel ? 'Confirmar nueva línea contractual' : 'Confirmar baja de esta línea' }}</option>
                                         </select>
@@ -221,6 +221,11 @@
                             </details>
                         </td>
                         <td>
+                            @foreach ($fila->candidatos ?? [] as $candidatoRedistribucion)
+                                @if (isset($candidatoRedistribucion['_redistribucion']))
+                                    @include('reemplazos.personal.partials.redistribucion', ['propuesta' => $candidatoRedistribucion['_redistribucion']])
+                                @endif
+                            @endforeach
                             @if ($vinculos)
                                 <details class="mb-2"><summary>{{ $vinculos['total'] }} referencias históricas del ID {{ $idHistorico }}</summary>
                                     @foreach ($vinculos['referencias'] as $vinculo)

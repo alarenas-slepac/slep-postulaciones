@@ -166,8 +166,8 @@ class PadronRevisionService
         $dependencias = $this->dependencias->snapshot();
         return ['personal' => $personal, 'establecimientos' => $establishments, 'asignaciones' => $assignments,
             'declaraciones' => $declarations, 'periodo_maximo' => $maxPeriod,
-            // Versión 10: correspondencias PLANTA SEP/PIE sin escalafón como clave.
+            // Versión 11: propuestas explícitas de redistribución entre financiamientos.
             // Las revisiones previas requieren analizar nuevamente el archivo.
-            'hash' => hash('sha256', json_encode(['v10', hash_final($fingerprint), $establishments, $maxPeriod, $dependencias['hash'], $cobertura['hash'], $aplicaciones, app(PadronPeriodoService::class)->huella()], JSON_THROW_ON_ERROR))];
+            'hash' => hash('sha256', json_encode(['v11', hash_final($fingerprint), $establishments, $maxPeriod, $dependencias['hash'], $cobertura['hash'], $aplicaciones, app(PadronPeriodoService::class)->huella()], JSON_THROW_ON_ERROR))];
     }
 }

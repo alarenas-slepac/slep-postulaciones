@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.490',
+    'current_version' => '2026.9.8.491',
     'entries' => [
+        [
+            'version' => '2026.9.8.491',
+            'title' => 'Padrón: propuesta de redistribución entre financiamientos',
+            'summary' => 'Sugiere conservar el contrato receptor y revisar la baja de una línea absorbida, con confirmaciones explícitas.',
+            'roles' => ['admin'],
+            'items' => [
+                'Detecta un receptor y una línea absorbida compatibles en RUT, establecimiento, contrato, estatuto y año, con fecha de ingreso conservada en el receptor y sin aumento de jornada total.',
+                'Comprueba conservación de jornada básica y media. El escalafón se actualiza desde el archivo y no identifica la correspondencia.',
+                'Muestra los IDs, financiamientos, horas antes y después y total del RUT. No preselecciona correspondencias ni confirma bajas: exige ambas decisiones con justificación.',
+                'Conserva IDs y antecedentes históricos; no elimina registros ni mueve asignaciones. Mantiene el bloqueo por asignaciones activas vinculadas directamente al ID absorbido.',
+                'Huella de revisión v11: volver a analizar el Excel para obtener las propuestas. Pruebas sintéticas; sin migraciones ni cambios en producción. La aplicación definitiva permanece deshabilitada.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.490',
             'title' => 'Padrón: correspondencias de PLANTA con financiamiento separado',
