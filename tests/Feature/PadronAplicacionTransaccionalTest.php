@@ -293,6 +293,65 @@ class PadronAplicacionTransaccionalTest extends TestCase
         }
     }
 
+    public function test_document_activity_requires_only_new_final_confirmation_and_freezes_new_references(): void
+    {
+        $revision = $this->revision();
+        $writer = $this->writer();
+        $token = $writer->plan($revision)['confirmacion_hash'];
+        foreach (PadronHistorialService::DOCUMENTOS as $table) {
+            DB::table($table)->where('id', 1)->update(['estado' => 'aprobado']);
+            DB::table($table)->insert(['id' => 3, 'reemplazo_personal_id' => 101]);
+            // Una referencia reasignada debe congelar el contrato vigente del nuevo ID.
+            DB::table($table)->where('id', 2)->update(['reemplazo_personal_id' => 101]);
+        }
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $before = $this->state();
+        try {
+            $writer->aplicar($revision, 7, $token);
+            $this->fail('Las dependencias nuevas requieren revisar el plan final.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('Recargue la misma revisión', $e->getMessage());
+            $this->assertSame($before, $this->state());
+        }
+        $this->apply($revision);
+        foreach (PadronHistorialService::DOCUMENTOS as $table) {
+            foreach (DB::table($table)->get() as $document) {
+                $copy = json_decode($document->padron_personal_snapshot, true)['personal'];
+                $this->assertSame(101, $copy['id']);
+                $this->assertSame(44, $copy['jornada']);
+                $this->assertSame(101, $document->reemplazo_personal_id);
+            }
+            $this->assertSame('aprobado', DB::table($table)->where('id', 1)->value('estado'));
+        }
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'jornada' => 30]);
+    }
+
+    public function test_live_assignment_to_absent_contract_blocks_application_without_expiring_review(): void
+    {
+        $revision = $this->revision();
+        $writer = $this->writer();
+        $this->assertSame([], $writer->plan($revision)['errores']);
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'id' => 502, 'anio' => 2026, 'establecimiento_id' => 1, 'reemplazos_personal_id' => 102,
+            'docente_rut' => '222222222', 'estado' => 'activa', 'horas_contrato' => 2,
+        ]);
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $plan = $writer->plan($revision);
+        $this->assertSame(1, $plan['conflictos']['bloqueantes']);
+        $before = $this->state();
+        try {
+            $writer->aplicar($revision, 7, $plan['confirmacion_hash']);
+            $this->fail('Una revisión editable no autoriza perder vínculos activos.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('ID contractual quedaría sin seleccionar', $e->getMessage());
+            $this->assertSame($before, $this->state());
+        }
+        DB::table('dotacion_docente_asignaciones')->where('id', 502)->update(['estado' => 'inactiva']);
+        $this->assertSame([], $writer->plan($revision)['errores']);
+        $this->apply($revision);
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 502, 'reemplazos_personal_id' => 102]);
+    }
+
     public function test_payload_cannot_overwrite_ids_or_internal_contract_metadata(): void
     {
         $revision = $this->revision([$this->data(['id' => 999, 'row_hash' => 'invalido', 'created_by' => 999])]);

@@ -128,7 +128,7 @@ class PadronRevisionTest extends TestCase
     public function test_stale_base_rejects_authorization(): void
     {
         $revision = $this->revision([$this->data(['jornada' => 45])]);
-        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['horas_contrato' => 21]);
+        DB::table('reemplazos_personal')->where('id', 101)->update(['jornada' => 43]);
         $this->assertTrue(app(PadronRevisionService::class)->stale($revision));
         $this->expectException(ValidationException::class);
         app(PadronRevisionService::class)->authorize($revision, '111111111', 'Excepción sintética justificada.', 1);
@@ -447,7 +447,7 @@ class PadronRevisionTest extends TestCase
         $this->assertStringContainsString('Ausencia vinculada a una fila', $html);
     }
 
-    public function test_historical_document_changes_invalidate_decisions_and_authorizations(): void
+    public function test_historical_document_activity_preserves_decisions_and_authorizations(): void
     {
         foreach (['solicitudes_reemplazo', 'cometidos_funcionarios', 'incumplimientos_laborales', 'reemplazos_personal_bloqueos'] as $table) {
             Schema::create($table, function (Blueprint $t) {
@@ -457,21 +457,11 @@ class PadronRevisionTest extends TestCase
         $revision = $this->ambiguousRevision();
         $service = app(\App\Services\Padron\PadronResolucionService::class);
         DB::table('solicitudes_reemplazo')->insert(['id' => 601, 'reemplazo_personal_id' => 101, 'estado' => 'cerrada']);
-        $this->assertTrue(app(PadronRevisionService::class)->stale($revision));
-        try {
-            $service->resolver($revision, $revision->filas->firstWhere('fila_excel', 2)->id, 101, 'Correspondencia sintética validada.', 1);
-            $this->fail('Debe rechazar revisiones con nuevas referencias.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('revision', $exception->errors());
-        }
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $service->resolver($revision, $revision->filas->firstWhere('fila_excel', 2)->id, 101, 'Correspondencia sintética validada.', 1);
         $excess = $this->revision([$this->data(['jornada' => 45])]);
         DB::table('solicitudes_reemplazo')->where('id', 601)->update(['estado' => 'observada']);
-        try {
-            app(PadronRevisionService::class)->authorize($excess, '111111111', 'Justificación sintética de prueba.', 1);
-            $this->fail('Debe rechazar autorizaciones desactualizadas.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('revision', $exception->errors());
-        }
+        app(PadronRevisionService::class)->authorize($excess, '111111111', 'Justificación sintética de prueba.', 1);
         $snapshot = app(\App\Services\Padron\PadronDependenciasService::class)->snapshot();
         $this->assertSame(['modulo' => 'Solicitud de reemplazo', 'id' => 601], $snapshot['por_personal'][101]['referencias'][0]);
         foreach (['cometidos_funcionarios', 'incumplimientos_laborales', 'reemplazos_personal_bloqueos'] as $table) {
@@ -481,6 +471,43 @@ class PadronRevisionTest extends TestCase
             $this->assertNotSame($before, $after['hash']);
         }
         $this->assertSame(4, $after['por_personal'][101]['total']);
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $this->assertFalse(app(PadronRevisionService::class)->stale($excess));
+        $this->assertDatabaseCount('padron_revision_decisiones', 1);
+        $this->assertDatabaseCount('padron_revision_autorizaciones', 1);
+    }
+
+    public function test_can_resume_after_days_of_activity_and_authorize_without_hiding_manual_forms(): void
+    {
+        $this->ambiguousRevision();
+        Schema::create('solicitudes_reemplazo', function (Blueprint $t) {
+            $t->id(); $t->integer('reemplazo_personal_id'); $t->string('estado');
+        });
+        $revision = $this->revision([
+            $this->data(['jornada' => 24, 'jornada_basica' => 24]),
+            $this->data(['financiamiento' => 'SEP', 'jornada' => 23, 'jornada_basica' => 23]),
+        ]);
+        $resolver = app(\App\Services\Padron\PadronResolucionService::class);
+        $first = $revision->filas->firstWhere('fila_excel', 2);
+        $resolver->resolver($revision, $first->id, 101, 'Primera correspondencia antes de continuar.', 1);
+        $this->travel(7)->days();
+        DB::table('solicitudes_reemplazo')->insert(['reemplazo_personal_id' => 101, 'estado' => 'pendiente']);
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 21]);
+        app(PadronRevisionService::class)->authorize($revision->fresh(), '111111111', 'Excepción sintética revisada después de siete días.', 1);
+        DB::table('solicitudes_reemplazo')->update(['estado' => 'aprobada']);
+        view()->share('errors', new ViewErrorBag);
+        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]));
+        $this->assertFalse($view->getData()['obsoleta']);
+        $html = $view->render();
+        $this->assertStringContainsString('Resolver correspondencia', $html);
+        $this->assertStringContainsString('Autorizada por usuario #1', $html);
+        $this->assertStringNotContainsString('name="accion" value="aplicar"', $html);
+        $this->assertSame(101, $resolver->decisiones($revision)[$first->id]->personal_id);
+        $resolver->resolver($revision, $revision->filas->firstWhere('fila_excel', 3)->id, 102, 'Segunda correspondencia tras actividad administrativa.', 1);
+        $this->assertDatabaseCount('padron_revision_decisiones', 2);
+        $this->assertDatabaseCount('padron_revision_autorizaciones', 1);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'jornada' => 22]);
+        $this->travelBack();
     }
 
     public function test_bad_file_and_unknown_contract_cannot_be_resolved_manually(): void

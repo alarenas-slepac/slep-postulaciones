@@ -30,6 +30,9 @@
         @else
             <strong>Solo previsualización.</strong> No se modifican contratos, vigencias ni asignaciones.
             Las decisiones manuales y las autorizaciones de jornada tampoco aplican registros al padrón.
+            <div class="mt-2">Puede continuar esta misma revisión en distintas sesiones: no vence por el paso del tiempo ni por actividad en los documentos auditados.
+                Las decisiones registradas se conservan. Los conflictos de Dotación y las referencias históricas se consultan con los datos actuales al recargar;
+                antes de aplicar se revalidan. Si cambia el padrón contractual base, los establecimientos o las versiones de períodos, se exige un nuevo análisis.</div>
         @endif
         La Declaración de Sostenedores mantiene su prioridad.
     </div>
@@ -40,7 +43,7 @@
         <div class="alert alert-danger" role="alert">{{ $errors->first() }}</div>
     @endif
     @if ($obsoleta)
-        <div class="alert alert-warning">La base, sus referencias históricas o la versión del análisis cambiaron. Analice nuevamente el archivo; no es posible registrar decisiones ni autorizar excepciones sobre esta revisión.</div>
+        <div class="alert alert-warning">El padrón contractual base, los establecimientos, las versiones de períodos o la versión del análisis cambiaron. Analice nuevamente el archivo; no es posible registrar decisiones ni autorizar excepciones sobre esta revisión. Los cambios en documentos y cobertura no causan este bloqueo.</div>
     @endif
     @foreach ($revision->errores as $error)
         <div class="alert alert-danger">{{ $error }}</div>
@@ -232,14 +235,16 @@
                                         <div>{{ $vinculo['modulo'] }} #{{ $vinculo['id'] }}</div>
                                     @endforeach
                                     @if ($vinculos['total'] > count($vinculos['referencias']))<div>Se muestran las primeras 20 referencias.</div>@endif
-                                    <div class="small">Pendiente proteger su lectura antes de aplicar cambios contractuales. No se trasladan ni eliminan estos documentos.</div>
+                                    <div class="small">Referencias actuales: se revalidan y protegen antes de aplicar cambios contractuales. No se trasladan ni eliminan estos documentos.</div>
                                 </details>
                             @endif
+                            <div class="small text-muted">Observaciones del análisis original; la cobertura actual se muestra en el diagnóstico de Dotación.</div>
                             @foreach ($fila->observaciones as $observacion)
                                 <div>{{ $observacion }}</div>
                             @endforeach
                             @if ($fila->asignaciones)
-                                <details><summary>{{ count($fila->asignaciones) }} asignaciones activas relacionadas (por RUT o ID)</summary>
+                                <details><summary>{{ count($fila->asignaciones) }} asignaciones relacionadas al analizar (por RUT o ID)</summary>
+                                    <div class="small">Copia del análisis original. Consulte los vínculos y la cobertura actuales en «Conflictos con asignaciones de Dotación».</div>
                                     @foreach ($fila->asignaciones as $asignacion)
                                         <div>#{{ $asignacion['id'] }} · Establecimiento ID {{ $asignacion['establecimiento_id'] ?? '—' }} · {{ $asignacion['tipo_asignacion'] ?? '—' }} · {{ $asignacion['horas_contrato'] ?? '—' }} h</div>
                                     @endforeach

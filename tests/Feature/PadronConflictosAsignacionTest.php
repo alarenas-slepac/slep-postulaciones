@@ -264,22 +264,25 @@ class PadronConflictosAsignacionTest extends TestCase
         app(PadronAplicacionService::class)->aplicar($revision, 1);
     }
 
-    public function test_correcting_dotacion_requires_new_review_and_keeps_old_snapshot(): void
+    public function test_correcting_dotacion_refreshes_conflicts_in_the_same_review(): void
     {
         $revision = $this->revision([$this->data(['jornada' => 10])]);
         $this->assertSame(1, $this->diagnosis($revision)['bloqueantes']);
         DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['horas_contrato' => 10]);
-        $this->assertTrue(app(PadronRevisionService::class)->stale($revision));
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $this->assertSame(0, $this->diagnosis($revision)['bloqueantes']);
         $new = $this->revision([$this->data(['jornada' => 10])]);
         $this->assertFalse(app(PadronRevisionService::class)->stale($new));
         $this->assertSame(0, $this->diagnosis($new)['bloqueantes']);
-        $this->assertNotSame($revision->base_hash, $new->base_hash);
+        $this->assertSame($revision->base_hash, $new->base_hash);
     }
 
-    public function test_changes_in_estamento_declaration_or_exclusions_invalidate_review(): void
+    public function test_changes_in_coverage_invalidate_final_confirmation_not_manual_review(): void
     {
         foreach (['asignacion', 'declaracion', 'exclusion'] as $change) {
             $revision = $this->revision([$this->data()]);
+            $aplicador = app(PadronAplicacionService::class);
+            $token = $aplicador->plan($revision)['confirmacion_hash'];
             if ($change === 'asignacion') {
                 DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['estamento_cobertura' => 'asistente']);
             } elseif ($change === 'declaracion') {
@@ -287,7 +290,8 @@ class PadronConflictosAsignacionTest extends TestCase
             } else {
                 DB::table('dotacion_docente_exclusiones')->insert(['establecimiento_id' => 1, 'anio' => 2026, 'docente_rut' => '111111111', 'horas' => 10]);
             }
-            $this->assertTrue(app(PadronRevisionService::class)->stale($revision));
+            $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+            $this->assertFalse($aplicador->confirmacionVigente($revision, $token));
         }
     }
 
@@ -423,7 +427,10 @@ class PadronConflictosAsignacionTest extends TestCase
         (require base_path('database/migrations/2026_09_08_160000_create_padron_periodo_versiones.php'))->up();
         DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => null, 'horas_contrato' => 45]);
         $applied = $this->revision([$this->data()]);
-        $applied->update(['aplicada_at' => now(), 'aplicada_por' => 1]);
+        // Estado de fixture explícito: otras pruebas usan el esquema anterior
+        // y Eloquent conserva en caché las columnas asignables del modelo.
+        $applied->forceFill(['aplicada_at' => now(), 'aplicada_por' => 1])->save();
+        $this->assertNotNull($applied->fresh()->aplicada_at, 'La revisión de prueba debe quedar aplicada.');
         $diagnosis = $this->diagnosis($this->revision([$this->data()]));
         $this->assertSame(0.0, $diagnosis['grupos'][0]['cobertura_actual']['horas']);
         $this->assertSame('no_comparable', $diagnosis['grupos'][0]['comparacion']['estado']);

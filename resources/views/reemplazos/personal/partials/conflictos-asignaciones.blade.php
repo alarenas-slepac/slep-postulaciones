@@ -13,7 +13,7 @@
         @if ($obsoleta || $revision->errores)
             <div class="alert alert-warning">Diagnóstico orientativo: corrija el archivo o genere una revisión vigente antes de continuar.</div>
         @endif
-        <div class="alert alert-info">Para resolver: corrija la correspondencia de IDs cuando proceda; si las horas o vínculos son incorrectos, revíselos en Dotación con sus permisos habituales. Luego analice nuevamente el padrón completo. No se trasladan ni eliminan asignaciones automáticamente. Una autorización sobre 44 horas no levanta estos bloqueos.</div>
+        <div class="alert alert-info">Para resolver: corrija la correspondencia de IDs cuando proceda; si las horas o vínculos son incorrectos, revíselos en Dotación con sus permisos habituales. Luego recargue esta misma revisión para recalcular los conflictos, conservando las decisiones y autorizaciones registradas. No se trasladan ni eliminan asignaciones automáticamente. Una autorización sobre 44 horas no levanta estos bloqueos.</div>
         <div class="table-responsive">
             <table class="table table-sm table-bordered align-middle">
                 <thead><tr><th>Funcionario / asignaciones</th><th>Establecimiento</th><th>Cobertura actual y propuesta</th><th>Motivo / revisión</th></tr></thead>
