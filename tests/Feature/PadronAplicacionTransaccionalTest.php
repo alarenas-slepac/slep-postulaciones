@@ -54,6 +54,7 @@ class PadronAplicacionTransaccionalTest extends TestCase
         (require base_path('database/migrations/2026_09_08_120000_create_padron_revisiones.php'))->up();
         (require base_path('database/migrations/2026_09_08_130000_add_padron_aplicacion_segura.php'))->up();
         (require base_path('database/migrations/2026_09_08_150000_add_padron_snapshot_to_documentos.php'))->up();
+        (require base_path('database/migrations/2026_09_08_160000_create_padron_periodo_versiones.php'))->up();
         DB::table('establecimientos')->insert(['id' => 1, 'rbd' => 99999]);
         $this->personal(101);
         $this->personal(102, ['rut' => '222222222']);
@@ -125,7 +126,7 @@ class PadronAplicacionTransaccionalTest extends TestCase
     private function state(): array
     {
         $state = [];
-        foreach (['reemplazos_personal', 'dotacion_docente_asignaciones', 'padron_personal_cambios', ...PadronHistorialService::DOCUMENTOS] as $table) {
+        foreach (['reemplazos_personal', 'dotacion_docente_asignaciones', 'padron_personal_cambios', 'padron_periodo_versiones', 'padron_periodo_personal', ...PadronHistorialService::DOCUMENTOS] as $table) {
             $state[$table] = DB::table($table)->orderBy('id')->get()->toJson();
         }
         return $state;
@@ -159,6 +160,11 @@ class PadronAplicacionTransaccionalTest extends TestCase
         $this->assertSame(30, json_decode($audit->despues, true)['jornada']);
         $this->assertSame(7, $revision->fresh()->aplicada_por);
         $this->assertSame([101, 103, 104], \App\Models\ReemplazoPersonal::padronVigente(2026)->orderBy('id')->pluck('id')->all());
+        $periodos = app(\App\Services\Padron\PadronPeriodoService::class);
+        $this->assertSame(44, $periodos->consultaMensual(2026, 8)->where('id', 101)->firstOrFail()->jornada);
+        $this->assertTrue($periodos->consultaMensual(2026, 8)->where('id', 102)->firstOrFail()->vigente);
+        $this->assertSame(30, $periodos->consultaMensual(2026, 9)->where('id', 101)->firstOrFail()->jornada);
+        $this->assertDatabaseCount('padron_periodo_versiones', 4); // 2025/12, julio, agosto y septiembre.
     }
 
     public function test_identical_retry_does_not_duplicate_people_audit_or_snapshots(): void
@@ -224,6 +230,23 @@ class PadronAplicacionTransaccionalTest extends TestCase
             $this->assertSame($before, $this->state());
             $this->assertNull($revision->fresh()->aplicada_at);
         }
+    }
+
+    public function test_missing_period_history_schema_prevents_personnel_application(): void
+    {
+        Schema::drop('padron_periodo_personal'); // Solo la base efímera de pruebas.
+        $revision = $this->revision();
+        $before = DB::table('reemplazos_personal')->orderBy('id')->get()->toJson();
+        try {
+            $this->apply($revision);
+            $this->fail('No se puede aplicar sin versiones mensuales.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('historial por período', $e->getMessage());
+        }
+        $this->assertSame($before, DB::table('reemplazos_personal')->orderBy('id')->get()->toJson());
+        $this->assertDatabaseCount('padron_personal_cambios', 0);
+        $this->assertDatabaseCount('padron_periodo_versiones', 0);
+        $this->assertNull($revision->fresh()->aplicada_at);
     }
 
     public function test_changed_authorization_after_screen_confirmation_is_rejected(): void

@@ -4110,8 +4110,23 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.484',
+    'current_version' => '2026.9.8.485',
     'entries' => [
+        [
+            'version' => '2026.9.8.485',
+            'title' => 'Padrón: versiones contractuales por período',
+            'summary' => 'Prepara copias mensuales conservando IDs y adapta las lecturas del padrón y la base contractual de Dotación.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp'],
+            'items' => [
+                'Agrega tablas de versiones por período; la migración no copia ni modifica personal y no habilita la aplicación definitiva.',
+                'El escritor protegido captura la base anterior y el resultado por lotes dentro de la misma transacción. Conserva correcciones del mismo mes, metadatos y referencias contractuales.',
+                'La nómina mensual y su CSV consultan copias de meses archivados, con búsqueda, paginación y restricciones por establecimiento. El período actual mantiene la lectura operativa.',
+                'Dotación consulta la base contractual por año sin recuperar meses antiguos ante una ausencia en una carga completa. Se mantienen la prioridad de declaración y las exclusiones existentes.',
+                'Los meses archivados son de solo lectura; no permiten editar el contrato actual ni traspasar bloqueos como si fueran antecedentes históricos.',
+                'Huella v9: regenerar revisiones anteriores. Se mantienen los bloqueos de cambios entre años y de aplicación definitiva hasta certificar lectores indirectos y concurrencia MySQL.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.484',
             'title' => 'Padrón: menor consumo de memoria en carga masiva',

@@ -1,4 +1,10 @@
-# Auditoría de consumidores del padrón — 2026.9.8.483
+# Auditoría de consumidores del padrón — actualizada en 2026.9.8.485
+
+Avance de esta etapa: [versiones por período](PADRON_VERSIONES_PERIODO.md).
+Las lecturas principales mensuales y la base contractual anual ya usan copias
+cuando existen; no están certificados todos los lectores indirectos ni los demás
+insumos históricos de Dotación. El bloqueo anual y la aplicación cerrada se mantienen.
+Los hallazgos de 483 descritos abajo documentan la causa original.
 
 ## Alcance y estado
 
@@ -54,8 +60,8 @@ copias, documentos sin copia, fila actual ausente, migración no instalada y con
 
 | Consumidor / entrada | Lectura identificada | Estado y acción pendiente |
 | --- | --- | --- |
-| Dotación: `DotacionEstablecimientoCalculator`, controladores de Dotación y exportaciones/avance | Año + último período por establecimiento; declaración prioritaria | Bloqueo anual agregado. Falta fuente contractual versionada y probar traslados/meses en vistas y exportaciones. |
-| `ReemplazosController::resolvePadronContext/buildPadronQuery` | Selector de años/meses y consulta directa del período | P0 pendiente: actualizar `anio/mes` sobre el mismo ID cambia también las nóminas mensuales. Requiere lectura histórica por período, no solo por año. |
+| Dotación: `DotacionEstablecimientoCalculator`, controladores de Dotación y exportaciones/avance | Año + último período por establecimiento; declaración prioritaria | Base contractual versionada en 485; pruebas de docentes/asistentes y traslados entre años. Pendiente certificar lectores indirectos y otros insumos; bloqueo anual conservado. |
+| `ReemplazosController::resolvePadronContext/buildPadronQuery` | Selector y consulta mensual, conteos y CSV | Adaptados en 485, con filtro por establecimiento y consulta SQL paginable. Meses archivados de solo lectura; traspaso de bloqueos históricos aún bloqueado. |
 | `CentroOperaciones/DatosBaseService::dotacionesPara` | Máximo período entre filas vigentes por establecimiento | P0 pendiente: si se desactiva el mes más reciente puede regresar a un mes anterior; no usa el piso de cargas completas aplicadas. |
 | `FuncionarioRegisterLookupService`, `TramiteAutofillService` | Último período del propio RUT sin filtro de vigencia en la consulta inicial | P0 pendiente: distinguir antecedente histórico de vínculo actual al dar de baja/trasladar. El autocompletado también tiene alternativa desde solicitudes aceptadas/cerradas; no quitarla sin revisar su finalidad. |
 | `LicenciasMedicas/LicenciaFuncionarioResolver`, `Tramites/LicenciaMedicaController` | Administración Central y búsqueda del padrón en el máximo período global | Pendiente: unificar criterio de vigencia y probar edición/importación sin alterar licencias previas. No extender aquí la exclusión de reemplazos de Dotación. |

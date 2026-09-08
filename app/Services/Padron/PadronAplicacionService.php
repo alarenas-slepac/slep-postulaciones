@@ -21,6 +21,7 @@ class PadronAplicacionService
             && Schema::hasTable('padron_aplicacion_control')
             && Schema::hasTable('padron_revision_decisiones')
             && Schema::hasTable('padron_personal_cambios')
+            && app(PadronPeriodoService::class)->instalado()
             && Schema::hasColumn('padron_revisiones', 'aplicada_at')
             && Schema::hasColumn('padron_revisiones', 'aplicada_por');
     }
@@ -107,7 +108,7 @@ class PadronAplicacionService
             'errores' => array_values(array_unique(array_merge($errores, $conflictos['errores'])))];
     }
 
-    /** La copia por documento no protege las consultas anuales directas de Dotación. */
+    /** Mantener hasta certificar también los lectores indirectos de años anteriores. */
     private function bloqueosHistoriaAnual(PadronRevision $revision, array $destinos, array $bajas): array
     {
         $ids = collect($destinos)->pluck('id')->filter()->merge($bajas)->unique()->values()->all();
@@ -125,7 +126,7 @@ class PadronAplicacionService
             if (! $anterior) {
                 $errores[] = 'ID '.$destino['id'].': el registro seleccionado ya no existe. Genere un nuevo análisis.';
             } elseif ((int) $anterior->anio !== (int) $revision->anio) {
-                $errores[] = 'Fila '.$destino['fila']->fila_excel.' · ID '.$anterior->id.': protección de Dotación histórica. Cambiar el año '.($anterior->anio ?? 'sin identificar').' a '.$revision->anio.' sobrescribiría la base contractual del año anterior. Se requiere implementar la lectura histórica anual antes de reutilizar este ID; no duplique registros ni cambie el año del Excel para omitir el bloqueo.';
+                $errores[] = 'Fila '.$destino['fila']->fila_excel.' · ID '.$anterior->id.': protección de Dotación histórica. Cambiar el año '.($anterior->anio ?? 'sin identificar').' a '.$revision->anio.' requiere certificar también los lectores indirectos del año anterior. La lectura versionada principal no levanta todavía este bloqueo; no duplique registros ni cambie el año del Excel para omitirlo.';
             }
         }
         foreach (array_unique($bajas) as $id) {
@@ -133,7 +134,7 @@ class PadronAplicacionService
             if (! $anterior) {
                 $errores[] = 'ID '.$id.': la baja propuesta ya no existe. Genere un nuevo análisis.';
             } elseif (($anterior->vigente ?? true) && (int) $anterior->anio !== (int) $revision->anio) {
-                $errores[] = 'ID '.$id.': protección de Dotación histórica. No se puede desactivar una versión del año '.($anterior->anio ?? 'sin identificar').' desde el padrón '.$revision->anio.' sin una lectura histórica anual. La confirmación manual de baja no levanta este bloqueo.';
+                $errores[] = 'ID '.$id.': protección de Dotación histórica. No se puede desactivar una versión del año '.($anterior->anio ?? 'sin identificar').' desde el padrón '.$revision->anio.' hasta certificar todos los consumidores históricos. La confirmación manual de baja no levanta este bloqueo.';
             }
         }
         return $errores;
@@ -211,6 +212,7 @@ class PadronAplicacionService
                 ->merge($plan['bajas'])
                 ->unique()->values()->all();
             app(PadronHistorialService::class)->congelarReferencias($idsAfectados);
+            app(PadronPeriodoService::class)->antesDeAplicar($revision, $usuario);
             $establecimientos = DB::table('establecimientos')->pluck('id', 'rbd');
             $ruts = [];
             foreach ($anteriores as $old) {
@@ -260,6 +262,7 @@ class PadronAplicacionService
                 ], $columns));
                 $this->auditar($revision, $old->id, (array) $old, 'desactivacion', $usuario);
             }
+            app(PadronPeriodoService::class)->despuesDeAplicar($revision, $usuario);
             $revision->forceFill(['aplicada_at' => now(), 'aplicada_por' => $usuario])->save();
             return $revision;
         }, 3);

@@ -121,6 +121,12 @@
             </div>
         </div>
     @else
+        @if (!empty($filters['historico']))
+            <div class="alert alert-info">
+                Padrón archivado: muestra la última copia disponible del período, conservando los IDs contractuales.
+                Es de solo lectura. Los bloqueos indicados son los actuales del ID, no un historial de bloqueos.
+            </div>
+        @endif
         @if ($lockedWithoutEstablecimiento)
             <div class="alert alert-warning">
                 <div class="fw-semibold">Tu usuario no tiene establecimiento asignado.</div>
@@ -131,7 +137,7 @@
         @endif
 
         @php
-            $userCanManageBloqueos = auth()->check() && method_exists(auth()->user(), 'hasAnyRole') && auth()->user()->hasAnyRole(['admin', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani']);
+            $userCanManageBloqueos = empty($filters['historico']) && auth()->check() && method_exists(auth()->user(), 'hasAnyRole') && auth()->user()->hasAnyRole(['admin', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani']);
         @endphp
 
         <div class="card mb-3">
@@ -347,8 +353,8 @@
         </div>
 
         @php
-            $userCanManageBloqueos = auth()->check() && method_exists(auth()->user(), 'hasAnyRole') && auth()->user()->hasAnyRole(['admin', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani']);
-            $canEditPadronRows = auth()->check() && method_exists(auth()->user(), 'hasRole') && auth()->user()->hasRole('admin') && !empty($filters['establecimiento_id']);
+            $userCanManageBloqueos = empty($filters['historico']) && auth()->check() && method_exists(auth()->user(), 'hasAnyRole') && auth()->user()->hasAnyRole(['admin', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani']);
+            $canEditPadronRows = empty($filters['historico']) && auth()->check() && method_exists(auth()->user(), 'hasRole') && auth()->user()->hasRole('admin') && !empty($filters['establecimiento_id']);
             $showAccionesPadron = $canEditPadronRows || $userCanManageBloqueos;
         @endphp
 
