@@ -50,7 +50,10 @@
                 <option value="{{ $selectedFuncionarioIdForJs }}" selected>{{ $selectedFuncionarioTextForJs }}</option>
             @endif
         </select>
-        <div class="form-text">Busca por RUT o nombre del funcionario del padrón del establecimiento.</div>
+        <div class="form-text">Busca por RUT o nombre en el padrón vigente del establecimiento.</div>
+        @if ($item->exists)
+            <div class="form-text">Al mantener el funcionario y establecimiento originales se conservan los antecedentes del documento, aunque haya una baja o traslado. Para cambiar de funcionario se exige un registro vigente.</div>
+        @endif
         @error('reemplazo_personal_id')
             <div class="invalid-feedback d-block">{{ $message }}</div>
         @enderror

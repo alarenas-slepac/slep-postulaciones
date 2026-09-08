@@ -1,4 +1,4 @@
-# Auditoría de consumidores del padrón — actualizada en 2026.9.8.487
+# Auditoría de consumidores del padrón — actualizada en 2026.9.8.489
 
 Avance de esta etapa: [versiones por período](PADRON_VERSIONES_PERIODO.md).
 Las lecturas principales mensuales y la base contractual anual ya usan copias
@@ -68,8 +68,8 @@ copias, documentos sin copia, fila actual ausente, migración no instalada y con
 | `FuncionarioRegisterLookupService`, `TramiteAutofillService` | Contratos vigentes por RUT y establecimiento | Adaptados en 486: antecedentes no acreditan vigencia; contempla ambigüedad entre RBD, huérfanos actuales y alternativa de solicitudes solo para RUT sin registros de padrón. |
 | `LicenciasMedicas/LicenciaFuncionarioResolver`, `Tramites/LicenciaMedicaController`, `LicenciaSeguimientoImportService` | Identidad AC prioritaria y contratos vigentes por establecimiento | Adaptados en 487: cruce exacto, advertencias de asociación, conservación de identidad en reimportación y rechazo de folios de otro RUT. No excluye reemplazos/suplencias. No certifica dependencia a la fecha del reposo ni concurrencia MySQL. |
 | `Remuneraciones/ReemplazoPersonalRutService`, `DescuentoCgrController` | Identidad por RUT; prioriza Administración Central y último año/mes/id del RUT | Pendiente: diferenciar identificación histórica de elegibilidad actual. No excluir exfuncionarios de descuentos sin confirmar regla del módulo. |
-| `IncumplimientoLaboralController` | Consultas directas en selector, validación y detalle; modelo con copia | Propiedad histórica protegida; pendiente revisar todo el ciclo de edición frente a bajas y traslados. |
-| `Tramites/CometidoFuncionarioController` | Búsquedas directas de titulares y período por establecimiento | Rendición adaptada previamente; faltan pruebas completas de edición/selección con padrón actualizado. |
+| `IncumplimientoLaboralController` | Selector vigente y edición con contexto documental | Adaptado en 489: selección y validación vigentes, edición conserva identidad guardada; copias parciales para documentos antiguos. Pendiente certificación MySQL concurrente. |
+| `Tramites/CometidoFuncionarioController` | Selector vigente y antecedentes originales para edición | Adaptado en 489 para establecimientos, incluido detalle AJAX. Administración Central no modificada. Pendiente certificar anexos/insumos financieros temporales y concurrencia. |
 | `FuncionarioEstab/SolicitudReemplazoController`, `ReemplazoSolicitudReglaMinima` | Selector vigente y edición con contexto documental | Protecciones y pruebas anteriores; mantener revisión de rutas indirectas y máximos por financiamiento. |
 | `Gestion/SolicitudReemplazoGestionController`, `Gestion/InformesController` | Nóminas, filtros históricos y estatuto | Adaptados previamente con pruebas; no confundir con certificación de todos los informes indirectos. |
 | `Gestion/EstadisticasController` | Ranking por ID | Corregido y probado en esta etapa. |
@@ -121,7 +121,7 @@ confirmación de identidad del endpoint de registro y la alternativa por solicit
 La consulta no escribe personal, usuarios ni documentos. No se agregan migraciones,
 rutas ni permisos, y no se habilita la aplicación definitiva ni los cambios entre años.
 
-Pendiente inmediato: revisar cometidos/incumplimientos y el ciclo de
+Pendiente inmediato: revisar los demás lectores y el ciclo de
 bloqueos según el inventario. La certificación de concurrencia MySQL debe incluir
 las escrituras de registro/autocompletado y licencias que pueden competir con una carga.
 
@@ -160,6 +160,32 @@ corrección/reproceso, cambios de estado, recálculo de días y renderizado de l
 del módulo con un layout aislado. Todas las pruebas usan SQLite en memoria y datos
 sintéticos; no certifican concurrencia real MySQL. El módulo no tiene un endpoint
 general de edición de identidad: se verifican sus operaciones de actualización actuales.
+
+## Cometidos e Incumplimientos (2026.9.8.489)
+
+- Las nuevas selecciones y su validación en servidor utilizan `PadronVigenciaService`.
+  No reaparece un mes anterior cuando el último queda inactivo. Se respeta el piso
+  de cargas completas y el establecimiento autorizado; no se excluyen reemplazos
+  o suplencias por las reglas particulares de Dotación.
+- Al editar y mantener el ID original se usan los campos guardados del documento,
+  no la identidad ni el contrato posterior de la fila actual. Se conservan nulos,
+  RUT, nombre, RBD y, en Cometidos, calidad jurídica, estamento y cargo.
+- La opción original solo se ofrece dentro del documento autorizado. Las nuevas
+  selecciones y el detalle AJAX de Cometidos no permiten recuperar una fila inactiva.
+  En Incumplimientos, mantener el ID original exige conservar su establecimiento
+  documental; no se migra una constancia automáticamente al nuevo RBD del padrón.
+- `PadronDocumentoFuncionarioService` valida las copias existentes. Si no existe
+  copia, guarda los campos conocidos del documento como copia parcial identificada
+  con origen `antecedentes_documento_sin_copia`. No inventa jornada, fechas u otros
+  antecedentes ausentes. Si cambia el funcionario, la copia previa queda en el
+  historial de copias y el nuevo contrato se captura con el mecanismo existente.
+- El flujo de Administración Central y las reglas de fechas, documentos y viáticos
+  no se modifican. Los anexos de viáticos siguen siendo una consulta actual por RUT:
+  esta etapa no certifica su vigencia retrospectiva ni todos los lectores financieros.
+- `PadronCometidosIncumplimientosTest` usa SQLite en memoria y datos sintéticos,
+  incluyendo actualizaciones reales de ambos controladores y conservación de IDs.
+  No se ejecutan migraciones productivas ni se modifica personal desde estos cambios.
+  Aplicación definitiva y cambios entre años continúan bloqueados; falta MySQL concurrente.
 
 ## Orden de cierre
 

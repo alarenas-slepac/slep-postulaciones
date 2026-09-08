@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Establecimiento;
 use App\Models\IncumplimientoLaboral;
 use App\Models\IncumplimientoLaboralHistorial;
-use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronDocumentoFuncionarioService;
+use App\Services\Padron\PadronVigenciaService;
 use App\Support\Rut;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -155,7 +156,8 @@ class IncumplimientoLaboralController extends Controller
         $selectedEstablecimientoId = old('establecimiento_id', $item->establecimiento_id);
         $selectedFuncionarioOption = $this->buildFuncionarioOption(
             old('reemplazo_personal_id') ? (int) old('reemplazo_personal_id') : $item->reemplazo_personal_id,
-            $selectedEstablecimientoId
+            $selectedEstablecimientoId,
+            $item
         );
 
         return view('incumplimientos.edit', [
@@ -186,6 +188,7 @@ class IncumplimientoLaboralController extends Controller
 
         $before = $this->snapshotItem($item);
 
+        app(PadronDocumentoFuncionarioService::class)->conservar($item);
         $item->fill($payload);
         $item->updated_by_user_id = $request->user()->id;
         $item->save();
@@ -313,7 +316,7 @@ class IncumplimientoLaboralController extends Controller
 
         $term = trim((string) $request->query('term', ''));
 
-        $rows = ReemplazoPersonal::query()
+        $rows = app(PadronVigenciaService::class)->consultaActual()
             ->where('establecimiento_id', $establecimientoId)
             ->when($term !== '', function ($query) use ($term) {
                 $query->where(function ($inner) use ($term) {
@@ -327,7 +330,7 @@ class IncumplimientoLaboralController extends Controller
             ->get(['id', 'rut', 'nombre', 'anio', 'mes', 'establecimiento_id']);
 
         $results = $rows
-            ->groupBy(fn($row) => strtoupper((string) $row->rut))
+            ->groupBy(fn($row) => strtoupper(preg_replace('/[^0-9Kk]/', '', (string) $row->rut)) ?: 'id:'.$row->id)
             ->map(function (Collection $group) {
                 $row = $group->first();
                 return [
@@ -485,7 +488,7 @@ class IncumplimientoLaboralController extends Controller
 
         $validated = $request->validate([
             'establecimiento_id' => [$isAdmin ? 'required' : 'nullable', 'integer', 'exists:establecimientos,id'],
-            'reemplazo_personal_id' => ['required', 'integer', 'exists:reemplazos_personal,id'],
+            'reemplazo_personal_id' => ['required', 'integer'],
             'fecha_desde' => ['required', 'date'],
             'fecha_hasta' => ['required', 'date', 'after_or_equal:fecha_desde'],
             'dias' => [
@@ -519,11 +522,15 @@ class IncumplimientoLaboralController extends Controller
         $establecimientoId = $isAdmin ? (int) $validated['establecimiento_id'] : $forcedEstablecimientoId;
         abort_if(!$isAdmin && $establecimientoId <= 0, 403, 'Usuario sin establecimiento asociado.');
 
-        /** @var ReemplazoPersonal|null $funcionario */
-        $funcionario = ReemplazoPersonal::query()->find($validated['reemplazo_personal_id']);
+        $conservaFuncionario = $existing && (int) $existing->reemplazo_personal_id === (int) $validated['reemplazo_personal_id'];
+        $funcionario = $conservaFuncionario
+            ? app(PadronDocumentoFuncionarioService::class)->funcionario($existing)
+            : app(PadronVigenciaService::class)->consultaActual()->find($validated['reemplazo_personal_id']);
         if (!$funcionario || (int) $funcionario->establecimiento_id !== (int) $establecimientoId) {
             throw ValidationException::withMessages([
-                'reemplazo_personal_id' => 'El funcionario seleccionado no pertenece al establecimiento indicado.',
+                'reemplazo_personal_id' => $conservaFuncionario
+                    ? 'Para conservar el funcionario original, mantenga el establecimiento del documento. Para cambiarlo, seleccione un funcionario vigente del nuevo establecimiento.'
+                    : 'El funcionario seleccionado no pertenece al padrón vigente del establecimiento indicado.',
             ]);
         }
 
@@ -541,6 +548,13 @@ class IncumplimientoLaboralController extends Controller
             'horas' => (int) $validated['horas'],
             'minutos' => (int) $validated['minutos'],
         ];
+
+        if ($conservaFuncionario) {
+            // Conservar exactamente lo guardado, sin reformatear ni consultar el RBD actual.
+            foreach (['establecimiento_id', 'reemplazo_personal_id', 'funcionario_rut', 'funcionario_nombre', 'funcionario_rbd'] as $campo) {
+                unset($payload[$campo]);
+            }
+        }
 
         return [$validated, $payload];
     }
@@ -612,15 +626,17 @@ class IncumplimientoLaboralController extends Controller
         ]);
     }
 
-    private function buildFuncionarioOption(?int $reemplazoPersonalId, ?int $establecimientoId): ?array
+    private function buildFuncionarioOption(?int $reemplazoPersonalId, ?int $establecimientoId, ?IncumplimientoLaboral $documento = null): ?array
     {
         if (!$reemplazoPersonalId || !$establecimientoId) {
             return null;
         }
 
-        $row = ReemplazoPersonal::query()
-            ->where('establecimiento_id', $establecimientoId)
-            ->find($reemplazoPersonalId);
+        $original = $documento && (int) $documento->reemplazo_personal_id === $reemplazoPersonalId
+            && (int) $documento->establecimiento_id === $establecimientoId;
+        $row = $original
+            ? app(PadronDocumentoFuncionarioService::class)->funcionario($documento)
+            : app(PadronVigenciaService::class)->consultaActual()->where('establecimiento_id', $establecimientoId)->find($reemplazoPersonalId);
 
         if (!$row) {
             return null;
@@ -628,7 +644,7 @@ class IncumplimientoLaboralController extends Controller
 
         return [
             'id' => (string) $row->id,
-            'text' => trim((Rut::format($row->rut) ?? $row->rut) . ' · ' . $row->nombre),
+            'text' => trim((Rut::format($row->rut) ?? $row->rut) . ' · ' . $row->nombre) . ($original ? ' · Antecedente del documento' : ''),
         ];
     }
 }
