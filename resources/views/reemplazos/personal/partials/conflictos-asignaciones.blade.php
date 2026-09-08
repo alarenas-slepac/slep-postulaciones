@@ -1,38 +1,59 @@
 <div class="card mb-3" id="conflictos-asignaciones">
     <div class="card-header">Conflictos con asignaciones de Dotación</div>
     <div class="card-body">
-        <p><strong>{{ $conflictos['bloqueantes'] }} asignaciones con bloqueos</strong> · {{ $conflictos['avisos'] }} con avisos sin bloqueo · {{ $conflictos['asignaciones_revisadas'] }} activas revisadas del año {{ $revision->anio ?? 'sin determinar' }}.</p>
+        <p><strong>{{ $conflictos['grupos_bloqueantes'] }} casos con bloqueos</strong> · {{ $conflictos['grupos_avisos'] }} casos con avisos sin bloqueo.
+            Cada caso corresponde a un RUT y establecimiento.</p>
+        <p class="small">{{ $conflictos['asignaciones_revisadas'] }} asignaciones activas revisadas del año {{ $revision->anio ?? 'sin determinar' }},
+            agrupadas en {{ $conflictos['grupos_revisados'] }} casos.
+            {{ $conflictos['bloqueantes'] }} asignaciones con bloqueos · {{ $conflictos['avisos'] }} con avisos sin bloqueo.</p>
         <p class="small">Diagnóstico de toda la carga y las decisiones actuales, independiente del filtro de filas.
             Las horas se contrastan por RUT y establecimiento, sin sumar Jornada Básica/Media nuevamente.
-            La declaración tiene prioridad y no se suma al padrón; las exclusiones docentes se descuentan.</p>
+            La declaración tiene prioridad y no se suma al padrón; las exclusiones docentes se descuentan.
+            Un exceso preexistente que la carga no aumenta se informa como aviso. Los excesos nuevos o agravados y los problemas de vínculos mantienen el bloqueo.</p>
         @if ($obsoleta || $revision->errores)
             <div class="alert alert-warning">Diagnóstico orientativo: corrija el archivo o genere una revisión vigente antes de continuar.</div>
         @endif
         <div class="alert alert-info">Para resolver: corrija la correspondencia de IDs cuando proceda; si las horas o vínculos son incorrectos, revíselos en Dotación con sus permisos habituales. Luego analice nuevamente el padrón completo. No se trasladan ni eliminan asignaciones automáticamente. Una autorización sobre 44 horas no levanta estos bloqueos.</div>
         <div class="table-responsive">
             <table class="table table-sm table-bordered align-middle">
-                <thead><tr><th>Asignación / funcionario</th><th>Establecimiento</th><th>Horas y cobertura propuesta</th><th>Motivo / revisión</th></tr></thead>
+                <thead><tr><th>Funcionario / asignaciones</th><th>Establecimiento</th><th>Cobertura actual y propuesta</th><th>Motivo / revisión</th></tr></thead>
                 <tbody>
                     @forelse ($conflictosPaginados as $item)
                         <tr class="{{ $item['bloqueante'] ? 'table-danger' : 'table-warning' }}">
-                            <td>#{{ $item['asignacion_id'] }} · ID contractual {{ $item['personal_id'] ?? 'Sin ID (vínculo por RUT)' }}<br>
-                                {{ $item['rut'] }}<br>{{ $item['tipo'] }} · {{ $item['asignatura'] }}
-                                @if ($item['fila_excel'])<div>Fila Excel {{ $item['fila_excel'] }}</div>@endif
-                                <a href="{{ route('reemplazos.personal.import', ['revision' => $revision->id, 'q' => $item['rut']]) }}">Ver filas del RUT</a>
+                            <td>{{ $item['rut'] ?: 'RUT sin identificar' }}<br>
+                                @if ($item['rut'])
+                                    <a href="{{ route('reemplazos.personal.import', ['revision' => $revision->id, 'q' => $item['rut']]) }}">Ver filas del RUT</a>
+                                @endif
+                                <details class="mt-2">
+                                    <summary>Ver {{ count($item['asignaciones']) }} asignaciones</summary>
+                                    @foreach ($item['asignaciones'] as $asignacion)
+                                        <div class="border-top mt-2 pt-2">
+                                            <strong>#{{ $asignacion['asignacion_id'] }} · {{ $asignacion['horas'] }} h</strong><br>
+                                            ID contractual: {{ $asignacion['personal_id'] ?? 'Sin ID (vínculo por RUT)' }}<br>
+                                            {{ $asignacion['tipo'] }} · {{ $asignacion['asignatura'] }}
+                                            @if ($asignacion['fila_excel'])<div>Fila Excel {{ $asignacion['fila_excel'] }}</div>@endif
+                                            @foreach ($asignacion['motivos'] as $codigo => $motivo)
+                                                @if ($codigo !== 'cobertura_insuficiente')<div>{{ $motivo }}</div>@endif
+                                            @endforeach
+                                        </div>
+                                    @endforeach
+                                </details>
                             </td>
                             <td>RBD {{ $item['rbd'] ?? '—' }} · {{ $item['establecimiento'] }}
                                 @if ($item['rbd'])
                                     <div><a href="{{ route('admin.dotacion-establecimiento.show', ['establecimiento' => $item['establecimiento_id'], 'anio' => $revision->anio]) }}" target="_blank" rel="noopener">Revisar Dotación</a></div>
                                 @endif
                             </td>
-                            <td>Esta asignación: {{ $item['horas'] }} h<br>
-                                Total RUT/establecimiento: {{ $item['total_asignadas'] }} h<br>
-                                Cobertura: {{ $item['cobertura']['horas'] }} h<br>
-                                Fuente: {{ $item['cobertura']['fuente'] }}<br>
-                                Padrón propuesto: {{ $item['cobertura']['horas_archivo'] }} h · Declaradas: {{ $item['cobertura']['horas_declaradas'] ?? '—' }} h<br>
-                                Exclusión docente: {{ $item['cobertura']['excluidas'] }} h
+                            <td><strong>Total asignado: {{ $item['total_asignadas'] }} h</strong><br>
+                                Cobertura actual: {{ $item['cobertura_actual']['horas'] }} h<br>
+                                <span class="small">{{ $item['cobertura_actual']['fuente'] }} · Padrón actual: {{ $item['cobertura_actual']['horas_archivo'] }} h</span><br>
+                                Cobertura propuesta: {{ $item['cobertura']['horas'] }} h<br>
+                                <span class="small">{{ $item['cobertura']['fuente'] }} · Padrón propuesto: {{ $item['cobertura']['horas_archivo'] }} h</span><br>
+                                Declaradas: {{ $item['cobertura']['horas_declaradas'] ?? '—' }} h · Exclusión docente: {{ $item['cobertura']['excluidas'] }} h<br>
+                                Exceso actual: {{ $item['comparacion']['exceso_actual'] === null ? 'No comparable' : $item['comparacion']['exceso_actual'].' h' }}<br>
+                                Exceso propuesto: {{ $item['comparacion']['exceso_propuesto'] }} h
                             </td>
-                            <td><strong>{{ $item['bloqueante'] ? 'Bloquea la aplicación' : 'Cambio informado: sin conflicto de cobertura detectado' }}</strong>
+                            <td><strong>{{ $item['bloqueante'] ? 'Bloquea la aplicación' : 'Aviso: no bloquea por este caso' }}</strong>
                                 @foreach ($item['motivos'] as $motivo)<div>{{ $motivo }}</div>@endforeach
                                 @foreach ($item['avisos'] as $aviso)<div>{{ $aviso }}</div>@endforeach
                             </td>
@@ -43,7 +64,9 @@
                 </tbody>
             </table>
         </div>
-        <p class="small text-muted">Una asignación se cuenta una sola vez aunque tenga varios motivos. El total de horas del RUT/establecimiento se repite como referencia: no debe sumarse entre filas.</p>
+        <p class="small text-muted">Cada RUT/establecimiento se muestra una sola vez, con el detalle desplegable de todas sus asignaciones.
+            Si falta el RUT, cada asignación se informa por separado para no mezclar identidades.
+            Un aviso no habilita por sí solo la aplicación definitiva del padrón.</p>
         {{ $conflictosPaginados->links() }}
     </div>
 </div>

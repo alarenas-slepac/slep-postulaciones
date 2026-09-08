@@ -40,6 +40,9 @@
     </div>
 
     @if(session('success'))<div class="alert alert-success rounded-4 shadow-sm">{{ session('success') }}</div>@endif
+    @if(session('advertencia_asociacion'))
+        <div class="alert alert-warning rounded-4" role="alert">{{ session('advertencia_asociacion') }}</div>
+    @endif
     @if($errors->any())
         <div class="alert alert-danger rounded-4 shadow-sm">
             <strong>No fue posible actualizar el estado:</strong>

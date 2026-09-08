@@ -12,7 +12,7 @@ class PadronConflictosAsignacionService
     public function snapshot(?int $anio): array
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'cobertura-v2');
+        hash_update($hash, 'cobertura-v3-comparacion');
         $read = static function (string $table, array $columns, bool $annual = false) use ($anio, $hash): array {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
@@ -61,7 +61,7 @@ class PadronConflictosAsignacionService
             if ($fila->accion === PadronReemplazosVigentes::OMITIDO) {
                 continue;
             }
-            $data = $fila->datos;
+            $data = array_intersect_key($fila->datos, array_flip(['rbd', 'tipocontrato', 'financiamiento', 'estatuto', 'escalafon', 'jornada']));
             $rut = PadronConciliador::rut($fila->rut);
             $estId = (int) ($estPorRbd[$data['rbd'] ?? 0]->id ?? 0);
             $key = $rut.'|'.$estId;
@@ -77,8 +77,11 @@ class PadronConflictosAsignacionService
                 $grupos[$key][] = $data;
             }
         }
+        // El detalle agrupado no necesita conservar otra colección de modelos
+        // ni nombres/fechas/documentos de todas las filas del archivo.
+        unset($filas, $fila, $decisiones, $selecciones, $data);
         $personal = DB::table('reemplazos_personal')->whereIn('id', array_filter(array_column($snapshot['asignaciones'], 'reemplazos_personal_id')))
-            ->get()->keyBy('id');
+            ->get(['id', 'rut', 'tipocontrato', 'financiamiento', 'estatuto', 'jornada'])->keyBy('id');
         $porGrupo = [];
         foreach ($snapshot['asignaciones'] as $asignacion) {
             $id = $asignacion['reemplazos_personal_id'] ?? null;
@@ -87,9 +90,14 @@ class PadronConflictosAsignacionService
                 $rut = PadronConciliador::rut($personal[$id]->rut ?? null);
             }
             $asignacion['_rut'] = $rut;
-            $porGrupo[$rut.'|'.$asignacion['establecimiento_id']][] = $asignacion;
+            $key = $rut !== '' ? $rut.'|'.$asignacion['establecimiento_id'] : 'sin_identidad|'.$asignacion['id'];
+            $porGrupo[$key][] = $asignacion;
         }
+        $asignacionesRevisadas = count($snapshot['asignaciones']);
+        unset($snapshot['asignaciones'], $asignacion);
+        $actuales = $this->contratosActuales($revision->anio, $porGrupo);
         $items = [];
+        $gruposResultado = [];
         $errores = [];
         if (! $revision->anio || $revision->errores) {
             $errores[] = 'Corrija el archivo y su período antes de considerar definitivo el diagnóstico de cobertura.';
@@ -100,7 +108,16 @@ class PadronConflictosAsignacionService
             $est = $establecimientos[$estId] ?? null;
             $rows = $grupos[$key] ?? [];
             $cobertura = $this->cobertura($rows, $rut, (string) ($est->rbd ?? ''), $estId, $snapshot);
+            $rowsActuales = $actuales[$key] ?? [];
+            $coberturaActual = $this->cobertura($rowsActuales, $rut, (string) ($est->rbd ?? ''), $estId, $snapshot);
+            if ($coberturaActual['fuente'] === 'Padrón propuesto') {
+                $coberturaActual['fuente'] = 'Padrón actual';
+            }
             $total = round(array_sum(array_map(fn ($a) => max(0, (float) ($a['horas_contrato'] ?? 0)), $asignaciones)), 2);
+            $comparacion = $this->compararCobertura($total, $rowsActuales, $coberturaActual, $cobertura);
+            $detalles = [];
+            $motivosGrupo = [];
+            $avisosGrupo = [];
             foreach ($asignaciones as $a) {
                 $id = $a['reemplazos_personal_id'] ?? null;
                 $destino = $destinos[$id] ?? null;
@@ -149,29 +166,109 @@ class PadronConflictosAsignacionService
                     $motivos['horas_invalidas'] = 'Las horas contractuales de la asignación no son válidas; revise su registro en Dotación.';
                 }
                 if ($total > $cobertura['horas'] + 0.01) {
-                    $motivos['cobertura_insuficiente'] = $total.' h asignadas al RUT/establecimiento superan las '.$cobertura['horas'].' h de cobertura propuesta ('.$cobertura['fuente'].').';
+                    if ($comparacion['estado'] === 'preexistente') {
+                        $avisos[] = 'Exceso preexistente: '.$comparacion['exceso_actual'].' h antes y '.$comparacion['exceso_propuesto'].' h con la propuesta. La carga no lo agrava; revise las asignaciones en Dotación. Este exceso por sí solo no bloquea.';
+                    } else {
+                        $motivos['cobertura_insuficiente'] = $total.' h asignadas al RUT/establecimiento superan las '.$cobertura['horas'].' h de cobertura propuesta ('.$cobertura['fuente'].'). '
+                            .match ($comparacion['estado']) {
+                                'nuevo' => 'La propuesta genera un exceso nuevo.',
+                                'agravado' => 'La propuesta aumenta el exceso de '.$comparacion['exceso_actual'].' a '.$comparacion['exceso_propuesto'].' h.',
+                                default => 'No hay una cobertura anterior comparable que permita acreditar un exceso preexistente.',
+                            };
+                    }
                 }
-                if (! $motivos && ! $avisos) {
-                    continue;
-                }
-                foreach ($motivos as $motivo) {
-                    $errores[] = 'Asignación #'.$a['id'].': '.$motivo;
-                }
-                $items[] = [
+                $item = [
                     'asignacion_id' => $a['id'], 'personal_id' => $id, 'rut' => $rut,
                     'establecimiento_id' => $estId, 'rbd' => $est->rbd ?? null,
                     'establecimiento' => $est->nombre_establecimiento ?? 'Establecimiento #'.$estId,
                     'tipo' => $a['tipo_asignacion'] ?? '', 'asignatura' => $a['asignatura_nombre'] ?? '',
                     'horas' => $a['horas_contrato'], 'total_asignadas' => $total,
                     'cobertura' => $cobertura, 'motivos' => $motivos, 'avisos' => $avisos,
+                    'cobertura_actual' => $coberturaActual, 'comparacion' => $comparacion,
                     'fila_excel' => $destino['fila'] ?? null, 'bloqueante' => (bool) $motivos,
                 ];
+                $detalles[] = $item;
+                if ($motivos || $avisos) {
+                    // Compatibilidad: se conserva el detalle plano para consumidores existentes.
+                    $items[] = $item;
+                }
+                $motivosGrupo = array_merge($motivosGrupo, array_values($motivos));
+                $avisosGrupo = array_merge($avisosGrupo, $avisos);
             }
+            if (! $motivosGrupo && ! $avisosGrupo) {
+                continue;
+            }
+            $motivosGrupo = array_values(array_unique($motivosGrupo));
+            $avisosGrupo = array_values(array_unique($avisosGrupo));
+            foreach ($motivosGrupo as $motivo) {
+                $errores[] = 'RUT '.($rut ?: 'sin identificar').' / RBD '.($est->rbd ?? 'sin identificar').': '.$motivo;
+            }
+            $gruposResultado[] = [
+                'rut' => $rut, 'establecimiento_id' => $estId, 'rbd' => $est->rbd ?? null,
+                'establecimiento' => $est->nombre_establecimiento ?? 'Establecimiento #'.$estId,
+                'total_asignadas' => $total, 'cobertura' => $cobertura, 'cobertura_actual' => $coberturaActual,
+                'comparacion' => $comparacion, 'motivos' => $motivosGrupo, 'avisos' => $avisosGrupo,
+                'bloqueante' => (bool) $motivosGrupo, 'asignaciones' => $detalles,
+            ];
         }
-        return ['items' => $items, 'errores' => array_values(array_unique($errores)),
-            'asignaciones_revisadas' => count($snapshot['asignaciones']),
+        usort($gruposResultado, fn ($a, $b) => ((int) $b['bloqueante'] <=> (int) $a['bloqueante'])
+            ?: strcmp($a['rut'], $b['rut']) ?: ($a['establecimiento_id'] <=> $b['establecimiento_id']));
+        return ['items' => $items, 'grupos' => $gruposResultado, 'errores' => array_values(array_unique($errores)),
+            'grupos_revisados' => count($porGrupo),
+            'grupos_bloqueantes' => count(array_filter($gruposResultado, fn ($g) => $g['bloqueante'])),
+            'grupos_avisos' => count(array_filter($gruposResultado, fn ($g) => ! $g['bloqueante'])),
+            'grupos_preexistentes' => count(array_filter($gruposResultado, fn ($g) => $g['comparacion']['estado'] === 'preexistente')),
+            'asignaciones_revisadas' => $asignacionesRevisadas,
             'bloqueantes' => count(array_filter($items, fn ($item) => $item['bloqueante'])),
             'avisos' => count(array_filter($items, fn ($item) => ! $item['bloqueante']))];
+    }
+
+    /** Misma base temporal anual de Dotación, sin limitarse a IDs enlazados. */
+    private function contratosActuales(?int $anio, array $porGrupo): array
+    {
+        if (! $anio) {
+            return [];
+        }
+        $ids = [];
+        foreach ($porGrupo as $asignaciones) {
+            $ids[(int) $asignaciones[0]['establecimiento_id']] = true;
+        }
+        $actuales = [];
+        foreach (array_keys($ids) as $estId) {
+            $query = app(PadronPeriodoService::class)->consultaAnual($estId, $anio)
+                ->select(['id', 'rut', 'establecimiento_id', 'jornada', 'tipocontrato', 'estatuto', 'escalafon']);
+            // No materializar nombres, documentos ni todas las filas de la base.
+            foreach ($query->toBase()->lazyById(100) as $registro) {
+                $row = (array) $registro;
+                $key = PadronConciliador::rut($row['rut']).'|'.$estId;
+                if (isset($porGrupo[$key]) && PadronConciliador::tipo($row) === 'regular') {
+                    $actuales[$key][] = $row;
+                }
+            }
+        }
+        return $actuales;
+    }
+
+    private function compararCobertura(float $total, array $actuales, array $actual, array $propuesta): array
+    {
+        $comparable = (bool) $actuales && ! $actual['ambigua'] && $actual['estamento'] !== null
+            && $actual['estamento'] === $propuesta['estamento'] && ! $propuesta['ambigua'];
+        foreach ($actuales as $row) {
+            if (! is_numeric($row['jornada'] ?? null) || (float) $row['jornada'] < 0) {
+                $comparable = false;
+            }
+        }
+        $antes = $comparable ? round(max(0, $total - $actual['horas']), 2) : null;
+        $despues = round(max(0, $total - $propuesta['horas']), 2);
+        $estado = match (true) {
+            ! $comparable => 'no_comparable',
+            $despues <= 0.01 => $antes > 0.01 ? 'resuelto' : 'sin_exceso',
+            $antes <= 0.01 => 'nuevo',
+            $despues > $antes + 0.01 => 'agravado',
+            default => 'preexistente',
+        };
+        return ['estado' => $estado, 'comparable' => $comparable,
+            'exceso_actual' => $antes, 'exceso_propuesto' => $despues];
     }
 
     private function cobertura(array $rows, string $rut, string $rbd, int $estId, array $snapshot): array

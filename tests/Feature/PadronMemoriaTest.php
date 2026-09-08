@@ -49,7 +49,8 @@ class PadronMemoriaTest extends TestCase
 
     #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
     #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
-    public function test_6500_rows_with_large_dependencies_can_create_and_open_a_review_under_128_mb(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('assignmentHours')]
+    public function test_6500_rows_with_large_dependencies_can_create_and_open_a_review_under_128_mb(int $horas): void
     {
         // Solo datos sintéticos. Ejecutar aisladamente con php -d memory_limit=128M.
         ini_set('memory_limit', '128M');
@@ -68,7 +69,7 @@ class PadronMemoriaTest extends TestCase
                 $incoming[] = ['fila_excel' => $id + 1, 'observaciones' => [], 'datos' => array_replace($data, ['mes' => 9])];
                 $asignaciones[] = ['id' => $id, 'anio' => 2026, 'establecimiento_id' => 1,
                     'reemplazos_personal_id' => $id, 'docente_rut' => $rut, 'estado' => 'activa',
-                    'horas_contrato' => 20, 'observaciones' => $payload];
+                    'horas_contrato' => $horas, 'observaciones' => $payload];
                 $declaraciones[] = ['id' => $id, 'rut' => $rut, 'rbd' => 99999,
                     'estamento' => 'DOCENTE', 'horas_contratadas' => 44, 'antecedentes' => $payload];
             }
@@ -90,10 +91,17 @@ class PadronMemoriaTest extends TestCase
         $data = $view->getData();
         $this->assertSame(6500, $data['filas']->total());
         $this->assertSame([], $data['bloqueos']);
+        $this->assertSame($horas > 44 ? 6500 : 0, $data['conflictos']['grupos_avisos']);
+        $this->assertSame(0, $data['conflictos']['grupos_bloqueantes']);
         $this->assertFalse($data['obsoleta']);
         $this->assertFalse(app(PadronAplicacionService::class)->disponible());
         $this->assertSame(0, DB::table('padron_personal_cambios')->count());
         $this->assertLessThan(128 * 1024 * 1024, memory_get_peak_usage(true));
+    }
+
+    public static function assignmentHours(): array
+    {
+        return ['sin conflictos' => [20], '6500 excesos preexistentes' => [45]];
     }
 
     public function test_trimmed_columns_still_change_hash_and_year_state_filters_are_preserved(): void

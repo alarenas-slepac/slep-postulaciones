@@ -1,4 +1,4 @@
-# Auditoría de consumidores del padrón — actualizada en 2026.9.8.486
+# Auditoría de consumidores del padrón — actualizada en 2026.9.8.487
 
 Avance de esta etapa: [versiones por período](PADRON_VERSIONES_PERIODO.md).
 Las lecturas principales mensuales y la base contractual anual ya usan copias
@@ -66,7 +66,7 @@ copias, documentos sin copia, fila actual ausente, migración no instalada y con
 | `ReemplazosController::resolvePadronContext/buildPadronQuery` | Selector y consulta mensual, conteos y CSV | Adaptados en 485, con filtro por establecimiento y consulta SQL paginable. Meses archivados de solo lectura; traspaso de bloqueos históricos aún bloqueado. |
 | `CentroOperaciones/DatosBaseService::dotacionesPara` | Último período por establecimiento, vigencia y piso de cargas completas | Adaptado en 486: no retrocede a un mes anterior si el último queda inactivo. Mantiene conteos únicos por RUT y reglas propias de Centro de Operaciones. |
 | `FuncionarioRegisterLookupService`, `TramiteAutofillService` | Contratos vigentes por RUT y establecimiento | Adaptados en 486: antecedentes no acreditan vigencia; contempla ambigüedad entre RBD, huérfanos actuales y alternativa de solicitudes solo para RUT sin registros de padrón. |
-| `LicenciasMedicas/LicenciaFuncionarioResolver`, `Tramites/LicenciaMedicaController` | Administración Central y búsqueda del padrón en el máximo período global | Pendiente: unificar criterio de vigencia y probar edición/importación sin alterar licencias previas. No extender aquí la exclusión de reemplazos de Dotación. |
+| `LicenciasMedicas/LicenciaFuncionarioResolver`, `Tramites/LicenciaMedicaController`, `LicenciaSeguimientoImportService` | Identidad AC prioritaria y contratos vigentes por establecimiento | Adaptados en 487: cruce exacto, advertencias de asociación, conservación de identidad en reimportación y rechazo de folios de otro RUT. No excluye reemplazos/suplencias. No certifica dependencia a la fecha del reposo ni concurrencia MySQL. |
 | `Remuneraciones/ReemplazoPersonalRutService`, `DescuentoCgrController` | Identidad por RUT; prioriza Administración Central y último año/mes/id del RUT | Pendiente: diferenciar identificación histórica de elegibilidad actual. No excluir exfuncionarios de descuentos sin confirmar regla del módulo. |
 | `IncumplimientoLaboralController` | Consultas directas en selector, validación y detalle; modelo con copia | Propiedad histórica protegida; pendiente revisar todo el ciclo de edición frente a bajas y traslados. |
 | `Tramites/CometidoFuncionarioController` | Búsquedas directas de titulares y período por establecimiento | Rendición adaptada previamente; faltan pruebas completas de edición/selección con padrón actualizado. |
@@ -121,9 +121,45 @@ confirmación de identidad del endpoint de registro y la alternativa por solicit
 La consulta no escribe personal, usuarios ni documentos. No se agregan migraciones,
 rutas ni permisos, y no se habilita la aplicación definitiva ni los cambios entre años.
 
-Pendiente inmediato: revisar licencias, cometidos/incumplimientos y el ciclo de
+Pendiente inmediato: revisar cometidos/incumplimientos y el ciclo de
 bloqueos según el inventario. La certificación de concurrencia MySQL debe incluir
-las escrituras de registro/autocompletado que pueden competir con una carga.
+las escrituras de registro/autocompletado y licencias que pueden competir con una carga.
+
+## Licencias Médicas (2026.9.8.487)
+
+- El ingreso manual/digital y las nuevas filas de seguimiento usan el mismo resolver:
+  RUT completo validado, sin búsquedas por prefijo; padrón vigente por RBD y piso de
+  revisiones completas aplicadas. No se excluyen reemplazos ni suplencias.
+- Se mantiene la prioridad de identidad de Administración Central, incluso para
+  autorizaciones de acceso inactivas: no son prueba de término del contrato laboral.
+- Un RUT con varios RBD vigentes, huérfanos actuales o sin contrato vigente no se
+  asigna arbitrariamente. Se conserva dependencia/comuna manual, fuente sin asociación
+  y advertencia en el historial. La falta de contrato actual no impide ingresar una
+  licencia histórica. Con un RBD único y distintas calidades/estamentos, solo los
+  campos unívocos se completan automáticamente y se advierte la diferencia.
+- La asociación consulta el padrón al ingresar: NO reconstruye el establecimiento
+  a la fecha del reposo ni acredita elegibilidad histórica. Esto se aclara en la vista.
+  El período utilizado queda guardado; las versiones contractuales no se usan para
+  inventar asociaciones retrospectivas. Esa resolución temporal requiere otra etapa.
+- La reimportación conserva la identidad/dependencia de licencias existentes, incluso
+  valores nulos, origen documental, ID, archivo y usuario creador. Actualiza los demás
+  campos de seguimiento conforme al comportamiento existente. No consulta el padrón
+  para reinterpretar un folio ya registrado. La corrección de identidad no se efectúa
+  mediante esta importación.
+- Un folio con RUT distinto o identidad no verificable se rechaza por fila y puede
+  revisarse/corregirse en el circuito de errores existente. La escritura revalida el
+  RUT con bloqueo del documento y guarda estados/historial en una transacción por fila.
+- Las advertencias no se cuentan como rechazos: el resumen muestra su total y hasta
+  25 casos enlazados; cada licencia conserva el motivo en su historial. La caché de
+  asociación se reinicia en cada importación/reproceso y se limita a 500 entradas.
+- Se eliminó un método privado duplicado sin llamadas en el controlador, después de
+  buscar dependencias. Sin cambios de rutas, permisos, migraciones ni datos productivos.
+
+`PadronLicenciasVigenciaTest` cubre consulta, ingreso manual, XLS/XLSX, reimportación,
+corrección/reproceso, cambios de estado, recálculo de días y renderizado de las vistas
+del módulo con un layout aislado. Todas las pruebas usan SQLite en memoria y datos
+sintéticos; no certifican concurrencia real MySQL. El módulo no tiene un endpoint
+general de edición de identidad: se verifican sus operaciones de actualización actuales.
 
 ## Orden de cierre
 
