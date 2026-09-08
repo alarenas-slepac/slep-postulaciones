@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.492',
+    'current_version' => '2026.9.8.493',
     'entries' => [
+        [
+            'version' => '2026.9.8.493',
+            'title' => 'Padrón: laboratorio de concurrencia y recuperación MySQL',
+            'summary' => 'Agrega pruebas optativas con procesos independientes y bases sintéticas aisladas, sin habilitar la aplicación definitiva.',
+            'roles' => ['admin'],
+            'items' => [
+                'Comprueba aplicación simultánea, idempotencia, rollback por fallo y desconexión, timeout, interbloqueo y reintentos sobre MySQL local.',
+                'Contrasta REPEATABLE READ y READ COMMITTED ante actualizaciones e inserciones concurrentes de personal y dependencias; registra esperas verificadas y hallazgos pendientes.',
+                'El laboratorio exige ejecución CLI explícita, conexión local y bases nuevas identificadas por ejecución; no utiliza la configuración de conexión de .env ni modifica producción.',
+                'No certifica equivalencia con el servidor productivo ni todos los escritores de otros módulos. La aplicación definitiva continúa deshabilitada hasta resolver los hallazgos y completar la compatibilidad histórica.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.492',
             'title' => 'Padrón: revisión estable durante la actividad de otros módulos',
