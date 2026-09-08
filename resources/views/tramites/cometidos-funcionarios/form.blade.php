@@ -178,7 +178,7 @@
 
         @if (!$origenAc && !$periodo)
             <div class="alert alert-warning">
-                No se encontró un padrón activo/cargado para tu establecimiento. Debe existir al menos un padrón mensual para poder seleccionar funcionarios.
+                No se encontraron funcionarios en el padrón vigente del establecimiento para nuevas selecciones. Al editar, puede conservarse el funcionario original del documento.
             </div>
         @endif
 
@@ -356,7 +356,10 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <div class="form-text">El listado usa el último padrón activo/cargado del establecimiento.</div>
+                            <div class="form-text">Las nuevas selecciones usan el padrón vigente del establecimiento.</div>
+                            @if ($isEdit)
+                                <div class="form-text">Al mantener el funcionario original se conservan los antecedentes del documento, aunque haya sido dado de baja o trasladado. Elegir otro funcionario requiere un contrato vigente.</div>
+                            @endif
                             @error('reemplazo_personal_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         </div>
 

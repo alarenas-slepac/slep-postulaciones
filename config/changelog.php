@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.488',
+    'current_version' => '2026.9.8.489',
     'entries' => [
+        [
+            'version' => '2026.9.8.489',
+            'title' => 'Padrón: vigencia e historia en Cometidos e Incumplimientos',
+            'summary' => 'Separa la selección vigente de los antecedentes originales al editar documentos de establecimientos.',
+            'roles' => ['admin', 'funcionario_estab', 'funcionario_slep'],
+            'items' => [
+                'Selectores y validaciones usan el último período por establecimiento y el piso de cargas completas, sin recuperar registros antiguos tras una baja.',
+                'Editar el mismo funcionario conserva identidad, establecimiento y antecedentes contractuales del documento, incluidos valores nulos, ante traslados o cambios del padrón.',
+                'Documentos antiguos sin copia conservan solamente sus datos conocidos; no reconstruyen contratos históricos desde datos actuales. Cambiar de funcionario exige vigencia y conserva la copia anterior.',
+                'Mantiene participación de reemplazos/suplencias según las reglas de estos módulos, permisos existentes y flujo de Administración Central.',
+                'Pruebas sintéticas de selección, edición, cambios explícitos, copias inválidas y compatibilidad. Sin migraciones ni cambios productivos; no habilita la aplicación definitiva ni levanta el bloqueo anual.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.488',
             'title' => 'Padrón: conflictos agrupados y excesos preexistentes',

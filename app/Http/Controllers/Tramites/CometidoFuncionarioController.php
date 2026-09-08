@@ -15,6 +15,8 @@ use App\Models\FuncionarioAcAutorizado;
 use App\Models\CometidoFuncionarioDocumentoGenerado;
 use App\Models\CometidoFuncionarioPasajeAereo;
 use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronDocumentoFuncionarioService;
+use App\Services\Padron\PadronVigenciaService;
 use App\Models\ViaticoReembolsoValor;
 use App\Models\ViaticoDisponibilidadMovimiento;
 use App\Models\ViaticoDisponibilidadPresupuestaria;
@@ -751,7 +753,7 @@ class CometidoFuncionarioController extends Controller
         abort_unless((int) $cometido->establecimiento_id === (int) $establecimiento->id, 403);
         abort_unless($cometido->esEditablePorEstablecimiento(), 403);
 
-        [$periodo, $funcionarios] = $this->funcionariosUltimoPadron($establecimiento, $cometido->reemplazo_personal_id);
+        [$periodo, $funcionarios] = $this->funcionariosUltimoPadron($establecimiento, $cometido);
 
         return view('tramites.cometidos-funcionarios.form', $this->formData($cometido, $establecimiento, $funcionarios, $periodo));
     }
@@ -769,8 +771,8 @@ class CometidoFuncionarioController extends Controller
         abort_unless((int) $cometido->establecimiento_id === (int) $establecimiento->id, 403);
         abort_unless($cometido->esEditablePorEstablecimiento(), 403);
 
-        [$periodo, $funcionarios] = $this->funcionariosUltimoPadron($establecimiento, $cometido->reemplazo_personal_id);
-        $funcionario = $this->funcionarioPadronSeleccionado($request, $establecimiento, $funcionarios);
+        [$periodo, $funcionarios] = $this->funcionariosUltimoPadron($establecimiento, $cometido);
+        $funcionario = $this->funcionarioPadronSeleccionado($request, $establecimiento, $funcionarios, $cometido);
         $data = $this->validatedData($request, $funcionario, $establecimiento, $cometido);
         $estadoAnterior = $cometido->estado;
         $estadoNuevo = $request->input('accion') === 'enviar' ? 'en_revision_uatp' : 'borrador';
@@ -780,6 +782,7 @@ class CometidoFuncionarioController extends Controller
         }
 
         DB::transaction(function () use ($request, $cometido, $data, $funcionario, $estadoAnterior, $estadoNuevo) {
+            app(PadronDocumentoFuncionarioService::class)->conservar($cometido);
             $cometido->update(array_merge($data, [
                 'estado' => $estadoNuevo,
                 'reemplazo_personal_id' => $funcionario->id,
@@ -1847,6 +1850,7 @@ class CometidoFuncionarioController extends Controller
     {
         $establecimiento = $this->establecimientoDelUsuario();
         abort_unless((int) $reemplazoPersonal->establecimiento_id === (int) $establecimiento->id, 403);
+        abort_unless(app(PadronVigenciaService::class)->consultaActual()->whereKey($reemplazoPersonal->id)->exists(), 404, 'Funcionario fuera del padrón vigente.');
 
         return response()->json([
             'id' => $reemplazoPersonal->id,
@@ -3165,29 +3169,34 @@ class CometidoFuncionarioController extends Controller
         return 'Confirmo que los datos ingresados en esta solicitud de cometido funcionario corresponden y son coincidentes con los documentos de respaldo subidos al sistema; que la información registrada se sustenta en dichos antecedentes y que la solicitud se presenta para revisión UATP sobre la base de esos respaldos.';
     }
 
-    private function funcionarioPadronSeleccionado(Request $request, Establecimiento $establecimiento, $funcionarios): ReemplazoPersonal
+    private function funcionarioPadronSeleccionado(Request $request, Establecimiento $establecimiento, $funcionarios, ?CometidoFuncionario $documento = null): ReemplazoPersonal
     {
+        $request->validate(['reemplazo_personal_id' => ['required', 'integer']]);
         $id = (int) $request->input('reemplazo_personal_id');
+        if ($documento && $documento->exists && (int) $documento->establecimiento_id === (int) $establecimiento->id
+            && (int) $documento->reemplazo_personal_id === $id) {
+            return app(PadronDocumentoFuncionarioService::class)->funcionario($documento);
+        }
         $idsPeriodo = $funcionarios->pluck('id')->map(fn($v) => (int) $v)->all();
 
         if (!in_array($id, $idsPeriodo, true)) {
-            throw ValidationException::withMessages(['reemplazo_personal_id' => 'El funcionario seleccionado no pertenece al último padrón activo/cargado del establecimiento.']);
+            throw ValidationException::withMessages(['reemplazo_personal_id' => 'El funcionario seleccionado no pertenece al padrón vigente del establecimiento.']);
         }
 
-        return ReemplazoPersonal::query()
+        $funcionario = app(PadronVigenciaService::class)->consultaActual()
             ->where('id', $id)
             ->where('establecimiento_id', $establecimiento->id)
-            ->firstOrFail();
+            ->first();
+        if (! $funcionario) {
+            throw ValidationException::withMessages(['reemplazo_personal_id' => 'El funcionario ya no pertenece al padrón vigente del establecimiento. Actualice el formulario.']);
+        }
+        return $funcionario;
     }
 
-    private function funcionariosUltimoPadron(Establecimiento $establecimiento, ?int $includeId = null): array
+    private function funcionariosUltimoPadron(Establecimiento $establecimiento, ?CometidoFuncionario $documento = null): array
     {
-        $base = ReemplazoPersonal::query()
+        $base = app(PadronVigenciaService::class)->consultaActual()
             ->where('establecimiento_id', $establecimiento->id);
-
-        if (Schema::hasColumn('reemplazos_personal', 'vigente')) {
-            $base->where('vigente', true);
-        }
 
         $periodo = (clone $base)
             ->whereNotNull('anio')
@@ -3196,28 +3205,19 @@ class CometidoFuncionarioController extends Controller
             ->orderByDesc('mes')
             ->first(['anio', 'mes']);
 
-        if (!$periodo && Schema::hasColumn('reemplazos_personal', 'vigente')) {
-            $base = ReemplazoPersonal::query()->where('establecimiento_id', $establecimiento->id);
-            $periodo = (clone $base)->whereNotNull('anio')->whereNotNull('mes')->orderByDesc('anio')->orderByDesc('mes')->first(['anio', 'mes']);
-        }
-
-        $q = ReemplazoPersonal::query()->where('establecimiento_id', $establecimiento->id);
-        if ($periodo) {
-            $q->where('anio', $periodo->anio)->where('mes', $periodo->mes);
-        }
-
-        if ($includeId) {
-            $q->orWhere(function ($sub) use ($includeId, $establecimiento) {
-                $sub->where('id', $includeId)->where('establecimiento_id', $establecimiento->id);
-            });
-        }
-
-        $funcionarios = $q
+        $funcionarios = $base
             ->orderBy('nombre')
             ->orderBy('rut')
             ->orderByDesc('id')
             ->get();
 
+        $includeId = null;
+        if ($documento && $documento->exists && $documento->reemplazo_personal_id
+            && (int) $documento->establecimiento_id === (int) $establecimiento->id) {
+            $includeId = (int) $documento->reemplazo_personal_id;
+            $funcionarios = $funcionarios->reject(fn ($row) => (int) $row->id === $includeId);
+            $funcionarios->prepend(app(PadronDocumentoFuncionarioService::class)->funcionario($documento));
+        }
         $funcionarios = $this->funcionariosUnicosParaSelect($funcionarios, $includeId);
 
         return [
