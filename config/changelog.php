@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.489',
+    'current_version' => '2026.9.8.490',
     'entries' => [
+        [
+            'version' => '2026.9.8.490',
+            'title' => 'Padrón: correspondencias de PLANTA con financiamiento separado',
+            'summary' => 'Reconoce denominaciones históricas PLANTA SEP/PIE y actualiza escalafón sin perder los IDs contractuales.',
+            'roles' => ['admin'],
+            'items' => [
+                'Compara PLANTA SEP con PLANTA cuando el financiamiento es SEP, y PLANTA PIE con PLANTA cuando es PIE. No infiere financiamiento desde el contrato.',
+                'En estas líneas el escalafón no es clave de correspondencia: conserva el valor anterior en la revisión y propone actualizarlo con el valor del archivo.',
+                'Mantiene coincidencia de RUT, RBD, fecha de ingreso, estatuto y jornadas; múltiples candidatos o filas equivalentes requieren revisión manual.',
+                'Informa la correspondencia compatible en las observaciones y conserva IDs, asignaciones y copias históricas, sin falsas ausencias por cambios de denominación.',
+                'Huella de revisión v10: volver a analizar el Excel para actualizar propuestas anteriores. Pruebas sintéticas; sin migraciones ni cambios en producción. La aplicación definitiva permanece deshabilitada.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.489',
             'title' => 'Padrón: vigencia e historia en Cometidos e Incumplimientos',
