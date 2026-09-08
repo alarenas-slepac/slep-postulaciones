@@ -530,7 +530,13 @@
         <tr>
             <td>Horas contrato docente PIE</td>
             <td class="text-right primary">{{ $fmt($horasContratoDocentePie) }}</td>
-            <td>Contratos completos de Educación Diferencial: {{ $fmt($horasContratoEducadorasDiferenciales) }} h + Coordinación PIE de otros docentes: {{ $fmt($horasContratoCoordinacionPie) }} h. Según título declarado, sin duplicar coordinación incluida en esos contratos.</td>
+            <td>
+                @if ($resumen['establecimiento_especial'] ?? false)
+                    No aplica por flag Especial. Los contratos de Educación Diferencial se contabilizan en Horas contrato aula.
+                @else
+                    Contratos completos de Educación Diferencial: {{ $fmt($horasContratoEducadorasDiferenciales) }} h + Coordinación PIE de otros docentes: {{ $fmt($horasContratoCoordinacionPie) }} h. Según título declarado, sin duplicar coordinación incluida en esos contratos.
+                @endif
+            </td>
         </tr>
         <tr class="total-row">
             <td>Horas contrato docentes vigentes</td>

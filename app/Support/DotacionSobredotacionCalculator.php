@@ -36,7 +36,11 @@ class DotacionSobredotacionCalculator
     {
         $clasificacionFunciones = self::clasificacionFunciones($necesidadesFunciones);
         $base = collect($docentes)
-            ->map(fn (array $docente) => self::prepararDocente($docente, $clasificacionFunciones))
+            ->map(fn (array $docente) => self::prepararDocente(
+                $docente,
+                $clasificacionFunciones,
+                (bool) ($resumen['establecimiento_especial'] ?? false)
+            ))
             ->values();
 
         $declaradasObjetivo = self::numero($resumen, 'horas_dotacion_funciones_declaradas');
@@ -70,7 +74,7 @@ class DotacionSobredotacionCalculator
     }
 
     /** @return array<string, mixed> */
-    private static function prepararDocente(array $docente, Collection $clasificacionFunciones): array
+    private static function prepararDocente(array $docente, Collection $clasificacionFunciones, bool $especial = false): array
     {
         $horasContrato = round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2);
         [$planta, $contrata] = self::contratoPorCalidad($docente, $horasContrato);
@@ -78,6 +82,9 @@ class DotacionSobredotacionCalculator
         $contratoPie = array_key_exists('horas_contrato_pie', $docente)
             ? max(0.0, (float) $docente['horas_contrato_pie'])
             : DotacionAsignacionCalculator::contratoPiePorDocente($docente);
+        if ($especial) {
+            $contratoPie = 0.0;
+        }
 
         // La porción PIE se reserva primero desde Contrata para mantener la
         // mayor cantidad posible de horas titulares en la dotación de Aula.
@@ -117,12 +124,12 @@ class DotacionSobredotacionCalculator
             'asignadas_protegidas' => round($asignadasProtegidas, 2),
             'declaradas_ajustables' => round($declaradasAjustables, 2),
             'declaradas_detalle' => $declaradasDetalle,
-            'asignadas_pie' => array_key_exists('horas_contrato_pie', $docente)
+            'asignadas_pie' => $especial ? 0.0 : (array_key_exists('horas_contrato_pie', $docente)
                 ? round($contratoPie, 2)
                 : round((float) $asignaciones
                     ->filter(fn ($asignacion) => self::esContratoPie($asignacion)
                         && DotacionAsignacionCalculator::coverageEstamento($asignacion) === 'docente')
-                    ->sum(fn ($asignacion) => self::horasAsignacion($asignacion)), 2),
+                    ->sum(fn ($asignacion) => self::horasAsignacion($asignacion)), 2)),
         ];
     }
 

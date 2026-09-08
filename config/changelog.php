@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.7.472',
+    'current_version' => '2026.9.8.473',
     'entries' => [
+        [
+            'version' => '2026.9.8.473',
+            'title' => 'Dotación: contratos de escuelas especiales en Aula',
+            'summary' => 'Excluye de contrato docente PIE los establecimientos con flag Especial.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'directivo_establecimiento'],
+            'items' => [
+                'Mantiene en cero el contrato docente PIE, incluida coordinación, y conserva en Aula los contratos de Educación Diferencial.',
+                'Aplica la excepción al resumen, detalle individual de sobredotación, PDF y Excel sin eliminar asignaciones históricas.',
+                'Mantiene la regla vigente para establecimientos sin flag Especial y respeta las exclusiones contractuales existentes.',
+            ],
+            'published_at' => '2026-09-08 09:00:00',
+        ],
         [
             'version' => '2026.9.7.472',
             'title' => 'Dotación: contratos completos de Educación Diferencial en PIE',
