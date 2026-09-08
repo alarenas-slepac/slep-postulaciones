@@ -191,13 +191,36 @@ class PadronConciliador
 
     private function signature(array $data): string
     {
+        if ($this->plantaConFinanciamientoSeparado($data)) {
+            // Compatibilidad con la denominación antigua: el financiamiento
+            // está en su propia columna. Escalafón es un dato a actualizar,
+            // no una clave de correspondencia en estas líneas PLANTA SEP/PIE.
+            $data['tipocontrato'] = 'PLANTA';
+            $data['escalafon'] = '';
+        }
         return implode('|', array_map(fn ($key) => self::text((string) ($data[$key] ?? '')), self::IDENTITY));
+    }
+
+    private function plantaConFinanciamientoSeparado(array $data): bool
+    {
+        $financiamiento = self::text($data['financiamiento'] ?? '');
+        $contrato = self::text($data['tipocontrato'] ?? '');
+
+        return in_array($financiamiento, ['SEP', 'PIE'], true)
+            && in_array($contrato, ['PLANTA', 'PLANTA '.$financiamiento], true);
     }
 
     private function match(array &$row, array $old): void
     {
         $row['personal_id'] = (int) $old['id'];
         $row['anterior'] = $old;
+        if ($this->plantaConFinanciamientoSeparado($old)
+            && $this->plantaConFinanciamientoSeparado($row['datos'])
+            && $this->signature($old) === $this->signature($row['datos'])
+            && (self::text($old['tipocontrato'] ?? '') !== self::text($row['datos']['tipocontrato'] ?? '')
+                || self::text($old['escalafon'] ?? '') !== self::text($row['datos']['escalafon'] ?? ''))) {
+            $row['observaciones'][] = 'Correspondencia PLANTA con financiamiento SEP/PIE separado: se conserva el ID y se propone actualizar contrato y escalafón con los valores del archivo.';
+        }
         $changed = false;
         foreach ($row['datos'] as $key => $value) {
             if (in_array($key, ['anio', 'mes', 'rut'], true) || ($key === 'fecha_antiguedad' && $value === null)) {
