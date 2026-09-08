@@ -41,6 +41,7 @@ class PadronConciliador
 
     public function reconcile(array $incoming, array $current, array $establishments, array $assignments = [], array $declarations = []): array
     {
+        $incoming = array_values($incoming);
         $rows = [];
         $errors = [];
         $periods = [];
@@ -86,6 +87,15 @@ class PadronConciliador
         if (count($periods) !== 1) {
             $errors[] = 'El archivo debe contener un único año y mes. No se pueden confirmar bajas.';
         }
+        $seleccion = count($periods) === 1 ? (new PadronReemplazosVigentes)->evaluar($rows) : ['omitidas' => [], 'bloqueos' => []];
+        foreach ($seleccion['omitidas'] as $index => $motivo) {
+            $rows[$index]['accion'] = PadronReemplazosVigentes::OMITIDO;
+            $rows[$index]['observaciones'][] = $motivo;
+        }
+        foreach ($seleccion['bloqueos'] as $index => $motivo) {
+            $rows[$index]['accion'] = 'error';
+            $rows[$index]['observaciones'][] = $motivo;
+        }
         $matched = [];
         $mentioned = [];
         foreach (collect($rows)->groupBy('rut') as $rut => $group) {
@@ -101,7 +111,7 @@ class PadronConciliador
                     ->filter(fn ($row) => $this->signature($row) === $this->signature($rows[$index]['datos']));
                 if ($matches->count() === 1) {
                     $candidate = $matches->first();
-                    $incomingMatches = $group->filter(fn ($row) => $this->signature($row['datos']) === $this->signature($candidate));
+                    $incomingMatches = $group->filter(fn ($row) => $row['accion'] !== PadronReemplazosVigentes::OMITIDO && $this->signature($row['datos']) === $this->signature($candidate));
                     if ($incomingMatches->count() === 1) {
                         $this->match($rows[$index], $candidate);
                         $matched[$candidate['id']] = true;
@@ -134,7 +144,9 @@ class PadronConciliador
                     $row['accion'] = 'revision_manual';
                 }
             } elseif (self::tipo($data) === 'reemplazo_suplencia') {
-                $row['observaciones'][] = 'Reemplazo/suplencia: se conserva en padrón, excluido de Dotación y de la selección de titulares.';
+                if ($row['accion'] !== PadronReemplazosVigentes::OMITIDO) {
+                    $row['observaciones'][] = 'Reemplazo/suplencia: se conserva en padrón, excluido de Dotación y de la selección de titulares.';
+                }
             }
             if ($row['asignaciones'] && ($row['anterior']['rbd'] ?? $data['rbd']) != $data['rbd']) {
                 $row['observaciones'][] = 'Traslado con asignaciones vinculadas: no se trasladan ni eliminan automáticamente.';
@@ -163,7 +175,7 @@ class PadronConciliador
             ];
         }
         $excesses = [];
-        foreach (collect($incoming)->groupBy('datos.rut') as $rut => $group) {
+        foreach (collect($incoming)->reject(fn ($item, $index) => isset($seleccion['omitidas'][$index]))->groupBy('datos.rut') as $rut => $group) {
             if (! $group->contains(fn ($item) => self::docente($item['datos']))) {
                 continue;
             }

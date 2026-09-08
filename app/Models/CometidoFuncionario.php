@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CometidoFuncionario extends Model
 {
+    use \App\Models\Concerns\ConservaPadronHistorico;
+
+    protected function relacionPadronHistorico(): string
+    {
+        return 'funcionarioPadron';
+    }
+
     protected $table = 'cometidos_funcionarios';
 
     protected $fillable = [

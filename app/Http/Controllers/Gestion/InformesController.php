@@ -856,13 +856,7 @@ class InformesController extends Controller
             ->when(!empty($tiposReemplazo), function ($query) use ($tiposReemplazo) {
                 $query->whereIn('tipo_reemplazo', $tiposReemplazo);
             })
-            ->whereHas('funcionarioTitular', function ($query) {
-                $query->where(function ($docente) {
-                    $docente
-                        ->whereIn('estatuto', ['DOCENTE', 'PROFESOR', 'PROFESORA'])
-                        ->orWhere('estatuto', 'like', '%DOC%');
-                });
-            })
+            ->titularDocente()
             ->whereDate('fecha_inicio_trabajo', '<=', $fechaTermino)
             ->whereDate('fecha_termino', '>=', $fechaInicio)
             ->orderBy('fecha_inicio_trabajo')

@@ -558,7 +558,7 @@ class SolicitudReemplazoController extends Controller
 
 'urls' => [
                 'funcionarios' => route('funcionario.solicitudes-reemplazo.ajax.funcionarios'),
-                'funcionarioDetalleTpl' => route('funcionario.solicitudes-reemplazo.ajax.funcionario.detalle', ['reemplazoPersonal' => '___ID___']),
+                'funcionarioDetalleTpl' => route('funcionario.solicitudes-reemplazo.ajax.funcionario.detalle', ['reemplazoPersonal' => '___ID___', 'solicitud_id' => $solicitud->id]),
                 'areasDesempeno' => route('funcionario.solicitudes-reemplazo.ajax.areas-desempeno'),
                 'postulantes' => route('funcionario.solicitudes-reemplazo.ajax.postulantes'),
                 'reglaMinima' => route('funcionario.solicitudes-reemplazo.ajax.regla-minima'),
@@ -600,10 +600,9 @@ class SolicitudReemplazoController extends Controller
 
         $titularValidacion = null;
         if ($request->filled('reemplazo_personal_id')) {
-            $titularValidacion = ReemplazoPersonal::query()
-                ->where('id', (int) $request->reemplazo_personal_id)
-                ->where('establecimiento_id', $establecimiento->id)
-                ->first();
+            $titularValidacion = $this->titularParaSolicitud(
+                (int) $establecimiento->id, (int) $request->reemplazo_personal_id, $solicitud,
+            );
         }
         $titularEsDocente = $this->funcionarioTitularEsDocente($titularValidacion?->estatuto);
         $horarioTitularRequiredOnUpdate = $titularEsDocente && blank($solicitud->horario_titular_pdf_path);
@@ -688,10 +687,10 @@ class SolicitudReemplazoController extends Controller
             }
         }
 
-        // Seguridad: titular pertenece al establecimiento
-        $titular = ReemplazoPersonal::where('id', $request->reemplazo_personal_id)
-            ->where('establecimiento_id', $establecimiento->id)
-            ->firstOrFail();
+        // El mismo titular conserva su contrato histórico; un nuevo titular debe
+        // pertenecer al establecimiento y ya pasó la validación de vigencia.
+        $titular = $titularValidacion;
+        abort_unless($titular, 404);
         $titularEsDocente = $this->funcionarioTitularEsDocente($titular->estatuto);
 
         if ($this->titularTieneBloqueoIndividualActivo($titular)) {
@@ -735,8 +734,8 @@ class SolicitudReemplazoController extends Controller
                 ->withInput();
         }
 
-        // Snapshot titular para validar máximos
-        $distTitular = $this->distribucionJornadaTitular($establecimiento->id, $titular);
+        // No reconstruir jornadas históricas desde el padrón actualizado.
+        $distTitular = $this->distribucionJornadaTitular($establecimiento->id, $titular, $solicitud);
         $jornadasIn = $request->input('jornadas', []);
 
         foreach ($distTitular as $row) {
@@ -1139,11 +1138,12 @@ class SolicitudReemplazoController extends Controller
     public function ajaxFuncionarioDetalle(\App\Models\ReemplazoPersonal $reemplazoPersonal)
     {
         $establecimiento = $this->establecimientoDelUsuario();
-
-        abort_unless((int)$reemplazoPersonal->establecimiento_id === (int)$establecimiento->id, 403);
+        $solicitud = $this->solicitudContexto(request(), (int) $establecimiento->id);
+        $reemplazoPersonal = $this->titularParaSolicitud((int) $establecimiento->id, (int) $reemplazoPersonal->id, $solicitud);
+        abort_unless($reemplazoPersonal, 403);
 
         $reemplazoPersonal->loadMissing('bloqueoActivo');
-        $dist = $this->distribucionJornadaTitular($establecimiento->id, $reemplazoPersonal);
+        $dist = $this->distribucionJornadaTitular($establecimiento->id, $reemplazoPersonal, $solicitud);
         $bloqueado = $this->titularTieneBloqueoIndividualActivo($reemplazoPersonal);
 
         $nombreFull = (string)$reemplazoPersonal->nombre;
@@ -1196,10 +1196,10 @@ class SolicitudReemplazoController extends Controller
             ]);
         }
 
-        $titular = ReemplazoPersonal::query()
-            ->where('id', (int) $request->query('reemplazo_personal_id'))
-            ->where('establecimiento_id', (int) $establecimiento->id)
-            ->first();
+        $solicitud = $this->solicitudContexto($request, (int) $establecimiento->id);
+        $titular = $this->titularParaSolicitud(
+            (int) $establecimiento->id, (int) $request->query('reemplazo_personal_id'), $solicitud,
+        );
 
         if (!$titular) {
             return response()->json([
@@ -1231,7 +1231,7 @@ class SolicitudReemplazoController extends Controller
             $inicio,
             $termino,
             $request->query('continuidad') === '1',
-            $request->filled('solicitud_id') ? (int) $request->query('solicitud_id') : null,
+            $solicitud?->id,
             $area
         );
 
@@ -1512,8 +1512,49 @@ class SolicitudReemplazoController extends Controller
         return $user->establecimiento;
     }
 
-    private function distribucionJornadaTitular(int $establecimientoId, ReemplazoPersonal $titular): array
+    private function solicitudContexto(Request $request, int $establecimientoId): ?SolicitudReemplazo
     {
+        $request->validate(['solicitud_id' => ['nullable', 'integer', 'min:1']]);
+        if (! $request->filled('solicitud_id')) {
+            return null;
+        }
+        // Un ID de solicitud enviado por el navegador no concede acceso a otro RBD.
+        return SolicitudReemplazo::query()->where('establecimiento_id', $establecimientoId)
+            ->findOrFail($request->integer('solicitud_id'));
+    }
+
+    private function titularParaSolicitud(int $establecimientoId, int $personalId, ?SolicitudReemplazo $solicitud = null): ?ReemplazoPersonal
+    {
+        if ($solicitud) {
+            abort_unless((int) $solicitud->establecimiento_id === $establecimientoId, 403);
+            if ($personalId === (int) $solicitud->reemplazo_personal_id) {
+                return $solicitud->funcionarioTitular;
+            }
+        }
+        return ReemplazoPersonal::query()->where('establecimiento_id', $establecimientoId)->find($personalId);
+    }
+
+    private function distribucionJornadaTitular(int $establecimientoId, ReemplazoPersonal $titular, ?SolicitudReemplazo $solicitud = null): array
+    {
+        if ($solicitud) {
+            abort_unless((int) $solicitud->establecimiento_id === $establecimientoId, 403);
+            if ((int) $solicitud->reemplazo_personal_id === (int) $titular->id) {
+                $jornadas = $solicitud->jornadas;
+                if ($jornadas->isNotEmpty()) {
+                    return $jornadas->map(fn ($j) => [
+                        'financiamiento' => (string) $j->financiamiento,
+                        'basica' => (float) $j->titular_basica,
+                        'media' => (float) $j->titular_media,
+                        'total' => (float) $j->titular_total,
+                    ])->values()->all();
+                }
+                if ($titular instanceof \App\Models\ReemplazoPersonalHistorico) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'jornadas' => 'La solicitud no tiene jornadas históricas por financiamiento. Requiere revisión; no se reemplazan por el padrón actual.',
+                    ]);
+                }
+            }
+        }
         // Usa periodo más reciente (anio/mes) si existen
         $base = ReemplazoPersonal::query()
             ->where('establecimiento_id', $establecimientoId)

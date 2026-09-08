@@ -9,9 +9,8 @@ use Illuminate\Validation\ValidationException;
 
 class PadronAplicacionService
 {
-    // Primera entrega: conservar el trabajo de aplicación, pero no habilitarlo
-    // solo por instalar tablas. Falta validar lectores de documentos históricos
-    // y cobertura con prioridad de Declaración de Sostenedores.
+    // Mantener cerrado hasta validar concurrencia real en MySQL y terminar el
+    // inventario de consumidores históricos. Las pruebas no habilitan producción.
     private const APLICACION_HABILITADA = false;
 
     public function __construct(private PadronRevisionService $revisiones) {}
@@ -28,46 +27,42 @@ class PadronAplicacionService
 
     public function decisiones(PadronRevision $revision)
     {
-        return DB::table('padron_revision_decisiones')->where('padron_revision_id', $revision->id)
-            ->orderBy('id')->get()->keyBy('padron_revision_fila_id');
+        return app(PadronResolucionService::class)->decisiones($revision);
     }
 
-    public function resolver(PadronRevision $revision, int $filaId, ?int $personalId, string $motivo, int $usuario): void
+    public function resolver(PadronRevision $revision, int $filaId, ?int $personalId, string $motivo, int $usuario, int $decisionAnterior = 0): void
     {
-        $this->assertDisponible();
-        DB::transaction(function () use ($revision, $filaId, $personalId, $motivo, $usuario): void {
-            $revision = PadronRevision::whereKey($revision->id)->lockForUpdate()->firstOrFail();
-            $this->assertEditable($revision);
-            $fila = $revision->filas()->findOrFail($filaId);
-            if (! in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar'], true)
-                || mb_strlen(trim($motivo)) < 10 || mb_strlen($motivo) > 2000) {
-                $this->fail('Solo se resuelven filas ambiguas, con justificación de 10 a 2.000 caracteres.');
-            }
-            if ($fila->fila_excel && PadronConciliador::tipo($fila->datos) === 'por_clasificar') {
-                $this->fail('Corrija el tipo de contrato desconocido en el Excel y vuelva a analizar.');
-            }
-            $candidatos = collect($fila->candidatos)->pluck('id')->map(fn ($id) => (int) $id)->all();
-            if ($personalId !== null && (! $fila->fila_excel || ! in_array($personalId, $candidatos, true))) {
-                $this->fail('El ID seleccionado no es un candidato válido para esta fila.');
-            }
-            // Las decisiones son anexadas, nunca sobrescritas: conserva auditoría.
-            DB::table('padron_revision_decisiones')->insert([
-                'padron_revision_id' => $revision->id, 'padron_revision_fila_id' => $filaId,
-                'personal_id' => $personalId, 'justificacion' => trim($motivo), 'resuelta_por' => $usuario,
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-        });
+        app(PadronResolucionService::class)->resolver($revision, $filaId, $personalId, $motivo, $usuario, $decisionAnterior);
     }
 
     /** Calcula bloqueos en servidor, tanto para la pantalla como para aplicar. */
     public function plan(PadronRevision $revision): array
     {
+        $confirmacionInicial = $this->confirmacionHash($revision);
         $errores = $revision->errores ?? [];
-        $decisiones = $this->decisiones($revision);
+        $decisiones = app(PadronResolucionService::class)->disponible() ? $this->decisiones($revision) : collect();
         $filas = $revision->filas()->orderBy('id')->get();
         $destinos = [];
+        $bajas = [];
         $usados = [];
-        foreach ($filas->whereNotNull('fila_excel') as $fila) {
+        if (! $revision->anio || ! $revision->mes || $filas->whereNotNull('fila_excel')->isEmpty()) {
+            $errores[] = 'No se puede aplicar un padrón vacío o sin período válido.';
+        }
+        $entrantes = $filas->whereNotNull('fila_excel')->values();
+        $vigenciaReemplazos = (new PadronReemplazosVigentes)->evaluar($entrantes->map(fn ($fila) => $fila->toArray())->all());
+        foreach ($entrantes as $index => $fila) {
+            if ((int) ($fila->datos['anio'] ?? 0) !== (int) $revision->anio || (int) ($fila->datos['mes'] ?? 0) !== (int) $revision->mes) {
+                $errores[] = 'Fila '.$fila->fila_excel.': el período no coincide con la revisión.';
+            }
+            if (($fila->accion === PadronReemplazosVigentes::OMITIDO) !== isset($vigenciaReemplazos['omitidas'][$index])) {
+                $errores[] = 'Fila '.$fila->fila_excel.': la selección de reemplazos no coincide con las fechas y jornadas. Analice nuevamente el archivo.';
+            }
+            if (isset($vigenciaReemplazos['bloqueos'][$index])) {
+                $errores[] = 'Fila '.$fila->fila_excel.': '.$vigenciaReemplazos['bloqueos'][$index];
+            }
+            if ($fila->accion === PadronReemplazosVigentes::OMITIDO) {
+                continue;
+            }
             $id = $fila->personal_id;
             if ($fila->accion === 'revision_manual') {
                 if (! $decisiones->has($fila->id)) {
@@ -91,6 +86,10 @@ class PadronAplicacionService
             if (! isset($usados[$fila->personal_id]) && $fila->accion === 'ausencia_por_revisar' && ! $decisiones->has($fila->id)) {
                 $errores[] = 'ID '.$fila->personal_id.': confirme su baja o vincúlelo a una fila del archivo.';
             }
+            if (! isset($usados[$fila->personal_id]) && ($fila->accion === 'baja_propuesta'
+                || ($fila->accion === 'ausencia_por_revisar' && $decisiones->has($fila->id)))) {
+                $bajas[] = (int) $fila->personal_id;
+            }
         }
         $autorizaciones = DB::table('padron_revision_autorizaciones')->where('padron_revision_id', $revision->id)->get()->keyBy('rut');
         foreach ($revision->excesos as $rut => $exceso) {
@@ -98,63 +97,80 @@ class PadronAplicacionService
                 $errores[] = 'RUT '.$rut.': faltan autorización y justificación para '.$exceso['total'].' horas.';
             }
         }
-        // No modifica asignaciones. Cualquier pérdida de cobertura exige resolver
-        // primero en Dotación y generar otra revisión con la base actualizada.
-        $establecimientos = DB::table('establecimientos')->pluck('id', 'rbd');
-        $cobertura = [];
-        $destinoPorId = [];
-        foreach ($destinos as $destino) {
-            $data = $destino['fila']->datos;
-            $estId = $establecimientos[$data['rbd'] ?? 0] ?? 0;
-            if (PadronConciliador::tipo($data) === 'regular') {
-                $key = $data['rut'].'|'.$estId;
-                $cobertura[$key] = ($cobertura[$key] ?? 0) + ($data['jornada'] ?? 0);
-            }
-            if ($destino['id']) {
-                $destinoPorId[$destino['id']] = $estId;
-            }
+        $conflictos = app(PadronConflictosAsignacionService::class)->analizar($revision);
+        if (! $this->confirmacionVigente($revision, $confirmacionInicial)) {
+            $errores[] = 'La revisión cambió mientras se calculaba el plan. Recargue antes de confirmar.';
         }
-        $asignadas = [];
-        $asignaciones = Schema::hasTable('dotacion_docente_asignaciones')
-            ? DB::table('dotacion_docente_asignaciones')->where('anio', $revision->anio)->where('estado', 'activa')->get()->map(fn ($a) => (array) $a)
-            : collect();
-        foreach ($asignaciones as $a) {
-            $id = $a['reemplazos_personal_id'] ?? null;
-            if ($id && (($destinoPorId[$id] ?? null) != $a['establecimiento_id'])) {
-                $errores[] = 'Asignación #'.$a['id'].': su ID contractual se trasladaría o quedaría fuera del padrón. Resuelva en Dotación antes de aplicar.';
-            }
-            $rut = PadronConciliador::rut(($a['docente_rut_normalizado'] ?? null) ?: ($a['docente_rut'] ?? ''));
-            $key = $rut.'|'.$a['establecimiento_id'];
-            $asignadas[$key] = ($asignadas[$key] ?? 0) + (float) ($a['horas_contrato'] ?? 0);
-        }
-        foreach ($asignadas as $key => $horas) {
-            if ($horas > ($cobertura[$key] ?? 0) + 0.01) {
-                $errores[] = 'RUT/establecimiento '.$key.': '.$horas.' h asignadas superan la cobertura regular del archivo. Resuelva las asignaciones y vuelva a analizar.';
-            }
-        }
-        return ['destinos' => $destinos, 'errores' => array_values(array_unique($errores))];
+        return ['destinos' => $destinos, 'bajas' => array_values(array_unique($bajas)), 'conflictos' => $conflictos,
+            'confirmacion_hash' => $confirmacionInicial,
+            'errores' => array_values(array_unique(array_merge($errores, $conflictos['errores'])))];
     }
 
-    public function aplicar(PadronRevision $revision, int $usuario): PadronRevision
+    private function confirmacionHash(PadronRevision $revision): string
+    {
+        $parts = [DB::table('padron_revisiones')->find($revision->id)];
+        foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'] as $table) {
+            $parts[] = Schema::hasTable($table)
+                ? DB::table($table)->where('padron_revision_id', $revision->id)->orderBy('id')->get()->all() : [];
+        }
+        return hash('sha256', json_encode($parts, JSON_THROW_ON_ERROR));
+    }
+
+    public function confirmacionVigente(PadronRevision $revision, string $hash): bool
+    {
+        return hash_equals($this->confirmacionHash($revision), $hash);
+    }
+
+    public function aplicar(PadronRevision $revision, int $usuario, ?string $confirmacionHash = null): PadronRevision
     {
         $this->assertDisponible();
+        if (DB::transactionLevel() !== 0) {
+            $this->fail('La aplicación debe iniciar su propia transacción, sin una lectura anterior abierta.');
+        }
+        if ($usuario <= 0 || ! preg_match('/^[a-f0-9]{64}$/', $confirmacionHash ?? '')) {
+            $this->fail('Falta la confirmación vigente de la revisión. Recargue la pantalla.');
+        }
         $columns = array_flip(Schema::getColumnListing('reemplazos_personal'));
-        return DB::transaction(function () use ($revision, $usuario, $columns): PadronRevision {
+        foreach (['vigente', 'fecha_antiguedad', 'row_hash', 'created_at', 'updated_at'] as $required) {
+            if (! isset($columns[$required])) {
+                $this->fail('Falta la columna requerida para la aplicación segura: '.$required.'.');
+            }
+        }
+        return DB::transaction(function () use ($revision, $usuario, $columns, $confirmacionHash): PadronRevision {
             // Un único escritor de cargas completas, incluso para revisiones distintas.
             DB::table('padron_aplicacion_control')->where('id', 1)->lockForUpdate()->firstOrFail();
             $revision = PadronRevision::whereKey($revision->id)->lockForUpdate()->firstOrFail();
             if ($revision->aplicada_at) {
                 return $revision; // Reintentos no duplican registros ni auditoría.
             }
+            foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'] as $table) {
+                DB::table($table)->where('padron_revision_id', $revision->id)->orderBy('id')->lockForUpdate()->get(['id']);
+            }
             $anteriores = DB::table('reemplazos_personal')->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-            if (Schema::hasTable('dotacion_docente_asignaciones')) {
-                DB::table('dotacion_docente_asignaciones')->orderBy('id')->lockForUpdate()->get(['id']);
+            foreach (['establecimientos', 'dotacion_docente_asignaciones', 'declaracion_sostenedores', 'dotacion_docente_exclusiones',
+                ...PadronHistorialService::DOCUMENTOS, 'reemplazos_personal_bloqueos'] as $table) {
+                if (Schema::hasTable($table)) {
+                    DB::table($table)->orderBy('id')->lockForUpdate()->get(['id']);
+                }
             }
             $this->assertEditable($revision);
             $plan = $this->plan($revision);
+            if (! hash_equals($plan['confirmacion_hash'], $confirmacionHash)) {
+                $this->fail('Las filas, decisiones o autorizaciones cambiaron desde la confirmación. Revise nuevamente la pantalla.');
+            }
             if ($plan['errores']) {
                 throw ValidationException::withMessages(['revision' => $plan['errores']]);
             }
+            foreach ($plan['destinos'] as $destino) {
+                if ($destino['id'] !== null && (! isset($anteriores[$destino['id']])
+                    || PadronConciliador::rut($anteriores[$destino['id']]->rut) !== PadronConciliador::rut($destino['fila']->rut))) {
+                    $this->fail('El ID seleccionado no corresponde al RUT de la fila. Genere un nuevo análisis.');
+                }
+            }
+            $idsAfectados = collect($plan['destinos'])->pluck('id')->filter()
+                ->merge($plan['bajas'])
+                ->unique()->values()->all();
+            app(PadronHistorialService::class)->congelarReferencias($idsAfectados);
             $establecimientos = DB::table('establecimientos')->pluck('id', 'rbd');
             $ruts = [];
             foreach ($anteriores as $old) {
@@ -164,7 +180,8 @@ class PadronAplicacionService
             foreach ($plan['destinos'] as $destino) {
                 $fila = $destino['fila'];
                 $before = $destino['id'] ? (array) $anteriores[$destino['id']] : null;
-                $data = $fila->datos;
+                // La carga nunca puede inyectar IDs, hashes ni campos internos.
+                $data = array_intersect_key($fila->datos, array_flip([...PadronExcelReader::REQUIRED, 'tramo', 'fecha_antiguedad']));
                 if (empty($data['fecha_antiguedad'])) {
                     unset($data['fecha_antiguedad']);
                 }
@@ -186,12 +203,16 @@ class PadronAplicacionService
                     $id = DB::table('reemplazos_personal')->insertGetId($data);
                 }
                 $vigentes[$id] = true;
-                $this->auditar($revision, $id, $before, $before ? 'actualizacion' : 'incorporacion', $usuario);
+                $this->auditar($revision, $id, $before, $before ? ($before['vigente'] ? 'actualizacion' : 'reactivacion') : 'incorporacion', $usuario);
             }
-            // Conserva todas las filas históricas y sus FK. Desactiva las líneas
-            // no seleccionadas del año, evitando reapariciones de meses antiguos.
-            foreach ($anteriores as $old) {
-                if ((int) $old->anio !== (int) $revision->anio || isset($vigentes[$old->id]) || ! $old->vigente) {
+            // Solo bajas presentes y resueltas en la revisión. Nunca barrer todo
+            // el año ni modificar versiones históricas no incluidas en el plan.
+            foreach ($plan['bajas'] as $id) {
+                $old = $anteriores[$id] ?? null;
+                if (! $old) {
+                    $this->fail('Una baja propuesta ya no existe. Genere un nuevo análisis.');
+                }
+                if (isset($vigentes[$old->id]) || ! $old->vigente) {
                     continue;
                 }
                 DB::table('reemplazos_personal')->where('id', $old->id)->update(array_intersect_key([
@@ -217,7 +238,7 @@ class PadronAplicacionService
     private function assertDisponible(): void
     {
         if (! $this->disponible()) {
-            $this->fail('La aplicación definitiva y la resolución manual no están habilitadas en esta etapa. Solo puede previsualizar y registrar autorizaciones; instalar las migraciones no habilita cambios al personal.');
+            $this->fail('La aplicación definitiva no está habilitada en esta etapa. Resolver coincidencias o registrar autorizaciones no modifica el personal.');
         }
     }
 

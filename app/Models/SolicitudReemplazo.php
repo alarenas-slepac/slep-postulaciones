@@ -7,6 +7,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SolicitudReemplazo extends Model
 {
+    use \App\Models\Concerns\ConservaPadronHistorico;
+    use \App\Models\Concerns\FiltraTitularHistorico;
+
+    protected function relacionPadronHistorico(): string
+    {
+        return 'funcionarioTitular';
+    }
+
     protected $table = 'solicitudes_reemplazo';
 
     protected $fillable = [

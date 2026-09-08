@@ -286,6 +286,7 @@ class PadronRevisionTest extends TestCase
                 'accion' => $action, 'revision' => $revision->id,
                 'confirmar_aplicacion' => 1, 'fila' => $revision->filas->first()->id,
                 'personal_id' => 101, 'justificacion' => 'Justificación sintética de prueba.',
+                'decision_anterior' => 0,
             ])->assertSessionHasErrors('revision');
         }
 
@@ -342,5 +343,159 @@ class PadronRevisionTest extends TestCase
         DB::table('reemplazos_personal')->insert(['id' => 107, 'establecimiento_id' => 1] + $this->data(['tipocontrato' => 'REEMPLAZO']));
         $this->assertSame([106], \App\Models\ReemplazoPersonal::query()
             ->padronVigente(2026)->sinReemplazoSuplencia()->orderBy('id')->pluck('id')->all());
+    }
+
+    private function ambiguousRevision(): PadronRevision
+    {
+        (require base_path('database/migrations/2026_09_08_130000_add_padron_aplicacion_segura.php'))->up();
+        DB::table('reemplazos_personal')->where('id', 101)->update(['jornada' => 22, 'jornada_basica' => 22]);
+        DB::table('reemplazos_personal')->insert(['id' => 102, 'establecimiento_id' => 1] + $this->data([
+            'mes' => 8, 'financiamiento' => 'SEP', 'jornada' => 22, 'jornada_basica' => 22,
+        ]));
+        return $this->revision([
+            $this->data(['jornada' => 24, 'jornada_basica' => 24]),
+            $this->data(['financiamiento' => 'SEP', 'jornada' => 20, 'jornada_basica' => 20]),
+        ]);
+    }
+
+    public function test_manual_decisions_keep_personnel_untouched_and_update_effective_summary(): void
+    {
+        $revision = $this->ambiguousRevision();
+        $before = DB::table('reemplazos_personal')->get()->toJson();
+        $assignments = DB::table('dotacion_docente_asignaciones')->get()->toJson();
+        $declarations = DB::table('declaracion_sostenedores')->get()->toJson();
+        $service = app(\App\Services\Padron\PadronResolucionService::class);
+        $first = $revision->filas->firstWhere('fila_excel', 2);
+        $second = $revision->filas->firstWhere('fila_excel', 3);
+        $service->resolver($revision, $first->id, 101, 'Conservar primera línea contractual.', 1);
+        $service->resolver($revision, $second->id, null, 'Confirmar nueva línea contractual.', 1);
+        $absent = $revision->filas->first(fn ($f) => $f->fila_excel === null && $f->personal_id === 102);
+        $service->resolver($revision, $absent->id, null, 'Confirmar propuesta de baja de línea.', 1);
+        $summary = $service->resumen($revision->filas, $service->decisiones($revision));
+        $this->assertSame(3, $summary['totales']['resuelta']);
+        $this->assertSame(1, $summary['totales']['ausencia_vinculada']);
+        $this->assertSame(101, $summary['selecciones'][$first->id]);
+        $this->assertNull($summary['selecciones'][$second->id]);
+        $this->assertSame($before, DB::table('reemplazos_personal')->get()->toJson());
+        $this->assertSame($assignments, DB::table('dotacion_docente_asignaciones')->get()->toJson());
+        $this->assertSame($declarations, DB::table('declaracion_sostenedores')->get()->toJson());
+        $this->assertFalse(app(\App\Services\Padron\PadronAplicacionService::class)->disponible());
+        $this->assertSame('revision_manual', $first->fresh()->accion);
+        $this->assertNull($first->fresh()->personal_id);
+    }
+
+    public function test_duplicate_id_foreign_candidates_and_covered_absence_are_rejected(): void
+    {
+        $revision = $this->ambiguousRevision();
+        $service = app(\App\Services\Padron\PadronResolucionService::class);
+        $first = $revision->filas->firstWhere('fila_excel', 2);
+        $second = $revision->filas->firstWhere('fila_excel', 3);
+        $service->resolver($revision, $first->id, 101, 'Conservar primera línea contractual.', 1);
+        $absence = $revision->filas->first(fn ($f) => ! $f->fila_excel && $f->personal_id === 101);
+        foreach ([[$second->id, 101], [$second->id, 999], [$absence->id, null], [99999, 102]] as [$rowId, $id]) {
+            try {
+                $service->resolver($revision, $rowId, $id, 'Decisión sintética no admisible.', 1);
+                $this->fail('Debe rechazar la correspondencia inválida.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('revision', $exception->errors());
+            }
+        }
+        $this->assertDatabaseCount('padron_revision_decisiones', 1);
+    }
+
+    public function test_decision_retries_are_idempotent_and_corrections_preserve_audit_and_check_version(): void
+    {
+        $revision = $this->ambiguousRevision();
+        $service = app(\App\Services\Padron\PadronResolucionService::class);
+        $row = $revision->filas->firstWhere('fila_excel', 2);
+        $service->resolver($revision, $row->id, 101, 'Primera decisión sintética.', 1);
+        $service->resolver($revision, $row->id, 101, 'Primera decisión sintética.', 1);
+        $this->assertDatabaseCount('padron_revision_decisiones', 1);
+        try {
+            $service->resolver($revision, $row->id, 102, 'Corrección desde pantalla antigua.', 2);
+            $this->fail('Debe detectar la decisión posterior a la pantalla.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('Recargue', $exception->errors()['revision'][0]);
+        }
+        $previous = (int) $service->decisiones($revision)[$row->id]->id;
+        $service->resolver($revision, $row->id, 102, 'Corrección sintética revisada.', 2, $previous);
+        $this->assertDatabaseCount('padron_revision_decisiones', 2);
+        $this->assertSame(102, $service->decisiones($revision)[$row->id]->personal_id);
+        $this->assertDatabaseHas('padron_revision_decisiones', ['id' => $previous, 'personal_id' => 101, 'resuelta_por' => 1]);
+    }
+
+    public function test_decision_endpoint_renders_forms_and_records_only_staging(): void
+    {
+        $revision = $this->ambiguousRevision();
+        view()->share('errors', new ViewErrorBag);
+        $html = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]))->render();
+        $this->assertStringContainsString('name="accion" value="resolver"', $html);
+        $this->assertStringNotContainsString('name="accion" value="aplicar"', $html);
+        $this->withoutMiddleware();
+        $user = new \App\Models\User;
+        $user->id = 1;
+        $this->actingAs($user);
+        $this->post(route('reemplazos.personal.import.store'), [
+            'accion' => 'resolver', 'revision' => $revision->id, 'fila' => $revision->filas->firstWhere('fila_excel', 2)->id,
+            'personal_id' => 101, 'justificacion' => 'Correspondencia sintética validada.', 'decision_anterior' => 0,
+        ])->assertRedirect(route('reemplazos.personal.import', ['revision' => $revision->id]));
+        $this->assertDatabaseCount('padron_revision_decisiones', 1);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'jornada' => 22]);
+        app('auth')->forgetGuards();
+        $html = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]))->render();
+        $this->assertStringContainsString('Historial de decisiones', $html);
+        $this->assertStringContainsString('Ausencia vinculada a una fila', $html);
+    }
+
+    public function test_historical_document_changes_invalidate_decisions_and_authorizations(): void
+    {
+        foreach (['solicitudes_reemplazo', 'cometidos_funcionarios', 'incumplimientos_laborales', 'reemplazos_personal_bloqueos'] as $table) {
+            Schema::create($table, function (Blueprint $t) {
+                $t->id(); $t->integer('reemplazo_personal_id'); $t->string('estado')->nullable();
+            });
+        }
+        $revision = $this->ambiguousRevision();
+        $service = app(\App\Services\Padron\PadronResolucionService::class);
+        DB::table('solicitudes_reemplazo')->insert(['id' => 601, 'reemplazo_personal_id' => 101, 'estado' => 'cerrada']);
+        $this->assertTrue(app(PadronRevisionService::class)->stale($revision));
+        try {
+            $service->resolver($revision, $revision->filas->firstWhere('fila_excel', 2)->id, 101, 'Correspondencia sintética validada.', 1);
+            $this->fail('Debe rechazar revisiones con nuevas referencias.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('revision', $exception->errors());
+        }
+        $excess = $this->revision([$this->data(['jornada' => 45])]);
+        DB::table('solicitudes_reemplazo')->where('id', 601)->update(['estado' => 'observada']);
+        try {
+            app(PadronRevisionService::class)->authorize($excess, '111111111', 'Justificación sintética de prueba.', 1);
+            $this->fail('Debe rechazar autorizaciones desactualizadas.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('revision', $exception->errors());
+        }
+        $snapshot = app(\App\Services\Padron\PadronDependenciasService::class)->snapshot();
+        $this->assertSame(['modulo' => 'Solicitud de reemplazo', 'id' => 601], $snapshot['por_personal'][101]['referencias'][0]);
+        foreach (['cometidos_funcionarios', 'incumplimientos_laborales', 'reemplazos_personal_bloqueos'] as $table) {
+            $before = app(\App\Services\Padron\PadronDependenciasService::class)->snapshot()['hash'];
+            DB::table($table)->insert(['reemplazo_personal_id' => 101]);
+            $after = app(\App\Services\Padron\PadronDependenciasService::class)->snapshot();
+            $this->assertNotSame($before, $after['hash']);
+        }
+        $this->assertSame(4, $after['por_personal'][101]['total']);
+    }
+
+    public function test_bad_file_and_unknown_contract_cannot_be_resolved_manually(): void
+    {
+        $this->ambiguousRevision();
+        $service = app(\App\Services\Padron\PadronResolucionService::class);
+        foreach ([['tipocontrato' => 'DESCONOCIDO'], ['rbd' => 99997]] as $change) {
+            $revision = $this->revision([$this->data($change)]);
+            try {
+                $service->resolver($revision, $revision->filas->firstWhere('fila_excel', 2)->id, null, 'No se deben omitir validaciones.', 1);
+                $this->fail('Debe exigir corregir el archivo.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('revision', $exception->errors());
+            }
+        }
+        $this->assertDatabaseCount('padron_revision_decisiones', 0);
     }
 }

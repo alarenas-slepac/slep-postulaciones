@@ -1290,9 +1290,9 @@ class CometidoFuncionarioRendicionController extends Controller
 
     private function textoCategoriaAaeeCometido(CometidoFuncionario $cometido): string
     {
-        $funcionarioPadron = $cometido->relationLoaded('funcionarioPadron')
-            ? $cometido->funcionarioPadron
-            : $cometido->funcionarioPadron()->first();
+        // La propiedad respeta la copia contractual del documento, incluso
+        // cuando la relación aún no fue cargada.
+        $funcionarioPadron = $cometido->funcionarioPadron;
 
         return trim(implode(' ', array_filter([
             $cometido->cargo_funcion,
