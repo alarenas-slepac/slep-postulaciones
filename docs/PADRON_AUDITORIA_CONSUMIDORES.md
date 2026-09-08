@@ -1,10 +1,12 @@
-# Auditoría de consumidores del padrón — actualizada en 2026.9.8.485
+# Auditoría de consumidores del padrón — actualizada en 2026.9.8.486
 
 Avance de esta etapa: [versiones por período](PADRON_VERSIONES_PERIODO.md).
 Las lecturas principales mensuales y la base contractual anual ya usan copias
 cuando existen; no están certificados todos los lectores indirectos ni los demás
 insumos históricos de Dotación. El bloqueo anual y la aplicación cerrada se mantienen.
 Los hallazgos de 483 descritos abajo documentan la causa original.
+En 486 se adaptaron Centro de Operaciones, auto-registro y autocompletado de
+trámites para distinguir vigencia de antecedentes históricos; ver alcance más abajo.
 
 ## Alcance y estado
 
@@ -62,8 +64,8 @@ copias, documentos sin copia, fila actual ausente, migración no instalada y con
 | --- | --- | --- |
 | Dotación: `DotacionEstablecimientoCalculator`, controladores de Dotación y exportaciones/avance | Año + último período por establecimiento; declaración prioritaria | Base contractual versionada en 485; pruebas de docentes/asistentes y traslados entre años. Pendiente certificar lectores indirectos y otros insumos; bloqueo anual conservado. |
 | `ReemplazosController::resolvePadronContext/buildPadronQuery` | Selector y consulta mensual, conteos y CSV | Adaptados en 485, con filtro por establecimiento y consulta SQL paginable. Meses archivados de solo lectura; traspaso de bloqueos históricos aún bloqueado. |
-| `CentroOperaciones/DatosBaseService::dotacionesPara` | Máximo período entre filas vigentes por establecimiento | P0 pendiente: si se desactiva el mes más reciente puede regresar a un mes anterior; no usa el piso de cargas completas aplicadas. |
-| `FuncionarioRegisterLookupService`, `TramiteAutofillService` | Último período del propio RUT sin filtro de vigencia en la consulta inicial | P0 pendiente: distinguir antecedente histórico de vínculo actual al dar de baja/trasladar. El autocompletado también tiene alternativa desde solicitudes aceptadas/cerradas; no quitarla sin revisar su finalidad. |
+| `CentroOperaciones/DatosBaseService::dotacionesPara` | Último período por establecimiento, vigencia y piso de cargas completas | Adaptado en 486: no retrocede a un mes anterior si el último queda inactivo. Mantiene conteos únicos por RUT y reglas propias de Centro de Operaciones. |
+| `FuncionarioRegisterLookupService`, `TramiteAutofillService` | Contratos vigentes por RUT y establecimiento | Adaptados en 486: antecedentes no acreditan vigencia; contempla ambigüedad entre RBD, huérfanos actuales y alternativa de solicitudes solo para RUT sin registros de padrón. |
 | `LicenciasMedicas/LicenciaFuncionarioResolver`, `Tramites/LicenciaMedicaController` | Administración Central y búsqueda del padrón en el máximo período global | Pendiente: unificar criterio de vigencia y probar edición/importación sin alterar licencias previas. No extender aquí la exclusión de reemplazos de Dotación. |
 | `Remuneraciones/ReemplazoPersonalRutService`, `DescuentoCgrController` | Identidad por RUT; prioriza Administración Central y último año/mes/id del RUT | Pendiente: diferenciar identificación histórica de elegibilidad actual. No excluir exfuncionarios de descuentos sin confirmar regla del módulo. |
 | `IncumplimientoLaboralController` | Consultas directas en selector, validación y detalle; modelo con copia | Propiedad histórica protegida; pendiente revisar todo el ciclo de edición frente a bajas y traslados. |
@@ -75,12 +77,53 @@ copias, documentos sin copia, fila actual ausente, migración no instalada y con
 | `Admin/FuncionarioViaticoAnexoController`, `Admin/PermisoSinGoceExcepcionController` | Validación/selección directa de funcionario | Pendientes pruebas de vigencia y conservación de excepciones existentes por RUT/ID. |
 | `System/GlobalSearchController` | Búsqueda directa del padrón | Pendiente distinguir resultados históricos/actuales sin romper acceso a documentos anteriores. |
 | `ReemplazoPersonalBloqueo::personal` | Relación actual por ID | Pendiente decidir vigencia del bloqueo tras traslado/cambio contractual; no se borra ni traslada automáticamente. |
-| `Auth/RegisterRutLookupController` y servicios de autocompletado | Consumidores indirectos de resolución por RUT | Incluir al probar registro y trámites; conservar permisos y respuestas existentes. |
+| `Auth/RegisterRutLookupController` y servicios de autocompletado | Consumidores indirectos de resolución por RUT | Respuesta de registro probada en 486, conservando confirmación por fecha de nacimiento. Pendiente certificación de concurrencia del registro completo y otros lectores indirectos. |
 | Servicios de `Padron` y `PersonalImportController` | Conciliación, historial, decisiones, escrituras controladas | Aplicación cerrada; antiguo importador privado sin ruta pública. Nuevos bloqueos no habilitan escrituras. |
 
 Los modelos `SolicitudReemplazo`, `CometidoFuncionario` e `IncumplimientoLaboral`
 usan `ConservaPadronHistorico`. Sus propiedades de relación están protegidas;
 consultar el método de relación o hacer un JOIN no equivale a leer la copia.
+
+## Vigencia en consumidores (2026.9.8.486)
+
+- `PadronVigenciaService` reutiliza el alcance explícito `padronVigente`, sin
+  cambiar globalmente el modelo ni las relaciones históricas. El máximo período
+  se calcula entre todas las filas del establecimiento y luego se filtra vigencia.
+  Una revisión completa aplicada impone un piso global; una previsualización no.
+- Las cargas parciales anteriores conservan el último período propio de cada RBD;
+  un mes más reciente de otro establecimiento no basta para declarar una baja.
+- Centro de Operaciones conserva el conteo único por RUT, clasificación existente
+  y participación de reemplazos/suplencias. No se le impone la exclusión propia de
+  Dotación. No cambia totales guardados en reportes ni configuración de anexos.
+- Registro y autocompletado consideran todas las líneas vigentes del RUT, incluso
+  si existen en RBD con meses distintos. Dos establecimientos vigentes requieren
+  regularización: no se selecciona uno solo por tener el mes más reciente.
+- Un registro huérfano histórico no invalida el contrato actual correctamente
+  asociado. Una fila sin establecimiento en el período global actual, o un ID
+  de establecimiento vigente inexistente en el catálogo, requiere regularización.
+- Un RUT conocido pero sin contrato actual no se registra como funcionario por su
+  antecedente anterior; puede continuar como postulante sujeto a las validaciones
+  existentes. No se modifican cuentas, roles o establecimientos de usuarios creados.
+- En nuevos trámites ese antecedente devuelve un motivo de falta de vigencia.
+  La alternativa original de solicitudes aceptadas/cerradas permanece para personas
+  sin filas de padrón; no se amplía a personas cuyo padrón solo conserva antecedentes.
+  No se cambia la regla de fechas/estados de esa alternativa en esta etapa.
+- Los trámites existentes siguen mostrando sus campos snapshot en edición;
+  el update documental no reescribe esa identidad desde el autocompletado actual.
+  No se migra ni elimina información histórica.
+- Sin columna `vigente` o tabla de revisiones se conserva el criterio temporal
+  disponible, sin inventar bajas ni generar errores de columna ausente.
+
+Pruebas: `PadronVigenciaConsumidoresTest` usa exclusivamente SQLite en memoria y
+datos sintéticos. Cubre bajas, períodos vacíos, traslados/reincorporaciones con ID
+estable, múltiples RBD, normalización y deduplicación, huérfanos, compatibilidad,
+confirmación de identidad del endpoint de registro y la alternativa por solicitudes.
+La consulta no escribe personal, usuarios ni documentos. No se agregan migraciones,
+rutas ni permisos, y no se habilita la aplicación definitiva ni los cambios entre años.
+
+Pendiente inmediato: revisar licencias, cometidos/incumplimientos y el ciclo de
+bloqueos según el inventario. La certificación de concurrencia MySQL debe incluir
+las escrituras de registro/autocompletado que pueden competir con una carga.
 
 ## Orden de cierre
 
