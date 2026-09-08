@@ -11,6 +11,7 @@ use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
 use App\Models\EstablecimientoCursoPie;
 use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronPeriodoService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -811,10 +812,8 @@ class DotacionEstablecimientoCalculator
             return collect();
         }
 
-        $query = ReemplazoPersonal::query()
-            ->padronVigente($anio)->sinReemplazoSuplencia()
-            ->where('establecimiento_id', $establecimiento->id)
-            ->where('anio', $anio);
+        $query = app(PadronPeriodoService::class)
+            ->consultaAnual((int) $establecimiento->id, $anio)->sinReemplazoSuplencia();
 
         if (self::schemaHasColumn('reemplazos_personal', 'vigente')) {
             $query->where('vigente', true);
@@ -1016,10 +1015,8 @@ class DotacionEstablecimientoCalculator
             return collect();
         }
 
-        $query = ReemplazoPersonal::query()
-            ->padronVigente($anio)->sinReemplazoSuplencia()
-            ->where('establecimiento_id', $establecimiento->id)
-            ->where('anio', $anio);
+        $query = app(PadronPeriodoService::class)
+            ->consultaAnual((int) $establecimiento->id, $anio)->sinReemplazoSuplencia();
 
         if (self::schemaHasColumn('reemplazos_personal', 'vigente')) {
             $query->where('vigente', true);

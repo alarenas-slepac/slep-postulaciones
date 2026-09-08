@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Establecimiento;
 use App\Models\ReemplazoPersonal;
 use App\Models\ReemplazoPersonalBloqueo;
+use App\Services\Padron\PadronPeriodoService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -151,6 +152,7 @@ class ReemplazosController extends Controller
 
     public function editPersonal(Request $request, ReemplazoPersonal $reemplazoPersonal): View
     {
+        $this->assertPersonalEditable($request, $reemplazoPersonal);
         $reemplazoPersonal->load('establecimiento:id,rbd,nombre_establecimiento');
 
         $establecimientos = Establecimiento::query()
@@ -167,6 +169,7 @@ class ReemplazosController extends Controller
 
     public function updatePersonal(Request $request, ReemplazoPersonal $reemplazoPersonal): RedirectResponse
     {
+        $this->assertPersonalEditable($request, $reemplazoPersonal);
         $validated = $request->validate([
             'establecimiento_id' => ['required', 'integer', 'exists:establecimientos,id'],
             'return.periodo' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
@@ -231,6 +234,7 @@ class ReemplazosController extends Controller
 
     public function bloquearPersonal(Request $request, ReemplazoPersonal $reemplazoPersonal): RedirectResponse
     {
+        $this->assertPersonalEditable($request, $reemplazoPersonal);
         $validated = $request->validate([
             'motivo' => ['required', 'string', 'max:255'],
             'observacion' => ['nullable', 'string', 'max:2000'],
@@ -278,6 +282,7 @@ class ReemplazosController extends Controller
 
     public function desbloquearPersonal(Request $request, ReemplazoPersonal $reemplazoPersonal): RedirectResponse
     {
+        $this->assertPersonalEditable($request, $reemplazoPersonal);
         $validated = $request->validate([
             'return.periodo' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'return.establecimiento_id' => ['nullable', 'integer', 'exists:establecimientos,id'],
@@ -323,6 +328,13 @@ class ReemplazosController extends Controller
 
         [$origenAnio, $origenMes] = $this->parsePeriodKey($validated['periodo_origen']);
         [$destinoAnio, $destinoMes] = $this->parsePeriodKey($validated['periodo_destino']);
+
+        if (app(PadronPeriodoService::class)->esHistorico($origenAnio, $origenMes)
+            || app(PadronPeriodoService::class)->esHistorico($destinoAnio, $destinoMes)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'periodo_origen' => 'El traspaso de bloqueos entre versiones archivadas requiere revisión; no se puede usar el contrato actual como sustituto del histórico.',
+            ]);
+        }
 
         if (!$origenAnio || !$origenMes || !$destinoAnio || !$destinoMes) {
             return redirect()->route('reemplazos.index')
@@ -543,12 +555,8 @@ class ReemplazosController extends Controller
         $isFuncionarioEstab = $user && method_exists($user, 'hasRole') && $user->hasRole('funcionario_estab');
         $forcedEstablecimiento = $isFuncionarioEstab ? $user->establecimiento()->first() : null;
 
-        $periodOptions = ReemplazoPersonal::query()
-            ->select('anio', 'mes')
-            ->distinct()
-            ->orderByDesc('anio')
-            ->orderByDesc('mes')
-            ->get()
+        $periodos = app(PadronPeriodoService::class);
+        $periodOptions = $periodos->periodos()
             ->map(function ($row) {
                 $month = str_pad((string) $row->mes, 2, '0', STR_PAD_LEFT);
 
@@ -577,13 +585,8 @@ class ReemplazosController extends Controller
 
         $establecimientosQuery = Establecimiento::query()
             ->select('establecimientos.id', 'establecimientos.rbd', 'establecimientos.nombre_establecimiento')
-            ->whereIn('establecimientos.id', function ($sub) use ($selectedYear, $selectedMonth) {
-                $sub->from('reemplazos_personal')
-                    ->select('establecimiento_id')
-                    ->where('anio', $selectedYear)
-                    ->where('mes', $selectedMonth)
-                    ->distinct();
-            })
+            ->whereIn('establecimientos.id', $periodos->consultaMensual($selectedYear, $selectedMonth)
+                ->select('reemplazos_personal.establecimiento_id')->distinct())
             ->orderBy('establecimientos.nombre_establecimiento');
 
         if ($forcedEstablecimiento) {
@@ -601,9 +604,7 @@ class ReemplazosController extends Controller
 
         $latestFile = null;
         if ($selectedYear && $selectedMonth) {
-            $latestFile = ReemplazoPersonal::query()
-                ->where('anio', $selectedYear)
-                ->where('mes', $selectedMonth)
+            $latestFile = $periodos->consultaMensual($selectedYear, $selectedMonth)
                 ->whereNotNull('source_filename')
                 ->orderByDesc('updated_at')
                 ->value('source_filename');
@@ -621,6 +622,7 @@ class ReemplazosController extends Controller
             'q' => trim((string) ($validated['q'] ?? '')),
             'per_page' => (int) ($validated['per_page'] ?? 25),
             'locked_without_establecimiento' => $lockedWithoutEstablecimiento,
+            'historico' => $periodos->esHistorico($selectedYear, $selectedMonth),
         ];
 
         return [$filters, [
@@ -637,7 +639,7 @@ class ReemplazosController extends Controller
 
     private function buildPadronQuery(array $filters)
     {
-        $query = ReemplazoPersonal::query()
+        $query = app(PadronPeriodoService::class)->consultaMensual($filters['anio'], $filters['mes'])
             ->leftJoin('establecimientos', 'establecimientos.id', '=', 'reemplazos_personal.establecimiento_id')
             ->with([
                 'establecimiento:id,rbd,nombre_establecimiento',
@@ -670,6 +672,21 @@ class ReemplazosController extends Controller
         }
 
         return $query;
+    }
+
+    private function assertPersonalEditable(Request $request, ReemplazoPersonal $personal): void
+    {
+        $periodos = app(PadronPeriodoService::class);
+        $periodKey = $request->input('return.periodo', $request->query('periodo', ''));
+        if ($periodKey !== null && ! is_string($periodKey)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['periodo' => 'El período debe tener formato año-mes.']);
+        }
+        [$anio, $mes] = $this->parsePeriodKey($periodKey ?? '');
+        if ($periodos->esHistorico($anio, $mes) || $periodos->esHistorico($personal->anio, $personal->mes)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'periodo' => 'El padrón archivado es de solo lectura. Consulte el período actual para gestionar el contrato vigente.',
+            ]);
+        }
     }
 
     private function extractReturnFilters(Request $request): array
