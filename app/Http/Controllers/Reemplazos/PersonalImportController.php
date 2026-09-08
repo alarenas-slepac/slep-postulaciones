@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Reemplazos;
 
 use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
+use App\Models\PadronRevision;
+use App\Services\Padron\PadronRevisionService;
+use App\Services\Padron\PadronAplicacionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +41,28 @@ class PersonalImportController extends Controller
             return $this->plantilla();
         }
 
+        if ($request->filled('revision')) {
+            $request->validate(['revision' => ['integer', 'min:1'], 'q' => ['nullable', 'string', 'max:100'], 'accion_filtro' => ['nullable', 'string', 'max:50']]);
+            $service = app(PadronRevisionService::class);
+            $service->assertInstalled();
+            $revision = PadronRevision::findOrFail($request->integer('revision'));
+            $aplicador = app(PadronAplicacionService::class);
+            $disponible = $aplicador->disponible();
+            $query = $revision->filas()->when($request->filled('q'), function ($q) use ($request) {
+                $term = trim((string) $request->query('q'));
+                $q->where(fn ($sub) => $sub->where('rut', 'like', '%'.$term.'%')->orWhere('nombre', 'like', '%'.$term.'%'));
+            })->when($request->filled('accion_filtro'), fn ($q) => $q->where('accion', $request->query('accion_filtro')));
+            return view('reemplazos.personal.revision', [
+                'revision' => $revision, 'filas' => $query->orderBy('id')->paginate(50)->withQueryString(),
+                'obsoleta' => ! $revision->aplicada_at && $service->stale($revision),
+                'aplicacionDisponible' => $disponible,
+                'decisiones' => $disponible ? $aplicador->decisiones($revision) : collect(),
+                'bloqueos' => $disponible && ! $revision->aplicada_at ? $aplicador->plan($revision)['errores'] : [],
+                'cambiosAplicados' => $revision->aplicada_at ? DB::table('padron_personal_cambios')->where('padron_revision_id', $revision->id)->count() : 0,
+                'autorizaciones' => DB::table('padron_revision_autorizaciones')->where('padron_revision_id', $revision->id)->get()->keyBy('rut'),
+            ]);
+        }
+
         return view('reemplazos.personal.import');
     }
 
@@ -61,6 +86,7 @@ class PersonalImportController extends Controller
             'RBD',
             'Bienios',
             'Tramo',
+            'fecha_antiguedad',
         ];
 
         $spreadsheet = new Spreadsheet();
@@ -77,15 +103,16 @@ class PersonalImportController extends Controller
             ['11111111-1', 'NOMBRE ASISTENTE EDUCACION', '1975-05-10', '2019-03-01', null, 'CONTRATA', 'REGULAR', 'ASISTENTE EDUCACION', 'INSPECTOR', 2026, 7, 44, 0, 0, 12345, 4, null],
         ], null, 'A2');
 
-        $headerRange = 'A1:Q1';
+        $headerRange = 'A1:R1';
         $sheet->getStyle($headerRange)->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '0F766E']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'D1D5DB']]],
         ]);
-        $sheet->getStyle('A1:Q3')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        $sheet->getStyle('A2:Q3')->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+        $sheet->getStyle('A1:R3')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle('A2:R3')->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+        $sheet->getStyle('R:R')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
         $sheet->getStyle('C:C')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
         $sheet->getStyle('D:D')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
         $sheet->getStyle('E:E')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
@@ -105,10 +132,12 @@ class PersonalImportController extends Controller
             ['Bienios es obligatorio como encabezado y se guardará como número entero si viene informado.'],
             ['Tramo se procesa si viene informado; se recomienda completarlo para docentes. Para no docentes puede quedar vacío.'],
             ['Valores sugeridos para Tramo: Acceso, Inicial, Temprano, Avanzado, Experto I, Experto II, Sin tramo.'],
+            ['fecha_antiguedad: fecha YYYY-MM-DD o DD/MM/YYYY. Si está ausente o vacía no se propone borrar la fecha existente.'],
+            ['La previsualización revisa el padrón completo sin modificar IDs, contratos ni asignaciones.'],
         ], null, 'A1');
         $instructions->getStyle('A1')->getFont()->setBold(true)->setSize(14);
         $instructions->getColumnDimension('A')->setWidth(120);
-        $instructions->getStyle('A1:A6')->getAlignment()->setWrapText(true);
+        $instructions->getStyle('A1:A9')->getAlignment()->setWrapText(true);
 
         $spreadsheet->setActiveSheetIndex(0);
 
@@ -120,6 +149,52 @@ class PersonalImportController extends Controller
     }
 
     public function store(Request $request)
+    {
+        $request->validate(['accion' => ['required', 'in:previsualizar,autorizar_exceso,resolver,aplicar']]);
+        if (in_array($request->input('accion'), ['resolver', 'aplicar'], true)) {
+            $data = $request->validate(['revision' => ['required', 'integer', 'min:1']]);
+            $revision = PadronRevision::findOrFail($data['revision']);
+            $aplicador = app(PadronAplicacionService::class);
+            if ($request->input('accion') === 'resolver') {
+                $data = $request->validate([
+                    'fila' => ['required', 'integer', 'min:1'], 'personal_id' => ['required', 'integer', 'min:0'],
+                    'justificacion' => ['required', 'string', 'min:10', 'max:2000'],
+                ]);
+                $aplicador->resolver($revision, $data['fila'], $data['personal_id'] ? (int) $data['personal_id'] : null, $data['justificacion'], (int) $request->user()->id);
+                $message = 'Decisión registrada. Revise los bloqueos antes de aplicar.';
+            } else {
+                $request->validate(['confirmar_aplicacion' => ['accepted']]);
+                @set_time_limit(240);
+                $aplicador->aplicar($revision, (int) $request->user()->id);
+                $message = 'Padrón aplicado. Los IDs y las referencias históricas se conservaron; las asignaciones no se modificaron.';
+            }
+            return redirect()->route('reemplazos.personal.import', ['revision' => $revision->id])->with('status', $message);
+        }
+        if ($request->input('accion') === 'previsualizar') {
+            $request->validate([
+                'excel' => ['required', 'file', 'mimes:xlsx,xls', 'max:51200'],
+                'padron_completo' => ['accepted'],
+            ]);
+            @set_time_limit(240);
+            $file = $request->file('excel');
+            $revision = app(PadronRevisionService::class)->create($file->getRealPath(), $file->getClientOriginalName(), (int) $request->user()->id);
+            return redirect()->route('reemplazos.personal.import', ['revision' => $revision->id]);
+        }
+        if ($request->input('accion') === 'autorizar_exceso') {
+            $data = $request->validate([
+                'revision' => ['required', 'integer'], 'rut' => ['required', 'string', 'max:32'],
+                'justificacion' => ['required', 'string', 'min:10', 'max:2000'],
+            ]);
+            $revision = PadronRevision::findOrFail($data['revision']);
+            app(PadronRevisionService::class)->authorize($revision, $data['rut'], $data['justificacion'], (int) $request->user()->id);
+            return redirect()->route('reemplazos.personal.import', ['revision' => $revision->id])
+                ->with('status', 'Excepción registrada para esta revisión. El padrón no se ha modificado.');
+        }
+    }
+
+    // Conservado para compatibilidad de implementación. No está expuesto por
+    // rutas: el flujo nuevo solo previsualiza hasta implementar aplicación segura.
+    private function importLegacy(Request $request)
     {
         $request->validate([
             'excel' => ['required', 'file', 'mimes:xlsx,xls'],

@@ -18,6 +18,7 @@ class ReemplazoPersonal extends Model
         'nombre',
         'fecha_nacimiento',
         'fecha_ingreso',
+        'fecha_antiguedad',
         'fecha_termino',
         'tipocontrato',
         'financiamiento',
@@ -38,6 +39,7 @@ class ReemplazoPersonal extends Model
     protected $casts = [
         'fecha_nacimiento' => 'date',
         'fecha_ingreso' => 'date',
+        'fecha_antiguedad' => 'date',
         'fecha_termino' => 'date',
         'anio' => 'integer',
         'mes' => 'integer',
@@ -68,6 +70,29 @@ class ReemplazoPersonal extends Model
     public function scopeDelEstablecimiento($q, int $establecimientoId)
     {
         return $q->where('establecimiento_id', $establecimientoId);
+    }
+
+    /** Alcance explícito: nunca filtra relaciones o consultas históricas globales. */
+    public function scopePadronVigente($q, ?int $anio = null)
+    {
+        $table = $this->getTable();
+        if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'vigente')) {
+            $q->where($table.'.vigente', true);
+        }
+        if ($anio !== null) {
+            $q->where($table.'.anio', $anio);
+        }
+        $q->whereRaw($table.'.anio * 100 + '.$table.'.mes = (SELECT MAX(p.anio * 100 + p.mes) FROM reemplazos_personal p WHERE p.establecimiento_id = '.$table.'.establecimiento_id'.($anio !== null ? ' AND p.anio = ?' : '').')', $anio !== null ? [$anio] : []);
+        if (\Illuminate\Support\Facades\Schema::hasColumn('padron_revisiones', 'aplicada_at')) {
+            $q->whereRaw($table.'.anio * 100 + '.$table.'.mes >= COALESCE((SELECT MAX(r.anio * 100 + r.mes) FROM padron_revisiones r WHERE r.aplicada_at IS NOT NULL'.($anio !== null ? ' AND r.anio = ?' : '').'), 0)', $anio !== null ? [$anio] : []);
+        }
+        return $q;
+    }
+
+    public function scopeSinReemplazoSuplencia($q)
+    {
+        return $q->whereRaw("UPPER(COALESCE(tipocontrato, '')) NOT LIKE ?", ['%REEMPLAZ%'])
+            ->whereRaw("UPPER(COALESCE(tipocontrato, '')) NOT LIKE ?", ['%SUPLEN%']);
     }
 
     public function scopeFuncionarios($q)

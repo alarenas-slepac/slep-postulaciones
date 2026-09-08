@@ -53,16 +53,22 @@
         <div class="card-body">
             <h5 class="card-title">Subir archivo Excel</h5>
             <p class="text-muted mb-3">
-                El import es <strong>idempotente</strong>: si subes el mismo archivo (o uno con las mismas filas),
-                no se duplicará información; se actualizarán los registros existentes según la clave de la fila.
+                Primero se genera una <strong>previsualización del padrón completo</strong>, sin modificar personal.
+                Puede revisar coincidencias, errores y autorizar excesos con justificación.
+                En esta etapa la aplicación definitiva está bloqueada: no se actualizan contratos ni vigencias,
+                ni se eliminan registros o asignaciones.
             </p>
 
             <form method="POST" action="{{ route('reemplazos.personal.import.store') }}" enctype="multipart/form-data">
                 @csrf
+                <input type="hidden" name="accion" value="previsualizar">
+                @if ($errors->any())
+                    <div class="alert alert-danger" role="alert">{{ $errors->first() }}</div>
+                @endif
 
                 <div class="mb-3">
-                    <label class="form-label">Archivo (.xlsx)</label>
-                    <input type="file" name="excel" class="form-control @error('excel') is-invalid @enderror" accept=".xlsx" required>
+                    <label class="form-label" for="excel">Archivo (.xlsx o .xls)</label>
+                    <input id="excel" type="file" name="excel" class="form-control @error('excel') is-invalid @enderror" accept=".xlsx,.xls" required>
                     @error('excel')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
@@ -82,6 +88,10 @@
                         Tramo. También se aceptan encabezados TRAMO, tramo, Tramo Docente, TRAMO DOCENTE o TRAMO_DOCENTE.
                         Si no se informa, la carga mantiene el comportamiento anterior.
                     </div>
+                    <div class="small text-muted mt-2">
+                        Nueva columna opcional: <strong>fecha_antiguedad</strong> (YYYY-MM-DD, DD/MM/YYYY o fecha Excel).
+                        Si está vacía o no viene en la plantilla, no se propone borrar la fecha existente.
+                    </div>
                     <div class="mt-2">
                         <a href="{{ route('reemplazos.personal.import', ['descargar_plantilla' => 1]) }}" class="btn btn-sm btn-outline-success">
                             <i class="bi bi-download"></i> Descargar plantilla oficial
@@ -89,8 +99,12 @@
                     </div>
                 </div>
 
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="padron_completo" value="1" id="padron-completo" required>
+                    <label class="form-check-label" for="padron-completo">Confirmo que el archivo contiene el padrón completo de todos los establecimientos para un único año y mes.</label>
+                </div>
                 <button class="btn btn-primary">
-                    <i class="bi bi-upload"></i> Importar
+                    <i class="bi bi-search"></i> Analizar y previsualizar
                 </button>
             </form>
         </div>

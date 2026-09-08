@@ -166,6 +166,8 @@ class SolicitudReemplazoController extends Controller
         }
         $titularEsDocente = $this->funcionarioTitularEsDocente($titularValidacion?->estatuto);
 
+        $this->assertTitularVigente($titularValidacion);
+
         $request->validate([
             'contacto_fono' => ['required', 'string', 'max:30'],
 
@@ -605,6 +607,11 @@ class SolicitudReemplazoController extends Controller
         }
         $titularEsDocente = $this->funcionarioTitularEsDocente($titularValidacion?->estatuto);
         $horarioTitularRequiredOnUpdate = $titularEsDocente && blank($solicitud->horario_titular_pdf_path);
+        // Conserva la referencia histórica al editar la misma solicitud.
+        // Cambiar de titular exige uno vigente y no reemplazo/suplencia.
+        if ((int) $request->reemplazo_personal_id !== (int) $solicitud->reemplazo_personal_id) {
+            $this->assertTitularVigente($titularValidacion);
+        }
 
         $request->validate([
             'contacto_fono' => ['required', 'string', 'max:30'],
@@ -1085,6 +1092,7 @@ class SolicitudReemplazoController extends Controller
 
         // Subquery: 1 id (el más reciente) por rut
         $idsUltimoPorRut = ReemplazoPersonal::query()
+            ->padronVigente()->sinReemplazoSuplencia()
             ->selectRaw('MAX(id) as id')
             ->where('establecimiento_id', $establecimiento->id)
             ->whereNotNull('rut')
@@ -1511,6 +1519,13 @@ class SolicitudReemplazoController extends Controller
             ->where('establecimiento_id', $establecimientoId)
             ->where('rut', $titular->rut);
 
+        if (ReemplazoPersonal::query()->padronVigente()->sinReemplazoSuplencia()->whereKey($titular->id)->exists()) {
+            $base->padronVigente()->sinReemplazoSuplencia();
+        } else {
+            // Lectura histórica: no convierte un titular anterior en seleccionable.
+            $base->where('anio', $titular->anio)->where('mes', $titular->mes);
+        }
+
         $last = (clone $base)->orderByDesc('anio')->orderByDesc('mes')->first(['anio', 'mes']);
 
         if ($last && $last->anio && $last->mes) {
@@ -1557,6 +1572,15 @@ class SolicitudReemplazoController extends Controller
         $nombres = implode(' ', $parts);
 
         return [$nombres, $apP, $apM];
+    }
+
+    private function assertTitularVigente(?ReemplazoPersonal $titular): void
+    {
+        if (! $titular || ! ReemplazoPersonal::query()->padronVigente()->sinReemplazoSuplencia()->whereKey($titular->id)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'reemplazo_personal_id' => 'Seleccione un titular vigente. No se admiten contratos de reemplazo o suplencia.',
+            ]);
+        }
     }
     private function nombreCompletoUsuario($user): string
     {

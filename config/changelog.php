@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.473',
+    'current_version' => '2026.9.8.474',
     'entries' => [
+        [
+            'version' => '2026.9.8.474',
+            'title' => 'Padrón: previsualización y conciliación por ID',
+            'summary' => 'Primera etapa de actualización segura del padrón completo, sin aplicar cambios al personal vigente.',
+            'roles' => ['admin'],
+            'items' => [
+                'Agrega fecha_antiguedad opcional y analiza diferencias, incorporaciones, ausencias y traslados preservando los IDs como referencia.',
+                'Muestra errores por fila, coincidencias ambiguas y asignaciones vinculadas, conservando prioridad de Declaración de Sostenedores.',
+                'Registra excepciones justificadas de jornada sobre 44 horas por carga y detecta revisiones desactualizadas.',
+                'La carga pasa a previsualización: la aplicación definitiva y exclusiones de reemplazo/suplencia quedan para la siguiente etapa.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.473',
             'title' => 'Dotación: contratos de escuelas especiales en Aula',
