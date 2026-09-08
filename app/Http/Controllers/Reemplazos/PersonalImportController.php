@@ -69,8 +69,9 @@ class PersonalImportController extends Controller
             })->when($request->filled('accion_filtro'), fn ($q) => $q->where('accion', $request->query('accion_filtro')));
             return view('reemplazos.personal.revision', [
                 'revision' => $revision, 'filas' => $query->orderBy('id')->paginate(50)->withQueryString(),
-                'obsoleta' => ! $revision->aplicada_at && ($service->stale($revision)
-                    || ! $aplicador->confirmacionVigente($revision, $plan['confirmacion_hash'])),
+                // Una confirmación final vencida exige recargar el plan, no
+                // descartar las decisiones ni ocultar la resolución manual.
+                'obsoleta' => ! $revision->aplicada_at && $service->stale($revision),
                 'aplicacionDisponible' => $disponible,
                 'resolucionDisponible' => $resolucionDisponible,
                 'decisiones' => $decisiones,

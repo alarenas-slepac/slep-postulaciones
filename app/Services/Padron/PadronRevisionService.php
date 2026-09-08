@@ -61,7 +61,7 @@ class PadronRevisionService
     public function stale(PadronRevision $revision): bool
     {
         $period = $revision->anio && $revision->mes ? $revision->anio * 100 + $revision->mes : null;
-        return ! hash_equals($revision->base_hash, $this->snapshot($period)['hash']);
+        return ! hash_equals($revision->base_hash, $this->snapshot($period, false)['hash']);
     }
 
     public function authorize(PadronRevision $revision, string $rut, string $justification, int $userId): void
@@ -73,7 +73,7 @@ class PadronRevisionService
             throw ValidationException::withMessages(['justificacion' => 'Ingrese una justificación de entre 10 y 2.000 caracteres.']);
         }
         if ($this->stale($revision)) {
-            throw ValidationException::withMessages(['revision' => 'El padrón o sus dependencias cambiaron. Genere una nueva revisión antes de autorizar.']);
+            throw ValidationException::withMessages(['revision' => 'El padrón contractual, los establecimientos, las versiones de períodos o la versión del análisis cambiaron. Genere una nueva revisión antes de autorizar.']);
         }
         if ($revision->errores || ! isset($revision->excesos[$rut])) {
             throw ValidationException::withMessages(['revision' => 'La revisión contiene errores o el RUT no tiene exceso de jornada. Corrija el archivo y vuelva a analizar.']);
@@ -105,7 +105,7 @@ class PadronRevisionService
         }
     }
 
-    private function snapshot(?int $period): array
+    private function snapshot(?int $period, bool $incluirCobertura = true): array
     {
         $maxPeriod = (int) DB::table('reemplazos_personal')->selectRaw('MAX(anio * 100 + mes) as periodo')->value('periodo');
         $aplicaciones = Schema::hasColumn('padron_revisiones', 'aplicada_at')
@@ -151,9 +151,11 @@ class PadronRevisionService
         }
         unset($historical, $historicalPeriods, $currentRuts, $records, $record);
         $establishments = DB::table('establecimientos')->orderBy('id')->get(['id', 'rbd'])->keyBy('rbd')->map(fn ($r) => $r->id)->all();
-        $cobertura = app(PadronConflictosAsignacionService::class)->snapshot($period ? intdiv($period, 100) : null);
-        // El hash usa la dependencia completa; la revisión solo copia el detalle
-        // necesario, no observaciones ni otras columnas de la asignación.
+        $cobertura = $incluirCobertura
+            ? app(PadronConflictosAsignacionService::class)->snapshot($period ? intdiv($period, 100) : null)
+            : ['asignaciones' => [], 'declaraciones' => []];
+        // Copia informativa del análisis original. La cobertura se recalcula en
+        // cada plan y se valida nuevamente al confirmar la aplicación.
         $assignments = $cobertura['asignaciones'];
         $declarations = [];
         // Usar exactamente las filas ya incluidas en la huella, en orden ID descendente.
@@ -163,11 +165,12 @@ class PadronRevisionService
                 $declarations[$rut] = $r['horas_contratadas'];
             }
         }
-        $dependencias = $this->dependencias->snapshot();
         return ['personal' => $personal, 'establecimientos' => $establishments, 'asignaciones' => $assignments,
             'declaraciones' => $declarations, 'periodo_maximo' => $maxPeriod,
-            // Versión 11: propuestas explícitas de redistribución entre financiamientos.
-            // Las revisiones previas requieren analizar nuevamente el archivo.
-            'hash' => hash('sha256', json_encode(['v11', hash_final($fingerprint), $establishments, $maxPeriod, $dependencias['hash'], $cobertura['hash'], $aplicaciones, app(PadronPeriodoService::class)->huella()], JSON_THROW_ON_ERROR))];
+            // Versión 12: base contractual estable durante la revisión manual.
+            // Documentos y cobertura no invalidan decisiones; su huella completa
+            // pertenece a la confirmación final. No se omiten controles de escritura.
+            // Las revisiones anteriores requieren analizar nuevamente el archivo.
+            'hash' => hash('sha256', json_encode(['v12', hash_final($fingerprint), $establishments, $maxPeriod, $aplicaciones, app(PadronPeriodoService::class)->huella()], JSON_THROW_ON_ERROR))];
     }
 }

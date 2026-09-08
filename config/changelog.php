@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.491',
+    'current_version' => '2026.9.8.492',
     'entries' => [
+        [
+            'version' => '2026.9.8.492',
+            'title' => 'Padrón: revisión estable durante la actividad de otros módulos',
+            'summary' => 'Conserva decisiones y autorizaciones mientras se actualizan documentos y cobertura, sin vencer toda la revisión.',
+            'roles' => ['admin'],
+            'items' => [
+                'La revisión manual no vence por tiempo ni por cambios en documentos auditados, asignaciones, declaraciones o exclusiones. Los conflictos se recalculan al recargar la misma revisión.',
+                'Mantiene la invalidación por cambios del padrón contractual, correspondencias de establecimientos, versiones de períodos y otras cargas aplicadas.',
+                'La confirmación final incluye las dependencias completas y exige recargar el plan si cambiaron, sin descartar decisiones. Conserva los bloqueos por cobertura y pérdida de vínculos, y la protección histórica transaccional.',
+                'Distingue observaciones y asignaciones del análisis original de referencias y conflictos actuales. Una confirmación final vencida no oculta los formularios manuales.',
+                'Huella v12: generar un nuevo análisis tras instalar este parche; no se revalidan automáticamente revisiones anteriores. Pruebas sintéticas de continuidad, autorizaciones, nuevos documentos y vínculos. Sin migraciones ni cambios en producción; la aplicación definitiva sigue deshabilitada.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.491',
             'title' => 'Padrón: propuesta de redistribución entre financiamientos',

@@ -143,7 +143,7 @@ class PadronAplicacionService
     private function confirmacionHash(PadronRevision $revision): string
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'confirmacion-v2'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
+        hash_update($hash, 'confirmacion-v3'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
         foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'] as $table) {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
@@ -154,6 +154,10 @@ class PadronAplicacionService
                 hash_update($hash, json_encode($row, JSON_THROW_ON_ERROR)."\n");
             }
         }
+        // La actividad de otros módulos no vence la revisión manual, pero una
+        // confirmación final solo sirve para las dependencias que se revisaron.
+        hash_update($hash, app(PadronDependenciasService::class)->snapshot()['hash']);
+        hash_update($hash, app(PadronConflictosAsignacionService::class)->snapshot($revision->anio)['hash']);
         return hash_final($hash);
     }
 
@@ -197,7 +201,7 @@ class PadronAplicacionService
             $this->assertEditable($revision);
             $plan = $this->plan($revision);
             if (! hash_equals($plan['confirmacion_hash'], $confirmacionHash)) {
-                $this->fail('Las filas, decisiones o autorizaciones cambiaron desde la confirmación. Revise nuevamente la pantalla.');
+                $this->fail('Las filas, decisiones, autorizaciones o dependencias cambiaron desde la confirmación. Recargue la misma revisión y revise el plan actualizado; las decisiones registradas se conservan.');
             }
             if ($plan['errores']) {
                 throw ValidationException::withMessages(['revision' => $plan['errores']]);
