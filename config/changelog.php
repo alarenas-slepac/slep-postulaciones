@@ -4110,8 +4110,38 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.486',
+    'current_version' => '2026.9.8.488',
     'entries' => [
+        [
+            'version' => '2026.9.8.488',
+            'title' => 'Padrón: conflictos agrupados y excesos preexistentes',
+            'summary' => 'Compara cobertura actual y propuesta por RUT/establecimiento sin repetir cada conflicto por asignación.',
+            'roles' => ['admin'],
+            'items' => [
+                'Muestra un caso por RUT/establecimiento, con contadores separados de casos y asignaciones, paginación independiente y detalle desplegable de todos sus vínculos.',
+                'Contrasta el total asignado con la cobertura actual y propuesta, usando la base anual de Dotación, contratos regulares vigentes, declaración prioritaria y exclusiones docentes.',
+                'Un exceso preexistente no agravado pasa a aviso; los excesos nuevos, agravados o sin base comparable conservan el bloqueo.',
+                'Mantiene los bloqueos por pérdida de ID, traslado, identidad incompatible, reemplazo/suplencia, estamento, horas inválidas y correspondencias pendientes.',
+                'Lectura por lotes y pruebas sintéticas de agrupación, historia, conservación de IDs y miles de avisos bajo 128 MB.',
+                'Huella de cobertura v3: regenerar las revisiones anteriores. Sin migraciones ni cambios en producción; no habilita la aplicación definitiva ni levanta el bloqueo anual.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
+        [
+            'version' => '2026.9.8.487',
+            'title' => 'Padrón: vigencia e identidad histórica en Licencias Médicas',
+            'summary' => 'Consulta contratos actuales sin reinterpretar la identidad de licencias existentes al reimportarlas.',
+            'roles' => ['admin', 'digitador_licencias', 'analista_licencias', 'analista_smc', 'administrador_licencias', 'coordinador_gdp'],
+            'items' => [
+                'Asocia por RUT completo y contratos vigentes de cada establecimiento, respetando cargas completas y sin excluir reemplazos o suplencias.',
+                'Mantiene la prioridad de identidad de Administración Central; su autorización de acceso no se interpreta como vigencia contractual.',
+                'Sin coincidencia única conserva los datos manuales y muestra advertencias en el ingreso, resumen de importación e historial documental.',
+                'La reimportación conserva RUT, nombre, dependencia, calidad jurídica, período de asociación y origen de licencias existentes. Rechaza folios de otro RUT con motivo por fila.',
+                'Pruebas sintéticas de bajas, traslados, reincorporaciones, contratos ambiguos, formatos XLS/XLSX y conservación de documentos al cambiar estados.',
+                'Sin migraciones, cambios de rutas o permisos. No habilita la aplicación definitiva del padrón ni levanta el bloqueo anual; queda pendiente la certificación concurrente MySQL.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.486',
             'title' => 'Padrón: vigencia en Centro de Operaciones y autocompletado',

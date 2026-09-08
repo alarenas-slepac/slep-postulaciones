@@ -58,8 +58,8 @@ class PersonalImportController extends Controller
             $conflictos = $plan['conflictos'] ?? null;
             $paginaConflictos = max(1, $request->integer('conflictos_page', 1));
             $conflictosPaginados = new \Illuminate\Pagination\LengthAwarePaginator(
-                array_slice($conflictos['items'] ?? [], ($paginaConflictos - 1) * 20, 20),
-                count($conflictos['items'] ?? []), 20, $paginaConflictos,
+                array_slice($conflictos['grupos'] ?? [], ($paginaConflictos - 1) * 20, 20),
+                count($conflictos['grupos'] ?? []), 20, $paginaConflictos,
                 ['path' => $request->url(), 'pageName' => 'conflictos_page', 'query' => $request->query(), 'fragment' => 'conflictos-asignaciones'],
             );
             $resumenResolucion = $resolucion->resumen($revision->filas()->get(['id', 'fila_excel', 'accion', 'personal_id']), $decisiones);

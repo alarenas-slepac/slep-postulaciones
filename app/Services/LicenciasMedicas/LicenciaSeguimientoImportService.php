@@ -17,6 +17,14 @@ use XMLReader;
 
 class LicenciaSeguimientoImportService
 {
+    private const IDENTIDAD_HISTORICA = [
+        'rut_funcionario', 'dv_funcionario', 'rut_normalizado', 'rut_formateado',
+        'nombre_funcionario', 'tipo_dependencia', 'establecimiento_id', 'establecimiento_nombre',
+        'comuna', 'subdireccion', 'unidad_departamento', 'cargo', 'grado', 'escalafon',
+        'calidad_juridica', 'estamento', 'fuente_asociacion_funcionario', 'periodo_reemplazos_usado',
+        'origen_ingreso', 'tipo_documento_ingreso',
+    ];
+
     private array $resolverCache = [];
 
     public function __construct(
@@ -28,6 +36,7 @@ class LicenciaSeguimientoImportService
 
     public function import(string $path, int $userId, string $originalName, string $storedPath, string $tipoIngresoDefault = '3'): array
     {
+        $this->resolverCache = [];
         $this->prepareLongRunningImport();
 
         $tipoIngresoDefault = LicenciaFolio::normalizeTipo($tipoIngresoDefault) ?: '3';
@@ -96,6 +105,7 @@ class LicenciaSeguimientoImportService
 
         $spreadsheet->disconnectWorksheets();
 
+        $resumen['asociaciones_por_revisar'] = $this->advertenciasAsociacion($importacion->id);
         $importacion->update([
             'total_filas' => $totales['filas'],
             'total_importadas' => $totales['importadas'],
@@ -133,6 +143,7 @@ class LicenciaSeguimientoImportService
 
     public function indexarErrores(LicenciaMedicaImportacion $importacion): int
     {
+        $this->resolverCache = [];
         if ($importacion->tipo !== 'seguimiento_excel') {
             throw ValidationException::withMessages([
                 'importacion' => 'Sólo se pueden reconstruir errores de importaciones de seguimiento histórico.',
@@ -264,6 +275,7 @@ class LicenciaSeguimientoImportService
 
     public function reprocesarError(LicenciaMedicaImportacionError $error, int $userId): LicenciaMedicaImportacionError
     {
+        $this->resolverCache = [];
         $resultado = DB::transaction(function () use ($error, $userId) {
             $registro = LicenciaMedicaImportacionError::query()
                 ->with('importacion')
@@ -454,6 +466,16 @@ class LicenciaSeguimientoImportService
         }
 
         $datos = $datosFuncionarios[$rut['normalizado']] ?? [];
+        $existente = LicenciaMedica::query()->where('tipo_ingreso_licencia', $tipo)
+            ->where('cuerpo_licencia', $cuerpo)->where('dv_licencia', $dv)
+            ->first(['id', 'rut_normalizado', 'rut_formateado', 'rut_funcionario', 'dv_funcionario']);
+        if ($existente && ! $this->mismoRut($existente, $rut['normalizado'])) {
+            return [
+                'error' => 'El folio ya pertenece a otro RUT o su identidad histórica no puede verificarse. No se modificó la licencia existente.',
+                'codigo_error' => 'folio_rut_conflictivo',
+                'valores_originales' => $valoresOriginales,
+            ];
+        }
         $nombre = $this->clean($this->value($row, $map, 'nombre')) ?: ($datos['nombre'] ?? null);
         if (! $nombre) {
             return [
@@ -465,7 +487,8 @@ class LicenciaSeguimientoImportService
 
         $establecimientoManual = $this->clean($this->value($row, $map, 'dependencia')) ?: ($datos['ubicacion'] ?? null);
         $comunaManual = $this->clean($this->value($row, $map, 'comuna')) ?: ($datos['comuna'] ?? null);
-        $asociacion = $this->resolveFuncionarioCached($rut['normalizado'], $rut['rut'], $establecimientoManual, $comunaManual);
+        // El padrón actual no reinterpreta la identidad de un documento existente.
+        $asociacion = $existente ? [] : $this->resolveFuncionarioCached($rut['normalizado'], $rut['rut'], $establecimientoManual, $comunaManual);
 
         $tipoLmRaw = $this->clean($this->value($row, $map, 'tipo_lm'));
         $tipoLm = null;
@@ -559,41 +582,70 @@ class LicenciaSeguimientoImportService
                 'fuente_asociacion_funcionario' => $asociacion['fuente'] ?? 'sin_asociacion',
                 'periodo_reemplazos_usado' => $asociacion['periodo'] ?? null,
                 'origen_planilla_anio' => $sheetName,
+                '_advertencia_asociacion' => $asociacion['advertencia'] ?? null,
             ],
         ];
     }
 
     private function guardarLicencia(array $data, int $importacionId, int $userId): string
     {
-        $existing = LicenciaMedica::where('tipo_ingreso_licencia', $data['tipo_ingreso_licencia'])
-            ->where('cuerpo_licencia', $data['cuerpo_licencia'])
-            ->where('dv_licencia', $data['dv_licencia'])
-            ->first();
+        return DB::transaction(function () use ($data, $importacionId, $userId): string {
+            $advertencia = $data['_advertencia_asociacion'] ?? null;
+            unset($data['_advertencia_asociacion']);
+            $existing = LicenciaMedica::where('tipo_ingreso_licencia', $data['tipo_ingreso_licencia'])
+                ->where('cuerpo_licencia', $data['cuerpo_licencia'])
+                ->where('dv_licencia', $data['dv_licencia'])
+                ->lockForUpdate()
+                ->first();
 
-        if ($existing) {
-            $anteriores = $this->estadosAnteriores($existing);
-            $existing->fill(array_filter($data, fn ($value) => ! is_null($value)));
+            if ($existing) {
+                if (! $this->mismoRut($existing, $data['rut_normalizado'])) {
+                    throw ValidationException::withMessages(['archivo_seguimiento' => 'El folio cambió de identidad durante la importación. No se sobrescribió la licencia.']);
+                }
+                $anteriores = $this->estadosAnteriores($existing);
+                $data = array_diff_key($data, array_flip(self::IDENTIDAD_HISTORICA));
+                $existing->fill(array_filter($data, fn ($value) => ! is_null($value)));
 
-            if (! $existing->isDirty()) {
-                return 'duplicadas';
+                if (! $existing->isDirty()) {
+                    return 'duplicadas';
+                }
+
+                $existing->importacion_id = $importacionId;
+                $existing->updated_by = $userId;
+                $existing->save();
+
+                $this->registrarCambiosEstado($existing, $anteriores, $userId, $importacionId);
+                return 'actualizadas';
             }
 
-            $existing->importacion_id = $importacionId;
-            $existing->updated_by = $userId;
-            $existing->save();
+            $data = array_filter($data, fn ($value) => ! is_null($value));
+            $data['importacion_id'] = $importacionId;
+            $data['updated_by'] = $userId;
+            $data['created_by'] = $userId;
+            $licencia = LicenciaMedica::create($data);
+            $this->registrarCambiosEstado($licencia, [], $userId, $importacionId);
+            if ($advertencia) {
+                LicenciaMedicaHistorial::create([
+                    'licencia_medica_id' => $licencia->id,
+                    'accion' => 'advertencia_asociacion',
+                    'descripcion' => $advertencia,
+                    'origen' => 'importacion_excel',
+                    'importacion_id' => $importacionId,
+                    'user_id' => $userId,
+                    'created_at' => now(),
+                ]);
+            }
 
-            $this->registrarCambiosEstado($existing, $anteriores, $userId, $importacionId);
-            return 'actualizadas';
-        }
+            return 'importadas';
+        });
+    }
 
-        $data = array_filter($data, fn ($value) => ! is_null($value));
-        $data['importacion_id'] = $importacionId;
-        $data['updated_by'] = $userId;
-        $data['created_by'] = $userId;
-        $licencia = LicenciaMedica::create($data);
-        $this->registrarCambiosEstado($licencia, [], $userId, $importacionId);
-
-        return 'importadas';
+    private function mismoRut(LicenciaMedica $licencia, string $rutNormalizado): bool
+    {
+        $guardado = $licencia->rut_normalizado ?: ($licencia->rut_formateado
+            ?: ($licencia->rut_funcionario.'-'.$licencia->dv_funcionario));
+        $rut = RutNormalizer::normalize($guardado);
+        return $rut['valido'] && $rut['normalizado'] === $rutNormalizado;
     }
 
     private function leerDatosFuncionarios($spreadsheet): array
@@ -698,6 +750,7 @@ class LicenciaSeguimientoImportService
 
         $zip->close();
 
+        $resumen['asociaciones_por_revisar'] = $this->advertenciasAsociacion($importacion->id);
         $importacion->update([
             'total_filas' => $totales['filas'],
             'total_importadas' => $totales['importadas'],
@@ -1052,6 +1105,9 @@ class LicenciaSeguimientoImportService
             return $this->resolverCache[$cacheKey];
         }
 
+        if (count($this->resolverCache) >= 500) {
+            $this->resolverCache = [];
+        }
         $this->resolverCache[$cacheKey] = $this->resolver->resolve($rutNormalizado, $rut, $establecimientoManual, $comunaManual);
         return $this->resolverCache[$cacheKey];
     }
@@ -1062,6 +1118,17 @@ class LicenciaSeguimientoImportService
             LicenciaEstadoService::ADMINISTRATIVO => $licencia->estado_administrativo_codigo,
             LicenciaEstadoService::COMPIN => $licencia->estado_compin_codigo,
             LicenciaEstadoService::RECUPERACION => $licencia->estado_recuperacion_codigo,
+        ];
+    }
+
+    private function advertenciasAsociacion(int $importacionId): array
+    {
+        $query = LicenciaMedicaHistorial::query()->where('importacion_id', $importacionId)
+            ->where('accion', 'advertencia_asociacion');
+        return [
+            'total' => (clone $query)->count(),
+            'muestra' => $query->orderBy('id')->limit(25)
+                ->get(['licencia_medica_id', 'descripcion'])->toArray(),
         ];
     }
 
@@ -1341,6 +1408,7 @@ class LicenciaSeguimientoImportService
             'pendientes' => $registro->errores()->where('estado', '<>', LicenciaMedicaImportacionError::ESTADO_RESUELTO)->count(),
             'actualizado_at' => now()->toIso8601String(),
         ];
+        $resumen['asociaciones_por_revisar'] = $this->advertenciasAsociacion($registro->id);
         $cambios['resumen_json'] = $resumen;
 
         $registro->update($cambios);

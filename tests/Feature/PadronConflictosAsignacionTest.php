@@ -141,7 +141,10 @@ class PadronConflictosAsignacionTest extends TestCase
         ]);
         $diagnosis = $this->diagnosis($this->revision([$this->data()]));
         $this->assertSame(15.0, $diagnosis['items'][0]['cobertura']['horas']);
-        $this->assertSame(1, $diagnosis['bloqueantes']);
+        $this->assertSame(15.0, $diagnosis['grupos'][0]['cobertura_actual']['horas']);
+        $this->assertSame(0, $diagnosis['bloqueantes']);
+        $this->assertSame('preexistente', $diagnosis['grupos'][0]['comparacion']['estado']);
+        $this->assertSame(5.0, $diagnosis['grupos'][0]['comparacion']['exceso_actual']);
     }
 
     public function test_transfer_and_absence_keep_id_conflict_even_with_another_contract_or_declaration(): void
@@ -288,10 +291,149 @@ class PadronConflictosAsignacionTest extends TestCase
         }
     }
 
+    public function test_preexisting_excess_without_contract_id_is_one_warning_with_all_assignment_details(): void
+    {
+        DB::table('reemplazos_personal')->where('id', 101)->update(['jornada' => 33, 'jornada_basica' => 33]);
+        DB::table('declaracion_sostenedores')->insert(['rut' => '111111111', 'rbd' => '99999', 'horas_contratadas' => 33]);
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['reemplazos_personal_id' => null, 'horas_contrato' => 2]);
+        $this->assignment(502, ['reemplazos_personal_id' => null, 'docente_rut' => '11111111-1', 'horas_contrato' => 32]);
+        $revision = $this->revision([$this->data(['jornada' => 33, 'jornada_basica' => 33])]);
+        $diagnosis = $this->diagnosis($revision);
+        $this->assertSame([], $diagnosis['errores']);
+        $this->assertSame(0, $diagnosis['grupos_bloqueantes']);
+        $this->assertSame(1, $diagnosis['grupos_avisos']);
+        $this->assertSame(2, $diagnosis['avisos']);
+        $this->assertCount(1, $diagnosis['grupos']);
+        $group = $diagnosis['grupos'][0];
+        $this->assertSame(34.0, $group['total_asignadas']);
+        $this->assertSame(['estado' => 'preexistente', 'comparable' => true, 'exceso_actual' => 1.0, 'exceso_propuesto' => 1.0], $group['comparacion']);
+        $this->assertCount(1, $group['avisos']);
+        $this->assertCount(2, $group['asignaciones']);
+        $this->assertSame([], app(PadronAplicacionService::class)->plan($revision)['errores']);
+        $this->assertFalse(app(PadronAplicacionService::class)->disponible());
+        view()->share('errors', new ViewErrorBag);
+        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]));
+        $this->assertCount(1, $view->getData()['conflictosPaginados']);
+        $html = $view->render();
+        $this->assertStringContainsString('Ver 2 asignaciones', $html);
+        $this->assertStringContainsString('Aviso: no bloquea por este caso', $html);
+        $this->assertSame(1, substr_count($html, 'Total asignado: 34 h'));
+        $this->assertSame(1, substr_count($html, 'Exceso preexistente: 1 h antes'));
+    }
+
+    public function test_current_vs_proposed_coverage_distinguishes_new_aggravated_and_improved_excess(): void
+    {
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 34]);
+        foreach ([[44, 33, 'nuevo', 0, 1, 1], [33, 32, 'agravado', 1, 2, 1], [32, 33, 'preexistente', 2, 1, 0]] as [$actual, $proposed, $state, $before, $after, $blocks]) {
+            DB::table('reemplazos_personal')->where('id', 101)->update(['jornada' => $actual, 'jornada_basica' => $actual]);
+            $diagnosis = $this->diagnosis($this->revision([$this->data(['jornada' => $proposed, 'jornada_basica' => $proposed])]));
+            $this->assertSame($blocks, $diagnosis['grupos_bloqueantes']);
+            $this->assertSame(['estado' => $state, 'comparable' => true, 'exceso_actual' => (float) $before, 'exceso_propuesto' => (float) $after], $diagnosis['grupos'][0]['comparacion']);
+        }
+    }
+
+    public function test_unknown_inactive_or_replacement_baseline_cannot_waive_coverage_block(): void
+    {
+        DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => null, 'horas_contrato' => 34]);
+        foreach ([['vigente' => false], ['anio' => 2025], ['tipocontrato' => 'REEMPLAZO'], ['tipocontrato' => 'SUPLENCIA']] as $change) {
+            DB::table('reemplazos_personal')->where('id', 101)->update(array_replace(['vigente' => true, 'anio' => 2026, 'tipocontrato' => 'CONTRATA'], $change));
+            $diagnosis = $this->diagnosis($this->revision([$this->data(['jornada' => 33, 'jornada_basica' => 33])]));
+            $this->assertSame('no_comparable', $diagnosis['grupos'][0]['comparacion']['estado']);
+            $this->assertNull($diagnosis['grupos'][0]['comparacion']['exceso_actual']);
+            $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+            $this->assertArrayHasKey('cobertura_insuficiente', $diagnosis['items'][0]['motivos']);
+        }
+    }
+
+    public function test_preexisting_excess_does_not_waive_a_lost_contract_id(): void
+    {
+        DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => 999, 'horas_contrato' => 45]);
+        $diagnosis = $this->diagnosis($this->revision([$this->data()]));
+        $this->assertSame('preexistente', $diagnosis['grupos'][0]['comparacion']['estado']);
+        $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+        $this->assertSame(0, $diagnosis['grupos_avisos']);
+        $this->assertArrayHasKey('id_sin_destino', $diagnosis['items'][0]['motivos']);
+        $this->assertArrayNotHasKey('cobertura_insuficiente', $diagnosis['items'][0]['motivos']);
+        $this->assertNotEmpty($diagnosis['errores']);
+    }
+
+    public function test_group_details_include_unflagged_assignments_and_do_not_merge_establishments(): void
+    {
+        $this->assignment(502, ['reemplazos_personal_id' => 999, 'horas_contrato' => 1]);
+        $this->assignment(503, ['establecimiento_id' => 2, 'reemplazos_personal_id' => null, 'horas_contrato' => 10]);
+        $diagnosis = $this->diagnosis($this->revision([$this->data()]));
+        $this->assertSame(2, $diagnosis['grupos_bloqueantes']);
+        $this->assertSame(2, $diagnosis['bloqueantes']);
+        $groups = collect($diagnosis['grupos'])->keyBy('establecimiento_id');
+        $this->assertCount(2, $groups[1]['asignaciones']);
+        $this->assertFalse($groups[1]['asignaciones'][0]['bloqueante']);
+        $this->assertSame(21.0, $groups[1]['total_asignadas']);
+        $this->assertSame(44.0, $groups[1]['cobertura']['horas']);
+        $this->assertSame(0.0, $groups[2]['cobertura']['horas']);
+        $this->assertSame(0.0, $groups[2]['cobertura_actual']['horas']);
+    }
+
+    public function test_repeated_coverage_block_is_reported_once_per_group_not_per_assignment(): void
+    {
+        foreach (range(502, 521) as $id) {
+            $this->assignment($id, ['horas_contrato' => 1]);
+        }
+        $revision = $this->revision([$this->data(['jornada' => 10, 'jornada_basica' => 10])]);
+        $diagnosis = $this->diagnosis($revision);
+        $this->assertSame(21, $diagnosis['bloqueantes']);
+        $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+        $this->assertCount(1, $diagnosis['errores']);
+        $this->assertCount(21, $diagnosis['grupos'][0]['asignaciones']);
+        view()->share('errors', new ViewErrorBag);
+        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]));
+        $this->assertSame(1, $view->getData()['conflictosPaginados']->total());
+        $this->assertStringContainsString('Ver 21 asignaciones', $view->render());
+    }
+
+    public function test_current_coverage_preserves_decimal_hours(): void
+    {
+        DB::table('reemplazos_personal')->update(['jornada' => 33.5, 'jornada_basica' => 33.5]);
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 34]);
+        $diagnosis = $this->diagnosis($this->revision([$this->data(['jornada' => 33, 'jornada_basica' => 33])]));
+        $this->assertSame(33.5, $diagnosis['grupos'][0]['cobertura_actual']['horas']);
+        $this->assertSame('agravado', $diagnosis['grupos'][0]['comparacion']['estado']);
+        $this->assertSame(0.5, $diagnosis['grupos'][0]['comparacion']['exceso_actual']);
+    }
+
+    public function test_baseline_uses_annual_history_without_reading_the_mutated_current_contract(): void
+    {
+        (require base_path('database/migrations/2026_09_08_160000_create_padron_periodo_versiones.php'))->up();
+        DB::table('reemplazos_personal')->update(['jornada' => 33, 'jornada_basica' => 33]);
+        DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => null, 'horas_contrato' => 34]);
+        $archive = $this->revision([$this->data()]);
+        DB::transaction(function () use ($archive): void {
+            $periodos = app(\App\Services\Padron\PadronPeriodoService::class);
+            $periodos->antesDeAplicar($archive, 1);
+            // Solo fixture SQLite: el contrato actual cambia de año y jornada.
+            DB::table('reemplazos_personal')->update(['anio' => 2027, 'mes' => 1, 'jornada' => 44]);
+        });
+        $diagnosis = $this->diagnosis($this->revision([$this->data(['jornada' => 33, 'jornada_basica' => 33])]));
+        $this->assertSame(33.0, $diagnosis['grupos'][0]['cobertura_actual']['horas']);
+        $this->assertSame('preexistente', $diagnosis['grupos'][0]['comparacion']['estado']);
+        $this->assertSame(0, $diagnosis['grupos_bloqueantes']);
+    }
+
+    public function test_older_contract_is_not_resurrected_below_a_complete_load_floor(): void
+    {
+        (require base_path('database/migrations/2026_09_08_160000_create_padron_periodo_versiones.php'))->up();
+        DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => null, 'horas_contrato' => 45]);
+        $applied = $this->revision([$this->data()]);
+        $applied->update(['aplicada_at' => now(), 'aplicada_por' => 1]);
+        $diagnosis = $this->diagnosis($this->revision([$this->data()]));
+        $this->assertSame(0.0, $diagnosis['grupos'][0]['cobertura_actual']['horas']);
+        $this->assertSame('no_comparable', $diagnosis['grupos'][0]['comparacion']['estado']);
+        $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+    }
+
     public function test_conflict_view_shows_all_counts_with_independent_pagination_without_writes(): void
     {
         foreach (range(502, 521) as $id) {
-            $this->assignment($id);
+            $this->assignment($id, ['reemplazos_personal_id' => null, 'docente_rut' => (string) (220000000 + $id)]);
         }
         $revision = $this->revision([$this->data(['jornada' => 10])]);
         $before = DB::table('reemplazos_personal')->get()->toJson();
@@ -301,6 +443,7 @@ class PadronConflictosAsignacionTest extends TestCase
             'revision' => $revision->id, 'q' => 'Sin coincidencias', 'conflictos_page' => 2,
         ]));
         $this->assertSame(21, $view->getData()['conflictos']['bloqueantes']);
+        $this->assertSame(21, $view->getData()['conflictos']['grupos_bloqueantes']);
         $this->assertCount(1, $view->getData()['conflictosPaginados']);
         $html = $view->render();
         $this->assertStringContainsString('Conflictos con asignaciones de Dotación', $html);

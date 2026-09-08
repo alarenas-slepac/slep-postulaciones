@@ -2,23 +2,28 @@
 
 namespace App\Services\LicenciasMedicas;
 
-use App\Models\Establecimiento;
 use App\Models\FuncionarioAcAutorizado;
-use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronVigenciaService;
 use Illuminate\Support\Facades\Schema;
 
 class LicenciaFuncionarioResolver
 {
     /**
      * Resuelve si el funcionario pertenece a Administracion Central o a un establecimiento.
-     * Prioridad: funcionarios_ac_autorizados; si no existe, reemplazos_personal del mes mas reciente.
+     * Asociación al momento del ingreso, no certificación del vínculo a la fecha del reposo.
+     * Mantiene prioridad de identidad AC; su autorización no equivale a vigencia laboral.
      */
     public function resolve(?string $rutNormalizado, ?string $rutCuerpo, ?string $establecimientoManual = null, ?string $comunaManual = null): array
     {
         $base = $this->base($establecimientoManual, $comunaManual);
 
-        $rutNorm = $this->cleanRut($rutNormalizado);
-        $rutDigits = preg_replace('/\D/', '', (string) $rutCuerpo);
+        $rut = RutNormalizer::normalize($rutNormalizado);
+        if (! $rut['valido'] || ($rutCuerpo !== null && $rutCuerpo !== ''
+            && ltrim(preg_replace('/\D/', '', $rutCuerpo), '0') !== $rut['rut'])) {
+            return array_replace($base, ['advertencia' => 'No se pudo asociar: el RUT completo y su dígito verificador deben ser válidos.']);
+        }
+        $rutNorm = $rut['normalizado'];
+        $rutDigits = $rut['rut'];
 
         if ($rutNorm !== '' || $rutDigits !== '') {
             $ac = $this->buscarFuncionarioAc($rutNorm, $rutDigits);
@@ -27,7 +32,7 @@ class LicenciaFuncionarioResolver
             }
         }
 
-        return $this->buscarReemplazosPersonal($rutNorm, $rutDigits, $base);
+        return $this->buscarReemplazosPersonal($rutNorm, $base);
     }
 
     private function base(?string $establecimientoManual, ?string $comunaManual): array
@@ -47,6 +52,7 @@ class LicenciaFuncionarioResolver
             'correo_funcionario' => null,
             'fuente' => 'sin_asociacion',
             'periodo' => null,
+            'advertencia' => null,
         ];
     }
 
@@ -64,8 +70,10 @@ class LicenciaFuncionarioResolver
                     }
 
                     if ($rutDigits !== '') {
-                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(run), '.', ''), '-', ''), ' ', '') = ?", [$rutDigits]);
-                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(run), '.', ''), '-', ''), ' ', '') LIKE ?", [$rutDigits . '%']);
+                        $query->orWhere(function ($run) use ($rutDigits, $rutNorm) {
+                            $run->whereRaw("REPLACE(REPLACE(REPLACE(UPPER(TRIM(run)), '.', ''), '-', ''), ' ', '') = ?", [$rutDigits])
+                                ->whereRaw('UPPER(TRIM(dv)) = ?', [substr($rutNorm, -1)]);
+                        });
                     }
                 })
                 ->orderByRaw("CASE WHEN estado_autorizacion = 'activo' THEN 0 ELSE 1 END")
@@ -104,61 +112,44 @@ class LicenciaFuncionarioResolver
         ]);
     }
 
-    private function buscarReemplazosPersonal(string $rutNorm, string $rutDigits, array $base): array
+    private function buscarReemplazosPersonal(string $rutNorm, array $base): array
     {
         try {
             if (! Schema::hasTable('reemplazos_personal')) {
-                return $base;
+                return array_replace($base, ['advertencia' => 'Padrón no disponible. Se conservan los datos manuales sin asociación automática.']);
             }
 
-            $periodo = ReemplazoPersonal::query()
-                ->select('anio', 'mes')
-                ->whereNotNull('anio')
-                ->whereNotNull('mes')
-                ->orderByDesc('anio')
-                ->orderByDesc('mes')
-                ->first();
-
-            if (! $periodo) {
-                return $base;
+            $padron = app(PadronVigenciaService::class)->porRut($rutNorm);
+            $registros = $padron['vigentes'];
+            if ($registros->isEmpty()) {
+                return array_replace($base, ['advertencia' => $padron['tiene_antecedentes']
+                    ? 'El RUT tiene antecedentes históricos, pero no contrato vigente en el padrón. Se conservan los datos manuales sin asociación automática.'
+                    : 'El RUT no se encuentra en el padrón. Se conservan los datos manuales sin asociación automática.']);
             }
-
-            $registro = ReemplazoPersonal::query()
-                ->with('establecimiento')
-                ->where('anio', $periodo->anio)
-                ->where('mes', $periodo->mes)
-                ->where(function ($q) use ($rutDigits, $rutNorm) {
-                    if ($rutNorm !== '') {
-                        $q->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(rut), '.', ''), '-', ''), ' ', '') = ?", [$rutNorm]);
-                    }
-                    if ($rutDigits !== '') {
-                        $q->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(rut), '.', ''), '-', ''), ' ', '') LIKE ?", [$rutDigits . '%']);
-                    }
-                })
-                ->first();
-
-            if (! $registro) {
-                $base['periodo'] = sprintf('%04d-%02d', $periodo->anio, $periodo->mes);
-                return $base;
+            if ($registros->contains(fn ($row) => ! $row->establecimiento_id || ! $row->establecimiento)) {
+                return array_replace($base, ['advertencia' => 'Hay contratos actuales sin establecimiento válido. Regularice el padrón; no se asignó un establecimiento automáticamente.']);
             }
+            if ($registros->pluck('establecimiento_id')->unique()->count() !== 1) {
+                return array_replace($base, ['advertencia' => 'El RUT tiene contratos vigentes en más de un establecimiento. Revise la dependencia de esta licencia; no se seleccionó un RBD automáticamente.']);
+            }
+            $registro = $registros->first();
+            $calidades = $registros->pluck('tipocontrato')->filter()->unique();
+            $estamentos = $registros->map(fn ($row) => $row->escalafon ?: $row->estatuto)->filter()->unique();
 
             return array_merge($base, [
                 'tipo_dependencia' => 'establecimiento',
                 'establecimiento_id' => $registro->establecimiento_id,
                 'establecimiento_nombre' => optional($registro->establecimiento)->nombre ?: optional($registro->establecimiento)->nombre_establecimiento ?: $base['establecimiento_nombre'],
                 'comuna' => optional($registro->establecimiento)->comuna ?: $base['comuna'],
-                'calidad_juridica' => $registro->tipocontrato,
-                'estamento' => $registro->escalafon ?: $registro->estatuto,
-                'fuente' => 'reemplazos_personal_mes_reciente',
-                'periodo' => sprintf('%04d-%02d', $periodo->anio, $periodo->mes),
+                'calidad_juridica' => $calidades->count() === 1 ? $calidades->first() : null,
+                'estamento' => $estamentos->count() === 1 ? $estamentos->first() : null,
+                'fuente' => 'reemplazos_personal_vigente',
+                'periodo' => sprintf('%04d-%02d', $registro->anio, $registro->mes),
+                'advertencia' => $calidades->count() > 1 || $estamentos->count() > 1
+                    ? 'La dependencia es única, pero hay distintas calidades jurídicas o estamentos vigentes. Revise esos datos manuales.' : null,
             ]);
         } catch (\Throwable $e) {
-            return $base;
+            return array_replace($base, ['advertencia' => 'No fue posible consultar el padrón. Se conservan los datos manuales sin asociación automática; revise la consulta antes de usar esta dependencia.']);
         }
-    }
-
-    private function cleanRut(?string $value): string
-    {
-        return preg_replace('/[^0-9K]/', '', strtoupper((string) $value)) ?: '';
     }
 }

@@ -62,7 +62,8 @@
                 <div class="cf-help">
                     <p class="mb-2"><strong>Duplicidad:</strong> no se crean registros repetidos. El sistema valida por tipo de ingreso, cuerpo y DV de licencia médica.</p>
                     <p class="mb-2"><strong>RUT:</strong> se valida el dígito verificador y luego se normaliza a formato sin puntos ni guion, con DV incluido, para cruces posteriores con remuneraciones y COMPIN.</p>
-                    <p class="mb-2"><strong>Dependencia:</strong> se busca primero en funcionarios de Administración Central y luego en reemplazos_personal usando sólo el mes más reciente. Si no cruza, se mantiene la dependencia/comuna del Excel como dato manual.</p>
+                    <p class="mb-2"><strong>Dependencia:</strong> se conserva la prioridad de Administración Central y luego se consultan contratos vigentes por establecimiento, incluidos reemplazos y suplencias. Sin coincidencia única se mantienen los datos manuales y se registra una advertencia. Esta asociación refleja el padrón al ingresar, no acredita la dependencia a la fecha del reposo histórico.</p>
+                    <p class="mb-2"><strong>Licencias existentes:</strong> se conservan su identidad, dependencia y origen documental, incluso ante bajas o traslados. Si el folio pertenece a otro RUT, la fila se rechaza con su motivo; no cambia de funcionario.</p>
                     <p class="mb-2"><strong>Historial:</strong> cada cambio de estado queda registrado con su dimensión, valor anterior, valor nuevo, usuario y carga de origen.</p>
                     <p class="mb-2"><strong>Estados:</strong> la importación clasifica por separado el avance administrativo, la resolución COMPIN y la recuperación financiera.</p>
                     <p class="mb-2"><strong>Fallas:</strong> si el proceso no puede completarse, la carga queda marcada como fallida para revisión.</p>
@@ -105,6 +106,19 @@
                     @endforeach
                     </tbody>
                 </table>
+            @endif
+
+            @if(($result['resumen']['asociaciones_por_revisar']['total'] ?? 0) > 0)
+                <div class="alert alert-warning mt-3" role="alert">
+                    <strong>Asociaciones por revisar: {{ $result['resumen']['asociaciones_por_revisar']['total'] }}.</strong>
+                    Las licencias fueron ingresadas; estas advertencias no son filas rechazadas.
+                    Se muestran hasta 25 casos. Cada motivo queda guardado en el historial de la licencia.
+                    <ul class="mb-0 mt-2">
+                        @foreach($result['resumen']['asociaciones_por_revisar']['muestra'] ?? [] as $aviso)
+                            <li><a href="{{ route('tramites.licencias-medicas.show', $aviso['licencia_medica_id']) }}">Licencia #{{ $aviso['licencia_medica_id'] }}</a>: {{ $aviso['descripcion'] }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             @endif
 
             @if(!empty($result['resumen']['inconsistencias']))

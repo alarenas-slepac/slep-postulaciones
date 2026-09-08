@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Tramites;
 
 use App\Http\Controllers\Controller;
-use App\Models\Establecimiento;
 use App\Models\LicenciaMedica;
 use App\Models\LicenciaMedicaHistorial;
 use App\Models\LicenciaMedicaImportacion;
-use App\Models\ReemplazoPersonal;
 use App\Services\LicenciasMedicas\LicenciaFolio;
 use App\Services\LicenciasMedicas\LicenciaPdfExtractor;
 use App\Services\LicenciasMedicas\LicenciaFuncionarioResolver;
@@ -334,12 +332,25 @@ class LicenciaMedicaController extends Controller
                 'created_at' => now(),
             ]);
 
+            if (! empty($asociacion['advertencia'])) {
+                LicenciaMedicaHistorial::create([
+                    'licencia_medica_id' => $licencia->id,
+                    'accion' => 'advertencia_asociacion',
+                    'descripcion' => $asociacion['advertencia'],
+                    'origen' => $origen,
+                    'user_id' => $request->user()->id,
+                    'created_at' => now(),
+                ]);
+            }
+
             return $licencia;
         });
 
         session()->forget(['licencia_medica_extracted', 'licencia_medica_archivo_temporal']);
 
-        return redirect()->route('tramites.licencias-medicas.show', $licencia)->with('success', 'Licencia medica registrada correctamente.');
+        return redirect()->route('tramites.licencias-medicas.show', $licencia)
+            ->with('success', 'Licencia medica registrada correctamente.')
+            ->with('advertencia_asociacion', $asociacion['advertencia'] ?? null);
     }
 
 
@@ -665,61 +676,6 @@ class LicenciaMedicaController extends Controller
         }
 
         return [];
-    }
-
-    private function resolverAsociacionReemplazos(?string $rutNormalizado, ?string $rutCuerpo, ?string $establecimientoManual, ?string $comunaManual): array
-    {
-        $base = [
-            'establecimiento_id' => null,
-            'establecimiento_nombre' => $establecimientoManual,
-            'comuna' => $comunaManual,
-            'calidad_juridica' => null,
-            'estamento' => null,
-            'fuente' => 'sin_asociacion',
-            'periodo' => null,
-        ];
-
-        try {
-            $periodo = ReemplazoPersonal::query()
-                ->select('anio', 'mes')
-                ->whereNotNull('anio')
-                ->whereNotNull('mes')
-                ->orderByDesc('anio')
-                ->orderByDesc('mes')
-                ->first();
-
-            if (!$periodo) return $base;
-
-            $rutDigits = preg_replace('/\D/', '', (string) $rutCuerpo);
-            $rutNorm = preg_replace('/[^0-9K]/', '', strtoupper((string) $rutNormalizado));
-
-            $registro = ReemplazoPersonal::query()
-                ->with('establecimiento')
-                ->where('anio', $periodo->anio)
-                ->where('mes', $periodo->mes)
-                ->where(function ($q) use ($rutDigits, $rutNorm) {
-                    $q->whereRaw("REPLACE(REPLACE(REPLACE(UPPER(rut), '.', ''), '-', ''), ' ', '') = ?", [$rutNorm])
-                      ->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(rut), '.', ''), '-', ''), ' ', '') LIKE ?", [$rutDigits . '%']);
-                })
-                ->first();
-
-            if (!$registro) {
-                $base['periodo'] = sprintf('%04d-%02d', $periodo->anio, $periodo->mes);
-                return $base;
-            }
-
-            return [
-                'establecimiento_id' => $registro->establecimiento_id,
-                'establecimiento_nombre' => optional($registro->establecimiento)->nombre ?: $establecimientoManual,
-                'comuna' => optional($registro->establecimiento)->comuna ?: $comunaManual,
-                'calidad_juridica' => $registro->tipocontrato,
-                'estamento' => $registro->escalafon ?: $registro->estatuto,
-                'fuente' => 'reemplazos_personal_mes_reciente',
-                'periodo' => sprintf('%04d-%02d', $periodo->anio, $periodo->mes),
-            ];
-        } catch (\Throwable $e) {
-            return $base;
-        }
     }
 
     public function recalcularDias(LicenciaMedica $licenciaMedica, LicenciaDiasLaboralesService $diasService)
