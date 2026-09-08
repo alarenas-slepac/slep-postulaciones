@@ -812,6 +812,7 @@ class DotacionEstablecimientoCalculator
         }
 
         $query = ReemplazoPersonal::query()
+            ->padronVigente($anio)->sinReemplazoSuplencia()
             ->where('establecimiento_id', $establecimiento->id)
             ->where('anio', $anio);
 
@@ -1016,6 +1017,7 @@ class DotacionEstablecimientoCalculator
         }
 
         $query = ReemplazoPersonal::query()
+            ->padronVigente($anio)->sinReemplazoSuplencia()
             ->where('establecimiento_id', $establecimiento->id)
             ->where('anio', $anio);
 
