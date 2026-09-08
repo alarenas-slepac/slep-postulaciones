@@ -76,7 +76,7 @@ class DotacionAsignacionCalculator
         $totalAulaAsignadas = (float) $necesidadesPlan->sum(fn ($item) => (float) ($item['horas_plan_asignadas'] ?? 0));
         $aulaPendientes = max(0.0, round($totalAulaRequeridas - $totalAulaAsignadas, 2));
         $aulaExcedidas = max(0.0, round($totalAulaAsignadas - $totalAulaRequeridas, 2));
-        $contratoDocentePie = self::resumenContratoDocentePie($asignaciones, $docentes);
+        $contratoDocentePie = self::resumenContratoDocentePie($asignaciones, $docentes, (bool) $establecimiento->especial);
 
         return [
             'necesidades' => $necesidades,
@@ -156,8 +156,14 @@ class DotacionAsignacionCalculator
     /**
      * @return array{coordinacion_pie: float, educadoras_diferenciales: float, total: float}
      */
-    private static function resumenContratoDocentePie(Collection $asignaciones, Collection $docentes): array
+    private static function resumenContratoDocentePie(Collection $asignaciones, Collection $docentes, bool $especial = false): array
     {
+        // En escuelas especiales los contratos diferenciales pertenecen a Aula,
+        // incluso si se conservan asignaciones PIE de períodos históricos.
+        if ($especial) {
+            return ['coordinacion_pie' => 0.0, 'educadoras_diferenciales' => 0.0, 'total' => 0.0];
+        }
+
         // La nómina recibida ya está consolidada por RUT, establecimiento y año,
         // con el último período contractual y las exclusiones aplicadas.
         $diferenciales = $docentes->filter(fn (array $docente) => self::esDocenteDiferencial($docente));

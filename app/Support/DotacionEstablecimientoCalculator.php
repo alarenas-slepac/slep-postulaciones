@@ -194,6 +194,7 @@ class DotacionEstablecimientoCalculator
         $horasContratoCoberturaTotal = round($horasContratoCalculado + $horasContratoAsistentes, 2);
 
         $resumen = [
+            'establecimiento_especial' => (bool) $establecimiento->especial,
             'matricula_total' => (int) ($cursos['totales']['matricula'] ?? 0),
             'cursos_total' => (int) ($cursos['totales']['cursos'] ?? 0),
             'docentes_total' => $docentes->count(),
