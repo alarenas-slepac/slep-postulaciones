@@ -9,7 +9,6 @@ use App\Mail\ContratoTrabajoFirmadoEnviado;
 use App\Mail\ResolucionDocenteFirmadaEnviada;
 use App\Models\SolicitudReemplazo;
 use App\Models\SolicitudReemplazoDeudaPension;
-use App\Models\ReemplazoPersonal;
 use App\Models\SolicitudReemplazoJornada;
 use App\Models\SolicitudReemplazoObservacion;
 use App\Models\PostulantProfile;
@@ -95,9 +94,7 @@ class SolicitudReemplazoGestionController extends Controller
         }
         if ($request->filled('p_titular')) {
             $t = '%' . trim($request->string('p_titular')) . '%';
-            $pendientesQ->whereHas('funcionarioTitular', function ($q) use ($t) {
-                $q->where('rut', 'like', $t)->orWhere('nombre', 'like', $t);
-            });
+            $pendientesQ->titularCoincide($t);
         }
         if ($request->filled('p_desde')) {
             $pendientesQ->whereDate('created_at', '>=', $request->date('p_desde')->format('Y-m-d'));
@@ -123,9 +120,7 @@ class SolicitudReemplazoGestionController extends Controller
             }
             if ($request->filled('v_titular')) {
                 $t = '%' . trim($request->string('v_titular')) . '%';
-                $validacionQ->whereHas('funcionarioTitular', function ($q) use ($t) {
-                    $q->where('rut', 'like', $t)->orWhere('nombre', 'like', $t);
-                });
+                $validacionQ->titularCoincide($t);
             }
             if ($request->filled('v_desde')) {
                 $validacionQ->whereDate('uatp_decision_at', '>=', $request->date('v_desde')->format('Y-m-d'));
@@ -171,9 +166,7 @@ class SolicitudReemplazoGestionController extends Controller
             }
             if ($request->filled('o_titular')) {
                 $t = '%' . trim($request->string('o_titular')) . '%';
-                $otrasQ->whereHas('funcionarioTitular', function ($q) use ($t) {
-                    $q->where('rut', 'like', $t)->orWhere('nombre', 'like', $t);
-                });
+                $otrasQ->titularCoincide($t);
             }
             if ($request->filled('o_reemplazo')) {
                 $t = '%' . trim($request->string('o_reemplazo')) . '%';
@@ -771,13 +764,6 @@ class SolicitudReemplazoGestionController extends Controller
             return collect();
         }
 
-        $idsTitularMismoRut = collect();
-        if ($rutTitularComparable !== '') {
-            $idsTitularMismoRut = ReemplazoPersonal::query()
-                ->whereRaw("UPPER(REPLACE(REPLACE(REPLACE(rut, '.', ''), '-', ''), ' ', '')) = ?", [$rutTitularComparable])
-                ->pluck('id');
-        }
-
         return SolicitudReemplazo::query()
             ->with([
                 'establecimiento:id,rbd,nombre_establecimiento,comuna',
@@ -787,19 +773,9 @@ class SolicitudReemplazoGestionController extends Controller
             ])
             ->where('id', '<>', $solicitud->id)
             ->whereIn('estado', ['aceptada', 'cerrado', 'cerrada'])
-            ->where(function ($q) use ($solicitud, $rutTitularComparable, $idsTitularMismoRut) {
+            ->where(function ($q) use ($solicitud, $rutTitularComparable) {
                 if ($rutTitularComparable !== '') {
-                    $q->where(function ($qq) use ($rutTitularComparable, $idsTitularMismoRut) {
-                        if ($idsTitularMismoRut->isNotEmpty()) {
-                            $qq->whereIn('reemplazo_personal_id', $idsTitularMismoRut->all());
-                        }
-
-                        $qq->orWhereHas('funcionarioTitular', function ($w) use ($rutTitularComparable) {
-                            $w->whereRaw("UPPER(REPLACE(REPLACE(REPLACE(rut, '.', ''), '-', ''), ' ', '')) = ?", [$rutTitularComparable]);
-                        });
-
-                        $qq->orWhereRaw("UPPER(REPLACE(REPLACE(REPLACE(COALESCE(rut_titular_normalizado, ''), '.', ''), '-', ''), ' ', '')) = ?", [$rutTitularComparable]);
-                    });
+                    $q->titularRutComparable($rutTitularComparable);
 
                     return;
                 }
@@ -3376,9 +3352,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
 
         if ($request->filled('titular')) {
             $term = '%' . trim((string) $request->query('titular')) . '%';
-            $baseQuery->whereHas('funcionarioTitular', function ($q) use ($term) {
-                $q->where('rut', 'like', $term)->orWhere('nombre', 'like', $term);
-            });
+            $baseQuery->titularCoincide($term);
         }
 
         if ($request->filled('reemplazante')) {
@@ -3584,9 +3558,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
 
         if ($request->filled('titular')) {
             $term = '%' . trim((string) $request->query('titular')) . '%';
-            $baseQuery->whereHas('funcionarioTitular', function ($q) use ($term) {
-                $q->where('rut', 'like', $term)->orWhere('nombre', 'like', $term);
-            });
+            $baseQuery->titularCoincide($term);
         }
 
         if ($request->filled('reemplazante')) {
@@ -4368,10 +4340,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
 
         if ($request->filled($prefix . '_titular')) {
             $term = '%' . trim((string) $request->input($prefix . '_titular')) . '%';
-            $query->whereHas('funcionarioTitular', function ($q) use ($term) {
-                $q->where('rut', 'like', $term)
-                    ->orWhere('nombre', 'like', $term);
-            });
+            $query->titularCoincide($term);
         }
 
         if ($prefix === 'o' && $request->filled('o_reemplazo')) {

@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class IncumplimientoLaboral extends Model
 {
+    use \App\Models\Concerns\ConservaPadronHistorico;
+
+    protected function relacionPadronHistorico(): string
+    {
+        return 'reemplazoPersonal';
+    }
+
     protected $table = 'incumplimientos_laborales';
 
     protected $fillable = [

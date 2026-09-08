@@ -10,7 +10,7 @@ use PhpOffice\PhpSpreadsheet\Reader\Exception as ReaderException;
 
 class PadronRevisionService
 {
-    public function __construct(private PadronExcelReader $reader, private PadronConciliador $conciliador) {}
+    public function __construct(private PadronExcelReader $reader, private PadronConciliador $conciliador, private PadronDependenciasService $dependencias) {}
 
     public function create(string $path, string $filename, int $userId): PadronRevision
     {
@@ -106,6 +106,11 @@ class PadronRevisionService
     private function snapshot(?int $period): array
     {
         $maxPeriod = (int) DB::table('reemplazos_personal')->selectRaw('MAX(anio * 100 + mes) as periodo')->value('periodo');
+        $aplicaciones = Schema::hasColumn('padron_revisiones', 'aplicada_at')
+            ? DB::table('padron_revisiones')->whereNotNull('aplicada_at')->orderBy('id')->get(['id', 'anio', 'mes', 'aplicada_at'])->all() : [];
+        foreach ($aplicaciones as $aplicacion) {
+            $maxPeriod = max($maxPeriod, (int) $aplicacion->anio * 100 + (int) $aplicacion->mes);
+        }
         $personal = [];
         $latestByEst = [];
         $historical = [];
@@ -142,12 +147,12 @@ class PadronRevisionService
             }
         }
         $establishments = DB::table('establecimientos')->orderBy('id')->get(['id', 'rbd'])->keyBy('rbd')->map(fn ($r) => $r->id)->all();
-        $assignments = Schema::hasTable('dotacion_docente_asignaciones')
-            ? DB::table('dotacion_docente_asignaciones')->where('estado', 'activa')
-                ->when($period, fn ($q) => $q->where('anio', intdiv($period, 100)))->orderBy('id')->get([
-                    'id', 'anio', 'establecimiento_id', 'docente_rut', 'docente_rut_normalizado',
-                    'reemplazos_personal_id', 'tipo_asignacion', 'asignatura_nombre', 'horas_contrato',
-                ])->map(fn ($r) => (array) $r)->all() : [];
+        $cobertura = app(PadronConflictosAsignacionService::class)->snapshot($period ? intdiv($period, 100) : null);
+        // El hash usa la dependencia completa; la revisión solo copia el detalle
+        // necesario, no observaciones ni otras columnas de la asignación.
+        $assignmentFields = array_flip(['id', 'anio', 'establecimiento_id', 'docente_rut', 'docente_rut_normalizado',
+            'reemplazos_personal_id', 'tipo_asignacion', 'asignatura_nombre', 'horas_contrato', 'estamento_cobertura']);
+        $assignments = array_map(fn ($a) => array_intersect_key($a, $assignmentFields), $cobertura['asignaciones']);
         $declarations = [];
         if (Schema::hasTable('declaracion_sostenedores')) {
             foreach (DB::table('declaracion_sostenedores')->orderByDesc('id')->get(['rut', 'horas_contratadas']) as $r) {
@@ -157,8 +162,11 @@ class PadronRevisionService
                 }
             }
         }
+        $dependencias = $this->dependencias->snapshot();
         return ['personal' => $personal, 'establecimientos' => $establishments, 'asignaciones' => $assignments,
             'declaraciones' => $declarations, 'periodo_maximo' => $maxPeriod,
-            'hash' => hash('sha256', json_encode([hash_final($fingerprint), $personal, $establishments, $assignments, $declarations, $maxPeriod], JSON_THROW_ON_ERROR))];
+            // Versión 6: distinguir reemplazos terminados antes del nuevo contrato regular.
+            // Las revisiones previas requieren analizar nuevamente el archivo.
+            'hash' => hash('sha256', json_encode(['v6', hash_final($fingerprint), $personal, $establishments, $assignments, $declarations, $maxPeriod, $dependencias['hash'], $cobertura['hash'], $aplicaciones], JSON_THROW_ON_ERROR))];
     }
 }

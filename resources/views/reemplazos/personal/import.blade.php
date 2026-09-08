@@ -54,7 +54,7 @@
             <h5 class="card-title">Subir archivo Excel</h5>
             <p class="text-muted mb-3">
                 Primero se genera una <strong>previsualización del padrón completo</strong>, sin modificar personal.
-                Puede revisar coincidencias, errores y autorizar excesos con justificación.
+                Puede resolver coincidencias ambiguas, revisar vínculos históricos y autorizar excesos con justificación.
                 En esta etapa la aplicación definitiva está bloqueada: no se actualizan contratos ni vigencias,
                 ni se eliminan registros o asignaciones.
             </p>
