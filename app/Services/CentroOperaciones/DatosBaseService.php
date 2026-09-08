@@ -4,9 +4,8 @@ namespace App\Services\CentroOperaciones;
 
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
-use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronVigenciaService;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -62,26 +61,9 @@ class DatosBaseService
             return $resultado;
         }
 
-        $periodos = DB::table('reemplazos_personal')
+        $filas = app(PadronVigenciaService::class)->consultaActual()
             ->whereIn('establecimiento_id', $ids)
-            ->when(
-                Schema::hasColumn('reemplazos_personal', 'vigente'),
-                fn ($query) => $query->where('vigente', true)
-            )
-            ->groupBy('establecimiento_id')
-            ->selectRaw('establecimiento_id, MAX((anio * 100) + mes) as periodo');
-
-        $filas = ReemplazoPersonal::query()
-            ->from('reemplazos_personal as rp')
-            ->joinSub($periodos, 'ultimo', function ($join) {
-                $join->on('ultimo.establecimiento_id', '=', 'rp.establecimiento_id')
-                    ->whereRaw('ultimo.periodo = ((rp.anio * 100) + rp.mes)');
-            })
-            ->when(
-                Schema::hasColumn('reemplazos_personal', 'vigente'),
-                fn ($query) => $query->where('rp.vigente', true)
-            )
-            ->get(['rp.id', 'rp.establecimiento_id', 'rp.rut', 'rp.estatuto', 'rp.anio', 'rp.mes']);
+            ->get(['id', 'establecimiento_id', 'rut', 'estatuto', 'anio', 'mes']);
 
         foreach ($filas->groupBy('establecimiento_id') as $establecimientoId => $personas) {
             $unicas = $personas->groupBy(function ($fila) {

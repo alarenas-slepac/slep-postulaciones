@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronVigenciaService;
 use App\Models\SolicitudReemplazo;
 use App\Models\User;
 use App\Support\RutChile;
@@ -20,18 +20,17 @@ class TramiteAutofillService
             ];
         }
 
-        $formattedRut = strtoupper(trim((string) ($normalized['rut'] ?? '')));
-        $normalizedRut = strtoupper(preg_replace('/[^0-9Kk]/', '', $formattedRut));
-
-        $rows = ReemplazoPersonal::query()
-            ->with(['establecimiento:id,rbd,nombre_establecimiento,comuna'])
-            ->where(function ($query) use ($formattedRut, $normalizedRut) {
-                $query->whereRaw('UPPER(TRIM(rut)) = ?', [$formattedRut])
-                    ->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(TRIM(rut)), '.', ''), '-', ''), ' ', '') = ?", [$normalizedRut]);
-            })
-            ->get();
+        $padron = app(PadronVigenciaService::class)->porRut($normalized['rut']);
+        $rows = $padron['vigentes'];
 
         if ($rows->isEmpty()) {
+            if ($padron['tiene_antecedentes']) {
+                return [
+                    'ok' => false,
+                    'tiene_antecedentes' => true,
+                    'message' => 'El RUT conserva antecedentes históricos, pero no tiene contrato vigente en el padrón. Regulariza su situación antes de crear un nuevo trámite; una solicitud anterior no acredita vigencia actual.',
+                ];
+            }
             $fallback = $this->resolveFromSolicitudes($user, $normalized);
             if ($fallback !== null) {
                 return $fallback;
@@ -54,19 +53,13 @@ class TramiteAutofillService
             ];
         }
 
-        $latestPeriod = (int) $rows
-            ->map(fn($row) => ((int) $row->anio * 100) + (int) $row->mes)
-            ->max();
-
-        $latestRows = $rows->filter(function ($row) use ($latestPeriod) {
-            return (((int) $row->anio * 100) + (int) $row->mes) === $latestPeriod;
-        })->values();
+        $latestRows = $rows;
 
         $establecimientoIds = $latestRows->pluck('establecimiento_id')->filter()->unique()->values();
         if ($establecimientoIds->count() > 1) {
             return [
                 'ok' => false,
-                'message' => 'El RUT aparece en más de un establecimiento dentro de su período más reciente en reemplazos_personal. Debe regularizarse el padrón antes de crear el trámite.',
+                'message' => 'El RUT tiene contratos vigentes en más de un establecimiento. Debe regularizarse el padrón antes de crear el trámite.',
             ];
         }
 

@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronVigenciaService;
 use App\Support\RutChile;
 
 class FuncionarioRegisterLookupService
@@ -20,16 +20,8 @@ class FuncionarioRegisterLookupService
             ];
         }
 
-        $formattedRut = strtoupper(trim((string) ($norm['rut'] ?? '')));
-        $normalizedRut = strtoupper(preg_replace('/[^0-9Kk]/', '', $formattedRut));
-
-        $candidates = ReemplazoPersonal::query()
-            ->with(['establecimiento:id,rbd,nombre_establecimiento,comuna'])
-            ->where(function ($query) use ($formattedRut, $normalizedRut) {
-                $query->whereRaw('UPPER(TRIM(rut)) = ?', [$formattedRut])
-                    ->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(TRIM(rut)), '.', ''), '-', ''), ' ', '') = ?", [$normalizedRut]);
-            })
-            ->get();
+        $padron = app(PadronVigenciaService::class)->porRut($norm['rut']);
+        $candidates = $padron['vigentes'];
 
         if ($candidates->isEmpty()) {
             return [
@@ -39,7 +31,10 @@ class FuncionarioRegisterLookupService
                 'rut' => $norm['rut'],
                 'rut_body' => $norm['rut_body'] ?? null,
                 'rut_dv' => $norm['rut_dv'] ?? null,
-                'message' => 'RUT no encontrado en la carga disponible de personal.',
+                'tiene_antecedentes' => $padron['tiene_antecedentes'],
+                'message' => $padron['tiene_antecedentes']
+                    ? 'El RUT tiene antecedentes en el padrón, pero no un contrato vigente. Puedes continuar como postulante.'
+                    : 'RUT no encontrado en la carga disponible de personal.',
             ];
         }
 
@@ -54,27 +49,9 @@ class FuncionarioRegisterLookupService
             ];
         }
 
-        $latestPeriod = (int) $candidates
-            ->map(fn($row) => ((int) $row->anio * 100) + (int) $row->mes)
-            ->max();
-
-        $latestRows = $candidates->filter(function ($row) use ($latestPeriod) {
-            $rowPeriod = ((int) $row->anio * 100) + (int) $row->mes;
-
-            return $latestPeriod > 0 && $rowPeriod === $latestPeriod;
-        })->values();
-
-        if ($latestRows->isEmpty()) {
-            return [
-                'valid' => true,
-                'status' => 'not_found',
-                'is_funcionario' => false,
-                'rut' => $norm['rut'],
-                'rut_body' => $norm['rut_body'] ?? null,
-                'rut_dv' => $norm['rut_dv'] ?? null,
-                'message' => 'RUT no encontrado en la carga disponible de personal. Puedes continuar como postulante.',
-            ];
-        }
+        // Todas las líneas actuales cuentan: dos RBD vigentes son ambiguos
+        // aunque sus últimas cargas parciales correspondan a meses distintos.
+        $latestRows = $candidates;
 
         $establecimientoIds = $latestRows
             ->pluck('establecimiento_id')
@@ -88,7 +65,7 @@ class FuncionarioRegisterLookupService
                 'status' => 'error',
                 'is_funcionario' => false,
                 'rut' => $norm['rut'],
-                'message' => 'El RUT aparece en más de un establecimiento dentro de su período más reciente en reemplazos_personal. Debe regularizarse el padrón antes del registro.',
+                'message' => 'El RUT tiene contratos vigentes en más de un establecimiento. Debe regularizarse el padrón antes del registro.',
             ];
         }
 
@@ -135,7 +112,7 @@ class FuncionarioRegisterLookupService
             'comuna' => (string) $establecimiento->comuna,
             'fecha_nacimiento' => $selected->fecha_nacimiento->format('Y-m-d'),
             'periodo' => sprintf('%02d/%04d', (int) $selected->mes, (int) $selected->anio),
-            'message' => 'RUT encontrado en reemplazos_personal. Se usará el período más reciente del propio RUT para registrar al funcionario.',
+            'message' => 'RUT encontrado en el padrón vigente. Se usará el establecimiento de su contrato actual para registrar al funcionario.',
         ];
     }
 

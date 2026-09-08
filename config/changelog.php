@@ -4110,8 +4110,23 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.485',
+    'current_version' => '2026.9.8.486',
     'entries' => [
+        [
+            'version' => '2026.9.8.486',
+            'title' => 'Padrón: vigencia en Centro de Operaciones y autocompletado',
+            'summary' => 'Distingue contratos actuales de antecedentes históricos en conteos, auto-registro y creación de trámites.',
+            'roles' => ['admin', 'funcionario', 'postulante', 'coordinador_uatp', 'coordinador_gdp'],
+            'items' => [
+                'Centro de Operaciones calcula el último período antes de filtrar vigencia y respeta las cargas completas aplicadas, sin recuperar personal de meses anteriores tras una baja.',
+                'Registro y autocompletado usan contratos vigentes por establecimiento; un antecedente histórico no acredita por sí solo un vínculo actual.',
+                'Conserva la confirmación de fecha de nacimiento, advierte múltiples establecimientos vigentes y regularización de registros actuales sin establecimiento.',
+                'La alternativa de solicitudes aceptadas/cerradas se mantiene para personas sin registros en el padrón; no sustituye la ausencia de vigencia de un RUT con antecedentes históricos.',
+                'Pruebas sintéticas de traslados, bajas, reincorporaciones, cargas parciales y completas, compatibilidad de esquema y conservación de documentos e IDs.',
+                'Sin nuevas migraciones, cambios de rutas, permisos o modificación de usuarios existentes. La aplicación definitiva y el bloqueo anual se mantienen.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.485',
             'title' => 'Padrón: versiones contractuales por período',
