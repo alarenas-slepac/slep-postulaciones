@@ -210,7 +210,14 @@ en la etapa siguiente.
   la lectura anual de Dotación. La auditoría 2026.9.8.483 confirmó pérdida de esa
   lectura y reemplaza esa prueba por un rechazo antes de escribir, descrito abajo.
 
-### Validación MySQL pendiente (entorno aislado)
+### Validación MySQL: laboratorio y pendientes (entorno aislado)
+
+La ejecución local de 2026.9.8.493 y sus límites se documentan en
+[PADRON_MYSQL_CONCURRENCIA.md](PADRON_MYSQL_CONCURRENCIA.md). Se verificó recuperación
+e idempotencia con procesos independientes, pero se detectaron confirmaciones
+obsoletas aceptadas bajo REPEATABLE READ y falta de certificación del protocolo de
+escritores externos. Estos hallazgos impiden cerrar la validación y habilitar la
+aplicación. El esquema de prueba es reducido y sintético; no equivale a producción.
 
 Antes de habilitar, usar una base MySQL desechable con datos sintéticos y la misma
 versión/configuración de producción, nunca la base productiva. Verificar motores
@@ -365,17 +372,19 @@ requiere una migración específica autorizada. No usar `migrate:fresh` ni `db:w
 La tercera migración agrega las copias contractuales descritas arriba y también
 bloquea una reversión que elimine historial.
 
-No se han ejecutado estas migraciones sobre datos del entorno de trabajo o producción.
-Las pruebas utilizan exclusivamente SQLite en memoria y datos sintéticos.
+No se han ejecutado estas migraciones sobre la base habitual ni sobre producción.
+Además de SQLite en memoria, el laboratorio MySQL ejecuta cuatro migraciones
+existentes en bases nuevas, aisladas y exclusivamente sintéticas; nunca sobre el
+padrón real. No hay migraciones nuevas en este parche.
 
 ## Etapas pendientes antes de habilitar aplicación definitiva
 
 1. Validar operativamente la resolución de conflictos de asignaciones ya expuesta:
    las correcciones se realizan en correspondencias o Dotación, seguidas de un nuevo
    análisis. La decisión del ID no mueve asignaciones ni autoriza pérdidas de cobertura.
-2. Validar concurrencia real y rollback en MySQL aislado según el protocolo anterior.
-   Las pruebas de escritura, auditoría e idempotencia en SQLite ya están implementadas;
-   no sustituyen esa validación del motor productivo.
+2. Resolver los hallazgos del laboratorio MySQL y repetir el protocolo con esquema
+   completo y configuración equivalente a producción. La recuperación local ya
+   se probó; la validación de concurrencia todavía no está aprobada.
 3. Completar la auditoría de consumidores ante cambios de año y traslados, especialmente
    lectores indirectos de Dotación histórica, antes de habilitar la escritura.
 4. Adaptar consumidores de vigencia sin perder referencias históricas de trámites,
