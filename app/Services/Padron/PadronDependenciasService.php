@@ -25,9 +25,9 @@ class PadronDependenciasService
                 hash_update($hash, 'ausente');
                 continue;
             }
-            // Leer por cursor permite detectar cambios incluso en documentos sin
-            // updated_at, sin guardar su contenido sensible en el inventario.
-            foreach (DB::table($tabla)->whereNotNull('reemplazo_personal_id')->orderBy('id')->cursor() as $row) {
+            // Lotes acotados: PDO puede almacenar el resultado completo de un cursor.
+            // Detecta cambios sin updated_at y no conserva contenidos en el inventario.
+            foreach (DB::table($tabla)->whereNotNull('reemplazo_personal_id')->lazyById(100) as $row) {
                 hash_update($hash, json_encode($row, JSON_THROW_ON_ERROR));
                 $id = (int) $row->reemplazo_personal_id;
                 $porPersonal[$id] ??= ['total' => 0, 'referencias' => []];

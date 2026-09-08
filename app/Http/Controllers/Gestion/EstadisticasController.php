@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Gestion;
 
 use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
-use App\Models\ReemplazoPersonal;
+use App\Models\ReemplazoPersonalHistorico;
 use App\Models\SolicitudReemplazo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class EstadisticasController extends Controller
 {
@@ -38,6 +39,10 @@ class EstadisticasController extends Controller
 
         if ($establecimientoId) {
             $query->where('establecimiento_id', $establecimientoId);
+            if (Schema::hasColumn('solicitudes_reemplazo', 'padron_personal_snapshot')) {
+                $query->addSelect('padron_personal_snapshot');
+            }
+            $query->with('funcionarioTitular:id,nombre,rut');
         }
 
         $solicitudes = $query->get();
@@ -89,7 +94,7 @@ class EstadisticasController extends Controller
             $rankingLimit = 5;
             $rankingMode = 'funcionarios';
             $rankingTitle = 'Top 5 funcionarios con más reemplazos solicitados';
-            $rankingSubtitle = 'Ranking del establecimiento filtrado agrupado por reemplazo_personal_id.';
+            $rankingSubtitle = 'Ranking agrupado por ID contractual. Identificación desde la última solicitud con copia histórica disponible en el establecimiento filtrado; sin copia, usa el padrón actual.';
             $rankingRows = $this->buildTopFuncionarios($solicitudes, $rankingLimit);
         } else {
             $rankingLimit = 10;
@@ -152,23 +157,15 @@ class EstadisticasController extends Controller
 
     private function buildTopFuncionarios(Collection $solicitudes, int $limit): Collection
     {
-        $funcionarioIds = $solicitudes
-            ->pluck('reemplazo_personal_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        $funcionariosById = ReemplazoPersonal::query()
-            ->whereIn('id', $funcionarioIds)
-            ->get(['id', 'nombre', 'rut'])
-            ->keyBy('id');
-
         return $solicitudes
             ->filter(fn (SolicitudReemplazo $s) => !empty($s->reemplazo_personal_id))
             ->groupBy(fn (SolicitudReemplazo $s) => (int) $s->reemplazo_personal_id)
-            ->map(function (Collection $items, int $funcionarioId) use ($funcionariosById) {
-                $funcionario = $funcionariosById->get($funcionarioId);
+            ->map(function (Collection $items, int $funcionarioId) {
+                // El ID sigue siendo la unidad del ranking; no fusionar personas por nombre.
+                // Preferir la copia del documento de mayor ID dentro del filtro aplicado.
+                $titulares = $items->sortByDesc('id')->map(fn (SolicitudReemplazo $s) => $s->funcionarioTitular);
+                $funcionario = $titulares->first(fn ($titular) => $titular instanceof ReemplazoPersonalHistorico)
+                    ?? $titulares->first(fn ($titular) => $titular !== null);
                 $nombre = trim((string) ($funcionario?->nombre ?? '')) ?: 'Funcionario sin nombre';
                 $rut = trim((string) ($funcionario?->rut ?? ''));
 

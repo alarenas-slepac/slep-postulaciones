@@ -4110,8 +4110,36 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.8.482',
+    'current_version' => '2026.9.8.484',
     'entries' => [
+        [
+            'version' => '2026.9.8.484',
+            'title' => 'Padrón: menor consumo de memoria en carga masiva',
+            'summary' => 'Evita materializar dependencias completas y grandes cadenas JSON al generar las huellas de revisión.',
+            'roles' => ['admin'],
+            'items' => [
+                'Lee asignaciones, declaraciones y documentos en lotes acotados; la huella incluye todas las columnas y solo conserva los campos necesarios para el diagnóstico.',
+                'Calcula incrementalmente la confirmación de filas, decisiones y autorizaciones, sin duplicar en memoria el contenido de la revisión.',
+                'Reduce copias del padrón y limita las columnas cargadas para preparar el plan y los conflictos, sin recortar filas ni saltar validaciones.',
+                'Prueba sintética de 6.500 filas con dependencias extensas bajo memory_limit=128M, además de pruebas de integridad de las huellas.',
+                'Huella de base v8: requiere regenerar revisiones anteriores. Sin cambios de configuración del servidor, migraciones ni habilitación de aplicación definitiva.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
+        [
+            'version' => '2026.9.8.483',
+            'title' => 'Padrón: protección anual y estadísticas históricas',
+            'summary' => 'Bloquea cambios entre años sin lectura histórica y conserva la identificación de titulares en estadísticas.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp'],
+            'items' => [
+                'El plan informa por ID las actualizaciones entre años y bajas de versiones de otros años, incluso sin asignaciones o documentos asociados. No las habilita una autorización de horas ni una confirmación manual.',
+                'El ranking de funcionarios usa la copia de la solicitud de mayor ID disponible dentro del establecimiento filtrado, conservando agrupación y conteos. Sin copia mantiene la lectura anterior.',
+                'Documenta los lectores anuales, mensuales y de vigencia pendientes; las copias por documento no equivalen a un padrón histórico completo.',
+                'Actualiza la huella a v7 y exige regenerar previsualizaciones anteriores. Pruebas sintéticas sin escrituras productivas ni nuevas migraciones.',
+                'La aplicación definitiva sigue bloqueada hasta completar lectura histórica, revisión de consumidores y pruebas MySQL aisladas.',
+            ],
+            'published_at' => '2026-09-08',
+        ],
         [
             'version' => '2026.9.8.482',
             'title' => 'Padrón: transición de reemplazo a contrato regular',

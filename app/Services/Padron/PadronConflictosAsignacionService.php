@@ -11,25 +11,39 @@ class PadronConflictosAsignacionService
 {
     public function snapshot(?int $anio): array
     {
-        $read = static function (string $table, bool $annual = false) use ($anio): array {
+        $hash = hash_init('sha256');
+        hash_update($hash, 'cobertura-v2');
+        $read = static function (string $table, array $columns, bool $annual = false) use ($anio, $hash): array {
+            hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
+                hash_update($hash, 'ausente');
                 return [];
             }
-            return DB::table($table)->when($annual && $anio, fn ($q) => $q->where('anio', $anio))
+            $rows = [];
+            $keep = array_flip($columns);
+            // Lotes acotados también con PDO MySQL buffered. La huella incluye
+            // TODAS las columnas, pero no retenemos observaciones ni adjuntos.
+            foreach (DB::table($table)->when($annual && $anio, fn ($q) => $q->where('anio', $anio))
                 ->when($table === 'dotacion_docente_asignaciones', fn ($q) => $q->where('estado', 'activa'))
-                ->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+                ->lazyById(100) as $row) {
+                hash_update($hash, json_encode($row, JSON_THROW_ON_ERROR)."\n");
+                $rows[] = array_intersect_key((array) $row, $keep);
+            }
+            return $rows;
         };
         $data = [
-            'asignaciones' => $read('dotacion_docente_asignaciones', true),
-            'declaraciones' => $read('declaracion_sostenedores'),
-            'exclusiones' => $read('dotacion_docente_exclusiones', true),
+            'asignaciones' => $read('dotacion_docente_asignaciones', ['id', 'anio', 'establecimiento_id',
+                'reemplazos_personal_id', 'docente_rut', 'docente_rut_normalizado', 'tipo_asignacion',
+                'asignatura_nombre', 'horas_contrato', 'estamento_cobertura'], true),
+            'declaraciones' => $read('declaracion_sostenedores', ['id', 'rut', 'rbd', 'estamento', 'horas_contratadas']),
+            'exclusiones' => $read('dotacion_docente_exclusiones', ['id', 'establecimiento_id', 'docente_rut', 'docente_rut_normalizado', 'horas'], true),
         ];
-        return $data + ['hash' => hash('sha256', json_encode($data, JSON_THROW_ON_ERROR))];
+        return $data + ['hash' => hash_final($hash)];
     }
 
     public function analizar(PadronRevision $revision): array
     {
-        $filas = $revision->filas()->orderBy('id')->get();
+        $filas = $revision->filas()->orderBy('id')->get(['id', 'fila_excel', 'accion', 'personal_id', 'rut', 'datos']);
         $resolucion = app(PadronResolucionService::class);
         $decisiones = $resolucion->disponible() ? $resolucion->decisiones($revision) : collect();
         $selecciones = $resolucion->selecciones($filas, $decisiones);

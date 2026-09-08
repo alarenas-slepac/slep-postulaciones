@@ -293,14 +293,67 @@ class PadronAplicacionTransaccionalTest extends TestCase
         $this->apply($revision);
     }
 
-    public function test_new_year_does_not_deactivate_unlisted_historical_versions(): void
+    public function test_new_year_cannot_overwrite_contracts_or_deactivate_previous_years(): void
     {
         $revision = $this->revision([$this->data(['anio' => 2027, 'mes' => 1])]);
-        $this->apply($revision);
-        $this->assertDatabaseHas('reemplazos_personal', ['id' => 91, 'anio' => 2025, 'vigente' => true]);
-        $this->assertDatabaseHas('reemplazos_personal', ['id' => 92, 'anio' => 2026, 'mes' => 7, 'vigente' => true]);
+        $before = $this->state();
+        $idsAntes = \App\Models\ReemplazoPersonal::padronVigente(2026)->orderBy('id')->pluck('id')->all();
+        $plan = $this->writer()->plan($revision);
+        $this->assertStringContainsString('Cambiar el año 2026 a 2027', implode(' ', $plan['errores']));
+        $this->assertStringContainsString('No se puede desactivar una versión del año 2026', implode(' ', $plan['errores']));
+        try {
+            $this->apply($revision);
+            $this->fail('La copia de documentos no basta para proteger la consulta anual.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('Dotación histórica', $e->getMessage());
+        }
+        $this->assertSame($before, $this->state());
+        $this->assertSame($idsAntes, \App\Models\ReemplazoPersonal::padronVigente(2026)->orderBy('id')->pluck('id')->all());
+        $this->assertNull($revision->fresh()->aplicada_at);
+    }
+
+    public function test_annual_guard_rechecks_actual_id_not_the_incoming_previous_values(): void
+    {
+        $revision = $this->revision([$this->data(['anio' => 2027, 'mes' => 1, 'jornada' => 45])]);
+        $revision->filas()->where('fila_excel', 2)->update(['anterior' => $this->data(['anio' => 2027])]);
+        app(PadronRevisionService::class)->authorize($revision, '111111111', 'Autorización sintética de exceso, no de historia.', 1);
+        $before = $this->state();
+        try {
+            $this->apply($revision);
+            $this->fail('La autorización de horas y los datos anteriores de pantalla no eluden la protección anual.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('Cambiar el año 2026 a 2027', $e->getMessage());
+        }
+        $this->assertSame($before, $this->state());
+    }
+
+    public function test_manually_confirming_a_previous_year_absence_does_not_bypass_history_guard(): void
+    {
+        $revision = $this->revision([$this->data(['anio' => 2027, 'mes' => 1])]);
+        $absence = $revision->filas()->whereNull('fila_excel')->where('personal_id', 102)->firstOrFail();
+        $absence->update(['accion' => 'ausencia_por_revisar']);
+        app(PadronResolucionService::class)->resolver($revision, $absence->id, null, 'Confirmación sintética de ausencia entre años.', 1);
+        $this->assertStringContainsString('ID 102: protección de Dotación histórica', implode(' ', $this->writer()->plan($revision)['errores']));
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 102, 'vigente' => true, 'anio' => 2026]);
+    }
+
+    public function test_annual_guard_also_covers_assistants_without_assignments_or_documents(): void
+    {
+        $this->personal(105, ['rut' => '555555555', 'estatuto' => 'ASISTENTE', 'escalafon' => 'AUXILIAR']);
+        $revision = $this->revision([$this->data(['rut' => '555555555', 'anio' => 2027, 'mes' => 1,
+            'estatuto' => 'ASISTENTE', 'escalafon' => 'AUXILIAR'])]);
+        $this->assertSame(105, $revision->filas->firstWhere('fila_excel', 2)->personal_id);
+        $this->assertStringContainsString('ID 105: protección de Dotación histórica', implode(' ', $this->writer()->plan($revision)['errores']));
+    }
+
+    public function test_overwriting_year_loses_the_annual_row_even_when_document_snapshot_exists(): void
+    {
+        // Reproducción aislada del consumidor que justifica el bloqueo, no usa el aplicador.
+        $this->assertContains(101, \App\Models\ReemplazoPersonal::padronVigente(2026)->pluck('id')->all());
+        DB::transaction(fn () => app(PadronHistorialService::class)->congelarReferencias([101]));
+        DB::table('reemplazos_personal')->where('id', 101)->update(['anio' => 2027, 'mes' => 1]);
         $this->assertSame(2026, SolicitudReemplazo::findOrFail(1)->funcionarioTitular->anio);
-        $this->assertSame(2027, DB::table('reemplazos_personal')->where('id', 101)->value('anio'));
+        $this->assertNotContains(101, \App\Models\ReemplazoPersonal::padronVigente(2026)->pluck('id')->all());
     }
 
     public function test_nested_transaction_is_not_accepted_as_application_boundary(): void
