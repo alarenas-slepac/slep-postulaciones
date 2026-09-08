@@ -206,9 +206,9 @@ en la etapa siguiente.
   histórica incompleta, repetición sin duplicados y rechazo de una segunda revisión
   después del commit de la primera. Esa secuencia **no es una prueba de dos sesiones
   MySQL ejecutándose simultáneamente**.
-- El cambio de año conserva las copias de documentos y no barre otras versiones,
-  pero aún debe auditarse su efecto en lectores de Dotación histórica por año que
-  consultan directamente el padrón. No equivale a certificar todos los consumidores.
+- La prueba inicial de cambio de año verificaba las copias de documentos, pero no
+  la lectura anual de Dotación. La auditoría 2026.9.8.483 confirmó pérdida de esa
+  lectura y reemplaza esa prueba por un rechazo antes de escribir, descrito abajo.
 
 ### Validación MySQL pendiente (entorno aislado)
 
@@ -273,6 +273,58 @@ Guardar los resultados de esta prueba antes de decidir la habilitación.
 - La huella pasa a versión 6: las revisiones anteriores deben regenerarse, sin
   reutilizar decisiones ni autorizaciones. No agrega rutas o migraciones ni
   habilita la aplicación definitiva del padrón.
+
+## Protección anual y estadísticas históricas (2026.9.8.483)
+
+- Auditoría y pendientes detallados en [PADRON_AUDITORIA_CONSUMIDORES.md](PADRON_AUDITORIA_CONSUMIDORES.md).
+  No se presenta el inventario como certificación de todos los módulos.
+- `DotacionEstablecimientoCalculator::docentes/asistentes` lee el padrón actual
+  filtrado por año. Reutilizar un ID con otro año hace desaparecer su contrato de
+  esa consulta; congelar documentos no lo evita. Se reproduce con datos sintéticos.
+- El plan bloquea reutilizar un ID cuyo año difiere del de la carga y desactivar
+  una versión vigente de otro año. Lee el año real por ID, no la copia anterior
+  enviada en una fila. Abarca docentes/asistentes, con o sin documentos/asignaciones.
+  Las bajas ya inactivas no generan un nuevo cambio ni ese bloqueo.
+- Los motivos aparecen en los bloqueos existentes de la revisión y se recalculan
+  dentro de la aplicación transaccional de prueba, antes de congelar o escribir.
+  Autorizar horas o confirmar una baja no los levanta. No duplicar registros ni
+  cambiar el año de la planilla como solución: falta implementar lectura histórica.
+- Las actualizaciones del mismo año siguen sujetas a los controles previos; esta
+  protección no congela meses ni resuelve por sí sola el historial de traslados.
+  La aplicación real permanece bloqueada por los pendientes del inventario.
+- Estadísticas obtiene la identidad del ranking por ID desde la solicitud de
+  mayor ID con copia histórica en el establecimiento filtrado. No cambia conteos,
+  agrupaciones ni filtros. Sin copia usa la relación actual, incluso antes de la
+  migración; una copia inválida requiere revisión y no se sustituye silenciosamente.
+- La huella pasa a v7: regenerar revisiones previas. No se crean migraciones ni
+  se modifican rutas, permisos, asignaciones o datos productivos.
+
+## Memoria de carga masiva (2026.9.8.484)
+
+- Se elimina la lectura completa y posterior `json_encode` conjunto de asignaciones,
+  declaraciones y exclusiones. Las filas se leen en lotes de 100: todas sus columnas
+  alimentan una huella incremental, pero solo se retienen los campos usados por la
+  conciliación/cobertura. No se ignoran cambios en observaciones o metadatos.
+- El inventario documental también usa lotes de 100, evitando que PDO MySQL almacene
+  el resultado completo de un cursor. Conserva conteos y hasta 20 referencias por ID.
+- El padrón base se recorre en lotes de 250 respetando año/mes/ID; comparte las filas
+  seleccionadas y libera los índices históricos antes de analizar dependencias.
+  La huella de base usa las huellas completas de origen, sin volver a serializar
+  todas las estructuras derivadas. Las declaraciones se reutilizan desde esa lectura.
+- La confirmación de pantalla/escritura recorre filas, decisiones y autorizaciones
+  por lotes y mantiene la comprobación de cambios posteriores. El plan y el diagnóstico
+  solo cargan las columnas necesarias de las filas de revisión, no copias anteriores,
+  candidatos ni observaciones que ya fueron persistidos y siguen visibles en pantalla.
+- Huella base v8 y confirmación v2: generar una nueva previsualización. No se cambian
+  límites de PHP, rutas, migraciones, permisos, datos productivos ni el bloqueo global.
+
+Validación de volumen: `php -d memory_limit=128M vendor/phpunit/phpunit/phpunit --filter PadronMemoriaTest`.
+Usa 6.500 filas sintéticas y columnas de texto extensas en asignaciones/declaraciones;
+ejercita creación/persistencia de revisión, comprobación de vigencia y preparación
+de pantalla. Solo sustituye el lector Excel para aislar la memoria de conciliación
+y BD. No es una importación del archivo real ni una reproducción de la BD productiva;
+no garantiza el mismo pico para cualquier volumen de candidatos/documentos. La prueba
+pesada se ejecuta en proceso separado para no heredar el pico de otras pruebas.
 
 ## Diagnóstico local de un Excel (herramienta de pruebas)
 

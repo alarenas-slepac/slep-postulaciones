@@ -35,10 +35,12 @@ class PadronRevisionService
             unset($row);
             $report['resumen'] = collect($report['filas'])->countBy('accion')->all();
         }
-        return DB::transaction(function () use ($filename, $path, $userId, $period, $base, $report): PadronRevision {
+        $baseHash = $base['hash'];
+        unset($incoming, $base);
+        return DB::transaction(function () use ($filename, $path, $userId, $period, $baseHash, $report): PadronRevision {
             $revision = PadronRevision::create([
                 'created_by' => $userId, 'archivo' => mb_substr(basename($filename), 0, 255),
-                'archivo_hash' => hash_file('sha256', $path), 'base_hash' => $base['hash'],
+                'archivo_hash' => hash_file('sha256', $path), 'base_hash' => $baseHash,
                 'anio' => $period ? intdiv($period, 100) : null, 'mes' => $period ? $period % 100 : null,
                 'resumen' => $report['resumen'], 'errores' => $report['errores'], 'excesos' => $report['excesos'],
             ]);
@@ -120,18 +122,19 @@ class PadronRevisionService
         // tenga una carga más reciente. Los IDs nunca se reescriben aquí.
         $query = DB::table('reemplazos_personal')->when($period, fn ($q) => $q->whereRaw('anio * 100 + mes <= ?', [$period]))
             ->orderByDesc('anio')->orderByDesc('mes')->orderBy('id');
-        foreach ($query->cursor() as $row) {
+        foreach ($query->lazy(250) as $row) {
             hash_update($fingerprint, json_encode($row, JSON_THROW_ON_ERROR));
             $key = $row->establecimiento_id ?? 'rbd_'.$row->rbd;
             $p = $row->anio * 100 + $row->mes;
             $latestByEst[$key] ??= $p;
+            $record = (array) $row;
             if ($latestByEst[$key] === $p) {
-                $personal[] = (array) $row;
+                $personal[] = $record;
             }
             $rut = PadronConciliador::rut($row->rut);
             $historicalPeriods[$rut] ??= $p;
             if ($historicalPeriods[$rut] === $p) {
-                $historical[$rut][] = (array) $row;
+                $historical[$rut][] = $record;
             }
         }
         // Una reincorporación puede tener IDs históricos aunque ya no figure
@@ -146,27 +149,25 @@ class PadronRevisionService
                 }
             }
         }
+        unset($historical, $historicalPeriods, $currentRuts, $records, $record);
         $establishments = DB::table('establecimientos')->orderBy('id')->get(['id', 'rbd'])->keyBy('rbd')->map(fn ($r) => $r->id)->all();
         $cobertura = app(PadronConflictosAsignacionService::class)->snapshot($period ? intdiv($period, 100) : null);
         // El hash usa la dependencia completa; la revisión solo copia el detalle
         // necesario, no observaciones ni otras columnas de la asignación.
-        $assignmentFields = array_flip(['id', 'anio', 'establecimiento_id', 'docente_rut', 'docente_rut_normalizado',
-            'reemplazos_personal_id', 'tipo_asignacion', 'asignatura_nombre', 'horas_contrato', 'estamento_cobertura']);
-        $assignments = array_map(fn ($a) => array_intersect_key($a, $assignmentFields), $cobertura['asignaciones']);
+        $assignments = $cobertura['asignaciones'];
         $declarations = [];
-        if (Schema::hasTable('declaracion_sostenedores')) {
-            foreach (DB::table('declaracion_sostenedores')->orderByDesc('id')->get(['rut', 'horas_contratadas']) as $r) {
-                $rut = PadronConciliador::rut($r->rut);
-                if (! array_key_exists($rut, $declarations)) {
-                    $declarations[$rut] = $r->horas_contratadas;
-                }
+        // Usar exactamente las filas ya incluidas en la huella, en orden ID descendente.
+        foreach (array_reverse($cobertura['declaraciones']) as $r) {
+            $rut = PadronConciliador::rut($r['rut']);
+            if (! array_key_exists($rut, $declarations)) {
+                $declarations[$rut] = $r['horas_contratadas'];
             }
         }
         $dependencias = $this->dependencias->snapshot();
         return ['personal' => $personal, 'establecimientos' => $establishments, 'asignaciones' => $assignments,
             'declaraciones' => $declarations, 'periodo_maximo' => $maxPeriod,
-            // Versión 6: distinguir reemplazos terminados antes del nuevo contrato regular.
+            // Versión 8: huellas incrementales, sin serializar nuevamente todas las filas.
             // Las revisiones previas requieren analizar nuevamente el archivo.
-            'hash' => hash('sha256', json_encode(['v6', hash_final($fingerprint), $personal, $establishments, $assignments, $declarations, $maxPeriod, $dependencias['hash'], $cobertura['hash'], $aplicaciones], JSON_THROW_ON_ERROR))];
+            'hash' => hash('sha256', json_encode(['v8', hash_final($fingerprint), $establishments, $maxPeriod, $dependencias['hash'], $cobertura['hash'], $aplicaciones], JSON_THROW_ON_ERROR))];
     }
 }

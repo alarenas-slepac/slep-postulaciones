@@ -41,7 +41,7 @@ class PadronAplicacionService
         $confirmacionInicial = $this->confirmacionHash($revision);
         $errores = $revision->errores ?? [];
         $decisiones = app(PadronResolucionService::class)->disponible() ? $this->decisiones($revision) : collect();
-        $filas = $revision->filas()->orderBy('id')->get();
+        $filas = $revision->filas()->orderBy('id')->get(['id', 'fila_excel', 'accion', 'personal_id', 'rut', 'datos']);
         $destinos = [];
         $bajas = [];
         $usados = [];
@@ -97,6 +97,7 @@ class PadronAplicacionService
                 $errores[] = 'RUT '.$rut.': faltan autorización y justificación para '.$exceso['total'].' horas.';
             }
         }
+        $errores = array_merge($errores, $this->bloqueosHistoriaAnual($revision, $destinos, $bajas));
         $conflictos = app(PadronConflictosAsignacionService::class)->analizar($revision);
         if (! $this->confirmacionVigente($revision, $confirmacionInicial)) {
             $errores[] = 'La revisión cambió mientras se calculaba el plan. Recargue antes de confirmar.';
@@ -106,14 +107,53 @@ class PadronAplicacionService
             'errores' => array_values(array_unique(array_merge($errores, $conflictos['errores'])))];
     }
 
+    /** La copia por documento no protege las consultas anuales directas de Dotación. */
+    private function bloqueosHistoriaAnual(PadronRevision $revision, array $destinos, array $bajas): array
+    {
+        $ids = collect($destinos)->pluck('id')->filter()->merge($bajas)->unique()->values()->all();
+        $columns = ['id', 'anio'];
+        if (Schema::hasColumn('reemplazos_personal', 'vigente')) {
+            $columns[] = 'vigente';
+        }
+        $personal = DB::table('reemplazos_personal')->whereIn('id', $ids)->get($columns)->keyBy('id');
+        $errores = [];
+        foreach ($destinos as $destino) {
+            if ($destino['id'] === null) {
+                continue;
+            }
+            $anterior = $personal[$destino['id']] ?? null;
+            if (! $anterior) {
+                $errores[] = 'ID '.$destino['id'].': el registro seleccionado ya no existe. Genere un nuevo análisis.';
+            } elseif ((int) $anterior->anio !== (int) $revision->anio) {
+                $errores[] = 'Fila '.$destino['fila']->fila_excel.' · ID '.$anterior->id.': protección de Dotación histórica. Cambiar el año '.($anterior->anio ?? 'sin identificar').' a '.$revision->anio.' sobrescribiría la base contractual del año anterior. Se requiere implementar la lectura histórica anual antes de reutilizar este ID; no duplique registros ni cambie el año del Excel para omitir el bloqueo.';
+            }
+        }
+        foreach (array_unique($bajas) as $id) {
+            $anterior = $personal[$id] ?? null;
+            if (! $anterior) {
+                $errores[] = 'ID '.$id.': la baja propuesta ya no existe. Genere un nuevo análisis.';
+            } elseif (($anterior->vigente ?? true) && (int) $anterior->anio !== (int) $revision->anio) {
+                $errores[] = 'ID '.$id.': protección de Dotación histórica. No se puede desactivar una versión del año '.($anterior->anio ?? 'sin identificar').' desde el padrón '.$revision->anio.' sin una lectura histórica anual. La confirmación manual de baja no levanta este bloqueo.';
+            }
+        }
+        return $errores;
+    }
+
     private function confirmacionHash(PadronRevision $revision): string
     {
-        $parts = [DB::table('padron_revisiones')->find($revision->id)];
+        $hash = hash_init('sha256');
+        hash_update($hash, 'confirmacion-v2'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
         foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'] as $table) {
-            $parts[] = Schema::hasTable($table)
-                ? DB::table($table)->where('padron_revision_id', $revision->id)->orderBy('id')->get()->all() : [];
+            hash_update($hash, $table);
+            if (! Schema::hasTable($table)) {
+                hash_update($hash, 'ausente');
+                continue;
+            }
+            foreach (DB::table($table)->where('padron_revision_id', $revision->id)->lazyById(100) as $row) {
+                hash_update($hash, json_encode($row, JSON_THROW_ON_ERROR)."\n");
+            }
         }
-        return hash('sha256', json_encode($parts, JSON_THROW_ON_ERROR));
+        return hash_final($hash);
     }
 
     public function confirmacionVigente(PadronRevision $revision, string $hash): bool
