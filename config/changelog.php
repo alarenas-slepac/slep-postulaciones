@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.9.504',
+    'current_version' => '2026.9.9.505',
     'entries' => [
+        [
+            'version' => '2026.9.9.505',
+            'title' => 'Padrón: cobertura anterior de contratos con denominación histórica',
+            'summary' => 'Evita descartar contratos históricos regulares al comparar las horas asignadas antes y después de la carga.',
+            'roles' => ['admin'],
+            'items' => [
+                'Reconoce PLANTA, CONTRATA, INDEFINIDO y PLAZO FIJO con sufijo SEP/PIE únicamente cuando coincide con la columna de financiamiento, al leer la cobertura anterior.',
+                'Mantiene los filtros de período, vigencia, establecimiento y estamento. No incorpora reemplazos, suplencias ni etiquetas desconocidas como cobertura regular.',
+                'Un exceso preexistente que la propuesta no agrava permanece como advertencia; los excesos nuevos o agravados y los demás conflictos siguen bloqueando.',
+                'Recalcula el diagnóstico al volver a abrir la revisión, sin modificar contratos, asignaciones ni decisiones guardadas. La aplicación definitiva sigue deshabilitada.',
+            ],
+            'published_at' => '2026-09-09',
+        ],
         [
             'version' => '2026.9.9.504',
             'title' => 'Padrón: guardar varias correspondencias del mismo RUT',

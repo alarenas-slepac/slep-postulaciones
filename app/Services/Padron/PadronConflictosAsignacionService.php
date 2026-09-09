@@ -12,7 +12,7 @@ class PadronConflictosAsignacionService
     public function snapshot(?int $anio): array
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'cobertura-v3-comparacion');
+        hash_update($hash, 'cobertura-v4-contratos-historicos');
         $read = static function (string $table, array $columns, bool $annual = false) use ($anio, $hash): array {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
@@ -246,17 +246,39 @@ class PadronConflictosAsignacionService
         $actuales = [];
         foreach (array_keys($ids) as $estId) {
             $query = app(PadronPeriodoService::class)->consultaAnual($estId, $anio)
-                ->select(['id', 'rut', 'establecimiento_id', 'jornada', 'tipocontrato', 'estatuto', 'escalafon']);
+                ->select(['id', 'rut', 'establecimiento_id', 'jornada', 'tipocontrato', 'financiamiento', 'estatuto', 'escalafon']);
             // No materializar nombres, documentos ni todas las filas de la base.
             foreach ($query->toBase()->lazyById(100) as $registro) {
                 $row = (array) $registro;
                 $key = PadronConciliador::rut($row['rut']).'|'.$estId;
-                if (isset($porGrupo[$key]) && PadronConciliador::tipo($row) === 'regular') {
+                if (isset($porGrupo[$key]) && $this->esContratoActualRegular($row)) {
                     $actuales[$key][] = $row;
                 }
             }
         }
         return $actuales;
+    }
+
+    /** Compatibilidad de lectura; no amplía los tipos admitidos del archivo nuevo. */
+    private function esContratoActualRegular(array $row): bool
+    {
+        $tipo = PadronConciliador::tipo($row);
+        if ($tipo !== 'por_clasificar') {
+            return $tipo === 'regular';
+        }
+        $financiamiento = PadronConciliador::text($row['financiamiento'] ?? '');
+        if (! in_array($financiamiento, ['SEP', 'PIE'], true)) {
+            return false;
+        }
+        // Solo denominaciones históricas ya reconocidas por la conciliación.
+        // El contrato completo y su financiamiento deben coincidir exactamente.
+        $contrato = PadronConciliador::text($row['tipocontrato'] ?? '');
+        foreach (['PLANTA', 'CONTRATA', 'INDEFINIDO', 'PLAZO FIJO'] as $base) {
+            if ($contrato === $base.' '.$financiamiento) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function compararCobertura(float $total, array $actuales, array $actual, array $propuesta): array
