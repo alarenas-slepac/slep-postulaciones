@@ -89,13 +89,20 @@ class PadronMemoriaTest extends TestCase
         $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
         $view = app(PersonalImportController::class)->create(Request::create('/prueba', 'GET', ['revision' => $revision->id]));
         $data = $view->getData();
-        $this->assertSame(6500, $data['filas']->total());
+        $this->assertSame(0, $data['filas']->total());
+        $this->assertFalse($data['mostrarFilas']);
         $this->assertSame([], $data['bloqueos']);
         $this->assertSame($horas > 44 ? 6500 : 0, $data['conflictos']['grupos_avisos']);
         $this->assertSame(0, $data['conflictos']['grupos_bloqueantes']);
         $this->assertFalse($data['obsoleta']);
         $this->assertFalse(app(PadronAplicacionService::class)->disponible());
         $this->assertSame(0, DB::table('padron_personal_cambios')->count());
+        unset($view, $data);
+        $response = app(PersonalImportController::class)->create(Request::create('/prueba', 'GET', [
+            'revision' => $revision->id, 'q' => $rut, 'solo_filas' => 1,
+        ]));
+        $this->assertSame('1', $response->headers->get('X-Padron-Filas'));
+        $this->assertStringContainsString('Persona sintética 6500', $response->getContent());
         $this->assertLessThan(128 * 1024 * 1024, memory_get_peak_usage(true));
     }
 

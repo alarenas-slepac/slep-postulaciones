@@ -512,7 +512,7 @@ class PadronAplicacionTransaccionalTest extends TestCase
         $this->assertSame('omitida_por_vigencia', $summary['estados'][$omitida->id]);
         $this->assertArrayNotHasKey($omitida->id, $summary['selecciones']);
         $view = app(\App\Http\Controllers\Reemplazos\PersonalImportController::class)->create(
-            \Illuminate\Http\Request::create('/prueba-padron', 'GET', ['revision' => $revision->id, 'accion_filtro' => 'reemplazo_anterior_omitido'])
+            \Illuminate\Http\Request::create('/prueba-padron', 'GET', ['revision' => $revision->id, 'q' => '555555555', 'accion_filtro' => 'reemplazo_anterior_omitido'])
         );
         $this->assertSame(1, $view->getData()['filas']->total());
         $this->assertSame($omitida->id, $view->getData()['filas']->first()->id);

@@ -224,7 +224,7 @@ class PadronCorreccionFinanciamientoTest extends TestCase
         \Illuminate\Support\Facades\Storage::disk('local')->put('views/layouts/app.blade.php', '@yield("content")');
         \Illuminate\Support\Facades\View::getFinder()->prependLocation(\Illuminate\Support\Facades\Storage::disk('local')->path('views'));
         \Illuminate\Support\Facades\View::share('errors', new \Illuminate\Support\ViewErrorBag);
-        $request = \Illuminate\Http\Request::create('/', 'GET', ['revision' => $revision->id]);
+        $request = \Illuminate\Http\Request::create('/', 'GET', ['revision' => $revision->id, 'q' => '111111111']);
         $html = app(\App\Http\Controllers\Reemplazos\PersonalImportController::class)->create($request)->render();
         $this->assertStringContainsString('Posible redistribución de financiamiento', $html);
         $this->assertStringContainsString('Conservar ID 101', $html);

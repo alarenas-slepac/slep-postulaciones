@@ -22,7 +22,7 @@
                         <tr class="{{ $item['bloqueante'] ? 'table-danger' : 'table-warning' }}">
                             <td>{{ $item['rut'] ?: 'RUT sin identificar' }}<br>
                                 @if ($item['rut'])
-                                    <a href="{{ route('reemplazos.personal.import', ['revision' => $revision->id, 'q' => $item['rut']]) }}">Ver filas del RUT</a>
+                                    <a data-padron-filas-link href="{{ route('reemplazos.personal.import', ['revision' => $revision->id, 'q' => $item['rut'], 'conflictos_page' => $conflictosPaginados->currentPage(), 'caso_rut' => $item['rut'], 'caso_establecimiento' => $item['establecimiento_id']]) }}#filas-padron">Ver filas del RUT</a>
                                 @endif
                                 <details class="mt-2">
                                     <summary>Ver {{ count($item['asignaciones']) }} asignaciones</summary>
@@ -54,6 +54,10 @@
                                 Exceso propuesto: {{ $item['comparacion']['exceso_propuesto'] }} h
                             </td>
                             <td><strong>{{ $item['bloqueante'] ? 'Bloquea la aplicación' : 'Aviso: no bloquea por este caso' }}</strong>
+                                @if ($item['correspondencias_pendientes'] > 0)
+                                    <div class="fw-semibold">Correspondencias pendientes del RUT: {{ $item['correspondencias_pendientes'] }}</div>
+                                    <div class="small">Cobertura propuesta provisional. El caso permanece pendiente hasta resolver todas las filas del RUT, incluidas las ausencias por revisar. Después se revalidan horas y vínculos; resolver las correspondencias no elimina otros conflictos.</div>
+                                @endif
                                 @foreach ($item['motivos'] as $motivo)<div>{{ $motivo }}</div>@endforeach
                                 @foreach ($item['avisos'] as $aviso)<div>{{ $aviso }}</div>@endforeach
                             </td>
@@ -67,6 +71,7 @@
         <p class="small text-muted">Cada RUT/establecimiento se muestra una sola vez, con el detalle desplegable de todas sus asignaciones.
             Si falta el RUT, cada asignación se informa por separado para no mezclar identidades.
             Un aviso no habilita por sí solo la aplicación definitiva del padrón.</p>
-        {{ $conflictosPaginados->links() }}
+        <p>Caso {{ $conflictosPaginados->total() ? $conflictosPaginados->currentPage() : 0 }} de {{ $conflictosPaginados->total() }}. Se muestra un caso a la vez; al resolver sus bloqueos se muestra el siguiente pendiente.</p>
+        {{ $conflictosPaginados->onEachSide(1)->links() }}
     </div>
 </div>

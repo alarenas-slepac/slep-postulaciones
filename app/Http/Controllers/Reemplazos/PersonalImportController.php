@@ -44,49 +44,92 @@ class PersonalImportController extends Controller
         }
 
         if ($request->filled('revision')) {
-            $request->validate(['revision' => ['integer', 'min:1'], 'q' => ['nullable', 'string', 'max:100'], 'accion_filtro' => ['nullable', 'string', 'max:50'], 'conflictos_page' => ['nullable', 'integer', 'min:1']]);
+            $request->validate(['revision' => ['integer', 'min:1'], 'q' => ['nullable', 'string', 'max:100'], 'accion_filtro' => ['nullable', 'string', 'max:50'], 'conflictos_page' => ['nullable', 'integer', 'min:1'],
+                'page' => ['nullable', 'integer', 'min:1'], 'solo_filas' => ['nullable', 'boolean'],
+                'avanzar_caso' => ['nullable', 'boolean'],
+                'caso_rut' => ['nullable', 'string', 'max:32'], 'caso_establecimiento' => ['nullable', 'integer', 'min:1']]);
             $service = app(PadronRevisionService::class);
             $service->assertInstalled();
             $revision = PadronRevision::findOrFail($request->integer('revision'));
+            if ($request->boolean('solo_filas')) {
+                // Leer filas no necesita recalcular el plan global ni su huella.
+                // Guardar decisiones y aplicar conservan su revalidación completa.
+                return response()->view('reemplazos.personal.partials.filas-revision',
+                    $this->datosFilas($revision, $request))
+                    ->header('Cache-Control', 'private, no-store')->header('X-Padron-Filas', '1');
+            }
             $aplicador = app(PadronAplicacionService::class);
             $disponible = $aplicador->disponible();
-            $resolucion = app(PadronResolucionService::class);
-            $resolucionDisponible = $resolucion->disponible();
             $plan = $revision->aplicada_at ? null : $aplicador->plan($revision);
-            $historial = $resolucionDisponible ? $resolucion->historial($revision) : collect();
-            $decisiones = $historial->keyBy('padron_revision_fila_id');
             $conflictos = $plan['conflictos'] ?? null;
-            $paginaConflictos = max(1, $request->integer('conflictos_page', 1));
+            $ultimaPaginaConflictos = max(1, count($conflictos['grupos'] ?? []));
+            $paginaConflictos = min($ultimaPaginaConflictos, max(1, $request->integer('conflictos_page', 1)));
+            if ($request->filled('caso_rut') && $request->filled('caso_establecimiento')) {
+                $pendiente = collect($conflictos['grupos'] ?? [])->search(fn ($grupo) => (! $request->boolean('avanzar_caso') || $grupo['bloqueante'])
+                    && $grupo['rut'] === $request->query('caso_rut')
+                    && $grupo['establecimiento_id'] === $request->integer('caso_establecimiento'));
+                if ($pendiente !== false) {
+                    $paginaConflictos = $pendiente + 1;
+                } elseif ($request->boolean('avanzar_caso')) {
+                    // Caso resuelto: volver al primer bloqueo restante de la cola.
+                    $paginaConflictos = 1;
+                    foreach (['q', 'accion_filtro', 'page', 'caso_rut', 'caso_establecimiento'] as $parametro) {
+                        $request->query->remove($parametro);
+                    }
+                }
+            }
             $conflictosPaginados = new \Illuminate\Pagination\LengthAwarePaginator(
-                array_slice($conflictos['grupos'] ?? [], ($paginaConflictos - 1) * 20, 20),
-                count($conflictos['grupos'] ?? []), 20, $paginaConflictos,
-                ['path' => $request->url(), 'pageName' => 'conflictos_page', 'query' => $request->query(), 'fragment' => 'conflictos-asignaciones'],
+                array_slice($conflictos['grupos'] ?? [], $paginaConflictos - 1, 1),
+                count($conflictos['grupos'] ?? []), 1, $paginaConflictos,
+                ['path' => $request->url(), 'pageName' => 'conflictos_page', 'query' => ['revision' => $revision->id], 'fragment' => 'conflictos-asignaciones'],
             );
-            $resumenResolucion = $resolucion->resumen($revision->filas()->get(['id', 'fila_excel', 'accion', 'personal_id']), $decisiones);
-            $query = $revision->filas()->when($request->filled('q'), function ($q) use ($request) {
-                $term = trim((string) $request->query('q'));
-                $q->where(fn ($sub) => $sub->where('rut', 'like', '%'.$term.'%')->orWhere('nombre', 'like', '%'.$term.'%'));
-            })->when($request->filled('accion_filtro'), fn ($q) => $q->where('accion', $request->query('accion_filtro')));
-            return view('reemplazos.personal.revision', [
-                'revision' => $revision, 'filas' => $query->orderBy('id')->paginate(50)->withQueryString(),
-                // Una confirmación final vencida exige recargar el plan, no
-                // descartar las decisiones ni ocultar la resolución manual.
-                'obsoleta' => ! $revision->aplicada_at && $service->stale($revision),
+            return view('reemplazos.personal.revision', array_merge($this->datosFilas($revision, $request), [
+                'revision' => $revision,
+                'paginaConflictos' => $paginaConflictos,
                 'aplicacionDisponible' => $disponible,
-                'resolucionDisponible' => $resolucionDisponible,
-                'decisiones' => $decisiones,
-                'historialDecisiones' => $historial->groupBy('padron_revision_fila_id'),
-                'resumenResolucion' => $resumenResolucion,
-                'dependenciasHistoricas' => app(PadronDependenciasService::class)->snapshot()['por_personal'],
                 'bloqueos' => $plan['errores'] ?? [],
                 'confirmacionHash' => $plan['confirmacion_hash'] ?? null,
                 'conflictos' => $conflictos, 'conflictosPaginados' => $conflictosPaginados,
                 'cambiosAplicados' => $revision->aplicada_at ? DB::table('padron_personal_cambios')->where('padron_revision_id', $revision->id)->count() : 0,
                 'autorizaciones' => DB::table('padron_revision_autorizaciones')->where('padron_revision_id', $revision->id)->get()->keyBy('rut'),
-            ]);
+            ]));
         }
 
         return view('reemplazos.personal.import');
+    }
+
+    private function datosFilas(PadronRevision $revision, Request $request): array
+    {
+        $resolucion = app(PadronResolucionService::class);
+        $disponible = $resolucion->disponible();
+        $historial = $disponible ? $resolucion->historial($revision) : collect();
+        $decisiones = $historial->keyBy('padron_revision_fila_id');
+        $mostrar = $request->filled('q');
+        $query = $revision->filas()->when(! $mostrar, fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($mostrar, function ($q) use ($request) {
+                $term = trim((string) $request->query('q'));
+                $q->where(fn ($sub) => $sub->where('rut', 'like', '%'.$term.'%')->orWhere('nombre', 'like', '%'.$term.'%'));
+            })->when($request->filled('accion_filtro'), fn ($q) => $q->where('accion', $request->query('accion_filtro')));
+        $filas = $query->orderBy('id')->paginate(50, ['*'], 'page', $request->integer('page', 1))
+            ->withPath(route('reemplazos.personal.import'))->appends($request->except(['solo_filas', 'avanzar_caso']))->fragment('filas-padron');
+        $ids = [];
+        foreach ($filas as $fila) {
+            $ids[] = $fila->personal_id;
+            $ids[] = $decisiones->get($fila->id)?->personal_id;
+            foreach ($fila->candidatos ?? [] as $candidato) {
+                $ids[] = $candidato['id'];
+            }
+        }
+        return [
+            'revision' => $revision, 'filas' => $filas, 'mostrarFilas' => $mostrar,
+            'paginaConflictos' => $request->integer('conflictos_page', 1),
+            'casoRut' => $request->query('caso_rut'), 'casoEstablecimiento' => $request->query('caso_establecimiento'),
+            'resolucionDisponible' => $disponible, 'decisiones' => $decisiones,
+            'historialDecisiones' => $historial->groupBy('padron_revision_fila_id'),
+            'resumenResolucion' => $resolucion->resumen($revision->filas()->get(['id', 'fila_excel', 'accion', 'personal_id']), $decisiones),
+            'dependenciasHistoricas' => app(PadronDependenciasService::class)->paraPersonal($ids),
+            'obsoleta' => ! $revision->aplicada_at && app(PadronRevisionService::class)->stale($revision),
+        ];
     }
 
     public function plantilla()
@@ -183,9 +226,19 @@ class PersonalImportController extends Controller
                     'fila' => ['required', 'integer', 'min:1'], 'personal_id' => ['required', 'integer', 'min:0'],
                     'justificacion' => ['required', 'string', 'min:10', 'max:2000'],
                     'decision_anterior' => ['required', 'integer', 'min:0'],
+                    'q' => ['nullable', 'string', 'max:100'], 'accion_filtro' => ['nullable', 'string', 'max:50'],
+                    'page' => ['nullable', 'integer', 'min:1'], 'conflictos_page' => ['nullable', 'integer', 'min:1'],
+                    'caso_rut' => ['nullable', 'string', 'max:32'], 'caso_establecimiento' => ['nullable', 'integer', 'min:1'],
                 ]);
                 $aplicador->resolver($revision, $data['fila'], $data['personal_id'] ? (int) $data['personal_id'] : null, $data['justificacion'], (int) $request->user()->id, (int) $data['decision_anterior']);
                 $message = 'Decisión de conciliación registrada. No se modificaron contratos, vigencias ni asignaciones.';
+                // Mantener el contexto permite resolver las demás filas del RUT.
+                $contexto = array_intersect_key($data, array_flip(['q', 'accion_filtro', 'page', 'conflictos_page', 'caso_rut', 'caso_establecimiento']));
+                if (! empty($contexto['caso_rut']) && ! empty($contexto['caso_establecimiento'])) {
+                    $contexto['avanzar_caso'] = 1;
+                }
+                return redirect()->to(route('reemplazos.personal.import', ['revision' => $revision->id] + $contexto).($contexto ? '#filas-padron' : ''))
+                    ->with('status', $message);
             } else {
                 $request->validate(['confirmar_aplicacion' => ['accepted']]);
                 @set_time_limit(240);

@@ -192,7 +192,8 @@ class PadronRevisionTest extends TestCase
         $html = $view->render();
         $this->assertStringContainsString('Solo previsualización.', $html);
         $this->assertStringContainsString('Registrar autorización de 45 horas', $html);
-        $this->assertStringContainsString('ID: 101', $html);
+        $this->assertStringNotContainsString('ID: 101', $html);
+        $this->assertStringContainsString('Las correspondencias se cargan solo al solicitarlas.', $html);
         $this->assertStringNotContainsString('importar_legacy', $html);
     }
 
@@ -428,7 +429,7 @@ class PadronRevisionTest extends TestCase
     {
         $revision = $this->ambiguousRevision();
         view()->share('errors', new ViewErrorBag);
-        $html = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]))->render();
+        $html = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id, 'q' => '111111111']))->render();
         $this->assertStringContainsString('name="accion" value="resolver"', $html);
         $this->assertStringNotContainsString('name="accion" value="aplicar"', $html);
         $this->withoutMiddleware();
@@ -442,7 +443,7 @@ class PadronRevisionTest extends TestCase
         $this->assertDatabaseCount('padron_revision_decisiones', 1);
         $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'jornada' => 22]);
         app('auth')->forgetGuards();
-        $html = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]))->render();
+        $html = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id, 'q' => '111111111']))->render();
         $this->assertStringContainsString('Historial de decisiones', $html);
         $this->assertStringContainsString('Ausencia vinculada a una fila', $html);
     }
@@ -496,7 +497,7 @@ class PadronRevisionTest extends TestCase
         app(PadronRevisionService::class)->authorize($revision->fresh(), '111111111', 'Excepción sintética revisada después de siete días.', 1);
         DB::table('solicitudes_reemplazo')->update(['estado' => 'aprobada']);
         view()->share('errors', new ViewErrorBag);
-        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]));
+        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id, 'q' => '111111111']));
         $this->assertFalse($view->getData()['obsoleta']);
         $html = $view->render();
         $this->assertStringContainsString('Resolver correspondencia', $html);
