@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\FuncionarioViaticoAnexo;
 use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronVigenciaService;
 use App\Support\RutChile;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class FuncionarioViaticoAnexoController extends Controller
@@ -50,7 +50,7 @@ class FuncionarioViaticoAnexoController extends Controller
     public function store(Request $request)
     {
         $data = $this->validatedData($request);
-        $funcionario = $this->funcionarioActivoPorRut($data['rut_body']);
+        $funcionario = $this->funcionarioActivoPorRut($data['rut']);
 
         if (!$funcionario) {
             throw ValidationException::withMessages([
@@ -78,7 +78,12 @@ class FuncionarioViaticoAnexoController extends Controller
     public function update(Request $request, FuncionarioViaticoAnexo $funcionarios_viatico_anexo)
     {
         $data = $this->validatedData($request, $funcionarios_viatico_anexo->id);
-        $funcionario = $this->funcionarioActivoPorRut($data['rut_body']);
+        // Desactivar/corregir observaciones no debe borrar los antecedentes del anexo.
+        if (! $data['activo'] && $data['rut_body'] === $funcionarios_viatico_anexo->rut_body) {
+            $funcionarios_viatico_anexo->update($data);
+            return redirect()->route('admin.funcionarios-viatico-anexo.index')->with('success', 'Registro desactivado; antecedentes conservados.');
+        }
+        $funcionario = $this->funcionarioActivoPorRut($data['rut']);
 
         if (!$funcionario) {
             throw ValidationException::withMessages([
@@ -97,6 +102,9 @@ class FuncionarioViaticoAnexoController extends Controller
 
     public function toggle(FuncionarioViaticoAnexo $funcionarios_viatico_anexo)
     {
+        if (! $funcionarios_viatico_anexo->activo && ! $this->funcionarioActivoPorRut($funcionarios_viatico_anexo->rut)) {
+            throw ValidationException::withMessages(['rut' => 'No se puede reactivar el anexo: no existe un contrato vigente identificable.']);
+        }
         $funcionarios_viatico_anexo->update([
             'activo' => !$funcionarios_viatico_anexo->activo,
         ]);
@@ -144,39 +152,18 @@ class FuncionarioViaticoAnexoController extends Controller
         ];
     }
 
-    private function funcionarioActivoPorRut(string $rutBody): ?ReemplazoPersonal
+    private function funcionarioActivoPorRut(string $rut): ?ReemplazoPersonal
     {
-        $base = ReemplazoPersonal::query();
-
-        if (Schema::hasColumn('reemplazos_personal', 'vigente')) {
-            $base->where('vigente', true);
+        $rows = app(PadronVigenciaService::class)->porRut($rut)['vigentes'];
+        if ($rows->isEmpty()) {
+            return null;
         }
-
-        $periodo = (clone $base)
-            ->whereNotNull('anio')
-            ->whereNotNull('mes')
-            ->orderByDesc('anio')
-            ->orderByDesc('mes')
-            ->first(['anio', 'mes']);
-
-        $query = ReemplazoPersonal::query();
-        if ($periodo) {
-            $query->where('anio', $periodo->anio)->where('mes', $periodo->mes);
+        // El anexo guarda un solo establecimiento/cargo: no escoger uno arbitrario.
+        if ($rows->contains(fn ($row) => ! $row->establecimiento)
+            || $rows->map(fn ($row) => [$row->establecimiento_id, $row->nombre, $row->estatuto, $row->escalafon])->unique()->count() !== 1) {
+            throw ValidationException::withMessages(['rut' => 'El RUT tiene antecedentes vigentes ambiguos o sin establecimiento. Regularice el padrón antes de habilitar el anexo.']);
         }
-        if (Schema::hasColumn('reemplazos_personal', 'vigente')) {
-            $query->where('vigente', true);
-        }
-
-        return $query
-            ->with('establecimiento')
-            ->where(function ($q) use ($rutBody) {
-                $q->where('rut', $rutBody)
-                    ->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(rut), '.', ''), '-', ''), ' ', '') LIKE ?", [$rutBody . '%']);
-            })
-            ->orderByDesc('anio')
-            ->orderByDesc('mes')
-            ->orderByDesc('id')
-            ->first();
+        return $rows->first();
     }
 
     private function snapshotFuncionario(ReemplazoPersonal $funcionario): array
@@ -184,7 +171,7 @@ class FuncionarioViaticoAnexoController extends Controller
         return [
             'nombre_completo' => $funcionario->nombre,
             'establecimiento_id' => $funcionario->establecimiento_id,
-            'establecimiento_nombre' => $funcionario->establecimiento?->nombre ?? $funcionario->establecimiento?->name ?? null,
+            'establecimiento_nombre' => $funcionario->establecimiento?->nombre_establecimiento,
             'estamento' => $funcionario->estatuto,
             'cargo_funcion' => $funcionario->escalafon,
         ];

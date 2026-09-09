@@ -14,6 +14,13 @@ class DotacionProporcionRecalculationService
 {
     public function recalculate(Establecimiento $establecimiento, int $anio, ?int $userId = null): array
     {
+        return app(\App\Services\Padron\PadronEscrituraService::class)->ejecutar(
+            fn () => $this->recalcularBajoControl($establecimiento, $anio, $userId),
+        );
+    }
+
+    private function recalcularBajoControl(Establecimiento $establecimiento, int $anio, ?int $userId): array
+    {
         if (! Schema::hasTable('dotacion_docente_asignaciones')) {
             return ['total' => 0, 'actualizadas' => 0, 'omitidas' => 0];
         }

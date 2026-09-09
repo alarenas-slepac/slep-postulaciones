@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
-use App\Models\ReemplazoPersonal;
 use App\Services\EstablecimientoImportService;
+use App\Services\Padron\PadronVigenciaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -143,7 +143,7 @@ class EstablecimientoController extends Controller
 
     public function show(Establecimiento $establecimiento): View
     {
-        $registros = ReemplazoPersonal::delEstablecimiento($establecimiento->id)
+        $registros = app(PadronVigenciaService::class)->consultaActual()->delEstablecimiento($establecimiento->id)
             ->orderBy('nombre')
             ->get();
 

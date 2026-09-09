@@ -114,4 +114,68 @@ class PadronDenominacionesFinanciamientoTest extends TestCase
         $report = $this->report([$this->data('PIE', 2, ['tipocontrato' => 'CONTRATA']), $this->data('SEP', 17, ['tipocontrato' => 'CONTRATA'])], $old);
         $this->assertSame(['revision_manual', 'revision_manual'], array_column(array_slice($report['filas'], 0, 2), 'accion'));
     }
+
+    public function test_additional_historical_labels_match_uniquely_without_mutating_original_data(): void
+    {
+        foreach (['CONTRATA', 'INDEFINIDO', 'PLAZO FIJO'] as $base) {
+            $incoming = [$this->data('SEP', 17, ['tipocontrato' => $base]), $this->data('PIE', 2, ['tipocontrato' => $base])];
+            $old = array_map(fn ($r, $i) => array_replace($r, ['id' => 101 + $i, 'mes' => 8, 'vigente' => true,
+                'tipocontrato' => strtolower($base).'  '.$r['financiamiento']]), $incoming, [0, 1]);
+            $report = $this->report($incoming, $old);
+            $this->assertSame([101, 102], array_column($report['filas'], 'personal_id'));
+            $this->assertSame(['actualizacion_propuesta', 'actualizacion_propuesta'], array_column($report['filas'], 'accion'));
+            $this->assertSame($old[0], $report['filas'][0]['anterior']);
+            $this->assertSame($incoming[0], $report['filas'][0]['datos']);
+            $this->assertStringContainsString('Corrección de denominación histórica', implode(' ', $report['filas'][0]['observaciones']));
+            $this->assertStringNotContainsString('No se propone reemplazar ningún ID', implode(' ', $report['filas'][0]['observaciones']));
+            $this->assertSame([102, 101], array_column($this->report(array_reverse($incoming), array_reverse($old))['filas'], 'personal_id'));
+        }
+    }
+
+    public function test_additional_labels_do_not_hide_other_differences_or_resolve_residual_contract_changes(): void
+    {
+        foreach (['CONTRATA', 'INDEFINIDO', 'PLAZO FIJO'] as $base) {
+            $incoming = [$this->data('SEP', 17, ['tipocontrato' => $base]), $this->data('PIE', 2)];
+            $old = [$this->data('SEP', 17, ['id' => 101, 'tipocontrato' => $base.' SEP']),
+                $this->data('PIE', 2, ['id' => 102, 'tipocontrato' => 'CONTRATA'])];
+            foreach ([[], ['rbd' => 99998], ['fecha_ingreso' => '2021-03-01'], ['estatuto' => 'ASISTENTE'],
+                ['escalafon' => 'DOCENTE SEP'], ['jornada' => 16], ['jornada_basica' => 16], ['jornada_media' => 1],
+                ['financiamiento' => 'SUB.GENERAL'], ['tipocontrato' => $base.' PIE'], ['tipocontrato' => $base.' SEP EXTRA']] as $change) {
+                $report = $this->report($incoming, [array_replace($old[0], $change), $old[1]]);
+                $this->assertSame($change ? null : 101, $report['filas'][0]['personal_id'], json_encode($change));
+                $this->assertSame('revision_manual', $report['filas'][1]['accion']); // No CONTRATA -> PLANTA por descarte.
+                $this->assertNull($report['filas'][1]['personal_id']);
+            }
+        }
+    }
+
+    public function test_canonical_and_historical_duplicate_candidates_remain_ambiguous(): void
+    {
+        foreach (['CONTRATA', 'INDEFINIDO', 'PLAZO FIJO'] as $base) {
+            $incoming = $this->data('SEP', 17, ['tipocontrato' => $base]);
+            foreach ([$base, $base.' SEP'] as $otherLabel) {
+                $old = [array_replace($incoming, ['id' => 101, 'tipocontrato' => $base.' SEP']),
+                    array_replace($incoming, ['id' => 102, 'tipocontrato' => $otherLabel])];
+                foreach ([$old, array_reverse($old)] as $order) {
+                    $report = $this->report([$incoming], $order);
+                    $this->assertNull($report['filas'][0]['personal_id']);
+                    $this->assertSame('revision_manual', $report['filas'][0]['accion']);
+                }
+            }
+            $old = [array_replace($incoming, ['id' => 101, 'tipocontrato' => $base.' SEP'])];
+            $report = $this->report([$incoming, array_replace($incoming, ['nombre' => 'Otra etiqueta sintética'])], $old);
+            $this->assertSame([null, null], array_column(array_slice($report['filas'], 0, 2), 'personal_id'));
+            $canonicalOld = [array_replace($incoming, ['id' => 101])];
+            $mixedIncoming = [$incoming, array_replace($incoming, ['tipocontrato' => $base.' SEP'])];
+            $report = $this->report($mixedIncoming, $canonicalOld);
+            $this->assertSame([null, null], array_column(array_slice($report['filas'], 0, 2), 'personal_id'));
+        }
+    }
+
+    public function test_extension_does_not_classify_historical_labels_as_valid_incoming_contracts(): void
+    {
+        foreach (['CONTRATA SEP', 'INDEFINIDO PIE', 'PLAZO FIJO PIE', 'REEMPLAZO SEP', 'SUPLENCIA PIE'] as $label) {
+            $this->assertNotSame('regular', PadronConciliador::tipo(['tipocontrato' => $label]));
+        }
+    }
 }

@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\PermisoSinGoceExcepcion;
 use App\Models\ReemplazoPersonal;
+use App\Services\Padron\PadronVigenciaService;
 use App\Support\RutChile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Validation\ValidationException;
 
 class PermisoSinGoceExcepcionController extends Controller
 {
@@ -69,7 +71,7 @@ class PermisoSinGoceExcepcionController extends Controller
 
         $titular = $this->buscarTitularPorRut($rut);
         if (!$titular) {
-            return back()->withErrors(['rut' => 'No se encontró un titular en el padrón de reemplazos con ese RUT.'])->withInput();
+            return back()->withErrors(['rut' => 'No se encontró un titular docente vigente, distinto de reemplazo o suplencia, con ese RUT.'])->withInput();
         }
 
         if (!$this->esDocente($titular->estatuto)) {
@@ -112,6 +114,9 @@ class PermisoSinGoceExcepcionController extends Controller
             'activo' => 'estado',
         ]);
 
+        if ($request->boolean('activo')) {
+            $this->assertTitularVigente($permisoSinGoceExcepcion);
+        }
         $permisoSinGoceExcepcion->fill([
             'nombre_titular' => $data['nombre_titular'],
             'observacion' => $data['observacion'] ?? null,
@@ -126,6 +131,9 @@ class PermisoSinGoceExcepcionController extends Controller
 
     public function toggle(Request $request, PermisoSinGoceExcepcion $permisoSinGoceExcepcion): RedirectResponse
     {
+        if (! $permisoSinGoceExcepcion->activo) {
+            $this->assertTitularVigente($permisoSinGoceExcepcion);
+        }
         $permisoSinGoceExcepcion->forceFill([
             'activo' => !$permisoSinGoceExcepcion->activo,
             'updated_by' => $request->user()->id,
@@ -137,21 +145,29 @@ class PermisoSinGoceExcepcionController extends Controller
     private function normalizarRutPlano(?string $value): string
     {
         $normalized = RutChile::normalize($value);
-        if ($normalized && !empty($normalized['rut_body']) && !empty($normalized['rut_dv'])) {
+        if ($normalized && ($normalized['status'] ?? '') === 'ok' && !empty($normalized['rut_body']) && !empty($normalized['rut_dv'])) {
             return strtoupper($normalized['rut_body'] . $normalized['rut_dv']);
         }
 
-        return strtoupper(preg_replace('/[^0-9Kk]/', '', (string) $value));
+        return '';
     }
 
     private function buscarTitularPorRut(string $rutNormalizado): ?ReemplazoPersonal
     {
-        return ReemplazoPersonal::query()
+        return app(PadronVigenciaService::class)->consultaActual()->sinReemplazoSuplencia()
             ->whereRaw("REPLACE(REPLACE(REPLACE(UPPER(rut), '.', ''), '-', ''), ' ', '') = ?", [$rutNormalizado])
+            ->whereHas('establecimiento')
             ->orderByDesc('anio')
             ->orderByDesc('mes')
             ->orderByDesc('id')
-            ->first();
+            ->get()->first(fn ($row) => $this->esDocente($row->estatuto));
+    }
+
+    private function assertTitularVigente(PermisoSinGoceExcepcion $excepcion): void
+    {
+        if (! $this->buscarTitularPorRut($excepcion->rut_normalizado)) {
+            throw ValidationException::withMessages(['activo' => 'No se puede habilitar la excepción sin un titular docente vigente. Puede mantener el antecedente desactivado.']);
+        }
     }
 
     private function esDocente(?string $estatuto): bool

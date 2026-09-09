@@ -28,16 +28,20 @@ function check(bool $condition, string $message): void
 
 function lockWait(PDO $admin, int $waiting, int $blocking, float $timeout = 5): bool
 {
-    $query = $admin->prepare('SELECT COUNT(*) FROM performance_schema.data_lock_waits w
-        JOIN performance_schema.threads r ON r.THREAD_ID = w.REQUESTING_THREAD_ID
-        JOIN performance_schema.threads b ON b.THREAD_ID = w.BLOCKING_THREAD_ID
-        WHERE r.PROCESSLIST_ID = ? AND b.PROCESSLIST_ID = ?');
+    $GLOBALS['padron_lab_last_wait'] = [];
+    $sql = Lab::lockWaitSql($admin);
+    $query = $admin->prepare($sql);
     $until = microtime(true) + $timeout;
     do {
         $query->execute([$waiting, $blocking]);
         if ($query->fetchColumn() > 0) { return true; }
-        usleep(20000);
+        // MariaDB renueva la caché I_S solo después de >100 ms sin lecturas.
+        // Polling a 20 ms puede mantener indefinidamente una imagen sin esperas.
+        usleep(200000);
     } while (microtime(true) < $until);
+    $debug = $admin->prepare('SELECT ID, STATE FROM information_schema.PROCESSLIST WHERE ID = ?');
+    $debug->execute([$waiting]);
+    $GLOBALS['padron_lab_last_wait'] = $debug->fetchAll(PDO::FETCH_ASSOC);
     return false;
 }
 
@@ -55,13 +59,25 @@ function appliedOnce(): void
     }
 }
 
+/** La primera lectura consistente debe ser posterior al último bloqueo. */
+function assertReadBoundary(array $result): void
+{
+    foreach ($result['trace'] ?? [] as $query) {
+        $sql = strtolower($query['sql']);
+        check(str_starts_with($sql, 'select ') && str_contains($sql, 'for update'),
+            'Lectura sin bloqueo antes de adquirir todas las dependencias: '.$sql);
+        if (str_contains($sql, '`reemplazos_personal_bloqueos`')) {
+            return;
+        }
+    }
+    throw new RuntimeException('La traza no acredita el último bloqueo de dependencias.');
+}
+
 try {
     $run = bin2hex(random_bytes(8));
     putenv('PADRON_MYSQL_LAB_RUN='.$run);
     $admin = Lab::admin();
-    $server = $admin->query('SELECT VERSION() AS version, @@transaction_isolation AS isolation_default,
-        @@default_storage_engine AS engine_default, @@innodb_lock_wait_timeout AS lock_wait_timeout_default')->fetch(PDO::FETCH_ASSOC);
-    check(str_starts_with($server['version'], '8.'), 'Este protocolo requiere MySQL 8 y performance_schema.data_lock_waits.');
+    $server = Lab::server($admin);
     $report = ['run' => $run, 'started_at' => gmdate(DATE_ATOM), 'server' => $server,
         'production_equivalence' => 'No verificada: no se consultó producción.',
         'schema' => 'Fixture sintético reducido; migraciones reales de revisión e historia. Dotación SIN FK contractual, documentos CON FK.',
@@ -74,7 +90,9 @@ try {
     }
     $cases = ['baseline', 'same_review', 'different_reviews', 'rollback_fault', 'disconnect', 'timeout', 'deadlock',
         'personal_update', 'document_update', 'assignment_update', 'declaration_update', 'exclusion_update',
-        'personal_insert', 'document_insert', 'assignment_insert', 'declaration_insert', 'exclusion_insert'];
+        'personal_insert', 'document_insert', 'assignment_insert', 'declaration_insert', 'exclusion_insert',
+        'coordinated_personal_insert', 'coordinated_document_insert', 'coordinated_assignment_insert',
+        'coordinated_declaration_insert', 'coordinated_exclusion_insert', 'coordinated_writer_first', 'coordinated_timeout'];
     if ($only !== null) { $cases = array_values(array_intersect($cases, [$only])); }
     check((bool) $cases && (bool) $isolations, 'Filtro de casos o aislamiento vacío.');
     $index = 0;
@@ -96,10 +114,55 @@ try {
                 $spawn = function (array $data) use (&$children): Child { $child = new Child($data); $children[] = $child; return $child; };
                 $before = Lab::state();
                 if ($case === 'baseline') {
-                    $a = $spawn($job);
+                    $a = $spawn($job + ['trace' => true]);
                     $entry['a'] = $a->wait('result');
                     check($entry['a']['status'] === 'committed', 'Aplicación básica rechazada.');
+                    assertReadBoundary($entry['a']);
                     appliedOnce();
+                } elseif ($case === 'coordinated_timeout') {
+                    $b = $spawn(array_replace($job, ['mode' => 'edit', 'operation' => 'control_lock', 'pause' => 'after_sql']));
+                    $bId = $b->wait('started')['connection']; $b->wait('after_sql');
+                    $a = $spawn(array_replace($job, ['mode' => 'coordinated', 'operation' => 'document_insert', 'timeout' => 1]));
+                    $aId = $a->wait('started')['connection'];
+                    check(lockWait($admin, $aId, $bId), 'No se observó la espera del escritor.');
+                    $entry['a'] = $a->wait('result');
+                    check($entry['a']['status'] === 'rejected' && $entry['a']['attempts'] === 1
+                        && $entry['a']['type'] === \Illuminate\Validation\ValidationException::class, 'No informó el timeout sin reintentos.');
+                    check(! isset($a->events['observed']), 'Ejecutó el callback pese al timeout.');
+                    $b->go(); $b->wait('result');
+                    check($before === Lab::state(), 'El timeout del coordinador dejó modificaciones.');
+                } elseif (str_starts_with($case, 'coordinated_')) {
+                    $writerFirst = $case === 'coordinated_writer_first';
+                    $operation = $writerFirst ? 'document_update' : substr($case, 12);
+                    if ($writerFirst) {
+                        $b = $spawn(array_replace($job, ['mode' => 'coordinated', 'operation' => $operation, 'pause' => 'coordinator_locked']));
+                        $bId = $b->wait('started')['connection']; $b->wait('coordinator_locked');
+                        $a = $spawn($job); $aId = $a->wait('started')['connection'];
+                        $entry['lock_wait_verified'] = lockWait($admin, $aId, $bId);
+                        check($entry['lock_wait_verified'], 'El aplicador no esperó al escritor coordinado.');
+                        $b->go(); $entry['b'] = $b->wait('result'); $entry['a'] = $a->wait('result');
+                        check($entry['b']['status'] === 'committed' && $entry['a']['status'] === 'rejected', 'No respetó el cambio previo a la aplicación.');
+                        check(DB::table('padron_personal_cambios')->count() === 0, 'Escribió con una confirmación anterior al escritor.');
+                    } else {
+                        $a = $spawn($job + ['pause' => 'audit_1']); $aId = $a->wait('started')['connection']; $a->wait('audit_1');
+                        $b = $spawn(array_replace($job, ['mode' => 'coordinated', 'operation' => $operation]));
+                        $bId = $b->wait('started')['connection'];
+                        $entry['lock_wait_verified'] = lockWait($admin, $bId, $aId);
+                        check($entry['lock_wait_verified'], 'La inserción coordinada no esperó al aplicador.');
+                        $b->poll(); check(! isset($b->events['observed']), 'Leyó datos antes de adquirir el control.');
+                        $a->go(); $entry['a'] = $a->wait('result'); $entry['b'] = $b->wait('result');
+                        $entry['observed'] = $b->wait('observed');
+                        check($entry['observed']['jornada'] === 30 && $entry['observed']['mes'] === 9, 'El escritor leyó el contrato anterior tras esperar.');
+                        check($entry['a']['status'] === 'committed', 'Falló el aplicador coordinado.');
+                        $expected = in_array($operation, ['document_insert', 'declaration_insert'], true) ? 'committed' : 'rejected';
+                        check($entry['b']['status'] === $expected, 'El escritor no revalidó los datos actuales.');
+                        appliedOnce();
+                        if ($operation === 'document_insert') {
+                            $copy = json_decode(DB::table('solicitudes_reemplazo')->where('id', 3)->value('padron_personal_snapshot'), true);
+                            check(($copy['personal']['jornada'] ?? null) == 30, 'El modelo documental no capturó el contrato posterior a la espera.');
+                        }
+                        if ($operation === 'assignment_insert') { check(! DB::table('dotacion_docente_asignaciones')->where('id', 502)->exists(), 'Creó un vínculo al contrato desactivado.'); }
+                    }
                 } elseif (in_array($case, ['same_review', 'different_reviews'], true)) {
                     $second = $case === 'same_review' ? $r : Lab::revision();
                     $a = $spawn($job + ['pause' => 'control_locked']);
@@ -156,8 +219,20 @@ try {
                     if ($case !== 'personal_update') {
                         check($entry['token_invalid_in_fresh_connection'], 'El cambio externo no alteró la confirmación de control.');
                     }
+                    $afterExternal = Lab::state();
                     $a->go(); $entry['a'] = $a->wait('result');
                     check($entry['a']['status'] === 'rejected', 'No rechazó la confirmación obsoleta tras el cambio externo.');
+                    assertReadBoundary($entry['a']);
+                    check($entry['a']['type'] === \Illuminate\Validation\ValidationException::class,
+                        'El rechazo no corresponde a la validación del padrón.');
+                    if ($case !== 'personal_update') {
+                        check(str_contains($entry['a']['reason'], 'Recargue la misma revisión'),
+                            'El rechazo no permite conservar y recargar la revisión manual.');
+                        check(! app(\App\Services\Padron\PadronRevisionService::class)->stale(PadronRevision::findOrFail($r['revision'])),
+                            'El cambio de dependencia invalidó la revisión manual.');
+                    }
+                    check($afterExternal === Lab::state(), 'El rechazo alteró datos o deshizo el cambio externo.');
+                    $entry['rejection_preserved_state'] = true;
                     check(DB::table('padron_personal_cambios')->count() === 0 && DB::table('padron_periodo_versiones')->count() === 0,
                         'Rechazo concurrente dejó auditoría o versiones parciales.');
                     check(DB::table('padron_revisiones')->whereNotNull('aplicada_at')->count() === 0, 'Cerró una carga rechazada.');
@@ -188,6 +263,11 @@ try {
                 $entry['status'] ??= 'passed';
             } catch (Throwable $e) {
                 $entry['status'] = 'failed';
+                $entry['wait_diagnostic'] = $GLOBALS['padron_lab_last_wait'] ?? [];
+                foreach ($children as $child) {
+                    try { $child->poll(); } catch (Throwable) { /* Conservar el fallo original. */ }
+                    $entry['worker_events'][] = $child->events;
+                }
                 // Solo mensajes propios/fixture; las excepciones SQL no se imprimen con bindings.
                 $entry['error'] = $e instanceof \Illuminate\Database\QueryException || $e instanceof PDOException ? get_class($e).': database_error' : $e->getMessage();
             } finally {

@@ -111,7 +111,15 @@ class PadronConciliador
                     ->filter(fn ($row) => $this->signature($row) === $this->signature($rows[$index]['datos']));
                 if ($matches->count() === 1) {
                     $candidate = $matches->first();
-                    $incomingMatches = $group->filter(fn ($row) => $row['accion'] !== PadronReemplazosVigentes::OMITIDO && $this->signature($row['datos']) === $this->signature($candidate));
+                    // Una etiqueta canónica no tiene prioridad sobre otro ID
+                    // equivalente con sufijo histórico: sigue siendo ambiguo.
+                    $equivalents = $old->reject(fn ($row) => isset($matched[$row['id']]))
+                        ->filter(fn ($row) => $this->firmaDenominacionHistorica($row) === $this->signature($rows[$index]['datos']));
+                    if ($equivalents->count() > 1) {
+                        continue;
+                    }
+                    $incomingMatches = $group->filter(fn ($row) => $row['accion'] !== PadronReemplazosVigentes::OMITIDO
+                        && $this->firmaDenominacionHistorica($row['datos']) === $this->firmaDenominacionHistorica($candidate));
                     if ($incomingMatches->count() === 1) {
                         $this->match($rows[$index], $candidate);
                         $matched[$candidate['id']] = true;
@@ -146,6 +154,34 @@ class PadronConciliador
                         $rows[$index]['observaciones'][] = 'Varias líneas, cambio de composición o coincidencia incierta. No se propone reemplazar ningún ID.';
                     }
                 }
+            }
+            // Extensión acotada, después de la conciliación existente: no vuelve
+            // a ejecutar el emparejamiento residual 1:1 ni resuelve por descarte
+            // otros cambios de contrato. Solo corrige etiquetas históricas.
+            foreach ($pending as $index) {
+                if ($rows[$index]['accion'] !== 'revision_manual' || self::tipo($rows[$index]['datos']) !== 'regular') {
+                    continue;
+                }
+                $matches = $remaining->reject(fn ($candidate) => isset($matched[$candidate['id']]))
+                    ->filter(fn ($candidate) => $this->firmaDenominacionHistorica($candidate) === $this->signature($rows[$index]['datos']));
+                if ($matches->count() !== 1) {
+                    continue;
+                }
+                $candidate = $matches->first();
+                if ($this->contratoHistoricoSinFinanciamiento($candidate) === null) {
+                    continue;
+                }
+                $incomingMatches = $group->filter(fn ($row) => $row['accion'] !== PadronReemplazosVigentes::OMITIDO
+                    && $this->firmaDenominacionHistorica($row['datos']) === $this->firmaDenominacionHistorica($candidate));
+                if ($incomingMatches->count() !== 1) {
+                    continue;
+                }
+                $rows[$index]['observaciones'] = array_values(array_filter($rows[$index]['observaciones'],
+                    fn ($message) => $message !== 'Varias líneas, cambio de composición o coincidencia incierta. No se propone reemplazar ningún ID.'));
+                $rows[$index]['observaciones'][] = 'Corrección de denominación histórica: el sufijo SEP/PIE coincide con el financiamiento. Se conserva el ID; no cambia el tipo contractual base ni se omiten diferencias de escalafón, fechas o jornadas.';
+                $rows[$index]['candidatos'] = [];
+                $this->match($rows[$index], $candidate);
+                $matched[$candidate['id']] = true;
             }
         }
         foreach ($rows as &$row) {
@@ -200,6 +236,27 @@ class PadronConciliador
         }
         return ['filas' => $rows, 'errores' => $errors, 'excesos' => $excesses,
             'resumen' => collect($rows)->countBy('accion')->all()];
+    }
+
+    private function contratoHistoricoSinFinanciamiento(array $data): ?string
+    {
+        $financiamiento = self::text($data['financiamiento'] ?? '');
+        if (! in_array($financiamiento, ['SEP', 'PIE'], true)) {
+            return null;
+        }
+        $contrato = self::text($data['tipocontrato'] ?? '');
+        foreach (['CONTRATA', 'INDEFINIDO', 'PLAZO FIJO'] as $base) {
+            if ($contrato === $base.' '.$financiamiento) {
+                return $base;
+            }
+        }
+        return null;
+    }
+
+    private function firmaDenominacionHistorica(array $data): string
+    {
+        $data['tipocontrato'] = $this->contratoHistoricoSinFinanciamiento($data) ?? ($data['tipocontrato'] ?? '');
+        return $this->signature($data);
     }
 
     private function signature(array $data): string

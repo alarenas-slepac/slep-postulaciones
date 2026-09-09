@@ -8,7 +8,7 @@ use App\Mail\SolicitudReemplazoCreada;
 use App\Models\Establecimiento;
 use App\Models\PostulantProfile;
 use App\Models\ReemplazoPersonal;
-use App\Models\ReemplazoPersonalBloqueo;
+use App\Services\Padron\PadronBloqueoService;
 use App\Models\PermisoSinGoceExcepcion;
 use App\Models\SolicitudReemplazo;
 use App\Models\SolicitudReemplazoJornada;
@@ -1118,6 +1118,8 @@ class SolicitudReemplazoController extends Controller
             ->limit(30)
             ->get(['id', 'rut', 'nombre', 'estatuto']);       // <- ahora sí traemos id
 
+        app(PadronBloqueoService::class)->cargar($items);
+
         return response()->json([
             'results' => $items->map(function ($x) {
                 $bloqueado = $this->titularTieneBloqueoIndividualActivo($x);
@@ -1677,18 +1679,7 @@ class SolicitudReemplazoController extends Controller
 
     private function titularTieneBloqueoIndividualActivo(ReemplazoPersonal $titular): bool
     {
-        if (!$this->funcionarioTitularEsDocente($titular->estatuto)) {
-            return false;
-        }
-
-        if ($titular->relationLoaded('bloqueoActivo')) {
-            return $titular->bloqueoActivo !== null;
-        }
-
-        return ReemplazoPersonalBloqueo::query()
-            ->where('reemplazo_personal_id', $titular->id)
-            ->where('activo', true)
-            ->exists();
+        return app(PadronBloqueoService::class)->bloqueado($titular);
     }
     private function tiposReemplazoValidos(): array
     {

@@ -27,7 +27,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->web(append: [
             TouchLastSeen::class,
+            \App\Http\Middleware\CoordinarEscrituraPadron::class,
         ]);
+        $middleware->prependToPriorityList(
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\CoordinarEscrituraPadron::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

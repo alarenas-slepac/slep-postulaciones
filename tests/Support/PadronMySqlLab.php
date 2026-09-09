@@ -32,6 +32,36 @@ final class PadronMySqlLab
         ]);
     }
 
+    /** No sustituir un motor silenciosamente: el reporte identifica el real. */
+    public static function server(\PDO $pdo): array
+    {
+        $version = (string) $pdo->query('SELECT VERSION()')->fetchColumn();
+        $maria = str_contains($version, 'MariaDB');
+        if (($maria && ! str_starts_with($version, '10.11.'))
+            || (! $maria && ! str_starts_with($version, '8.'))) {
+            throw new \RuntimeException('Solo MySQL 8 o MariaDB 10.11 con observación real de bloqueos.');
+        }
+        $isolation = $maria ? 'tx_isolation' : 'transaction_isolation';
+        return ['version' => $version, 'family' => $maria ? 'MariaDB' : 'MySQL',
+            'lock_observer' => $maria ? 'information_schema.INNODB_LOCK_WAITS' : 'performance_schema.data_lock_waits',
+            'isolation_default' => $pdo->query('SELECT @@'.$isolation)->fetchColumn(),
+            'engine_default' => $pdo->query('SELECT @@default_storage_engine')->fetchColumn(),
+            'lock_wait_timeout_default' => $pdo->query('SELECT @@innodb_lock_wait_timeout')->fetchColumn()];
+    }
+
+    public static function lockWaitSql(\PDO $pdo): string
+    {
+        return self::server($pdo)['family'] === 'MariaDB'
+            ? 'SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w
+                JOIN information_schema.INNODB_TRX r ON r.trx_id = w.requesting_trx_id
+                JOIN information_schema.INNODB_TRX b ON b.trx_id = w.blocking_trx_id
+                WHERE r.trx_mysql_thread_id = ? AND b.trx_mysql_thread_id = ?'
+            : 'SELECT COUNT(*) FROM performance_schema.data_lock_waits w
+                JOIN performance_schema.threads r ON r.THREAD_ID = w.REQUESTING_THREAD_ID
+                JOIN performance_schema.threads b ON b.THREAD_ID = w.BLOCKING_THREAD_ID
+                WHERE r.PROCESSLIST_ID = ? AND b.PROCESSLIST_ID = ?';
+    }
+
     public static function assertName(string $database): void
     {
         $run = getenv('PADRON_MYSQL_LAB_RUN') ?: '';
@@ -200,10 +230,16 @@ final class PadronMySqlLab
     public static function state(): array
     {
         $tables = ['reemplazos_personal', 'dotacion_docente_asignaciones', 'declaracion_sostenedores', 'dotacion_docente_exclusiones',
-            'padron_personal_cambios', 'padron_periodo_versiones', 'padron_periodo_personal', 'padron_revisiones',
+            'padron_personal_cambios', 'padron_periodo_versiones', 'padron_periodo_personal', 'padron_revisiones', 'reemplazos_personal_bloqueos',
             ...\App\Services\Padron\PadronHistorialService::DOCUMENTOS];
         $out = [];
-        foreach ($tables as $table) { $out[$table] = hash('sha256', json_encode(DB::table($table)->orderBy('id')->get(), JSON_THROW_ON_ERROR)); }
+        foreach ($tables as $table) {
+            $hash = hash_init('sha256');
+            foreach (DB::table($table)->lazyById(100) as $row) {
+                hash_update($hash, json_encode($row, JSON_THROW_ON_ERROR)."\n");
+            }
+            $out[$table] = hash_final($hash);
+        }
         return $out;
     }
 }

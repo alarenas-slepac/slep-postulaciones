@@ -178,6 +178,47 @@ class PadronAplicacionTransaccionalTest extends TestCase
         $this->assertSame(7, $revision->fresh()->aplicada_por);
     }
 
+    public function test_compact_initial_read_keeps_complete_audit_images_for_updates_and_deactivations(): void
+    {
+        Schema::table('reemplazos_personal', fn (Blueprint $t) => $t->text('antecedente_adicional')->nullable());
+        foreach ([101, 102, 103] as $id) {
+            DB::table('reemplazos_personal')->where('id', $id)->update(['antecedente_adicional' => str_repeat('Antecedente sintético '.$id.'. ', 200)]);
+        }
+        $revision = $this->revision();
+        $before = DB::table('reemplazos_personal')->whereIn('id', [101, 102, 103])->get()->keyBy('id');
+        $identityRead = false;
+        DB::listen(function (QueryExecuted $event) use (&$identityRead): void {
+            if (DB::transactionLevel() > 0 && $event->sql === 'select "rut", "id" from "reemplazos_personal" order by "id" asc') {
+                $identityRead = true;
+            }
+        });
+        $this->apply($revision);
+        $this->assertTrue($identityRead, 'La adquisición inicial no debe materializar todos los contratos completos.');
+        foreach ([101, 102, 103] as $id) {
+            $audit = DB::table('padron_personal_cambios')->where('personal_id', $id)->first();
+            $this->assertSame((array) $before[$id], json_decode($audit->antes, true));
+            $this->assertSame((array) DB::table('reemplazos_personal')->find($id), json_decode($audit->despues, true));
+        }
+    }
+
+    public function test_new_contract_keeps_existing_rut_format_from_initial_identity_map(): void
+    {
+        DB::table('reemplazos_personal')->whereIn('id', [91, 92, 101])->update(['rut' => '11.111.111-1']);
+        $revision = $this->revision([$this->data(), $this->data(['financiamiento' => 'SEP', 'jornada' => 10, 'jornada_basica' => 10])]);
+        $existingLine = $revision->filas()->where('fila_excel', 2)->firstOrFail();
+        app(PadronResolucionService::class)->resolver($revision, $existingLine->id, 101, 'Conservar el contrato sintético existente.', 1);
+        $newLine = $revision->filas()->where('fila_excel', 3)->firstOrFail();
+        if ($newLine->accion === 'revision_manual') {
+            app(PadronResolucionService::class)->resolver($revision, $newLine->id, null, 'Nueva línea sintética de financiamiento.', 1);
+        }
+        $this->assertSame([], $this->writer()->plan($revision)['errores']);
+        $this->apply($revision);
+        $newId = DB::table('padron_personal_cambios')->where('accion', 'incorporacion')->value('personal_id');
+        $this->assertNotNull($newId);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => $newId, 'rut' => '11.111.111-1', 'financiamiento' => 'SEP']);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'rut' => '11.111.111-1', 'row_hash' => 'sintetico-101']);
+    }
+
     public function test_second_review_of_same_base_is_rejected_after_first_commits(): void
     {
         $first = $this->revision();

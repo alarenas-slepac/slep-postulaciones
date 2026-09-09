@@ -193,8 +193,16 @@ class GlobalSearchController extends Controller
             }
             $this->whereLikeAny($query, $term, ['rut', 'nombre', 'rbd', 'estatuto', 'escalafon']);
             $results = array_merge($results, $query->limit(4)->get()->map(function (ReemplazoPersonal $funcionario) {
-                $url = Route::has('reemplazos.index') ? route('reemplazos.index', ['q' => $funcionario->rut ?: $funcionario->nombre]) : route('dashboard');
-                return $this->result('person', 'Funcionario padrón', $funcionario->nombre ?: 'Funcionario', trim(collect([$funcionario->rut, $funcionario->establecimiento?->nombre_establecimiento])->filter()->implode(' · ')), $url, 'bi-person-lines-fill');
+                // Es un antecedente identificativo, no una acreditación de vigencia.
+                $url = Route::has('reemplazos.index') ? route('reemplazos.index', [
+                    'q' => $funcionario->rut ?: $funcionario->nombre,
+                    'periodo' => sprintf('%04d-%02d', $funcionario->anio, $funcionario->mes),
+                    'establecimiento_id' => $funcionario->establecimiento_id,
+                ]) : route('dashboard');
+                return $this->result('person', 'Antecedente padrón', $funcionario->nombre ?: 'Funcionario', trim(collect([
+                    $funcionario->rut, $funcionario->establecimiento?->nombre_establecimiento,
+                    sprintf('%04d-%02d', $funcionario->anio, $funcionario->mes),
+                ])->filter()->implode(' · ')), $url, 'bi-person-lines-fill');
             })->all());
         }
 

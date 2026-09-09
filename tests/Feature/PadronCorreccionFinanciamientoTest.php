@@ -79,10 +79,24 @@ class PadronCorreccionFinanciamientoTest extends TestCase
             'jornada' => $hours, 'jornada_basica' => $hours, 'jornada_media' => 0];
     }
 
-    public function test_correction_resolves_assignments_and_updates_contracts_without_replacing_ids_or_history(): void
+    public static function contractLabels(): array
     {
+        return [['PLANTA'], ['CONTRATA'], ['INDEFINIDO'], ['PLAZO FIJO']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('contractLabels')]
+    public function test_correction_resolves_assignments_and_updates_contracts_without_replacing_ids_or_history(string $base): void
+    {
+        if ($base !== 'PLANTA') {
+            foreach ([101 => 'SUB.GENERAL', 102 => 'PIE', 103 => 'SEP'] as $id => $funding) {
+                DB::table('reemplazos_personal')->where('id', $id)->update([
+                    'tipocontrato' => $id === 101 ? $base : $base.' '.$funding, 'escalafon' => 'DOCENTE AULA',
+                ]);
+            }
+        }
         $before = DB::table('dotacion_docente_asignaciones')->orderBy('id')->get()->toJson();
-        $incoming = [$this->data('SEP', 17), $this->data('SUB.GENERAL', 21), $this->data('PIE', 2)];
+        $incoming = array_map(fn ($row) => array_replace($row, ['tipocontrato' => $base]),
+            [$this->data('SEP', 17), $this->data('SUB.GENERAL', 21), $this->data('PIE', 2)]);
         $service = app(PadronRevisionService::class);
         $snapshot = (new \ReflectionMethod($service, 'snapshot'))->invoke($service, 202609);
         $report = app(PadronConciliador::class)->reconcile(
@@ -112,7 +126,7 @@ class PadronCorreccionFinanciamientoTest extends TestCase
         $writer->aplicar($revision, 7, $plan['confirmacion_hash']);
         $this->assertSame([101, 102, 103], DB::table('reemplazos_personal')->orderBy('id')->pluck('id')->all());
         foreach ([101 => 'SUB.GENERAL', 102 => 'PIE', 103 => 'SEP'] as $id => $funding) {
-            $this->assertDatabaseHas('reemplazos_personal', ['id' => $id, 'tipocontrato' => 'PLANTA',
+            $this->assertDatabaseHas('reemplazos_personal', ['id' => $id, 'tipocontrato' => $base,
                 'financiamiento' => $funding, 'escalafon' => 'DOCENTE AULA', 'vigente' => true, 'row_hash' => 'sintetico-'.$id]);
         }
         $this->assertSame(40, (int) DB::table('reemplazos_personal')->sum('jornada'));
@@ -120,8 +134,8 @@ class PadronCorreccionFinanciamientoTest extends TestCase
         $this->assertDatabaseCount('solicitudes_reemplazo', 6);
         foreach (SolicitudReemplazo::all() as $document) {
             $this->assertSame(103, (int) $document->reemplazo_personal_id);
-            $this->assertSame('PLANTA SEP', $document->funcionarioTitular->tipocontrato);
-            $this->assertSame('DOCENTE SEP', $document->funcionarioTitular->escalafon);
+            $this->assertSame($base.' SEP', $document->funcionarioTitular->tipocontrato);
+            $this->assertSame($base === 'PLANTA' ? 'DOCENTE SEP' : 'DOCENTE AULA', $document->funcionarioTitular->escalafon);
             $this->assertSame('cerrado', $document->estado);
             $this->assertSame('2026-08-01 00:00:00', $document->updated_at->format('Y-m-d H:i:s'));
         }

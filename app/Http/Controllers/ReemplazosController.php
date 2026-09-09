@@ -6,6 +6,7 @@ use App\Models\Establecimiento;
 use App\Models\ReemplazoPersonal;
 use App\Models\ReemplazoPersonalBloqueo;
 use App\Services\Padron\PadronPeriodoService;
+use App\Services\Padron\PadronBloqueoService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -43,7 +44,7 @@ class ReemplazosController extends Controller
             'total' => (clone $padronQuery)->count(),
             'establecimientos' => (clone $padronQuery)->distinct()->count('reemplazos_personal.establecimiento_id'),
             'ultima_actualizacion' => (clone $padronQuery)->max('reemplazos_personal.updated_at'),
-            'bloqueados' => (clone $padronQuery)->whereHas('bloqueoActivo')->count(),
+            'bloqueados' => app(PadronBloqueoService::class)->filtrarBloqueados(clone $padronQuery)->count(),
         ];
 
         $resumenEstablecimientos = (clone $padronQuery)
@@ -58,6 +59,8 @@ class ReemplazosController extends Controller
             ->orderBy('reemplazos_personal.nombre')
             ->paginate($filters['per_page'])
             ->withQueryString();
+
+        app(PadronBloqueoService::class)->cargar($personal->getCollection());
 
         return view('reemplazos.index', [
             'title' => 'Reemplazos',
@@ -253,9 +256,7 @@ class ReemplazosController extends Controller
         $tipoPersonal = $this->tipoPersonalBloqueablePadron($reemplazoPersonal);
 
         DB::transaction(function () use ($reemplazoPersonal, $validated, $request) {
-            $existing = ReemplazoPersonalBloqueo::query()
-                ->where('reemplazo_personal_id', $reemplazoPersonal->id)
-                ->where('activo', true)
+            $existing = app(PadronBloqueoService::class)->paraFuncionario($reemplazoPersonal)
                 ->lockForUpdate()
                 ->first();
 
@@ -293,9 +294,7 @@ class ReemplazosController extends Controller
 
         $tipoPersonal = $this->tipoPersonalBloqueablePadron($reemplazoPersonal);
 
-        $updated = ReemplazoPersonalBloqueo::query()
-            ->where('reemplazo_personal_id', $reemplazoPersonal->id)
-            ->where('activo', true)
+        $updated = app(PadronBloqueoService::class)->paraFuncionario($reemplazoPersonal)
             ->update([
                 'activo' => false,
                 'desbloqueado_por' => $request->user()?->id,
@@ -304,7 +303,7 @@ class ReemplazosController extends Controller
             ]);
 
         $message = $updated > 0
-            ? $tipoPersonal . ' desbloqueado correctamente: ' . $reemplazoPersonal->nombre . '.'
+            ? $tipoPersonal . ' desbloqueado en todos sus contratos y establecimientos: ' . $reemplazoPersonal->nombre . '.'
             : 'El registro no tenía un bloqueo activo.';
 
         return $this->redirectToPadronWithReturn($validated['return'] ?? [])
@@ -329,132 +328,43 @@ class ReemplazosController extends Controller
         [$origenAnio, $origenMes] = $this->parsePeriodKey($validated['periodo_origen']);
         [$destinoAnio, $destinoMes] = $this->parsePeriodKey($validated['periodo_destino']);
 
-        if (app(PadronPeriodoService::class)->esHistorico($origenAnio, $origenMes)
-            || app(PadronPeriodoService::class)->esHistorico($destinoAnio, $destinoMes)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'periodo_origen' => 'El traspaso de bloqueos entre versiones archivadas requiere revisión; no se puede usar el contrato actual como sustituto del histórico.',
-            ]);
+        $periodos = app(PadronPeriodoService::class);
+        $disponibles = $periodos->periodos()->map(fn ($p) => sprintf('%04d-%02d', $p->anio, $p->mes));
+        if (! $disponibles->contains($validated['periodo_origen']) || ! $disponibles->contains($validated['periodo_destino'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['periodo_origen' => 'Seleccione períodos disponibles del padrón.']);
         }
 
-        if (!$origenAnio || !$origenMes || !$destinoAnio || !$destinoMes) {
-            return redirect()->route('reemplazos.index')
-                ->with('error', 'Los períodos seleccionados no son válidos.');
+        // Compatibilidad de la ruta anterior: ahora verifica, no copia bloqueos.
+        // La identidad es el RUT y las fuentes archivadas conservan su período real.
+        $origen = $periodos->consultaMensual($origenAnio, $origenMes)->get(['id', 'rut']);
+        $bloqueos = app(PadronBloqueoService::class);
+        $bloqueos->cargar($origen);
+        $personas = $origen->filter(fn ($p) => $p->bloqueoActivo)
+            ->unique(fn ($p) => $this->normalizarRutPadron($p->rut));
+        $ruts = $personas->map(fn ($p) => $this->normalizarRutPadron($p->rut))->filter()->values()->all();
+        $destinos = $periodos->consultaMensual($destinoAnio, $destinoMes)
+            ->whereIn(DB::raw("REPLACE(REPLACE(REPLACE(UPPER(TRIM(rut)), '.', ''), '-', ''), ' ', '')"), $ruts)
+            ->get(['id', 'rut']);
+        $bloqueos->cargar($destinos);
+        $rutsDestino = $destinos->filter(fn ($p) => $p->bloqueoActivo)
+            ->map(fn ($p) => $this->normalizarRutPadron($p->rut))->unique();
+        $detalle = [];
+        foreach ($personas->take(80) as $p) {
+            $this->pushDetalleTraspaso($detalle, $p->bloqueoActivo, $rutsDestino->contains($this->normalizarRutPadron($p->rut))
+                ? 'El funcionario ya está bloqueado en destino por su RUT, aunque haya cambiado de RBD o contrato.'
+                : 'Sin contrato en destino; el bloqueo permanece activo por RUT para futuras incorporaciones.');
         }
-
-        $resumen = DB::transaction(function () use ($origenAnio, $origenMes, $destinoAnio, $destinoMes, $validated, $request) {
-            $bloqueosOrigen = ReemplazoPersonalBloqueo::query()
-                ->with(['personal.establecimiento:id,rbd,nombre_establecimiento'])
-                ->where('activo', true)
-                ->whereHas('personal', function ($query) use ($origenAnio, $origenMes) {
-                    $query->where('anio', $origenAnio)
-                        ->where('mes', $origenMes);
-                })
-                ->orderBy('rbd')
-                ->orderBy('rut')
-                ->get();
-
-            if ($bloqueosOrigen->isEmpty()) {
-                return [
-                    'periodo_origen' => $this->formatPeriodKeyLabel($validated['periodo_origen']),
-                    'periodo_destino' => $this->formatPeriodKeyLabel($validated['periodo_destino']),
-                    'bloqueos_encontrados' => 0,
-                    'traspasados' => 0,
-                    'ya_existian' => 0,
-                    'no_encontrados' => 0,
-                    'omitidos_no_bloqueables' => 0,
-                    'detalle' => [],
-                ];
-            }
-
-            $ruts = $bloqueosOrigen
-                ->map(fn($bloqueo) => $this->normalizarRutPadron($bloqueo->rut ?: $bloqueo->personal?->rut))
-                ->filter()
-                ->unique()
-                ->values();
-
-            $rbds = $bloqueosOrigen
-                ->map(fn($bloqueo) => (int) ($bloqueo->rbd ?: $bloqueo->personal?->rbd))
-                ->filter()
-                ->unique()
-                ->values();
-
-            $destinos = ReemplazoPersonal::query()
-                ->where('anio', $destinoAnio)
-                ->where('mes', $destinoMes)
-                ->when($rbds->isNotEmpty(), fn($query) => $query->whereIn('rbd', $rbds->all()))
-                ->get()
-                ->filter(fn($row) => $ruts->contains($this->normalizarRutPadron($row->rut)) && $this->esPersonalBloqueablePadron($row))
-                ->groupBy(fn($row) => $this->claveTraspasoBloqueo($row->rut, $row->rbd));
-
-            $detalle = [];
-            $resumen = [
-                'periodo_origen' => $this->formatPeriodKeyLabel($validated['periodo_origen']),
-                'periodo_destino' => $this->formatPeriodKeyLabel($validated['periodo_destino']),
-                'bloqueos_encontrados' => $bloqueosOrigen->count(),
-                'traspasados' => 0,
-                'ya_existian' => 0,
-                'no_encontrados' => 0,
-                'omitidos_no_bloqueables' => 0,
-                'detalle' => [],
-            ];
-
-            foreach ($bloqueosOrigen as $bloqueo) {
-                $personalOrigen = $bloqueo->personal;
-
-                if (!$personalOrigen || !$this->esPersonalBloqueablePadron($personalOrigen)) {
-                    $resumen['omitidos_no_bloqueables']++;
-                    $this->pushDetalleTraspaso($detalle, $bloqueo, 'Omitido: el registro origen no corresponde a Docente o AAEE bloqueable.');
-                    continue;
-                }
-
-                $rbd = (int) ($bloqueo->rbd ?: $personalOrigen->rbd);
-                $rut = $bloqueo->rut ?: $personalOrigen->rut;
-                $key = $this->claveTraspasoBloqueo($rut, $rbd);
-                $destinosCoincidentes = $destinos->get($key, collect());
-
-                if ($destinosCoincidentes->isEmpty()) {
-                    $resumen['no_encontrados']++;
-                    $this->pushDetalleTraspaso($detalle, $bloqueo, 'No encontrado en el padrón destino con el mismo RUT y RBD.');
-                    continue;
-                }
-
-                foreach ($destinosCoincidentes as $personalDestino) {
-                    $yaExiste = ReemplazoPersonalBloqueo::query()
-                        ->where('reemplazo_personal_id', $personalDestino->id)
-                        ->where('activo', true)
-                        ->lockForUpdate()
-                        ->exists();
-
-                    if ($yaExiste) {
-                        $resumen['ya_existian']++;
-                        $this->pushDetalleTraspaso($detalle, $bloqueo, 'Ya existía bloqueo activo en destino para ' . $personalDestino->nombre . '.');
-                        continue;
-                    }
-
-                    ReemplazoPersonalBloqueo::create([
-                        'reemplazo_personal_id' => $personalDestino->id,
-                        'establecimiento_id' => $personalDestino->establecimiento_id,
-                        'rbd' => $personalDestino->rbd,
-                        'rut' => $personalDestino->rut,
-                        'nombre' => $personalDestino->nombre,
-                        'motivo' => $bloqueo->motivo,
-                        'observacion' => $this->observacionTraspasoBloqueo($bloqueo->observacion, $validated['periodo_origen']),
-                        'activo' => true,
-                        'bloqueado_por' => $request->user()?->id,
-                    ]);
-
-                    $resumen['traspasados']++;
-                    $this->pushDetalleTraspaso($detalle, $bloqueo, 'Traspasado a ' . $personalDestino->nombre . '.');
-                }
-            }
-
-            $resumen['detalle'] = array_slice($detalle, 0, 80);
-
-            return $resumen;
-        });
+        $resumen = [
+            'periodo_origen' => $this->formatPeriodKeyLabel($validated['periodo_origen']),
+            'periodo_destino' => $this->formatPeriodKeyLabel($validated['periodo_destino']),
+            'bloqueos_encontrados' => $personas->count(), 'traspasados' => 0,
+            'ya_existian' => $rutsDestino->count(),
+            'no_encontrados' => $personas->count() - $rutsDestino->count(),
+            'omitidos_no_bloqueables' => 0, 'detalle' => $detalle,
+        ];
 
         return redirect()->route('reemplazos.index', ['periodo' => $validated['periodo_destino']])
-            ->with('status', 'Traspaso de bloqueos finalizado: ' . $resumen['traspasados'] . ' bloqueo(s) traspasado(s) al padrón destino.')
+            ->with('status', 'Verificación finalizada. Los bloqueos siguen al funcionario por RUT automáticamente; no se copiaron ni modificaron registros.')
             ->with('traspaso_bloqueos_resumen', $resumen);
     }
 
@@ -462,11 +372,6 @@ class ReemplazosController extends Controller
     private function normalizarRutPadron(?string $rut): string
     {
         return preg_replace('/[^0-9Kk]/', '', mb_strtoupper((string) $rut)) ?: '';
-    }
-
-    private function claveTraspasoBloqueo(?string $rut, $rbd): string
-    {
-        return $this->normalizarRutPadron($rut) . '|' . (int) $rbd;
     }
 
     private function formatPeriodKeyLabel(string $periodKey): string
@@ -478,16 +383,6 @@ class ReemplazosController extends Controller
         }
 
         return str_pad((string) $mes, 2, '0', STR_PAD_LEFT) . '/' . $anio;
-    }
-
-    private function observacionTraspasoBloqueo(?string $observacionOriginal, string $periodoOrigen): string
-    {
-        $nota = 'Bloqueo traspasado automáticamente desde el padrón ' . $this->formatPeriodKeyLabel($periodoOrigen) . '.';
-        $observacionOriginal = trim((string) $observacionOriginal);
-
-        return $observacionOriginal !== ''
-            ? $observacionOriginal . "\n\n" . $nota
-            : $nota;
     }
 
     private function pushDetalleTraspaso(array &$detalle, ReemplazoPersonalBloqueo $bloqueo, string $resultado): void

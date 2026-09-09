@@ -167,10 +167,12 @@ class PadronRevisionService
         }
         return ['personal' => $personal, 'establecimientos' => $establishments, 'asignaciones' => $assignments,
             'declaraciones' => $declarations, 'periodo_maximo' => $maxPeriod,
-            // Versión 12: base contractual estable durante la revisión manual.
+            // Versión 13: correspondencia única con denominaciones históricas
+            // CONTRATA/INDEFINIDO/PLAZO FIJO SEP/PIE. Regenerar propuestas previas.
+            // La base contractual sigue estable durante la revisión manual.
             // Documentos y cobertura no invalidan decisiones; su huella completa
             // pertenece a la confirmación final. No se omiten controles de escritura.
             // Las revisiones anteriores requieren analizar nuevamente el archivo.
-            'hash' => hash('sha256', json_encode(['v12', hash_final($fingerprint), $establishments, $maxPeriod, $aplicaciones, app(PadronPeriodoService::class)->huella()], JSON_THROW_ON_ERROR))];
+            'hash' => hash('sha256', json_encode(['v13', hash_final($fingerprint), $establishments, $maxPeriod, $aplicaciones, app(PadronPeriodoService::class)->huella()], JSON_THROW_ON_ERROR))];
     }
 }
