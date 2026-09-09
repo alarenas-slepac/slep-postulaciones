@@ -2,9 +2,20 @@
 
 ## Estado
 
-Validación local del 8 de septiembre de 2026. **No habilitar la aplicación
-definitiva**: se encontraron confirmaciones obsoletas aceptadas bajo REPEATABLE
-READ y falta certificar la coordinación con los escritores externos.
+Actualización 2026.9.9.497: el laboratorio admite también MariaDB 10.11 de forma
+explícita. Se ejecutó en 10.11.18: 38 casos aprobados, cero fallos de aserción y
+10 controles negativos de escritores sin protocolo. No habilita producción.
+Ver [pruebas con copia aislada](PADRON_MARIADB_COPIA_AISLADA.md). Las secciones
+de resultados MySQL siguientes conservan la evidencia histórica de cada parche.
+
+Actualización del 9 de septiembre de 2026: se corrigieron los cuatro rechazos
+faltantes de confirmación bajo REPEATABLE READ. **No habilitar la aplicación
+definitiva**: sigue pendiente certificar la coordinación con escritores externos
+y los consumidores históricos. Los resultados originales se conservan abajo.
+
+El parche 2026.9.9.495 incorpora coordinación en las entradas identificadas y nuevas
+pruebas. Alcance, evidencia y pendientes en
+[PADRON_COORDINACION_ESCRITURAS.md](PADRON_COORDINACION_ESCRITURAS.md).
 
 No se modificó producción, la base habitual, `.env` ni la constante de habilitación.
 La instancia que escribe existe únicamente en el laboratorio, con guardas de
@@ -42,8 +53,10 @@ php tests/Integration/padron_mysql_concurrency.php --run --case=document_update 
 ```
 
 Es una herramienta optativa fuera de las carpetas de ejecución automática de
-PHPUnit. Sin `--run` no crea bases. Los filtros inválidos se rechazan. Requiere
-MySQL 8 y la vista de esperas; no acepta MariaDB como sustituto silencioso.
+PHPUnit. Sin `--run` no crea bases. Los filtros inválidos se rechazan. Admite
+MySQL 8 con `performance_schema.data_lock_waits` o MariaDB 10.11 con
+`information_schema.INNODB_LOCK_WAITS` e `INNODB_TRX`. El reporte identifica
+el motor real. Otros motores/versiones mayores se rechazan.
 
 Los reportes JSON se guardan en `storage/app/testing/padron_mysql_<ejecucion>.json`,
 ignorados por Git. Contienen versión, aislamiento efectivo, motores, bases,
@@ -57,7 +70,7 @@ ejecuciones de diagnóstico del propio laboratorio. No se ejecuta DROP ni se
 reutiliza/vacía una base existente. Su eliminación posterior requiere identificar
 explícitamente los nombres del reporte; no borrar por prefijos indiscriminados.
 
-## Resultados y hallazgos
+## Resultados originales y hallazgos (2026.9.8.493)
 
 La matriz completa contiene 17 escenarios por aislamiento. Ejecución final:
 `18c9693592202d63`, reporte local
@@ -123,10 +136,53 @@ intercalaciones externas que requieren auditar sus puntos de escritura, no diez
 defectos ya demostrados en endpoints reales. Cambiar solo el aislamiento no cierra
 ambos problemas.
 
+## Corrección de la confirmación (2026.9.9.494)
+
+La existencia de las tablas dependientes se resuelve antes de `DB::transaction`.
+Dentro de cada intento se adquieren primero el control global, la revisión, sus
+filas/decisiones/autorizaciones, el personal y las dependencias. Solo después se
+leen la base contractual, las huellas y los datos para el plan. No se consulta
+`information_schema` entre esos bloqueos.
+
+El cambio elimina la lectura anticipada identificada en la traza del laboratorio.
+Se conserva el aislamiento original y el orden de bloqueos; no se sustituye por
+READ COMMITTED ni se eluden las verificaciones de cobertura. Las consultas de
+metadatos pueden seguir utilizándose después de completar los bloqueos. No se
+certifican migraciones DDL simultáneas a una aplicación.
+
+En REPEATABLE READ las lecturas consistentes reutilizan la vista creada por la
+primera de ellas; las lecturas con bloqueo tienen otro comportamiento. Por eso
+el orden de adquisición respecto de la primera lectura importa en este flujo.
+Referencia: [MySQL 8.4: niveles de aislamiento](https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html).
+
+El laboratorio ahora comprueba que no se ejecute ninguna lectura sin bloqueo
+antes del último bloqueo de dependencias, tanto en la aplicación simple como
+en los cinco escenarios de actualización. En los cuatro de dependencias exige
+un rechazo de validación que permita recargar la misma revisión, comprueba que
+su huella base siga vigente y verifica que el rechazo no modifique personal,
+documentos, cobertura, auditoría, versiones ni el estado de la revisión.
+
+No cambia `base_hash` v12 ni el formato de confirmación: instalar este parche no
+exige regenerar revisiones por un cambio de versión. Las decisiones manuales y
+autorizaciones no se borran. Los cambios contractuales o de base que antes
+invalidaban una revisión continúan haciéndolo.
+
+Ejecución posterior a la corrección: `08fff9012c5b58d7`, reporte local
+`storage/app/testing/padron_mysql_08fff9012c5b58d7.json`. Los 34 escenarios terminaron
+con **24 aprobados, cero fallos de aserción y 10 observaciones de protocolo externo**
+(salida 2, no certificación de habilitación). Los cuatro casos anteriormente
+fallidos rechazan ahora la confirmación antigua y mantienen vigente la revisión
+manual, tanto en REPEATABLE READ como en READ COMMITTED. Se conservaron también
+los resultados de rollback, desconexión, timeout, interbloqueo e idempotencia.
+
+Regresión posterior al ajuste: 332 pruebas y 2.403 aserciones aprobadas con el
+filtro `Padron|Dotacion|SolicitudReemplazo`. Sintaxis PHP y `optimize:clear`
+correctos. No se cambiaron rutas, permisos, migraciones ni activos compilados.
+
 ## Trabajo necesario antes de habilitar
 
-1. Corregir la revalidación final para que use datos actuales tras adquirir los
-   bloqueos, sin restablecer la invalidación continua de decisiones manuales.
+1. Mantener la regresión de confirmación corregida y validar también el esquema
+   completo y la configuración equivalentes a producción.
 2. Inventariar todos los escritores de contratos y dependencias y adoptar un
    protocolo transaccional compatible, con orden de bloqueos y revalidación tras
    esperas. Incluir altas por RUT, sin FK y nuevas filas de cobertura.
@@ -135,5 +191,6 @@ ambos problemas.
 4. Repetir la matriz sin confirmaciones obsoletas aceptadas ni intercalaciones
    inseguras. Completar por separado la auditoría de consumidores históricos.
 
-Este parche aporta pruebas y evidencia; no modifica las reglas productivas de
-aplicación, no levanta bloqueos y no certifica que el padrón esté listo para aplicar.
+El parche 493 aportó pruebas y evidencia; el 494 corrige el orden de lecturas en
+el servicio de aplicación. Ninguno levanta su bloqueo de habilitación ni certifica
+que el padrón esté listo para aplicar en producción.

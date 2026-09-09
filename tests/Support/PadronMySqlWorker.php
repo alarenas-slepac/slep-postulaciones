@@ -34,11 +34,11 @@ final class PadronMySqlWorker
             PadronMySqlLab::guard();
             DB::statement('SET SESSION innodb_lock_wait_timeout = '.(int) ($job['timeout'] ?? 8));
             self::emit('started', ['connection' => (int) DB::selectOne('SELECT CONNECTION_ID() AS id')->id,
-                'isolation' => DB::selectOne('SELECT @@transaction_isolation AS value')->value]);
+                'isolation' => PadronMySqlLab::server(DB::connection()->getPdo())['isolation_default']]);
+            DB::connection()->getEventDispatcher()->listen(TransactionBeginning::class, function () use (&$attempts): void { $attempts++; });
             if ($job['mode'] === 'apply') {
                 $fired = [];
                 $audits = 0;
-                DB::connection()->getEventDispatcher()->listen(TransactionBeginning::class, function () use (&$attempts): void { $attempts++; });
                 DB::listen(function (QueryExecuted $event) use ($job, &$fired, &$audits, &$trace, &$attempts): void {
                     $sql = strtolower($event->sql);
                     if (($job['trace'] ?? false) && $attempts > 0 && count($trace) < 60) {
@@ -59,6 +59,33 @@ final class PadronMySqlWorker
                     }
                 });
                 PadronMySqlLab::writer()->aplicar(PadronRevision::findOrFail($job['revision']), 7, $job['token']);
+            } elseif ($job['mode'] === 'coordinated') {
+                app(\App\Services\Padron\PadronEscrituraService::class)->ejecutar(function () use ($job): void {
+                    if (($job['pause'] ?? '') === 'coordinator_locked') { self::barrier('coordinator_locked'); }
+                    $personal = DB::table('reemplazos_personal')->find(101);
+                    self::emit('observed', ['jornada' => (int) $personal->jornada, 'mes' => (int) $personal->mes]);
+                    // Validaciones representativas dentro del callback, no una
+                    // certificación de todos los controladores del esquema real.
+                    if ($job['operation'] === 'personal_insert' && (int) $personal->mes !== 8) {
+                        throw ValidationException::withMessages(['padron' => 'El período cambió. Revise los datos actuales antes de guardar.']);
+                    }
+                    if ($job['operation'] === 'assignment_insert'
+                        && ! app(\App\Services\Padron\PadronVigenciaService::class)->consultaActual()->whereKey(102)->exists()) {
+                        throw ValidationException::withMessages(['padron' => 'El contrato ya no pertenece al padrón vigente.']);
+                    }
+                    if ($job['operation'] === 'exclusion_insert') {
+                        $base = (float) DB::table('declaracion_sostenedores')->where('id', 1)->value('horas_contratadas');
+                        $assigned = (float) DB::table('dotacion_docente_asignaciones')->where('estado', 'activa')->sum('horas_contrato');
+                        if (25 > $base - $assigned) {
+                            throw ValidationException::withMessages(['padron' => 'Las horas exceden el saldo sin asignación actual.']);
+                        }
+                    }
+                    if ($job['operation'] === 'document_insert') {
+                        \App\Models\SolicitudReemplazo::forceCreate(['id' => 3, 'reemplazo_personal_id' => 101]);
+                    } else {
+                        self::mutation($job['operation']);
+                    }
+                });
             } else {
                 DB::beginTransaction();
                 if ($job['mode'] === 'deadlock_actor') {

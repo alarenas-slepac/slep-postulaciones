@@ -22,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
         require_once app_path('Support/helpers.php');
 
         $this->app->singleton(IncidenciaCatalogo::class);
+        $this->app->scoped(\App\Services\Padron\PadronEscrituraService::class);
 
         // No bindear manualmente 'request' aquí.
         $this->app->singleton(Client::class, function () {

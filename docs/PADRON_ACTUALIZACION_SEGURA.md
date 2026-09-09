@@ -1,5 +1,14 @@
 # Padrón completo: actualización segura
 
+Estado más reciente: [laboratorio MariaDB y copia aislada](PADRON_MARIADB_COPIA_AISLADA.md)
+(2026.9.9.499). La nueva normalización contractual exige analizar nuevamente
+el Excel (huella v13), conservando las revisiones anteriores como historial.
+La revalidación final de la revisión bloqueada ya termina con
+108 MB bajo límite de 128 MB. La aplicación definitiva continúa deshabilitada:
+falta probar el ciclo completo resuelto y cerrar los pendientes del laboratorio.
+Los cambios de consumidores y
+bloqueos se conservan en [cierre de consumidores](PADRON_CIERRE_CONSUMIDORES.md).
+
 ## Previsualización y resolución manual implementadas
 
 La ruta existente de carga masiva, restringida a `admin`, ahora recibe la acción
@@ -216,8 +225,16 @@ La ejecución local de 2026.9.8.493 y sus límites se documentan en
 [PADRON_MYSQL_CONCURRENCIA.md](PADRON_MYSQL_CONCURRENCIA.md). Se verificó recuperación
 e idempotencia con procesos independientes, pero se detectaron confirmaciones
 obsoletas aceptadas bajo REPEATABLE READ y falta de certificación del protocolo de
-escritores externos. Estos hallazgos impiden cerrar la validación y habilitar la
-aplicación. El esquema de prueba es reducido y sintético; no equivale a producción.
+escritores externos. El parche 2026.9.9.494 corrige los cuatro casos de confirmación
+moviendo los metadatos fuera de la transacción y manteniendo las decisiones
+manuales. La coordinación de escritores externos y la certificación histórica
+siguen pendientes: no se habilita la aplicación. El esquema de prueba es reducido
+y sintético; no equivale a producción.
+
+2026.9.9.495 añade el coordinador de escritores y middleware previo al binding,
+con pruebas de importación, errores HTTP y esperas reales. Véase el inventario
+y sus límites en [PADRON_COORDINACION_ESCRITURAS.md](PADRON_COORDINACION_ESCRITURAS.md).
+No habilita la aplicación definitiva ni certifica escritores que eludan el protocolo.
 
 Antes de habilitar, usar una base MySQL desechable con datos sintéticos y la misma
 versión/configuración de producción, nunca la base productiva. Verificar motores

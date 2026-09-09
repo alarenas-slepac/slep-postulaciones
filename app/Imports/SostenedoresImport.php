@@ -17,6 +17,11 @@ class SostenedoresImport
 {
     public function import(UploadedFile|string $file): array
     {
+        return app(\App\Services\Padron\PadronEscrituraService::class)->ejecutar(fn () => $this->importarBajoControl($file));
+    }
+
+    private function importarBajoControl(UploadedFile|string $file): array
+    {
         $path = $file instanceof UploadedFile ? $file->getRealPath() : (string) $file;
         $spreadsheet = IOFactory::load($path);
 

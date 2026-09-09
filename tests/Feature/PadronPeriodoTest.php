@@ -344,4 +344,22 @@ class PadronPeriodoTest extends TestCase
         $compiled = app('blade.compiler')->compileString(file_get_contents(resource_path('views/reemplazos/index.blade.php')));
         $this->assertNotEmpty(token_get_all($compiled, TOKEN_PARSE));
     }
+
+    public function test_block_follows_stable_id_and_verifies_archived_origin_without_copying(): void
+    {
+        DB::table('reemplazos_personal_bloqueos')->insert([
+            'reemplazo_personal_id' => 101, 'activo' => true, 'motivo' => 'Bloqueo sintético',
+        ]);
+        $this->capturarCambio(fn () => DB::table('reemplazos_personal')->update(['mes' => 9, 'establecimiento_id' => 2, 'rbd' => 99998]));
+        $request = Request::create('/padron', 'POST', ['periodo_origen' => '2026-08', 'periodo_destino' => '2026-09']);
+        $request->setLaravelSession(app('session')->driver());
+        $response = app(ReemplazosController::class)->traspasarBloqueosPersonal($request);
+        $summary = $response->getSession()->get('traspaso_bloqueos_resumen');
+        $this->assertSame(1, $summary['ya_existian']);
+        $this->assertSame(0, $summary['traspasados']);
+        $this->assertDatabaseCount('reemplazos_personal_bloqueos', 1);
+        $view = app(ReemplazosController::class)->index(Request::create('/padron', 'GET', ['periodo' => '2026-08']))->getData();
+        $this->assertSame(1, $view['summary']['bloqueados']);
+        $this->assertSame('Bloqueo sintético', $view['personal']->firstWhere('id', 101)->bloqueoActivo->motivo);
+    }
 }

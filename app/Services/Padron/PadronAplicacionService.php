@@ -181,7 +181,16 @@ class PadronAplicacionService
                 $this->fail('Falta la columna requerida para la aplicación segura: '.$required.'.');
             }
         }
-        return DB::transaction(function () use ($revision, $usuario, $columns, $confirmacionHash): PadronRevision {
+        // Resolver metadatos ANTES de iniciar la transacción. En MySQL 8,
+        // consultar information_schema entre los bloqueos puede fijar una vista
+        // REPEATABLE READ anterior al commit de un escritor al que esperamos.
+        // No introducir lecturas sin bloqueo hasta adquirir todas las dependencias.
+        $tablasDependientes = array_values(array_filter([
+            'establecimientos', 'dotacion_docente_asignaciones', 'declaracion_sostenedores', 'dotacion_docente_exclusiones',
+            ...PadronHistorialService::DOCUMENTOS, 'reemplazos_personal_bloqueos',
+        ], static fn (string $table): bool => Schema::hasTable($table)));
+
+        return DB::transaction(function () use ($revision, $usuario, $columns, $confirmacionHash, $tablasDependientes): PadronRevision {
             // Un único escritor de cargas completas, incluso para revisiones distintas.
             DB::table('padron_aplicacion_control')->where('id', 1)->lockForUpdate()->firstOrFail();
             $revision = PadronRevision::whereKey($revision->id)->lockForUpdate()->firstOrFail();
@@ -191,12 +200,13 @@ class PadronAplicacionService
             foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'] as $table) {
                 DB::table($table)->where('padron_revision_id', $revision->id)->orderBy('id')->lockForUpdate()->get(['id']);
             }
-            $anteriores = DB::table('reemplazos_personal')->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-            foreach (['establecimientos', 'dotacion_docente_asignaciones', 'declaracion_sostenedores', 'dotacion_docente_exclusiones',
-                ...PadronHistorialService::DOCUMENTOS, 'reemplazos_personal_bloqueos'] as $table) {
-                if (Schema::hasTable($table)) {
-                    DB::table($table)->orderBy('id')->lockForUpdate()->get(['id']);
-                }
+            // Se bloquean las mismas filas/rangos, pero solo se retiene su identidad.
+            // Conservar todos los contratos completos durante plan() duplicaba la
+            // base en memoria. La imagen completa para auditoría se lee por ID,
+            // bajo estos mismos bloqueos y antes de modificar cada contrato.
+            $identidades = DB::table('reemplazos_personal')->orderBy('id')->lockForUpdate()->pluck('rut', 'id');
+            foreach ($tablasDependientes as $table) {
+                DB::table($table)->orderBy('id')->lockForUpdate()->get(['id']);
             }
             $this->assertEditable($revision);
             $plan = $this->plan($revision);
@@ -207,8 +217,8 @@ class PadronAplicacionService
                 throw ValidationException::withMessages(['revision' => $plan['errores']]);
             }
             foreach ($plan['destinos'] as $destino) {
-                if ($destino['id'] !== null && (! isset($anteriores[$destino['id']])
-                    || PadronConciliador::rut($anteriores[$destino['id']]->rut) !== PadronConciliador::rut($destino['fila']->rut))) {
+                if ($destino['id'] !== null && (! $identidades->has($destino['id'])
+                    || PadronConciliador::rut($identidades[$destino['id']]) !== PadronConciliador::rut($destino['fila']->rut))) {
                     $this->fail('El ID seleccionado no corresponde al RUT de la fila. Genere un nuevo análisis.');
                 }
             }
@@ -219,13 +229,15 @@ class PadronAplicacionService
             app(PadronPeriodoService::class)->antesDeAplicar($revision, $usuario);
             $establecimientos = DB::table('establecimientos')->pluck('id', 'rbd');
             $ruts = [];
-            foreach ($anteriores as $old) {
-                $ruts[PadronConciliador::rut($old->rut)] ??= $old->rut;
+            foreach ($identidades as $rut) {
+                $ruts[PadronConciliador::rut($rut)] ??= $rut;
             }
             $vigentes = [];
             foreach ($plan['destinos'] as $destino) {
                 $fila = $destino['fila'];
-                $before = $destino['id'] ? (array) $anteriores[$destino['id']] : null;
+                $before = $destino['id'] !== null
+                    ? (array) DB::table('reemplazos_personal')->where('id', $destino['id'])->firstOrFail()
+                    : null;
                 // La carga nunca puede inyectar IDs, hashes ni campos internos.
                 $data = array_intersect_key($fila->datos, array_flip([...PadronExcelReader::REQUIRED, 'tramo', 'fecha_antiguedad']));
                 if (empty($data['fecha_antiguedad'])) {
@@ -254,7 +266,7 @@ class PadronAplicacionService
             // Solo bajas presentes y resueltas en la revisión. Nunca barrer todo
             // el año ni modificar versiones históricas no incluidas en el plan.
             foreach ($plan['bajas'] as $id) {
-                $old = $anteriores[$id] ?? null;
+                $old = $identidades->has($id) ? DB::table('reemplazos_personal')->find($id) : null;
                 if (! $old) {
                     $this->fail('Una baja propuesta ya no existe. Genere un nuevo análisis.');
                 }

@@ -55,6 +55,13 @@ class EstablecimientoImportService
      */
     public function importFromPath(string $path, string|int|null $sheetOption = null, bool $truncate = false): array
     {
+        return app(\App\Services\Padron\PadronEscrituraService::class)->ejecutar(
+            fn () => $this->importarBajoControl($path, $sheetOption, $truncate)
+        );
+    }
+
+    private function importarBajoControl(string $path, string|int|null $sheetOption, bool $truncate): array
+    {
         if (!is_file($path)) {
             throw new InvalidArgumentException('Archivo no encontrado para importación.');
         }

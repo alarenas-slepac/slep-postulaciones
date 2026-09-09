@@ -53,7 +53,7 @@
             $traspasoResumen = session('traspaso_bloqueos_resumen');
         @endphp
         <div class="alert alert-info">
-            <div class="fw-semibold mb-2">Resumen del traspaso de bloqueos</div>
+            <div class="fw-semibold mb-2">Verificación de bloqueos por funcionario</div>
             <div class="small mb-2">
                 Origen: <strong>{{ $traspasoResumen['periodo_origen'] ?? '—' }}</strong> ·
                 Destino: <strong>{{ $traspasoResumen['periodo_destino'] ?? '—' }}</strong>
@@ -67,7 +67,7 @@
             </div>
             @if (!empty($traspasoResumen['detalle']))
                 <details class="small">
-                    <summary>Ver detalle del traspaso</summary>
+                    <summary>Ver detalle de la verificación</summary>
                     <div class="table-responsive mt-2">
                         <table class="table table-sm table-bordered align-middle mb-0">
                             <thead>
@@ -124,7 +124,7 @@
         @if (!empty($filters['historico']))
             <div class="alert alert-info">
                 Padrón archivado: muestra la última copia disponible del período, conservando los IDs contractuales.
-                Es de solo lectura. Los bloqueos indicados son los actuales del ID, no un historial de bloqueos.
+                Es de solo lectura. Los bloqueos indicados son los actuales del funcionario por RUT, no un historial de bloqueos.
             </div>
         @endif
         @if ($lockedWithoutEstablecimiento)
@@ -147,6 +147,7 @@
                         <h5 class="card-title mb-1"><i class="bi bi-people"></i> Padrón mensual de personal</h5>
                         <div class="text-muted small">
                             Vista operativa del padrón por establecimiento para el período seleccionado.
+                            El bloqueo sigue al funcionario por RUT en todos sus contratos, aunque cambie de establecimiento; no requiere traspaso manual.
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
@@ -155,7 +156,7 @@
                         </a>
                         @if ($userCanManageBloqueos)
                             <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#traspasarBloqueosModal">
-                                <i class="bi bi-arrow-left-right"></i> Traspasar bloqueos
+                                <i class="bi bi-arrow-left-right"></i> Verificar bloqueos
                             </button>
                         @endif
                         <a href="{{ route('reemplazos.export', request()->query()) }}" class="btn btn-outline-success-dark">
@@ -229,12 +230,12 @@
                     <form method="POST" action="{{ route('reemplazos.personal.traspasar-bloqueos') }}" class="modal-content">
                         @csrf
                         <div class="modal-header">
-                            <h5 class="modal-title" id="traspasarBloqueosModalLabel">Traspasar bloqueos activos</h5>
+                            <h5 class="modal-title" id="traspasarBloqueosModalLabel">Verificar bloqueos activos por RUT</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                         </div>
                         <div class="modal-body">
                             <div class="alert alert-warning small">
-                                Esta acción copiará al padrón destino los bloqueos activos de Docentes y AAEE encontrados en el padrón origen, cruzando por RUT y RBD. No desactiva los bloqueos del padrón origen y evita duplicar bloqueos ya activos en destino.
+                                Los bloqueos siguen al funcionario por RUT automáticamente. Esta acción verifica su presencia en ambos períodos, incluso con otro RBD o ID contractual. No copia, desactiva ni modifica bloqueos.
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Padrón origen <span class="text-danger">*</span></label>
@@ -256,13 +257,13 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="form-text">Período donde se crearán los nuevos bloqueos si existe el mismo RUT y RBD.</div>
+                                <div class="form-text">Período donde se verificará el mismo RUT, sin restringir por establecimiento.</div>
                             </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button class="btn btn-warning" onclick="return confirm('¿Traspasar los bloqueos activos desde el padrón origen al padrón destino?');">
-                                <i class="bi bi-arrow-left-right"></i> Traspasar bloqueos
+                            <button class="btn btn-warning">
+                                <i class="bi bi-arrow-left-right"></i> Verificar bloqueos
                             </button>
                         </div>
                     </form>
@@ -437,7 +438,7 @@
 
                                                 @if ($userCanManageBloqueos)
                                                     @if ($rowEsBloqueable && $row->bloqueoActivo)
-                                                        <form method="POST" action="{{ route('reemplazos.personal.desbloquear', $row) }}" onsubmit="return confirm('¿Desbloquear este {{ $rowTipoBloqueoDetalle }} titular?');">
+                                                        <form method="POST" action="{{ route('reemplazos.personal.desbloquear', $row) }}" onsubmit="return confirm('¿Desbloquear a este funcionario en TODOS sus contratos y establecimientos?');">
                                                             @csrf
                                                             @method('DELETE')
                                                             @foreach (request()->query() as $key => $value)
@@ -469,7 +470,7 @@
                                                                     </div>
                                                                     <div class="modal-body">
                                                                         <div class="alert alert-warning small">
-                                                                            El {{ $rowTipoBloqueoDetalle }} quedará impedido de ser usado en nuevas solicitudes de reemplazo mientras el bloqueo esté activo.
+                                                                            El {{ $rowTipoBloqueoDetalle }} quedará impedido de ser usado en nuevas solicitudes de reemplazo en todos sus contratos y establecimientos mientras el bloqueo esté activo. Un traslado o una nueva carga de padrón no lo elimina.
                                                                         </div>
                                                                         <div class="mb-2">
                                                                             <div class="fw-semibold">{{ $row->rut }} - {{ $row->nombre }}</div>
