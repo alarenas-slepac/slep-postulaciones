@@ -42,7 +42,12 @@ class ReemplazoSolicitudReglaMinima
             return $this->respuesta(false, 0, null, null, null, null, 'La fecha término debe ser mayor o igual a la fecha inicio.');
         }
 
-        $duracion = $inicio->diffInDays($termino) + 1;
+        // Contar fechas calendario, no horas transcurridas: el inicio del día
+        // puede ser 01:00 en Chile al cambiar el horario. Recrear las fechas
+        // en UTC solo para esta diferencia conserva ambos días inclusivos.
+        $inicioCalendario = Carbon::createFromFormat('!Y-m-d', $inicio->toDateString(), 'UTC');
+        $terminoCalendario = Carbon::createFromFormat('!Y-m-d', $termino->toDateString(), 'UTC');
+        $duracion = (int) $inicioCalendario->diffInDays($terminoCalendario) + 1;
         $rutTitular = self::normalizarRut($titular->rut ?? '');
         $rutReemplazo = self::normalizarRut($reemplazante?->user?->rut ?? '');
         $continuidadAnterior = null;

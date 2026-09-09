@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.9.501',
+    'current_version' => '2026.9.9.502',
     'entries' => [
+        [
+            'version' => '2026.9.9.502',
+            'title' => 'Reemplazos: duración inclusiva independiente del cambio de horario',
+            'summary' => 'Corrige el conteo de días del nuevo tramo y la validación de duración mínima.',
+            'roles' => ['admin', 'funcionario_estab'],
+            'items' => [
+                'Cuenta fechas calendario incluyendo inicio y término, sin perder un día por el cambio de horario de Chile.',
+                'El tramo del 06/09/2026 al 03/10/2026 se contabiliza como 28 días tanto en el aviso como al validar la solicitud.',
+                'Mantiene las fechas guardadas, las reglas de continuidad y los mínimos de duración existentes.',
+            ],
+            'published_at' => '2026-09-09',
+        ],
         [
             'version' => '2026.9.9.501',
             'title' => 'Padrón: revisión por caso y filas bajo demanda',
