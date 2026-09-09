@@ -403,6 +403,98 @@ class PadronConflictosAsignacionTest extends TestCase
         $this->assertSame(1, substr_count($html, 'Exceso preexistente: 1 h antes'));
     }
 
+    public function test_historical_pie_contract_keeps_id_and_preexisting_excess_without_writes(): void
+    {
+        DB::table('reemplazos_personal')->update(['tipocontrato' => 'PLANTA PIE', 'financiamiento' => 'PIE']);
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 2]);
+        $this->assignment(502, ['horas_contrato' => 44, 'tipo_asignacion' => 'pie_educadora_diferencial']);
+        DB::table('declaracion_sostenedores')->insert(['rut' => '111111111', 'rbd' => '99999', 'horas_contratadas' => 44, 'estamento' => 'DOCENTE']);
+        $revision = $this->revision([$this->data(['tipocontrato' => 'PLANTA', 'financiamiento' => 'PIE'])]);
+        $fila = $revision->filas()->whereNotNull('fila_excel')->firstOrFail();
+        $this->assertSame('actualizacion_propuesta', $fila->accion);
+        $this->assertSame(101, (int) $fila->personal_id);
+        $before = DB::table('reemplazos_personal')->get()->toJson();
+        $assignments = DB::table('dotacion_docente_asignaciones')->get()->toJson();
+        $group = $this->diagnosis($revision)['grupos'][0];
+        $this->assertSame(46.0, $group['total_asignadas']);
+        $this->assertSame(44.0, $group['cobertura_actual']['horas_archivo']);
+        $this->assertSame(44.0, $group['cobertura_actual']['horas']);
+        $this->assertSame('Declaración de Sostenedores', $group['cobertura_actual']['fuente']);
+        $this->assertSame(['estado' => 'preexistente', 'comparable' => true, 'exceso_actual' => 2.0, 'exceso_propuesto' => 2.0], $group['comparacion']);
+        $this->assertFalse($group['bloqueante']);
+        $this->assertSame(0, $group['correspondencias_pendientes']);
+        $this->assertSame([], app(PadronAplicacionService::class)->plan($revision)['errores']);
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $this->assertFalse(app(PadronAplicacionService::class)->disponible());
+        $this->assertSame($before, DB::table('reemplazos_personal')->get()->toJson());
+        $this->assertSame($assignments, DB::table('dotacion_docente_asignaciones')->get()->toJson());
+        $this->assertDatabaseCount('padron_revision_decisiones', 0);
+        $this->assertDatabaseCount('padron_personal_cambios', 0);
+    }
+
+    public function test_supported_historical_labels_require_matching_financing(): void
+    {
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 46]);
+        foreach (['PLANTA', 'CONTRATA', 'INDEFINIDO', 'PLAZO FIJO'] as $base) {
+            foreach (['SEP', 'PIE'] as $fund) {
+                DB::table('reemplazos_personal')->update(['tipocontrato' => strtolower($base.'  '.$fund), 'financiamiento' => strtolower($fund)]);
+                $group = $this->diagnosis($this->revision([$this->data(['tipocontrato' => $base, 'financiamiento' => $fund])]))['grupos'][0];
+                $this->assertSame(44.0, $group['cobertura_actual']['horas']);
+                $this->assertSame('preexistente', $group['comparacion']['estado']);
+                $this->assertFalse($group['bloqueante']);
+            }
+        }
+        foreach ([['PLANTA PIE', 'SEP'], ['PLANTA SEP', ''], ['PLANTA PIE', 'REGULAR'], ['OTRO PIE', 'PIE'], ['PLANTA PIE EXTRA', 'PIE'], ['REEMPLAZO PIE', 'PIE'], ['SUPLENCIA SEP', 'SEP']] as [$label, $fund]) {
+            DB::table('reemplazos_personal')->update(['tipocontrato' => $label, 'financiamiento' => $fund]);
+            $group = $this->diagnosis($this->revision([$this->data(['tipocontrato' => 'PLANTA', 'financiamiento' => 'PIE'])]))['grupos'][0];
+            $this->assertSame(0.0, $group['cobertura_actual']['horas']);
+            $this->assertSame('no_comparable', $group['comparacion']['estado']);
+            $this->assertTrue($group['bloqueante']);
+        }
+    }
+
+    public function test_historical_labels_still_block_new_and_aggravated_excess(): void
+    {
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 34]);
+        foreach ([[44, 33, 'nuevo'], [33, 32, 'agravado']] as [$before, $after, $state]) {
+            DB::table('reemplazos_personal')->update(['tipocontrato' => 'PLANTA PIE', 'financiamiento' => 'PIE', 'jornada' => $before]);
+            $group = $this->diagnosis($this->revision([$this->data(['tipocontrato' => 'PLANTA', 'financiamiento' => 'PIE', 'jornada' => $after])]))['grupos'][0];
+            $this->assertSame($state, $group['comparacion']['estado']);
+            $this->assertTrue($group['bloqueante']);
+        }
+    }
+
+    public function test_historical_labels_do_not_bypass_validity_year_or_latest_establishment_period(): void
+    {
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 46]);
+        foreach ([['vigente' => false], ['anio' => 2025], ['mes' => 7]] as $change) {
+            DB::table('reemplazos_personal')->where('id', 101)->update(array_replace([
+                'tipocontrato' => 'PLANTA PIE', 'financiamiento' => 'PIE', 'vigente' => true, 'anio' => 2026, 'mes' => 8,
+            ], $change));
+            DB::table('reemplazos_personal')->insert(['id' => 102, 'establecimiento_id' => 1] + $this->data(['rut' => '222222222', 'mes' => 8]));
+            $group = $this->diagnosis($this->revision([$this->data(['tipocontrato' => 'PLANTA', 'financiamiento' => 'PIE'])]))['grupos'][0];
+            $this->assertSame('no_comparable', $group['comparacion']['estado']);
+            $this->assertTrue($group['bloqueante']);
+            DB::table('reemplazos_personal')->where('id', 102)->delete();
+        }
+    }
+
+    public function test_historical_label_uses_frozen_period_financing_not_mutated_current_values(): void
+    {
+        (require base_path('database/migrations/2026_09_08_160000_create_padron_periodo_versiones.php'))->up();
+        DB::table('reemplazos_personal')->update(['tipocontrato' => 'PLANTA PIE', 'financiamiento' => 'PIE']);
+        DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => null, 'horas_contrato' => 46]);
+        $archive = $this->revision([$this->data(['tipocontrato' => 'PLANTA', 'financiamiento' => 'PIE'])]);
+        DB::transaction(function () use ($archive): void {
+            app(\App\Services\Padron\PadronPeriodoService::class)->antesDeAplicar($archive, 1);
+            DB::table('reemplazos_personal')->update(['anio' => 2027, 'mes' => 1, 'financiamiento' => 'SEP', 'jornada' => 20]);
+        });
+        $group = $this->diagnosis($this->revision([$this->data(['tipocontrato' => 'PLANTA', 'financiamiento' => 'PIE'])]))['grupos'][0];
+        $this->assertSame(44.0, $group['cobertura_actual']['horas']);
+        $this->assertSame('preexistente', $group['comparacion']['estado']);
+        $this->assertFalse($group['bloqueante']);
+    }
+
     public function test_current_vs_proposed_coverage_distinguishes_new_aggravated_and_improved_excess(): void
     {
         DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 34]);
