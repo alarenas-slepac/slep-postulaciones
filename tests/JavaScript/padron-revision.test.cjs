@@ -8,10 +8,12 @@ const blade = fs.readFileSync(path.join(__dirname, '../../resources/views/reempl
 const script = blade.match(/<script>([\s\S]*?)<\/script>/)[1];
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
-function setup(fetch) {
+function setup(fetch, forms = []) {
     const listeners = {};
     const panel = {
-        innerHTML: '', attributes: {}, children: [],
+        innerHTML: '', attributes: {}, children: [], batchError: {textContent: ''}, submitted: [],
+        querySelector() { return this.batchError; },
+        querySelectorAll() { return forms; },
         setAttribute(key, value) { this.attributes[key] = value; },
         removeAttribute(key) { delete this.attributes[key]; },
         replaceChildren(...children) { this.children = children; },
@@ -21,7 +23,11 @@ function setup(fetch) {
     vm.runInNewContext(script, {
         document: {
             getElementById() { return panel; },
-            createElement(tag) { return {tag, dataset: {}}; },
+            createElement(tag) { return {tag, dataset: {}, children: [],
+                appendChild(child) { this.children.push(child); },
+                submit() { panel.submitted.push(this); },
+            }; },
+            body: {appendChild() {}},
             addEventListener(type, listener) { listeners[type] = listener; },
         },
         window: {location: {href: 'https://example.test/revision?revision=1'}, history: {replaceState(_state, _title, href) { panel.url = href; }}},
@@ -50,6 +56,56 @@ test('loads only the requested fragment and releases the busy indicator', async 
     assert.equal(request.options.credentials, 'same-origin');
     assert.equal(ui.panel.innerHTML, '<div>Selected RUT</div>');
     assert.equal(ui.panel.attributes['aria-busy'], undefined);
+});
+
+function decisionForm(id, selection, rut = '111111111', valid = true) {
+    const values = {_token: 'synthetic-csrf', revision: '1', fila: String(id), personal_id: selection,
+        justificacion: 'Decisión sintética justificada.', decision_anterior: '0', q: rut, conflictos_page: '2'};
+    return {dataset: {rut}, action: 'https://example.test/import',
+        elements: {namedItem(name) { return name in values ? {value: values[name]} : null; }},
+        closest() { return {}; }, reportValidity() { return valid; }};
+}
+
+function batchClick(ui) {
+    const button = {};
+    ui.listeners['panel:click']({target: {closest() { return button; }}});
+    return button;
+}
+
+test('batch submits only explicit selections, preserves individual reasons and context', () => {
+    const ui = setup(() => {}, [decisionForm(1, '101'), decisionForm(2, ''), decisionForm(3, '0')]);
+    const button = batchClick(ui);
+    assert.equal(ui.panel.submitted.length, 1);
+    const fields = Object.fromEntries(ui.panel.submitted[0].children.map(input => [input.name, input.value]));
+    assert.equal(fields.accion, 'resolver_varias');
+    assert.equal(fields._token, 'synthetic-csrf');
+    assert.equal(fields.rut, '111111111');
+    assert.equal(fields.conflictos_page, '2');
+    assert.equal(fields['decisiones[0][fila]'], '1');
+    assert.equal(fields['decisiones[1][fila]'], '3');
+    assert.equal(fields['decisiones[1][personal_id]'], '0');
+    assert.equal(fields['decisiones[0][justificacion]'], 'Decisión sintética justificada.');
+    assert.equal(fields['decisiones[2][fila]'], undefined);
+    assert.equal(button.disabled, true);
+    batchClick(ui);
+    assert.equal(ui.panel.submitted.length, 1);
+});
+
+test('batch rejects empty selection, different RUTs, duplicate IDs and invalid justification', () => {
+    for (const forms of [[decisionForm(1, '')],
+        [decisionForm(1, '101'), decisionForm(2, '102', '222222222')],
+        [decisionForm(1, '101'), decisionForm(2, '101')],
+        [decisionForm(1, '101'), decisionForm(2, '102', '111111111', false)]]) {
+        const ui = setup(() => {}, forms);
+        batchClick(ui);
+        assert.equal(ui.panel.submitted.length, 0);
+    }
+});
+
+test('batch normalizes RUT formatting but does not preselect any contract', () => {
+    const ui = setup(() => {}, [decisionForm(1, '101', '11.111.111-1'), decisionForm(2, '102')]);
+    batchClick(ui);
+    assert.equal(ui.panel.submitted.length, 1);
 });
 
 test('an older response cannot overwrite the most recently selected RUT', async () => {

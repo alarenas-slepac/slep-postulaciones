@@ -35,6 +35,14 @@
     @else
     @if ($obsoleta)<div class="alert alert-warning">La revisión cambió de base. Analice nuevamente el archivo antes de registrar decisiones.</div>@endif
     <p class="small text-muted">{{ $filas->total() }} registros. Los casos ambiguos muestran los IDs candidatos; no se selecciona uno automáticamente. Corrija el archivo y vuelva a analizar cuando corresponda.</p>
+    @if ($resolucionDisponible && ! $revision->aplicada_at && ! $obsoleta && ! $revision->errores)
+        <div class="border rounded p-3 mb-3">
+            <button type="button" class="btn btn-primary" data-padron-resolver-varias>Registrar selecciones del mismo RUT</button>
+            <div class="small mt-2">Complete «Registro a conservar» y la justificación en las filas que desea guardar. Se envían juntas solo las filas seleccionadas de esta página, de un único RUT. Las demás quedan pendientes. Si hay un error, no se guarda ninguna del grupo.</div>
+            <div data-padron-lote-error class="text-danger mt-2" role="alert"></div>
+            <noscript>Para registrar varias a la vez debe activar JavaScript. Puede seguir usando «Registrar decisión» en cada fila.</noscript>
+        </div>
+    @endif
     <div class="table-responsive">
         <table class="table table-bordered table-sm align-middle">
             <thead><tr><th>Fila Excel / funcionario</th><th>ID actual / acción propuesta</th><th>Actual → archivo</th><th>Observaciones y asignaciones</th></tr></thead>
@@ -49,6 +57,10 @@
                         }
                         $idHistorico = $fila->fila_excel ? $idSeleccionado : $fila->personal_id;
                         $vinculos = $dependenciasHistoricas[$idHistorico] ?? null;
+                        $decisionEnviada = collect(old('decisiones', []))->firstWhere('fila', $fila->id);
+                        if (! $decisionEnviada && (int) old('fila') === $fila->id) {
+                            $decisionEnviada = ['personal_id' => old('personal_id'), 'justificacion' => old('justificacion'), 'decision_anterior' => old('decision_anterior')];
+                        }
                     @endphp
                     <tr @class(['table-danger' => $fila->accion === 'error', 'table-warning' => in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar']), 'table-secondary' => $fila->accion === 'reemplazo_anterior_omitido'])>
                         <td>{{ $fila->fila_excel ?? 'Ausente' }}<br><strong>{{ $fila->rut }}</strong><br>{{ $fila->nombre }}</td>
@@ -78,7 +90,7 @@
                             @endif
                             @if ($resolucionDisponible && ! $revision->aplicada_at && ! $obsoleta && ! $revision->errores && $estadoRevision !== 'ausencia_vinculada' && in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar']) && (! $fila->fila_excel || \App\Services\Padron\PadronConciliador::tipo($fila->datos) !== 'por_clasificar'))
                                 <details><summary>Resolver correspondencia</summary>
-                                    <form method="POST" action="{{ route('reemplazos.personal.import.store') }}" class="mt-2">
+                                    <form method="POST" action="{{ route('reemplazos.personal.import.store') }}" class="mt-2" data-padron-decision-form data-rut="{{ $fila->rut }}">
                                         @csrf
                                         <input type="hidden" name="accion" value="resolver">
                                         <input type="hidden" name="q" value="{{ request('q') }}">
@@ -91,17 +103,17 @@
                                         @endif
                                         <input type="hidden" name="revision" value="{{ $revision->id }}">
                                         <input type="hidden" name="fila" value="{{ $fila->id }}">
-                                        <input type="hidden" name="decision_anterior" value="{{ $decisiones->get($fila->id)?->id ?? 0 }}">
+                                        <input type="hidden" name="decision_anterior" value="{{ $decisionEnviada['decision_anterior'] ?? $decisiones->get($fila->id)?->id ?? 0 }}">
                                         <label class="form-label" for="decision-{{ $fila->id }}">Registro a conservar</label>
                                         <select id="decision-{{ $fila->id }}" name="personal_id" class="form-select form-select-sm" required>
                                             <option value="">Seleccione explícitamente</option>
                                             @foreach ($fila->candidatos as $candidato)
-                                                <option value="{{ $candidato['id'] }}">ID {{ $candidato['id'] }} · RBD {{ $candidato['rbd'] ?? '—' }} · {{ $candidato['jornada'] ?? '—' }} h · {{ $candidato['financiamiento'] ?? '—' }}{{ isset($candidato['_redistribucion']) ? ' · Receptor sugerido (requiere confirmación)' : '' }}</option>
+                                                <option value="{{ $candidato['id'] }}" @selected((string) ($decisionEnviada['personal_id'] ?? '') === (string) $candidato['id'])>ID {{ $candidato['id'] }} · RBD {{ $candidato['rbd'] ?? '—' }} · {{ $candidato['jornada'] ?? '—' }} h · {{ $candidato['financiamiento'] ?? '—' }}{{ isset($candidato['_redistribucion']) ? ' · Receptor sugerido (requiere confirmación)' : '' }}</option>
                                             @endforeach
-                                            <option value="0">{{ $fila->fila_excel ? 'Confirmar nueva línea contractual' : 'Confirmar baja de esta línea' }}</option>
+                                            <option value="0" @selected((string) ($decisionEnviada['personal_id'] ?? '') === '0')>{{ $fila->fila_excel ? 'Confirmar nueva línea contractual' : 'Confirmar baja de esta línea' }}</option>
                                         </select>
                                         <label class="form-label mt-1" for="motivo-{{ $fila->id }}">Justificación</label>
-                                        <textarea id="motivo-{{ $fila->id }}" name="justificacion" class="form-control form-control-sm" minlength="10" maxlength="2000" required></textarea>
+                                        <textarea id="motivo-{{ $fila->id }}" name="justificacion" class="form-control form-control-sm" minlength="10" maxlength="2000" required>{{ $decisionEnviada['justificacion'] ?? '' }}</textarea>
                                         <button class="btn btn-sm btn-outline-primary mt-1">Registrar decisión</button>
                                     </form>
                                 </details>

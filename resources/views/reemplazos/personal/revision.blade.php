@@ -148,6 +148,57 @@
     const panel = document.getElementById('filas-padron');
     if (!panel) return;
     let pending;
+    let savingBatch = false;
+    panel.addEventListener('click', event => {
+        const button = event.target.closest('[data-padron-resolver-varias]');
+        if (!button || savingBatch) return;
+        const error = panel.querySelector('[data-padron-lote-error]');
+        error.textContent = '';
+        const forms = Array.from(panel.querySelectorAll('form[data-padron-decision-form]'))
+            .filter(form => form.elements.namedItem('personal_id').value !== '');
+        if (!forms.length) {
+            error.textContent = 'Seleccione explícitamente un registro a conservar, una nueva línea o una baja antes de guardar.';
+            return;
+        }
+        const ruts = new Set(forms.map(form => form.dataset.rut.replace(/[^0-9k]/gi, '').toUpperCase()));
+        if (ruts.size !== 1 || ruts.has('')) {
+            error.textContent = 'Las selecciones deben corresponder al mismo RUT. Busque un funcionario y vuelva a seleccionar.';
+            return;
+        }
+        const selectedIds = forms.map(form => form.elements.namedItem('personal_id').value).filter(id => id !== '0');
+        if (new Set(selectedIds).size !== selectedIds.length) {
+            error.textContent = 'No puede conservar el mismo ID en dos filas. Revise las selecciones.';
+            return;
+        }
+        for (const form of forms) {
+            form.closest('details').open = true;
+            if (!form.reportValidity()) return;
+        }
+        const batch = document.createElement('form');
+        batch.method = 'POST';
+        batch.action = forms[0].action;
+        const field = (name, value) => {
+            const input = document.createElement('input');
+            input.type = 'hidden'; input.name = name; input.value = value;
+            batch.appendChild(input);
+        };
+        for (const name of ['_token', 'revision', 'q', 'accion_filtro', 'page', 'conflictos_page', 'caso_rut', 'caso_establecimiento']) {
+            const input = forms[0].elements.namedItem(name);
+            if (input) field(name, input.value);
+        }
+        field('accion', 'resolver_varias');
+        field('rut', Array.from(ruts)[0]);
+        forms.forEach((form, index) => {
+            for (const name of ['fila', 'personal_id', 'justificacion', 'decision_anterior']) {
+                field(`decisiones[${index}][${name}]`, form.elements.namedItem(name).value);
+            }
+        });
+        document.body.appendChild(batch);
+        savingBatch = true;
+        button.disabled = true;
+        button.textContent = 'Registrando decisiones…';
+        batch.submit();
+    });
     async function loadRows(href) {
         if (pending) pending.abort();
         const controller = new AbortController();

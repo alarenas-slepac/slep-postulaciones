@@ -4110,8 +4110,34 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.9.502',
+    'current_version' => '2026.9.9.504',
     'entries' => [
+        [
+            'version' => '2026.9.9.504',
+            'title' => 'Padrón: guardar varias correspondencias del mismo RUT',
+            'summary' => 'Permite registrar juntas las decisiones seleccionadas, con validación atómica y sin aplicar contratos.',
+            'roles' => ['admin'],
+            'items' => [
+                'Seleccione Registro a conservar y escriba una justificación en cada fila; el botón registra juntas las selecciones visibles del mismo RUT.',
+                'Las filas sin selección quedan pendientes. Se conservan las opciones individuales, las nuevas líneas y bajas explícitas, y las justificaciones por fila.',
+                'Valida la base una sola vez por envío, rechaza IDs repetidos y decisiones desactualizadas, y guarda todo o nada. Un reenvío idéntico no duplica auditorías.',
+                'Mantiene las selecciones al producirse un error y revalida el conflicto del funcionario después del guardado. No habilita la aplicación definitiva ni altera contratos o asignaciones.',
+            ],
+            'published_at' => '2026-09-09',
+        ],
+        [
+            'version' => '2026.9.9.503',
+            'title' => 'Padrón: ensayo de aplicación en laboratorio privado',
+            'summary' => 'Prepara la prueba integral sobre una copia adicional sin habilitar la aplicación productiva.',
+            'roles' => ['admin'],
+            'items' => [
+                'El ejecutor local exige una revisión vigente y sin bloqueos; no resuelve correspondencias ni autoriza jornadas automáticamente.',
+                'Prueba aplicación, reversión de un fallo y repetición sin duplicados sobre una nueva copia MariaDB, conservando el laboratorio de origen.',
+                'Verifica IDs, campos contractuales, altas, reactivaciones, bajas, documentos históricos, versiones mensuales, asignaciones y bloqueos.',
+                'La aplicación completa del Excel real sigue pendiente de resolver la revisión y superar el ensayo; no se habilitan rutas ni escrituras en producción.',
+            ],
+            'published_at' => '2026-09-09',
+        ],
         [
             'version' => '2026.9.9.502',
             'title' => 'Reemplazos: duración inclusiva independiente del cambio de horario',
