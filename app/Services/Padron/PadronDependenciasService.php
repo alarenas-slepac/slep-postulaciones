@@ -14,6 +14,33 @@ class PadronDependenciasService
         'reemplazos_personal_bloqueos' => 'Bloqueo de personal',
     ];
 
+    /** Detalle informativo acotado; nunca sustituye la huella de confirmación. */
+    public function paraPersonal(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (! $ids) {
+            return [];
+        }
+        $porPersonal = [];
+        foreach (self::TABLAS as $tabla => $modulo) {
+            if (! Schema::hasTable($tabla)) {
+                continue;
+            }
+            foreach (array_chunk($ids, 500) as $lote) {
+                foreach (DB::table($tabla)->whereIn('reemplazo_personal_id', $lote)
+                    ->select(['id', 'reemplazo_personal_id'])->lazyById(100) as $row) {
+                    $id = (int) $row->reemplazo_personal_id;
+                    $porPersonal[$id] ??= ['total' => 0, 'referencias' => []];
+                    $porPersonal[$id]['total']++;
+                    if (count($porPersonal[$id]['referencias']) < 20) {
+                        $porPersonal[$id]['referencias'][] = ['modulo' => $modulo, 'id' => (int) $row->id];
+                    }
+                }
+            }
+        }
+        return $porPersonal;
+    }
+
     /** Inventario de referencias por ID. No modifica documentos ni presume que estén protegidos. */
     public function snapshot(): array
     {

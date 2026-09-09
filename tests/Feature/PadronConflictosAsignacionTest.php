@@ -247,11 +247,89 @@ class PadronConflictosAsignacionTest extends TestCase
         $this->assertArrayHasKey('correspondencia', $this->diagnosis($revision)['items'][0]['motivos']);
         $before = DB::table('dotacion_docente_asignaciones')->get()->toJson();
         app(PadronResolucionService::class)->resolver($revision, $fila->id, 101, 'Coincidencia sintética verificada por ID.', 1);
+        $this->assertSame(1, $this->diagnosis($revision)['bloqueantes']);
+        $ausencia = $revision->filas()->whereNull('fila_excel')->where('personal_id', 102)->firstOrFail();
+        app(PadronResolucionService::class)->resolver($revision, $ausencia->id, null, 'Baja sintética revisada sin asignaciones por ID.', 1);
         $this->assertSame(0, $this->diagnosis($revision)['bloqueantes']);
         $decision = app(PadronResolucionService::class)->decisiones($revision)[$fila->id];
         app(PadronResolucionService::class)->resolver($revision, $fila->id, 102, 'Corrección sintética de correspondencia.', 1, $decision->id);
         $this->assertArrayHasKey('id_sin_destino', $this->diagnosis($revision)['items'][0]['motivos']);
         $this->assertSame($before, DB::table('dotacion_docente_asignaciones')->get()->toJson());
+    }
+
+    public function test_rut_conflict_remains_until_all_incoming_and_absence_decisions_are_resolved(): void
+    {
+        DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => null]);
+        DB::table('reemplazos_personal')->insert(['id' => 102, 'establecimiento_id' => 1] + $this->data(['mes' => 8, 'financiamiento' => 'PIE']));
+        $revision = $this->revision([$this->data(['jornada' => 30])]);
+        $primera = $revision->filas()->whereNotNull('fila_excel')->firstOrFail();
+        $segunda = $revision->filas()->create([
+            'fila_excel' => 3, 'rut' => '11.111.111-1', 'nombre' => 'Persona sintética',
+            'accion' => 'revision_manual', 'datos' => $this->data(['jornada' => 10]),
+            'candidatos' => [], 'observaciones' => [], 'asignaciones' => [],
+        ]);
+        $antes = DB::table('dotacion_docente_asignaciones')->get()->toJson();
+        $personal = DB::table('reemplazos_personal')->get()->toJson();
+        $service = app(PadronResolucionService::class);
+        $this->assertSame(4, $this->diagnosis($revision)['grupos'][0]['correspondencias_pendientes']);
+
+        $service->resolver($revision, $primera->id, 101, 'Correspondencia sintética verificada.', 1);
+        $diagnosis = $this->diagnosis($revision);
+        // La ausencia de 101 ya está vinculada; la segunda fila y 102 siguen pendientes.
+        $this->assertSame(2, $diagnosis['grupos'][0]['correspondencias_pendientes']);
+        $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+        $this->assertSame(30.0, $diagnosis['grupos'][0]['cobertura']['horas']);
+        view()->share('errors', new ViewErrorBag);
+        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]));
+        $this->assertStringContainsString('Correspondencias pendientes del RUT: 2', $view->render());
+
+        $service->resolver($revision, $segunda->id, null, 'Nueva línea sintética revisada.', 1);
+        $diagnosis = $this->diagnosis($revision);
+        $this->assertSame(1, $diagnosis['grupos'][0]['correspondencias_pendientes']);
+        $this->assertArrayHasKey('correspondencia', $diagnosis['items'][0]['motivos']);
+        $this->assertNotEmpty(app(PadronAplicacionService::class)->plan($revision)['errores']);
+        $ausencia = $revision->filas()->whereNull('fila_excel')->where('personal_id', 102)->firstOrFail();
+        $service->resolver($revision, $ausencia->id, null, 'Baja sintética revisada sin vínculo directo.', 1);
+        $this->assertSame([], $this->diagnosis($revision)['grupos']);
+        $this->assertSame([], app(PadronAplicacionService::class)->plan($revision)['errores']);
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $this->assertSame($antes, DB::table('dotacion_docente_asignaciones')->get()->toJson());
+        $this->assertSame($personal, DB::table('reemplazos_personal')->get()->toJson());
+    }
+
+    public function test_resolving_all_correspondences_does_not_waive_a_lost_id(): void
+    {
+        DB::table('reemplazos_personal')->insert(['id' => 102, 'establecimiento_id' => 1] + $this->data(['mes' => 8, 'financiamiento' => 'PIE']));
+        $revision = $this->revision([$this->data(['jornada' => 30])]);
+        $service = app(PadronResolucionService::class);
+        $fila = $revision->filas()->whereNotNull('fila_excel')->firstOrFail();
+        $service->resolver($revision, $fila->id, 102, 'Correspondencia sintética revisada.', 1);
+        $ausencia = $revision->filas()->whereNull('fila_excel')->where('personal_id', 101)->firstOrFail();
+        $service->resolver($revision, $ausencia->id, null, 'Baja sintética con vínculo por revisar.', 1);
+        $diagnosis = $this->diagnosis($revision);
+        $this->assertSame(0, $diagnosis['grupos'][0]['correspondencias_pendientes']);
+        $this->assertArrayNotHasKey('correspondencia', $diagnosis['items'][0]['motivos']);
+        $this->assertArrayHasKey('id_sin_destino', $diagnosis['items'][0]['motivos']);
+        $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+    }
+
+    public function test_pending_absence_applies_to_all_establishments_of_only_its_rut(): void
+    {
+        DB::table('reemplazos_personal')->insert(['id' => 102, 'establecimiento_id' => 2] + $this->data(['mes' => 8, 'rbd' => 99998]));
+        $this->assignment(502, ['reemplazos_personal_id' => null, 'establecimiento_id' => 2]);
+        $this->assignment(503, ['reemplazos_personal_id' => null, 'docente_rut' => '222222222']);
+        $revision = $this->revision([$this->data(), $this->data(['rbd' => 99998]), $this->data(['rut' => '222222222'])]);
+        $revision->filas()->create([
+            'fila_excel' => null, 'rut' => '11.111.111-1', 'nombre' => 'Persona sintética',
+            'personal_id' => 999, 'accion' => 'ausencia_por_revisar', 'datos' => [],
+            'candidatos' => [], 'observaciones' => [], 'asignaciones' => [],
+        ]);
+        $diagnosis = $this->diagnosis($revision);
+        $this->assertSame(2, $diagnosis['grupos_bloqueantes']);
+        foreach ($diagnosis['grupos'] as $group) {
+            $this->assertSame('111111111', $group['rut']);
+            $this->assertSame(1, $group['correspondencias_pendientes']);
+        }
     }
 
     public function test_authorizing_over_44_does_not_override_assignment_conflicts(): void
@@ -460,5 +538,116 @@ class PadronConflictosAsignacionTest extends TestCase
         $this->assertSame($before, DB::table('reemplazos_personal')->get()->toJson());
         $this->assertSame($assignments, DB::table('dotacion_docente_asignaciones')->get()->toJson());
         $this->assertDatabaseCount('padron_personal_cambios', 0);
+    }
+
+    public function test_decision_preserves_search_and_pagination_and_leaves_remaining_conflicts_visible(): void
+    {
+        DB::table('reemplazos_personal')->insert(['id' => 102, 'establecimiento_id' => 1] + $this->data(['mes' => 8, 'financiamiento' => 'PIE']));
+        $revision = $this->revision([$this->data(['jornada' => 30])]);
+        $this->withoutMiddleware();
+        view()->share('errors', new ViewErrorBag);
+        $contexto = ['q' => '111111111', 'accion_filtro' => 'revision_manual', 'page' => 1, 'conflictos_page' => 1,
+            'caso_rut' => '111111111', 'caso_establecimiento' => 1];
+        $this->get(route('reemplazos.personal.import', ['revision' => $revision->id] + $contexto))
+            ->assertOk()->assertSee('name="q" value="111111111"', false)
+            ->assertSee('name="accion_filtro" value="revision_manual"', false)
+            ->assertSee('name="conflictos_page" value="1"', false);
+        $this->actingAs((new \App\Models\User)->forceFill(['id' => 1]));
+        $response = $this->post(route('reemplazos.personal.import.store'), $contexto + [
+            'accion' => 'resolver', 'revision' => $revision->id,
+            'fila' => $revision->filas()->whereNotNull('fila_excel')->firstOrFail()->id,
+            'personal_id' => 101, 'justificacion' => 'Correspondencia sintética validada.', 'decision_anterior' => 0,
+        ]);
+        $response->assertRedirect(route('reemplazos.personal.import', ['revision' => $revision->id] + $contexto + ['avanzar_caso' => 1]).'#filas-padron');
+        app('auth')->forgetGuards();
+        $this->get($response->headers->get('Location'))->assertOk()
+            ->assertSee('Correspondencias pendientes del RUT: 1')
+            ->assertSee('Bloquea la aplicación');
+        $this->assertDatabaseCount('padron_revision_decisiones', 1);
+        app('auth')->forgetGuards();
+    }
+
+    public function test_conflict_pagination_returns_to_last_available_page_instead_of_empty_page(): void
+    {
+        $revision = $this->revision([$this->data(['jornada' => 10])]);
+        view()->share('errors', new ViewErrorBag);
+        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', [
+            'revision' => $revision->id, 'conflictos_page' => 2,
+        ]));
+        $this->assertSame(1, $view->getData()['conflictosPaginados']->currentPage());
+        $this->assertCount(1, $view->getData()['conflictosPaginados']);
+        $this->assertStringContainsString('Bloquea la aplicación', $view->render());
+    }
+
+    public function test_lightweight_rows_do_not_recalculate_global_plan_or_dependency_snapshot(): void
+    {
+        $revision = $this->revision([$this->data(['jornada' => 10]), $this->data(['rut' => '222222222', 'nombre' => 'Otra persona sintética'])]);
+        $this->mock(PadronAplicacionService::class)->shouldNotReceive('plan');
+        $this->partialMock(\App\Services\Padron\PadronDependenciasService::class, function ($mock) {
+            $mock->shouldNotReceive('snapshot');
+            $mock->shouldReceive('paraPersonal')->once()->andReturn([]);
+        });
+        $response = app(PersonalImportController::class)->create(Request::create('/', 'GET', [
+            'revision' => $revision->id, 'q' => '111111111', 'solo_filas' => 1,
+        ]));
+        $this->assertSame('1', $response->headers->get('X-Padron-Filas'));
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $html = $response->getContent();
+        $this->assertStringContainsString('Persona sintética', $html);
+        $this->assertStringNotContainsString('Otra persona sintética', $html);
+        $this->assertStringNotContainsString('Conflictos con asignaciones de Dotación', $html);
+        $this->assertStringNotContainsString('<html', $html);
+    }
+
+    public function test_default_view_hides_rows_limits_blocks_to_ten_and_shows_one_case(): void
+    {
+        $revision = $this->revision([$this->data(['jornada' => 10])]);
+        view()->share('errors', new ViewErrorBag);
+        $this->partialMock(PadronAplicacionService::class, function ($mock) {
+            $mock->shouldReceive('plan')->once()->andReturn([
+                'errores' => array_map(fn ($i) => 'Bloqueo sintético '.$i, range(1, 15)),
+                'conflictos' => null,
+            ]);
+        });
+        $html = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]))->render();
+        $this->assertStringContainsString('<details class="alert alert-warning" id="bloqueos-padron">', $html);
+        $this->assertStringContainsString('15 bloqueos por resolver', $html);
+        $this->assertStringContainsString('Bloqueo sintético 10', $html);
+        $this->assertStringNotContainsString('Bloqueo sintético 11', $html);
+        $this->assertStringNotContainsString('Fila Excel / funcionario', $html);
+    }
+
+    public function test_same_case_is_retained_until_resolved_then_next_case_is_shown(): void
+    {
+        $this->assignment(502, ['docente_rut' => '222222222', 'reemplazos_personal_id' => null]);
+        $revision = $this->revision([$this->data(['jornada' => 10])]);
+        view()->share('errors', new ViewErrorBag);
+        $contexto = ['revision' => $revision->id, 'caso_rut' => '111111111', 'caso_establecimiento' => 1, 'q' => '111111111', 'avanzar_caso' => 1];
+        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', $contexto));
+        $this->assertCount(1, $view->getData()['conflictosPaginados']);
+        $this->assertSame('111111111', $view->getData()['conflictosPaginados']->first()['rut']);
+        $this->assertTrue($view->getData()['mostrarFilas']);
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['horas_contrato' => 10]);
+        $view = app(PersonalImportController::class)->create(Request::create('/', 'GET', $contexto));
+        $this->assertCount(1, $view->getData()['conflictosPaginados']);
+        $this->assertSame('222222222', $view->getData()['conflictosPaginados']->first()['rut']);
+        $this->assertFalse($view->getData()['mostrarFilas']);
+    }
+
+    public function test_scoped_dependencies_match_global_inventory_only_for_requested_ids(): void
+    {
+        Schema::create('solicitudes_reemplazo', function (Blueprint $t) {
+            $t->id(); $t->integer('reemplazo_personal_id'); $t->text('documento')->nullable();
+        });
+        foreach (range(1, 25) as $i) {
+            DB::table('solicitudes_reemplazo')->insert(['id' => $i, 'reemplazo_personal_id' => 101, 'documento' => str_repeat('x', 1000)]);
+        }
+        DB::table('solicitudes_reemplazo')->insert(['id' => 26, 'reemplazo_personal_id' => 999]);
+        $service = app(\App\Services\Padron\PadronDependenciasService::class);
+        $scoped = $service->paraPersonal([101, 101, null]);
+        $this->assertSame([101 => $service->snapshot()['por_personal'][101]], $scoped);
+        $this->assertSame(25, $scoped[101]['total']);
+        $this->assertCount(20, $scoped[101]['referencias']);
+        $this->assertSame([], $service->paraPersonal([]));
     }
 }

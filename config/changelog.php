@@ -4110,8 +4110,34 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.9.499',
+    'current_version' => '2026.9.9.501',
     'entries' => [
+        [
+            'version' => '2026.9.9.501',
+            'title' => 'Padrón: revisión por caso y filas bajo demanda',
+            'summary' => 'Simplifica los bloqueos y carga las correspondencias seleccionadas sin recalcular todo el plan.',
+            'roles' => ['admin'],
+            'items' => [
+                'El cuadro de bloqueos es desplegable, comienza cerrado y muestra los primeros diez sin desactivar los demás controles.',
+                'Dotación muestra un caso a la vez. Conserva el caso mientras tenga bloqueos y avanza al primer pendiente restante cuando se resuelve.',
+                'Las filas se consultan al seleccionar el RUT, con carga parcial, paginación y recuperación ante errores. No se materializa la nómina de coincidencias al abrir la revisión.',
+                'Consulta referencias históricas solo para los IDs visibles y sus candidatos. La lectura parcial evita el cálculo global del plan; mantiene los controles de vigencia, autorización, conciliación y aplicación en el servidor.',
+            ],
+            'published_at' => '2026-09-09',
+        ],
+        [
+            'version' => '2026.9.9.500',
+            'title' => 'Padrón: resolución completa de conflictos por RUT',
+            'summary' => 'Mantiene el conflicto de Dotación mientras existan correspondencias o ausencias pendientes del funcionario.',
+            'roles' => ['admin'],
+            'items' => [
+                'El diagnóstico comparte los estados efectivos de conciliación e incluye las ausencias por revisar. No cuenta como pendientes las ausencias ya vinculadas, las bajas confirmadas ni los reemplazos omitidos.',
+                'Muestra cuántas correspondencias quedan por RUT y advierte que la cobertura es provisional. Al completar las decisiones se revalidan horas y vínculos sin levantar otros bloqueos.',
+                'Conserva búsqueda, filtro y páginas al registrar cada decisión. Los enlaces del RUT conducen a sus filas y la paginación de conflictos se ajusta si disminuye la cantidad de casos.',
+                'Conserva revisiones y decisiones existentes: no cambia la huella base, no requiere reimportar el Excel ni modifica contratos, asignaciones o la habilitación de la aplicación definitiva.',
+            ],
+            'published_at' => '2026-09-09',
+        ],
         [
             'version' => '2026.9.9.499',
             'title' => 'Padrón: normalización de denominaciones contractuales históricas',

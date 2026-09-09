@@ -46,7 +46,8 @@ class PadronConflictosAsignacionService
         $filas = $revision->filas()->orderBy('id')->get(['id', 'fila_excel', 'accion', 'personal_id', 'rut', 'datos']);
         $resolucion = app(PadronResolucionService::class);
         $decisiones = $resolucion->disponible() ? $resolucion->decisiones($revision) : collect();
-        $selecciones = $resolucion->selecciones($filas, $decisiones);
+        $resumen = $resolucion->resumen($filas, $decisiones);
+        $selecciones = $resumen['selecciones'];
         $establecimientos = DB::table('establecimientos')->orderBy('id')->get()->keyBy('id');
         $estPorRbd = $establecimientos->keyBy('rbd');
         $snapshot = $this->snapshot($revision->anio);
@@ -57,6 +58,15 @@ class PadronConflictosAsignacionService
         $destinos = [];
         $grupos = [];
         $pendientes = [];
+        // El caso pertenece al RUT completo, no a la última fila resuelta.
+        // Incluye ausencias pendientes, pero no las ya vinculadas a un ID
+        // seleccionado, las bajas confirmadas ni reemplazos omitidos.
+        foreach ($filas as $fila) {
+            if (in_array($resumen['estados'][$fila->id], ['pendiente', 'error'], true)) {
+                $rut = PadronConciliador::rut($fila->rut);
+                $pendientes[$rut] = ($pendientes[$rut] ?? 0) + 1;
+            }
+        }
         foreach ($filas->whereNotNull('fila_excel') as $fila) {
             if ($fila->accion === PadronReemplazosVigentes::OMITIDO) {
                 continue;
@@ -66,7 +76,6 @@ class PadronConflictosAsignacionService
             $estId = (int) ($estPorRbd[$data['rbd'] ?? 0]->id ?? 0);
             $key = $rut.'|'.$estId;
             if (! array_key_exists($fila->id, $selecciones)) {
-                $pendientes[$rut] = true;
                 continue;
             }
             $id = $selecciones[$fila->id];
@@ -79,7 +88,7 @@ class PadronConflictosAsignacionService
         }
         // El detalle agrupado no necesita conservar otra colección de modelos
         // ni nombres/fechas/documentos de todas las filas del archivo.
-        unset($filas, $fila, $decisiones, $selecciones, $data);
+        unset($filas, $fila, $decisiones, $selecciones, $resumen, $data);
         $personal = DB::table('reemplazos_personal')->whereIn('id', array_filter(array_column($snapshot['asignaciones'], 'reemplazos_personal_id')))
             ->get(['id', 'rut', 'tipocontrato', 'financiamiento', 'estatuto', 'jornada'])->keyBy('id');
         $porGrupo = [];
@@ -128,7 +137,7 @@ class PadronConflictosAsignacionService
                     $motivos['identidad'] = 'No se pudo identificar el RUT o establecimiento de la asignación.';
                 }
                 if (isset($pendientes[$rut])) {
-                    $motivos['correspondencia'] = 'Hay líneas del RUT sin resolver; seleccione su correspondencia y vuelva a revisar.';
+                    $motivos['correspondencia'] = 'Quedan '.$pendientes[$rut].' líneas del RUT pendientes, incluidas las ausencias por revisar o errores de archivo. Resuelva todas antes de dar por cerrado este conflicto.';
                 }
                 if ($id && ! $destino) {
                     $motivos['id_sin_destino'] = 'El ID contractual quedaría sin seleccionar o propuesto para baja. Otra línea del mismo RUT no reemplaza este vínculo.';
@@ -209,6 +218,7 @@ class PadronConflictosAsignacionService
                 'total_asignadas' => $total, 'cobertura' => $cobertura, 'cobertura_actual' => $coberturaActual,
                 'comparacion' => $comparacion, 'motivos' => $motivosGrupo, 'avisos' => $avisosGrupo,
                 'bloqueante' => (bool) $motivosGrupo, 'asignaciones' => $detalles,
+                'correspondencias_pendientes' => $pendientes[$rut] ?? 0,
             ];
         }
         usort($gruposResultado, fn ($a, $b) => ((int) $b['bloqueante'] <=> (int) $a['bloqueante'])
