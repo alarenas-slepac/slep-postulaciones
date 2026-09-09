@@ -3,6 +3,7 @@
 /** CLI local opt-in. Copia privada: nunca imprime registros, SQL ni excepciones con bindings. */
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 require dirname(__DIR__).'/Support/PadronMySqlLab.php';
+require dirname(__DIR__).'/Support/PadronRehearsal.php';
 
 use App\Models\PadronRevision;
 use App\Models\ReemplazoPersonal;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 use Tests\Support\PadronMySqlLab as Lab;
 
-$options = getopt('', ['root:', 'action:', 'source:', 'excel:', 'revision:']);
+$options = getopt('', ['root:', 'action:', 'source:', 'excel:', 'revision:', 'user:', 'synthetic-case:']);
 $start = microtime(true);
 $report = ['application_enabled' => false];
 $root = null;
@@ -43,7 +44,7 @@ try {
     }
     $root = $candidateRoot;
     $action = $options['action'] ?? '';
-    if (! in_array($action, ['init', 'import', 'inspect', 'preview', 'plan', 'reject', 'blocks', 'transfer', 'history', 'matrix', 'verify-fatal'], true)) {
+    if (! in_array($action, ['init', 'import', 'inspect', 'preview', 'plan', 'reject', 'blocks', 'transfer', 'history', 'matrix', 'verify-fatal', 'rehearse', 'rehearse-synthetic'], true)) {
         throw new RuntimeException('Acción no permitida.');
     }
     $configPath = $root.'/private-runtime.json';
@@ -119,6 +120,38 @@ try {
         $report['source_bytes'] = filesize($source);
         $report['database'] = $database;
     } else {
+        if ($action === 'rehearse-synthetic') {
+            $syntheticCase = $options['synthetic-case'] ?? 'success';
+            if (! in_array($syntheticCase, ['success', 'unresolved', 'stale', 'missing-user'], true)) {
+                throw new RuntimeException('Caso sintético no permitido.');
+            }
+            // Fixture separado: no usa ni altera funcionarios de la copia real.
+            $syntheticRun = bin2hex(random_bytes(8));
+            putenv('PADRON_MYSQL_LAB_RUN='.$syntheticRun);
+            $database = 'padron_lab_'.$syntheticRun.'_90';
+            Lab::assertName($database);
+            $pdo->exec('CREATE DATABASE `'.$database.'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+            Lab::boot($database, 'REPEATABLE READ');
+            Lab::fixture();
+            \Illuminate\Support\Facades\Schema::create('users', function (\Illuminate\Database\Schema\Blueprint $table) { $table->id(); });
+            DB::table('users')->insert(['id' => 7]);
+            \Illuminate\Support\Facades\Schema::table('reemplazos_personal_bloqueos', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->string('rut')->nullable(); $table->boolean('activo')->default(true);
+            });
+            DB::table('reemplazos_personal_bloqueos')->where('id', 1)->update(['rut' => '222222222']);
+            $options['revision'] = Lab::revision()['revision'];
+            $options['user'] = 7;
+            $report['synthetic_only'] = true;
+            $report['synthetic_case'] = $syntheticCase;
+            if ($syntheticCase === 'unresolved') {
+                DB::table('padron_revision_filas')->where('padron_revision_id', $options['revision'])->where('fila_excel', 2)
+                    ->update(['accion' => 'revision_manual', 'personal_id' => null]);
+            } elseif ($syntheticCase === 'stale') {
+                DB::table('reemplazos_personal')->where('id', 101)->update(['jornada' => 43]);
+            } elseif ($syntheticCase === 'missing-user') {
+                $options['user'] = 0;
+            }
+        }
         Lab::boot($database, 'REPEATABLE READ');
         Lab::guard();
         // Sin servidor web, workers ni scheduler. Interceptar además servicios externos.
@@ -128,7 +161,9 @@ try {
         \Illuminate\Support\Facades\Queue::fake();
         \Illuminate\Support\Facades\Bus::fake();
         $report['external_services_disabled'] = true;
-        if ($action === 'inspect') {
+        if (in_array($action, ['rehearse', 'rehearse-synthetic'], true)) {
+            $report += \Tests\Support\PadronRehearsal::run($root, (int) ($options['revision'] ?? 0), (int) ($options['user'] ?? 0));
+        } elseif ($action === 'inspect') {
             Artisan::call('padron:verificar-entorno', ['--json' => true]);
             $report['preflight'] = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
             $report['table_count'] = (int) DB::selectOne('SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = DATABASE()')->n;
@@ -254,7 +289,7 @@ try {
         }
         if (app(PadronAplicacionService::class)->disponible()) { throw new RuntimeException('El servicio productivo no debe habilitarse.'); }
     }
-    $report['status'] = 'completed';
+    $report['status'] ??= 'completed';
     unset($report['baseline_hashes']);
 } catch (Throwable $e) {
     $report['status'] = 'failed';
@@ -262,11 +297,17 @@ try {
     $report['origin'] = basename($e->getFile()).':'.$e->getLine();
     // Solo mensajes propios de este ejecutor; nunca detalles SQL/validaciones con RUT.
     $report['error'] = $e->getFile() === __FILE__ ? $e->getMessage() : 'test_error_details_suppressed';
+    if ($e instanceof RuntimeException
+        && $e->getFile() === realpath(dirname(__DIR__).'/Support/PadronRehearsal.php')
+        && preg_match('/^[a-z_]+$/D', $e->getMessage())) {
+        // Códigos estáticos de las verificaciones; no contienen SQL ni datos.
+        $report['error'] = $e->getMessage();
+    }
     $previous = $e instanceof \Illuminate\Database\QueryException ? $e->getPrevious() : $e;
     if ($previous instanceof PDOException) { $report['driver_code'] = $previous->errorInfo[1] ?? null; }
 }
 $report['seconds'] = round(microtime(true) - $start, 3);
-$report['peak_memory_mb'] = round(memory_get_peak_usage(true) / 1048576, 2);
+$report['peak_memory_mb'] = max($report['pre_application_peak_memory_mb'] ?? 0, round(memory_get_peak_usage(true) / 1048576, 2));
 if ($root) { file_put_contents($root.'/report-'.($options['action'] ?? 'invalid').'-'.gmdate('YmdHis').'.json', json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)); }
 echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)."\n";
 exit($report['status'] === 'completed' ? 0 : 1);

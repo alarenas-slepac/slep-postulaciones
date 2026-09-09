@@ -216,24 +216,43 @@ class PersonalImportController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate(['accion' => ['required', 'in:previsualizar,autorizar_exceso,resolver,aplicar']]);
-        if (in_array($request->input('accion'), ['resolver', 'aplicar'], true)) {
+        $request->validate(['accion' => ['required', 'in:previsualizar,autorizar_exceso,resolver,resolver_varias,aplicar']]);
+        if (in_array($request->input('accion'), ['resolver', 'resolver_varias', 'aplicar'], true)) {
             $data = $request->validate(['revision' => ['required', 'integer', 'min:1']]);
             $revision = PadronRevision::findOrFail($data['revision']);
             $aplicador = app(PadronAplicacionService::class);
-            if ($request->input('accion') === 'resolver') {
-                $data = $request->validate([
-                    'fila' => ['required', 'integer', 'min:1'], 'personal_id' => ['required', 'integer', 'min:0'],
-                    'justificacion' => ['required', 'string', 'min:10', 'max:2000'],
-                    'decision_anterior' => ['required', 'integer', 'min:0'],
+            if (in_array($request->input('accion'), ['resolver', 'resolver_varias'], true)) {
+                $contexto = $request->validate([
                     'q' => ['nullable', 'string', 'max:100'], 'accion_filtro' => ['nullable', 'string', 'max:50'],
                     'page' => ['nullable', 'integer', 'min:1'], 'conflictos_page' => ['nullable', 'integer', 'min:1'],
                     'caso_rut' => ['nullable', 'string', 'max:32'], 'caso_establecimiento' => ['nullable', 'integer', 'min:1'],
                 ]);
-                $aplicador->resolver($revision, $data['fila'], $data['personal_id'] ? (int) $data['personal_id'] : null, $data['justificacion'], (int) $request->user()->id, (int) $data['decision_anterior']);
-                $message = 'Decisión de conciliación registrada. No se modificaron contratos, vigencias ni asignaciones.';
+                if ($request->input('accion') === 'resolver') {
+                    $data = $request->validate([
+                        'fila' => ['required', 'integer', 'min:1'], 'personal_id' => ['required', 'integer', 'min:0'],
+                        'justificacion' => ['required', 'string', 'min:10', 'max:2000'],
+                        'decision_anterior' => ['required', 'integer', 'min:0'],
+                    ]);
+                    $aplicador->resolver($revision, $data['fila'], $data['personal_id'] ? (int) $data['personal_id'] : null, $data['justificacion'], (int) $request->user()->id, (int) $data['decision_anterior']);
+                    $message = 'Decisión de conciliación registrada. No se modificaron contratos, vigencias ni asignaciones.';
+                } else {
+                    $data = $request->validate([
+                        'rut' => ['required', 'string', 'max:32'],
+                        'decisiones' => ['required', 'array', 'min:1', 'max:50'],
+                        'decisiones.*' => ['required', 'array'],
+                        'decisiones.*.fila' => ['required', 'integer', 'min:1', 'distinct'],
+                        'decisiones.*.personal_id' => ['required', 'integer', 'min:0'],
+                        'decisiones.*.justificacion' => ['required', 'string', 'min:10', 'max:2000'],
+                        'decisiones.*.decision_anterior' => ['required', 'integer', 'min:0'],
+                    ]);
+                    $entradas = array_map(static function (array $entrada): array {
+                        $entrada['personal_id'] = (int) $entrada['personal_id'] === 0 ? null : (int) $entrada['personal_id'];
+                        return $entrada;
+                    }, $data['decisiones']);
+                    $cantidad = app(PadronResolucionService::class)->resolverVarias($revision, $data['rut'], $entradas, (int) $request->user()->id);
+                    $message = $cantidad.' decisiones registradas en conjunto. No se modificaron contratos, vigencias ni asignaciones.';
+                }
                 // Mantener el contexto permite resolver las demás filas del RUT.
-                $contexto = array_intersect_key($data, array_flip(['q', 'accion_filtro', 'page', 'conflictos_page', 'caso_rut', 'caso_establecimiento']));
                 if (! empty($contexto['caso_rut']) && ! empty($contexto['caso_establecimiento'])) {
                     $contexto['avanzar_caso'] = 1;
                 }
