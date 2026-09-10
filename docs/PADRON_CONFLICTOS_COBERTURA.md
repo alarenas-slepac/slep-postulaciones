@@ -1,6 +1,6 @@
 # Padrón: comparación de cobertura y conflictos agrupados
 
-Parche 2026.9.8.488. Diagnóstico de solo lectura; no aplica la carga, modifica contratos ni reasigna horas.
+Actualizado en el parche 2026.9.10.508. Diagnóstico de solo lectura; no aplica la carga, modifica contratos ni reasigna horas.
 
 ## Unidad de revisión
 
@@ -35,7 +35,8 @@ Una declaración sin contrato regular propuesto no acredita pertenencia al padr�
 | Ya existía y la propuesta lo mantiene o reduce | Aviso; no bloquea por cobertura |
 | No existía y la propuesta lo genera | Bloqueo |
 | Existía y la propuesta lo aumenta | Bloqueo |
-| No hay base vigente comparable o hay ambigüedad de estamento/composición | No se presume preexistencia; si hay exceso, bloquea |
+| No hay base anterior comparable, pero existe cobertura regular propuesta positiva y no ambigua | Aviso; no se presume preexistencia ni se bloquea solo por ese exceso |
+| No hay contrato regular propuesto, la cobertura es cero o la propuesta tiene ambigüedad de estamento/composición | Mantiene el bloqueo |
 | La propuesta elimina el exceso | No bloquea por cobertura |
 
 Se mantiene la tolerancia existente de 0,01 h. La clasificación considera las
@@ -48,12 +49,17 @@ un solo aviso de exceso preexistente de 1 h. No son 1 h de exceso por asignació
 Si la cobertura actual era 44 h y la propuesta baja a 33 h, ese exceso de 1 h es
 nuevo y bloquea. Si baja de 33 a 32 h, el exceso aumenta de 1 a 2 h y bloquea.
 
+Ejemplo sin base comparable: 49 h asignadas y cobertura propuesta de 44 h muestran
+5 h de exceso por revisar como aviso. El exceso actual sigue figurando como
+«No comparable»; no se inventa una cobertura anterior ni se acredita preexistencia.
+Las 49 h asignadas y las 44 h contractuales no se modifican ni se autorizan 5 h nuevas.
+
 ## Protecciones que no cambian
 
-Un aviso de exceso preexistente no anula los bloqueos por pérdida del ID contractual,
+Un aviso de exceso preexistente o sin base comparable no anula los bloqueos por pérdida del ID contractual,
 traslado, identidad incompatible, ausencia de contrato regular, reemplazo/suplencia,
 cambio de estamento, horas inválidas o correspondencias sin resolver. Por ello un
-caso puede tener aviso de preexistencia y continuar bloqueado por otro motivo.
+caso puede tener un aviso de exceso y continuar bloqueado por otro motivo.
 La autorización de jornadas superiores a 44 h tampoco sustituye estos controles.
 
 Se conserva el detalle plano `items` para consumidores existentes. La pantalla usa
@@ -62,9 +68,10 @@ Las lecturas se hacen por lotes y no cargan observaciones ni adjuntos en el diag
 
 ## Después de instalar
 
-La huella de cobertura cambia a `cobertura-v3-comparacion`. Las revisiones previas
-quedan obsoletas y deben generarse nuevamente desde el padrón completo. No reutilizar
-decisiones como si correspondieran a una base vigente.
+La huella de cobertura cambia a `cobertura-v6-aviso-sin-base-comparable`.
+Recargar la misma revisión recalcula el diagnóstico y la confirmación final;
+este cambio no invalida la base contractual ni reescribe decisiones o autorizaciones.
+Una confirmación final anterior debe renovarse, conservando la revisión manual.
 
 No requiere migraciones nuevas, cambios de rutas o compilación de CSS/JavaScript.
 No habilita la aplicación definitiva del padrón ni elimina su protección anual.

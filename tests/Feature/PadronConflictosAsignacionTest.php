@@ -449,7 +449,9 @@ class PadronConflictosAsignacionTest extends TestCase
             $group = $this->diagnosis($this->revision([$this->data(['tipocontrato' => 'PLANTA', 'financiamiento' => 'PIE'])]))['grupos'][0];
             $this->assertSame(0.0, $group['cobertura_actual']['horas']);
             $this->assertSame('no_comparable', $group['comparacion']['estado']);
-            $this->assertTrue($group['bloqueante']);
+            $this->assertNull($group['comparacion']['exceso_actual']);
+            $this->assertFalse($group['bloqueante']);
+            $this->assertStringContainsString('Exceso sin base anterior comparable', implode(' ', $group['avisos']));
         }
     }
 
@@ -474,7 +476,8 @@ class PadronConflictosAsignacionTest extends TestCase
             DB::table('reemplazos_personal')->insert(['id' => 102, 'establecimiento_id' => 1] + $this->data(['rut' => '222222222', 'mes' => 8]));
             $group = $this->diagnosis($this->revision([$this->data(['tipocontrato' => 'PLANTA', 'financiamiento' => 'PIE'])]))['grupos'][0];
             $this->assertSame('no_comparable', $group['comparacion']['estado']);
-            $this->assertTrue($group['bloqueante']);
+            $this->assertSame(0.0, $group['cobertura_actual']['horas']);
+            $this->assertFalse($group['bloqueante']);
             DB::table('reemplazos_personal')->where('id', 102)->delete();
         }
     }
@@ -506,7 +509,7 @@ class PadronConflictosAsignacionTest extends TestCase
         }
     }
 
-    public function test_unknown_inactive_or_replacement_baseline_cannot_waive_coverage_block(): void
+    public function test_missing_regular_baseline_warns_without_claiming_preexisting_excess(): void
     {
         DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => null, 'horas_contrato' => 34]);
         foreach ([['vigente' => false], ['anio' => 2025], ['tipocontrato' => 'REEMPLAZO'], ['tipocontrato' => 'SUPLENCIA']] as $change) {
@@ -514,8 +517,9 @@ class PadronConflictosAsignacionTest extends TestCase
             $diagnosis = $this->diagnosis($this->revision([$this->data(['jornada' => 33, 'jornada_basica' => 33])]));
             $this->assertSame('no_comparable', $diagnosis['grupos'][0]['comparacion']['estado']);
             $this->assertNull($diagnosis['grupos'][0]['comparacion']['exceso_actual']);
-            $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
-            $this->assertArrayHasKey('cobertura_insuficiente', $diagnosis['items'][0]['motivos']);
+            $this->assertSame(0, $diagnosis['grupos_bloqueantes']);
+            $this->assertArrayNotHasKey('cobertura_insuficiente', $diagnosis['items'][0]['motivos']);
+            $this->assertStringContainsString('No se puede determinar si el exceso es preexistente', implode(' ', $diagnosis['grupos'][0]['avisos']));
         }
     }
 
@@ -604,7 +608,90 @@ class PadronConflictosAsignacionTest extends TestCase
         $diagnosis = $this->diagnosis($this->revision([$this->data()]));
         $this->assertSame(0.0, $diagnosis['grupos'][0]['cobertura_actual']['horas']);
         $this->assertSame('no_comparable', $diagnosis['grupos'][0]['comparacion']['estado']);
+        $this->assertSame(0, $diagnosis['grupos_bloqueantes']);
+    }
+
+    public function test_49_assigned_vs_44_proposed_without_baseline_is_readonly_warning_in_plan_and_view(): void
+    {
+        DB::table('reemplazos_personal')->update(['vigente' => false]);
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 5]);
+        $this->assignment(502, ['reemplazos_personal_id' => null, 'horas_contrato' => 44]);
+        DB::table('declaracion_sostenedores')->insert(['rut' => '111111111', 'rbd' => '99999', 'horas_contratadas' => 44, 'estamento' => 'DOCENTE']);
+        $revision = $this->revision([$this->data()]);
+        $personal = DB::table('reemplazos_personal')->get()->toJson();
+        $assignments = DB::table('dotacion_docente_asignaciones')->get()->toJson();
+        $declarations = DB::table('declaracion_sostenedores')->get()->toJson();
+        $plan = app(PadronAplicacionService::class)->plan($revision);
+        $group = $plan['conflictos']['grupos'][0];
+        $this->assertSame([], $plan['errores']);
+        $this->assertFalse($group['bloqueante']);
+        $this->assertSame(49.0, $group['total_asignadas']);
+        $this->assertSame(44.0, $group['cobertura']['horas']);
+        $this->assertSame('Declaración de Sostenedores', $group['cobertura']['fuente']);
+        $this->assertSame(['estado' => 'no_comparable', 'comparable' => false, 'exceso_actual' => null, 'exceso_propuesto' => 5.0], $group['comparacion']);
+        $this->assertSame(0, $plan['conflictos']['grupos_preexistentes']);
+        $this->assertSame(1, $plan['conflictos']['grupos_avisos']);
+        $this->assertCount(1, $group['avisos']);
+        $this->assertCount(2, $group['asignaciones']);
+        view()->share('errors', new ViewErrorBag);
+        $html = app(PersonalImportController::class)->create(Request::create('/', 'GET', ['revision' => $revision->id]))->render();
+        $this->assertStringContainsString('Aviso: no bloquea por este caso', $html);
+        $this->assertStringContainsString('Exceso actual: No comparable', $html);
+        $this->assertStringContainsString('Exceso propuesto: 5 h', $html);
+        $this->assertSame(1, substr_count($html, 'Exceso sin base anterior comparable: 49 h'));
+        $this->assertStringNotContainsString('Bloquea la aplicación', $html);
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $this->assertFalse(app(PadronAplicacionService::class)->disponible());
+        $this->assertSame($personal, DB::table('reemplazos_personal')->get()->toJson());
+        $this->assertSame($assignments, DB::table('dotacion_docente_asignaciones')->get()->toJson());
+        $this->assertSame($declarations, DB::table('declaracion_sostenedores')->get()->toJson());
+        $this->assertDatabaseCount('padron_revision_decisiones', 0);
+        $this->assertDatabaseCount('padron_revision_autorizaciones', 0);
+        $this->assertDatabaseCount('padron_personal_cambios', 0);
+    }
+
+    public function test_noncomparable_warning_does_not_waive_other_conflicts(): void
+    {
+        DB::table('reemplazos_personal')->update(['vigente' => false]);
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 49]);
+        $revision = $this->revision([$this->data()]);
+        foreach ([['reemplazos_personal_id' => 999], ['estamento_cobertura' => 'asistente']] as $change) {
+            DB::table('dotacion_docente_asignaciones')->update(array_replace(['reemplazos_personal_id' => 101, 'estamento_cobertura' => 'docente'], $change));
+            $diagnosis = $this->diagnosis($revision);
+            $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+            $this->assertArrayNotHasKey('cobertura_insuficiente', $diagnosis['items'][0]['motivos']);
+            $this->assertNotEmpty($diagnosis['items'][0]['motivos']);
+            $this->assertNotEmpty(app(PadronAplicacionService::class)->plan($revision)['errores']);
+        }
+        DB::table('dotacion_docente_asignaciones')->update(['reemplazos_personal_id' => 101, 'estamento_cobertura' => 'docente']);
+        $revision->filas()->create(['fila_excel' => 3, 'rut' => '111111111', 'nombre' => 'Persona sintética',
+            'accion' => 'revision_manual', 'datos' => $this->data(['jornada' => 1]), 'candidatos' => [], 'observaciones' => [], 'asignaciones' => []]);
+        $diagnosis = $this->diagnosis($revision);
+        $this->assertArrayHasKey('correspondencia', $diagnosis['items'][0]['motivos']);
         $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+    }
+
+    public function test_noncomparable_excess_still_blocks_without_usable_proposed_coverage(): void
+    {
+        DB::table('reemplazos_personal')->update(['vigente' => false]);
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 49]);
+        foreach ([['rut' => '222222222'], ['tipocontrato' => 'REEMPLAZO'], ['jornada' => 0],
+            ['estatuto' => 'ASISTENTE', 'escalafon' => 'DOCENTE AULA']] as $change) {
+            $diagnosis = $this->diagnosis($this->revision([$this->data($change)]));
+            $this->assertSame('no_comparable', $diagnosis['grupos'][0]['comparacion']['estado']);
+            $this->assertSame(1, $diagnosis['grupos_bloqueantes']);
+            $this->assertArrayHasKey('cobertura_insuficiente', $diagnosis['items'][0]['motivos']);
+        }
+    }
+
+    public function test_noncomparable_warning_does_not_authorize_proposed_contract_over_44(): void
+    {
+        DB::table('reemplazos_personal')->update(['vigente' => false]);
+        DB::table('dotacion_docente_asignaciones')->update(['horas_contrato' => 49]);
+        $plan = app(PadronAplicacionService::class)->plan($this->revision([$this->data(['jornada' => 45])]));
+        $this->assertSame(0, $plan['conflictos']['grupos_bloqueantes']);
+        $this->assertStringContainsString('faltan autorización y justificación para 45 horas', implode(' ', $plan['errores']));
+        $this->assertDatabaseCount('padron_revision_autorizaciones', 0);
     }
 
     public function test_conflict_view_shows_all_counts_with_independent_pagination_without_writes(): void
