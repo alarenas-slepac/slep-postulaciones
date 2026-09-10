@@ -11,6 +11,7 @@
             'ausencia_vinculada' => 'Ausencia vinculada a una fila', 'error' => 'Error de archivo',
             'propuesta_automatica' => 'Propuesta automática',
             'omitida_por_vigencia' => 'Omitida por vigencia (REEMPLAZO)',
+            'conservada' => 'Conservar en el período de carga',
         ];
     @endphp
 <div data-padron-filas>
@@ -52,6 +53,8 @@
                         $estadoRevision = $resumenResolucion['estados'][$fila->id] ?? 'pendiente';
                         $idSeleccionado = $resumenResolucion['selecciones'][$fila->id] ?? null;
                         $anteriorComparacion = $fila->anterior;
+                        $datosPropuestos = $estadoRevision === 'conservada'
+                            ? array_replace($fila->anterior ?? [], ['anio' => $revision->anio, 'mes' => $revision->mes]) : $fila->datos;
                         if ($fila->accion === 'revision_manual' && $decisiones->has($fila->id)) {
                             $anteriorComparacion = collect($fila->candidatos)->firstWhere('id', $idSeleccionado);
                         }
@@ -62,10 +65,16 @@
                             $decisionEnviada = ['personal_id' => old('personal_id'), 'justificacion' => old('justificacion'), 'decision_anterior' => old('decision_anterior')];
                         }
                     @endphp
-                    <tr @class(['table-danger' => $fila->accion === 'error', 'table-warning' => in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar']), 'table-secondary' => $fila->accion === 'reemplazo_anterior_omitido'])>
+                    <tr @class(['table-danger' => $fila->accion === 'error', 'table-warning' => $estadoRevision === 'pendiente' || in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar']), 'table-secondary' => $fila->accion === 'reemplazo_anterior_omitido'])>
                         <td>{{ $fila->fila_excel ?? 'Ausente' }}<br><strong>{{ $fila->rut }}</strong><br>{{ $fila->nombre }}</td>
-                        <td>ID: {{ $fila->personal_id ?? 'Sin seleccionar' }}<br>{{ $etiquetas[$fila->accion] ?? $fila->accion }}
+                        <td>ID: {{ $fila->personal_id ?? 'Sin seleccionar' }}<br>{{ $estadoRevision === 'conservada' ? 'Conservación propuesta (ausente del Excel)' : ($etiquetas[$fila->accion] ?? $fila->accion) }}
                             <div class="fw-semibold">{{ $estadosRevision[$estadoRevision] ?? $estadoRevision }}</div>
+                            @if ($estadoRevision === 'pendiente' && $fila->accion === 'baja_propuesta')
+                                <div class="small">Ya se conservó otro contrato de este RUT. Decida también si conserva este ID o confirma su baja; no se dará de baja automáticamente.</div>
+                            @endif
+                            @if ($estadoRevision === 'conservada')
+                                <div class="small">Se conserva este ID y sus datos para {{ $revision->anio }}/{{ $revision->mes }}, sin duplicar contratos ni liberar asignaciones. Solo se actualiza el período al aplicar definitivamente.</div>
+                            @endif
                             @if ($estadoRevision === 'ausencia_vinculada')
                                 <div class="small">El ID se conservaría en otra fila del archivo; no se propone su baja mientras permanezca seleccionado.</div>
                             @endif
@@ -88,8 +97,8 @@
                                     @endforeach
                                 </details>
                             @endif
-                            @if ($resolucionDisponible && ! $revision->aplicada_at && ! $obsoleta && ! $revision->errores && $estadoRevision !== 'ausencia_vinculada' && in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar']) && (! $fila->fila_excel || \App\Services\Padron\PadronConciliador::tipo($fila->datos) !== 'por_clasificar'))
-                                <details><summary>Resolver correspondencia</summary>
+                            @if ($resolucionDisponible && ! $revision->aplicada_at && ! $obsoleta && ! $revision->errores && $estadoRevision !== 'ausencia_vinculada' && in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar', 'baja_propuesta']) && (! $fila->fila_excel || \App\Services\Padron\PadronConciliador::tipo($fila->datos) !== 'por_clasificar'))
+                                <details><summary>{{ $fila->fila_excel ? 'Resolver correspondencia' : 'Resolver ausencia' }}</summary>
                                     <form method="POST" action="{{ route('reemplazos.personal.import.store') }}" class="mt-2" data-padron-decision-form data-rut="{{ $fila->rut }}">
                                         @csrf
                                         <input type="hidden" name="accion" value="resolver">
@@ -107,6 +116,9 @@
                                         <label class="form-label" for="decision-{{ $fila->id }}">Registro a conservar</label>
                                         <select id="decision-{{ $fila->id }}" name="personal_id" class="form-select form-select-sm" required>
                                             <option value="">Seleccione explícitamente</option>
+                                            @if (! $fila->fila_excel)
+                                                <option value="{{ $fila->personal_id }}" @selected((string) ($decisionEnviada['personal_id'] ?? '') === (string) $fila->personal_id)>Conservar este ID en el período de carga · ID {{ $fila->personal_id }} · {{ $revision->anio }}/{{ $revision->mes }}</option>
+                                            @endif
                                             @foreach ($fila->candidatos as $candidato)
                                                 <option value="{{ $candidato['id'] }}" @selected((string) ($decisionEnviada['personal_id'] ?? '') === (string) $candidato['id'])>ID {{ $candidato['id'] }} · RBD {{ $candidato['rbd'] ?? '—' }} · {{ $candidato['jornada'] ?? '—' }} h · {{ $candidato['financiamiento'] ?? '—' }}{{ isset($candidato['_redistribucion']) ? ' · Receptor sugerido (requiere confirmación)' : '' }}</option>
                                             @endforeach
@@ -121,11 +133,11 @@
                         </td>
                         <td>
                             @foreach (['rbd' => 'RBD', 'tipocontrato' => 'Contrato', 'financiamiento' => 'Financiamiento', 'jornada' => 'Jornada', 'fecha_antiguedad' => 'Antigüedad'] as $campo => $titulo)
-                                <div><strong>{{ $titulo }}:</strong> {{ $anteriorComparacion[$campo] ?? '—' }} → {{ $fila->datos[$campo] ?? ($campo === 'fecha_antiguedad' && $fila->fila_excel ? 'Conservar anterior' : '—') }}</div>
+                                <div><strong>{{ $titulo }}:</strong> {{ $anteriorComparacion[$campo] ?? '—' }} → {{ $datosPropuestos[$campo] ?? ($campo === 'fecha_antiguedad' && $fila->fila_excel ? 'Conservar anterior' : '—') }}</div>
                             @endforeach
                             <details><summary>Otros datos comparados</summary>
                                 @foreach (['nombre', 'fecha_nacimiento', 'fecha_ingreso', 'fecha_termino', 'estatuto', 'escalafon', 'anio', 'mes', 'jornada_basica', 'jornada_media', 'bienios', 'tramo'] as $campo)
-                                    <div>{{ $campo }}: {{ $anteriorComparacion[$campo] ?? '—' }} → {{ $fila->datos[$campo] ?? '—' }}</div>
+                                    <div>{{ $campo }}: {{ $anteriorComparacion[$campo] ?? '—' }} → {{ $datosPropuestos[$campo] ?? '—' }}</div>
                                 @endforeach
                             </details>
                         </td>

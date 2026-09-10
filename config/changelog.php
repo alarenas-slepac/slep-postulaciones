@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.10.508',
+    'current_version' => '2026.9.10.509',
     'entries' => [
+        [
+            'version' => '2026.9.10.509',
+            'title' => 'Padrón: conservar contratos ausentes en el mes de carga',
+            'summary' => 'Permite conservar explícitamente los IDs de contratos regulares omitidos del Excel, trasladando sus datos al mes de la revisión sin duplicarlos.',
+            'roles' => ['admin'],
+            'items' => [
+                'Añade Conservar este ID en el período de carga en las ausencias, con justificación y registro individual o conjunto por RUT. Durante la revisión no cambia contratos ni asignaciones.',
+                'Recupera la cobertura propuesta e incluye las horas conservadas en la autorización de jornadas superiores a 44 horas. Si se conserva solo una parte del RUT, exige decidir las demás ausencias antes de aplicar.',
+                'Conserva jornadas, financiamiento, documentos, asignaciones e historial mensual. Al aplicar actualiza el mes del mismo ID; no registra un contrato nuevo ni atribuye sus datos al Excel.',
+                'Impide conservar contratos vencidos, no regulares o de otro año y exige retirar una confirmación de baja con liberación incompatible. Mantiene la aplicación definitiva deshabilitada y no requiere migraciones nuevas.',
+            ],
+            'published_at' => '2026-09-10',
+        ],
         [
             'version' => '2026.9.10.508',
             'title' => 'Padrón: exceso sin cobertura anterior comparable como aviso',

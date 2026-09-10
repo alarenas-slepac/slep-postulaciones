@@ -71,7 +71,7 @@ class PadronConflictosAsignacionService
                 $pendientes[$rut] = ($pendientes[$rut] ?? 0) + 1;
             }
         }
-        foreach ($filas->whereNotNull('fila_excel') as $fila) {
+        foreach ($resolucion->entrantes($revision, $filas, $decisiones) as $fila) {
             if ($fila->accion === PadronReemplazosVigentes::OMITIDO) {
                 continue;
             }

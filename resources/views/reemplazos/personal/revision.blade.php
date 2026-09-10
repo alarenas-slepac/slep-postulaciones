@@ -14,6 +14,7 @@
             'ausencia_vinculada' => 'Ausencia vinculada a una fila', 'error' => 'Error de archivo',
             'propuesta_automatica' => 'Propuesta automática',
             'omitida_por_vigencia' => 'Omitida por vigencia (REEMPLAZO)',
+            'conservada' => 'Conservar en el período de carga',
         ];
     @endphp
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -93,6 +94,7 @@
     <div class="card mb-3"><div class="card-body">
         <h5>Resolución de coincidencias</h5>
         <p>Seleccione el ID que corresponde a cada línea ambigua o confirme una nueva línea contractual. Cada decisión requiere justificación y conserva su historial. Un ID no puede ser seleccionado en dos filas.</p>
+        <p>Si un funcionario fue omitido del Excel y debe continuar, abra sus filas y seleccione «Conservar este ID en el período de carga» en cada ausencia. Puede registrar juntas las selecciones del mismo RUT. Se mantienen los datos contractuales y se actualiza el mes solo al aplicar, sin duplicar IDs ni liberar sus asignaciones.</p>
         @if (! $resolucionDisponible)
             <div class="alert alert-warning">Ejecute las migraciones de revisión del padrón con PHP 8.3 para habilitar las decisiones manuales.</div>
         @endif
@@ -113,6 +115,7 @@
             @forelse ($revision->excesos as $rut => $exceso)
                 <div class="border rounded p-3 mb-2">
                     <strong>{{ $rut }}: {{ $exceso['total'] }} h</strong> · Exceso: {{ $exceso['exceso'] }} h · Filas Excel: {{ implode(', ', $exceso['filas']) }}
+                    @if (! empty($exceso['ids_conservados']))<div>Incluye IDs conservados: {{ implode(', ', $exceso['ids_conservados']) }}</div>@endif
                     @if ($autorizaciones->has($rut))
                         @php
                             $autorizacion = $autorizaciones->get($rut);
