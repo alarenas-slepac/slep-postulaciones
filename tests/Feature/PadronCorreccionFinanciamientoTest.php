@@ -81,19 +81,23 @@ class PadronCorreccionFinanciamientoTest extends TestCase
 
     public static function contractLabels(): array
     {
-        return [['PLANTA'], ['CONTRATA'], ['INDEFINIDO'], ['PLAZO FIJO']];
+        return [['PLANTA'], ['CONTRATA'], ['INDEFINIDO'], ['PLAZO FIJO'],
+            ['PLANTA', 'CONTRATA'], ['PLANTA', 'INDEFINIDO'], ['CONTRATA', 'PLAZO FIJO']];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('contractLabels')]
-    public function test_correction_resolves_assignments_and_updates_contracts_without_replacing_ids_or_history(string $base): void
+    public function test_correction_resolves_assignments_and_updates_contracts_without_replacing_ids_or_history(string $base, ?string $previousBase = null): void
     {
-        if ($base !== 'PLANTA') {
+        $previousBase ??= $base;
+        if ($previousBase !== 'PLANTA') {
             foreach ([101 => 'SUB.GENERAL', 102 => 'PIE', 103 => 'SEP'] as $id => $funding) {
                 DB::table('reemplazos_personal')->where('id', $id)->update([
-                    'tipocontrato' => $id === 101 ? $base : $base.' '.$funding, 'escalafon' => 'DOCENTE AULA',
+                    'tipocontrato' => $id === 101 ? $previousBase : $previousBase.' '.$funding, 'escalafon' => 'DOCENTE AULA',
                 ]);
             }
         }
+        // Cubrir tanto vínculos por RUT como por ID contractual explícito.
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['reemplazos_personal_id' => 103]);
         $before = DB::table('dotacion_docente_asignaciones')->orderBy('id')->get()->toJson();
         $incoming = array_map(fn ($row) => array_replace($row, ['tipocontrato' => $base]),
             [$this->data('SEP', 17), $this->data('SUB.GENERAL', 21), $this->data('PIE', 2)]);
@@ -112,6 +116,8 @@ class PadronCorreccionFinanciamientoTest extends TestCase
         $this->assertSame(8, $diagnosis['asignaciones_revisadas']);
         $this->assertSame(0, $diagnosis['bloqueantes']);
         $this->assertSame([], $diagnosis['errores']);
+        $this->assertDatabaseCount('padron_revision_decisiones', 0);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 103, 'tipocontrato' => $previousBase.' SEP', 'mes' => 8]);
 
         // Instancia aislada de prueba; no cambia la constante ni el binding de la aplicación.
         $writer = new class($service) extends PadronAplicacionService {
@@ -134,8 +140,8 @@ class PadronCorreccionFinanciamientoTest extends TestCase
         $this->assertDatabaseCount('solicitudes_reemplazo', 6);
         foreach (SolicitudReemplazo::all() as $document) {
             $this->assertSame(103, (int) $document->reemplazo_personal_id);
-            $this->assertSame($base.' SEP', $document->funcionarioTitular->tipocontrato);
-            $this->assertSame($base === 'PLANTA' ? 'DOCENTE SEP' : 'DOCENTE AULA', $document->funcionarioTitular->escalafon);
+            $this->assertSame($previousBase.' SEP', $document->funcionarioTitular->tipocontrato);
+            $this->assertSame($previousBase === 'PLANTA' ? 'DOCENTE SEP' : 'DOCENTE AULA', $document->funcionarioTitular->escalafon);
             $this->assertSame('cerrado', $document->estado);
             $this->assertSame('2026-08-01 00:00:00', $document->updated_at->format('Y-m-d H:i:s'));
         }
