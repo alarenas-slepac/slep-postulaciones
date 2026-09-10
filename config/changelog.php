@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.10.506',
+    'current_version' => '2026.9.10.507',
     'entries' => [
+        [
+            'version' => '2026.9.10.507',
+            'title' => 'Padrón: correspondencia automática por cambio de tipo contractual',
+            'summary' => 'Conserva el ID cuando cambia el tipo de contrato regular y la línea mantiene una correspondencia inequívoca en el mismo RUT y establecimiento.',
+            'roles' => ['admin'],
+            'items' => [
+                'Empareja cambios como CONTRATA o CONTRATA PIE a PLANTA si coinciden financiamiento, jornada, distribución Básica/Media, fecha de ingreso, estatuto y escalafón. Reconoce los sufijos históricos SEP/PIE coherentes con su financiamiento.',
+                'Comprueba unicidad en ambos lados del grupo original; no elige entre duplicados ni resuelve por descarte. No amplía esta regla a reemplazos, suplencias o tipos desconocidos.',
+                'Propone actualizar el contrato conservando sus asignaciones y documentos históricos, sin falsas incorporaciones ni bajas. Mantiene las validaciones de cobertura y autorización de jornadas superiores a 44 horas.',
+                'Se aplica al analizar nuevamente el archivo; las revisiones y decisiones ya guardadas no se reescriben ni invalidan por esta ampliación. No requiere migraciones ni habilita la aplicación definitiva en producción.',
+            ],
+            'published_at' => '2026-09-10',
+        ],
         [
             'version' => '2026.9.10.506',
             'title' => 'Padrón: bajas con liberación diferida de asignaciones',

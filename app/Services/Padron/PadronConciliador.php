@@ -183,6 +183,36 @@ class PadronConciliador
                 $this->match($rows[$index], $candidate);
                 $matched[$candidate['id']] = true;
             }
+            // Cambio de tipo entre contratos regulares: misma línea contractual,
+            // no una incorporación o baja. La unicidad se comprueba contra TODO
+            // el grupo original, no por descarte después de consumir otros IDs.
+            if ($pending && ! $hasInvalid && count($periods) === 1) {
+                $oldByLine = $old->groupBy(fn ($row) => $this->firmaSinTipoContrato($row));
+                $incomingByLine = $group->reject(fn ($row) => $row['accion'] === PadronReemplazosVigentes::OMITIDO)
+                    ->groupBy(fn ($row) => $this->firmaSinTipoContrato($row['datos']));
+                foreach ($pending as $index) {
+                    $data = $rows[$index]['datos'];
+                    if ($rows[$index]['accion'] !== 'revision_manual' || self::tipo($data) !== 'regular') {
+                        continue;
+                    }
+                    $signature = $this->firmaSinTipoContrato($data);
+                    $candidates = $oldByLine->get($signature, collect());
+                    if ($candidates->count() !== 1 || $incomingByLine->get($signature)->count() !== 1) {
+                        continue;
+                    }
+                    $candidate = $candidates->first();
+                    $base = $this->contratoRegularHistorico($candidate);
+                    if (isset($matched[$candidate['id']]) || $base === null || $base === self::text($data['tipocontrato'])) {
+                        continue;
+                    }
+                    $rows[$index]['observaciones'] = array_values(array_filter($rows[$index]['observaciones'],
+                        fn ($message) => $message !== 'Varias líneas, cambio de composición o coincidencia incierta. No se propone reemplazar ningún ID.'));
+                    $rows[$index]['observaciones'][] = 'Cambio de tipo contractual con correspondencia única: coinciden RUT, RBD, financiamiento, jornada, distribución Básica/Media, fecha de ingreso, estatuto y escalafón. Se conserva el ID y se actualiza el contrato; no se crean ni dan de baja líneas por este cambio.';
+                    $rows[$index]['candidatos'] = [];
+                    $this->match($rows[$index], $candidate);
+                    $matched[$candidate['id']] = true;
+                }
+            }
         }
         foreach ($rows as &$row) {
             $data = $row['datos'];
@@ -236,6 +266,25 @@ class PadronConciliador
         }
         return ['filas' => $rows, 'errores' => $errors, 'excesos' => $excesses,
             'resumen' => collect($rows)->countBy('accion')->all()];
+    }
+
+    private function firmaSinTipoContrato(array $data): string
+    {
+        // No reutilizar signature(): su regla PLANTA SEP/PIE también omite
+        // escalafón. Aquí solo se permite variar el tipo de contrato.
+        return json_encode(array_map(fn ($key) => self::text((string) ($data[$key] ?? '')),
+            array_values(array_diff(self::IDENTITY, ['tipocontrato']))), JSON_THROW_ON_ERROR);
+    }
+
+    private function contratoRegularHistorico(array $data): ?string
+    {
+        if (self::tipo($data) === 'regular') {
+            return self::text($data['tipocontrato']);
+        }
+        if ($this->plantaConFinanciamientoSeparado($data)) {
+            return 'PLANTA';
+        }
+        return $this->contratoHistoricoSinFinanciamiento($data);
     }
 
     private function contratoHistoricoSinFinanciamiento(array $data): ?string

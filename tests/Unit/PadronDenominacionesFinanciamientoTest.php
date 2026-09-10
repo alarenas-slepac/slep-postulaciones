@@ -132,7 +132,7 @@ class PadronDenominacionesFinanciamientoTest extends TestCase
         }
     }
 
-    public function test_additional_labels_do_not_hide_other_differences_or_resolve_residual_contract_changes(): void
+    public function test_additional_labels_preserve_other_checks_and_independent_unique_contract_changes(): void
     {
         foreach (['CONTRATA', 'INDEFINIDO', 'PLAZO FIJO'] as $base) {
             $incoming = [$this->data('SEP', 17, ['tipocontrato' => $base]), $this->data('PIE', 2)];
@@ -143,8 +143,9 @@ class PadronDenominacionesFinanciamientoTest extends TestCase
                 ['financiamiento' => 'SUB.GENERAL'], ['tipocontrato' => $base.' PIE'], ['tipocontrato' => $base.' SEP EXTRA']] as $change) {
                 $report = $this->report($incoming, [array_replace($old[0], $change), $old[1]]);
                 $this->assertSame($change ? null : 101, $report['filas'][0]['personal_id'], json_encode($change));
-                $this->assertSame('revision_manual', $report['filas'][1]['accion']); // No CONTRATA -> PLANTA por descarte.
-                $this->assertNull($report['filas'][1]['personal_id']);
+                // La línea PIE tiene identidad propia inequívoca, no se elige por descarte.
+                $this->assertSame('actualizacion_propuesta', $report['filas'][1]['accion']);
+                $this->assertSame(102, $report['filas'][1]['personal_id']);
             }
         }
     }
