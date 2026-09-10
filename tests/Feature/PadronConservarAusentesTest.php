@@ -267,6 +267,110 @@ class PadronConservarAusentesTest extends TestCase
         $this->rechaza(fn () => $this->conservar($revision));
     }
 
+    public function test_historical_planta_batch_preserves_42_hours_ids_decisions_and_monthly_history(): void
+    {
+        DB::table('reemplazos_personal')->where('id', 103)->update(['tipocontrato' => 'PLANTA PIE', 'financiamiento' => 'PIE']);
+        DB::table('reemplazos_personal')->insert(array_replace((array) DB::table('reemplazos_personal')->find(103), [
+            'id' => 104, 'row_hash' => 'sintetico-104', 'tipocontrato' => 'PLANTA SEP', 'financiamiento' => 'SEP', 'jornada' => 4, 'jornada_basica' => 4,
+        ]));
+        DB::table('dotacion_docente_asignaciones')->where('id', 503)->update(['horas_contrato' => 1]);
+        DB::table('dotacion_docente_asignaciones')->insert(['id' => 504, 'reemplazos_personal_id' => 104, 'anio' => 2026,
+            'establecimiento_id' => 1, 'docente_rut' => '111111111', 'horas_contrato' => 4, 'estado' => 'activa']);
+        $revision = $this->revision();
+        $before = $this->estado();
+        $baseHash = $revision->base_hash;
+        $this->conservar($revision, [101]);
+        $savedDecision = DB::table('padron_revision_decisiones')->first();
+        $this->assertTrue($this->writer()->plan($revision->fresh())['conflictos']['grupos'][0]['bloqueante']);
+        $this->assertSame(2, $this->conservar($revision, [103, 104]));
+        $plan = $this->writer()->plan($revision->fresh());
+        $this->assertSame([], $plan['errores']);
+        $this->assertSame([], $plan['bajas']);
+        $this->assertSame(42.0, $plan['conflictos']['grupos'][0]['cobertura']['horas']);
+        $this->assertSame(43.0, $plan['conflictos']['grupos'][0]['total_asignadas']);
+        $this->assertSame('preexistente', $plan['conflictos']['grupos'][0]['comparacion']['estado']);
+        $this->assertFalse($plan['conflictos']['grupos'][0]['bloqueante']);
+        $this->assertStringNotContainsString('Contrato:', implode(' ', $plan['conflictos']['grupos'][0]['avisos']));
+        $this->assertSame($before, $this->estado());
+        $this->assertSame($baseHash, $revision->fresh()->base_hash);
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision->fresh()));
+        $this->assertEquals($savedDecision, DB::table('padron_revision_decisiones')->find($savedDecision->id));
+        $this->assertSame(0, $this->conservar($revision, [103, 104]));
+        $this->withoutMiddleware();
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+        $this->get(route('reemplazos.personal.import', ['revision' => $revision->id, 'q' => '111111111']))
+            ->assertOk()->assertSee('PLANTA PIE → PLANTA PIE')->assertSee('PLANTA SEP → PLANTA SEP')->assertSee('mes: 8 → 9');
+        $personal = DB::table('reemplazos_personal')->whereIn('id', [101, 103, 104])->get()->keyBy('id');
+        $writer = $this->writer();
+        $writer->aplicar($revision, 7, $plan['confirmacion_hash']);
+        foreach ($personal as $id => $old) {
+            $after = (array) DB::table('reemplazos_personal')->find($id);
+            $this->assertSame(array_replace((array) $old, ['mes' => 9, 'updated_at' => $after['updated_at']]), $after);
+            $this->assertDatabaseHas('padron_periodo_personal', ['personal_id' => $id, 'mes' => 8, 'tipocontrato' => $old->tipocontrato]);
+            $this->assertDatabaseHas('padron_periodo_personal', ['personal_id' => $id, 'mes' => 9, 'tipocontrato' => $old->tipocontrato]);
+        }
+        $this->assertSame($before['dotacion_docente_asignaciones'], $this->estado()['dotacion_docente_asignaciones']);
+        $this->assertDatabaseCount('reemplazos_personal', 4);
+        $this->assertDatabaseCount('padron_asignacion_cambios', 0);
+    }
+
+    public static function historicalTypes(): array
+    {
+        $cases = [];
+        foreach (['PLANTA', 'CONTRATA', 'INDEFINIDO', 'PLAZO FIJO'] as $base) {
+            foreach (['PIE', 'SEP'] as $funding) { $cases[$base.' '.$funding] = [$base.' '.$funding, $funding]; }
+        }
+        $cases['espacios y minúsculas'] = [' planta   pie ', ' pie '];
+        return $cases;
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('historicalTypes')]
+    public function test_historical_recognition_is_only_for_conservation_and_never_rewrites_the_type(string $type, string $funding): void
+    {
+        $service = app(PadronResolucionService::class);
+        $revision = $this->revision();
+        $original = array_replace((array) DB::table('reemplazos_personal')->find(103), ['tipocontrato' => $type, 'financiamiento' => $funding]);
+        $data = $service->datosConservados($revision, $original);
+        $this->assertSame($type, $data['tipocontrato']);
+        $this->assertSame($funding, $data['financiamiento']);
+        $this->assertSame(9, $data['mes']);
+        $this->assertSame('regular', $service->tipoPropuesto((object) ['fila_excel' => null, 'accion' => 'conservacion_propuesta', 'datos' => $data]));
+        $this->assertSame('por_clasificar', $service->tipoPropuesto((object) ['fila_excel' => 2, 'accion' => 'revision_manual', 'datos' => $data]));
+        $this->assertSame('por_clasificar', PadronConciliador::tipo($data));
+    }
+
+    public static function invalidConservations(): array
+    {
+        return [
+            'sufijo incompatible' => [['tipocontrato' => 'PLANTA PIE', 'financiamiento' => 'SEP'], 'no es regular reconocido'],
+            'sin financiamiento' => [['tipocontrato' => 'PLANTA SEP', 'financiamiento' => ''], 'no es regular reconocido'],
+            'tipo desconocido' => [['tipocontrato' => 'OTRO PIE', 'financiamiento' => 'PIE'], 'no es regular reconocido'],
+            'reemplazo' => [['tipocontrato' => 'REEMPLAZO PIE', 'financiamiento' => 'PIE'], 'no es regular reconocido'],
+            'suplencia' => [['tipocontrato' => 'SUPLENCIA'], 'no es regular reconocido'],
+            'otro año' => [['anio' => 2025], 'año contractual 2025'],
+            'mes posterior' => [['mes' => 10], 'mes contractual 10 es posterior'],
+            'mes inválido' => [['mes' => 0], 'mes contractual no es válido'],
+            'inactivo' => [['vigente' => false], 'contrato está inactivo'],
+            'jornada negativa' => [['jornada' => -1], 'jornada contractual debe ser numérica'],
+            'terminado' => [['fecha_termino' => '2026-08-31'], 'terminó el 2026-08-31'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidConservations')]
+    public function test_conservation_error_identifies_contract_and_reason(array $changes, string $message): void
+    {
+        $revision = $this->revision();
+        $original = array_replace((array) DB::table('reemplazos_personal')->find(103), $changes);
+        try {
+            app(PadronResolucionService::class)->datosConservados($revision, $original);
+            $this->fail('Debe rechazar la conservación.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('ID 103:', $exception->getMessage());
+            $this->assertStringContainsString($message, $exception->getMessage());
+        }
+        $this->assertDatabaseCount('padron_revision_decisiones', 0);
+    }
+
     public function test_admin_form_offers_explicit_batch_conservation_and_displays_proposed_month(): void
     {
         $revision = $this->revision();

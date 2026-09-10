@@ -276,7 +276,8 @@ class PadronConciliador
             array_values(array_diff(self::IDENTITY, ['tipocontrato']))), JSON_THROW_ON_ERROR);
     }
 
-    private function contratoRegularHistorico(array $data): ?string
+    /** Lectura de contratos existentes; no amplía los tipos admitidos en un Excel nuevo. */
+    public function contratoRegularHistorico(array $data): ?string
     {
         if (self::tipo($data) === 'regular') {
             return self::text($data['tipocontrato']);

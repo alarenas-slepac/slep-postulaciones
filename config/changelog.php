@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.10.509',
+    'current_version' => '2026.9.10.510',
     'entries' => [
+        [
+            'version' => '2026.9.10.510',
+            'title' => 'Padrón: conservación de contratos históricos SEP y PIE',
+            'summary' => 'Corrige el rechazo de contratos ausentes con denominaciones históricas cuyo sufijo coincide con su financiamiento.',
+            'roles' => ['admin'],
+            'items' => [
+                'Reconoce PLANTA PIE y PLANTA SEP, y las variantes históricas ya admitidas de CONTRATA, INDEFINIDO y PLAZO FIJO. No amplía la clasificación de tipos del Excel nuevo.',
+                'Usa el mismo reconocimiento en la conservación, la cobertura de Dotación y el plan de aplicación, sin renombrar contratos, duplicar IDs ni liberar asignaciones.',
+                'Detalla el ID y el motivo del rechazo: período, vigencia, tipo y financiamiento, jornada o fecha de término. Mantiene las protecciones y la validación atómica del lote.',
+                'Permite retomar la misma revisión sin cambiar la huella base ni reescribir decisiones. No requiere migraciones y no habilita la aplicación definitiva en producción.',
+            ],
+            'published_at' => '2026-09-10',
+        ],
         [
             'version' => '2026.9.10.509',
             'title' => 'Padrón: conservar contratos ausentes en el mes de carga',
