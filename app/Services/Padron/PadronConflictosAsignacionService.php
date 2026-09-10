@@ -12,7 +12,7 @@ class PadronConflictosAsignacionService
     public function snapshot(?int $anio): array
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'cobertura-v4-contratos-historicos');
+        hash_update($hash, 'cobertura-v5-bajas-diferidas');
         $read = static function (string $table, array $columns, bool $annual = false) use ($anio, $hash): array {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
@@ -27,7 +27,11 @@ class PadronConflictosAsignacionService
                 ->when($table === 'dotacion_docente_asignaciones', fn ($q) => $q->where('estado', 'activa'))
                 ->lazyById(100) as $row) {
                 hash_update($hash, json_encode($row, JSON_THROW_ON_ERROR)."\n");
-                $rows[] = array_intersect_key((array) $row, $keep);
+                $resumen = array_intersect_key((array) $row, $keep);
+                if ($table === 'dotacion_docente_asignaciones') {
+                    $resumen['_huella'] = hash('sha256', json_encode($row, JSON_THROW_ON_ERROR));
+                }
+                $rows[] = $resumen;
             }
             return $rows;
         };
@@ -88,6 +92,7 @@ class PadronConflictosAsignacionService
         }
         // El detalle agrupado no necesita conservar otra colección de modelos
         // ni nombres/fechas/documentos de todas las filas del archivo.
+        $bajasAsignaciones = app(PadronBajaAsignacionesService::class)->evaluar($revision, $filas, $resumen['estados'], $snapshot['asignaciones']);
         unset($filas, $fila, $decisiones, $selecciones, $resumen, $data);
         $personal = DB::table('reemplazos_personal')->whereIn('id', array_filter(array_column($snapshot['asignaciones'], 'reemplazos_personal_id')))
             ->get(['id', 'rut', 'tipocontrato', 'financiamiento', 'estatuto', 'jornada'])->keyBy('id');
@@ -186,6 +191,13 @@ class PadronConflictosAsignacionService
                             };
                     }
                 }
+                if ($bajasAsignaciones[$rut]['confirmada'] ?? false) {
+                    // Solo se omiten conflictos que la baja y la liberación
+                    // confirmadas resuelven juntas. Identidad/estamento/errores
+                    // distintos siguen bloqueando la aplicación completa.
+                    unset($motivos['id_sin_destino'], $motivos['sin_contrato_regular'], $motivos['cobertura_insuficiente']);
+                    $avisos[] = 'Baja con liberación confirmada: estas asignaciones se inactivarán únicamente al aplicar el padrón. Sus horas quedarán disponibles; el historial se conserva.';
+                }
                 $item = [
                     'asignacion_id' => $a['id'], 'personal_id' => $id, 'rut' => $rut,
                     'establecimiento_id' => $estId, 'rbd' => $est->rbd ?? null,
@@ -219,11 +231,13 @@ class PadronConflictosAsignacionService
                 'comparacion' => $comparacion, 'motivos' => $motivosGrupo, 'avisos' => $avisosGrupo,
                 'bloqueante' => (bool) $motivosGrupo, 'asignaciones' => $detalles,
                 'correspondencias_pendientes' => $pendientes[$rut] ?? 0,
+                'baja_asignaciones' => $bajasAsignaciones[$rut] ?? null,
             ];
         }
         usort($gruposResultado, fn ($a, $b) => ((int) $b['bloqueante'] <=> (int) $a['bloqueante'])
             ?: strcmp($a['rut'], $b['rut']) ?: ($a['establecimiento_id'] <=> $b['establecimiento_id']));
         return ['items' => $items, 'grupos' => $gruposResultado, 'errores' => array_values(array_unique($errores)),
+            'bajas_asignaciones' => $bajasAsignaciones,
             'grupos_revisados' => count($porGrupo),
             'grupos_bloqueantes' => count(array_filter($gruposResultado, fn ($g) => $g['bloqueante'])),
             'grupos_avisos' => count(array_filter($gruposResultado, fn ($g) => ! $g['bloqueante'])),

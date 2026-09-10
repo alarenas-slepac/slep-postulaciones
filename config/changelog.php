@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.9.505',
+    'current_version' => '2026.9.10.506',
     'entries' => [
+        [
+            'version' => '2026.9.10.506',
+            'title' => 'Padrón: bajas con liberación diferida de asignaciones',
+            'summary' => 'Permite confirmar el retiro de un funcionario ausente de todo el archivo y liberar sus asignaciones solo al aplicar el padrón.',
+            'roles' => ['admin'],
+            'items' => [
+                'Muestra el alcance por RUT, IDs contractuales, año, cantidad de asignaciones y horas. Exige justificación y confirmación explícita; permite retirar la autorización antes de aplicar.',
+                'La revisión no modifica contratos ni asignaciones. Al aplicar, inactiva únicamente las asignaciones confirmadas, conservando IDs, necesidades, horas e historial con auditoría antes/después.',
+                'No presume retiro si el RUT aparece en otro establecimiento del archivo. Revalida vínculos, bajas y alcance; los cambios en las asignaciones requieren una nueva confirmación.',
+                'La baja y la liberación comparten la transacción de aplicación: un fallo revierte ambas. Requiere la nueva migración de decisiones y auditoría; no habilita la aplicación definitiva en producción.',
+            ],
+            'published_at' => '2026-09-10',
+        ],
         [
             'version' => '2026.9.9.505',
             'title' => 'Padrón: cobertura anterior de contratos con denominación histórica',

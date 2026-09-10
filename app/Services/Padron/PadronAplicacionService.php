@@ -143,8 +143,8 @@ class PadronAplicacionService
     private function confirmacionHash(PadronRevision $revision): string
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'confirmacion-v3'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
-        foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'] as $table) {
+        hash_update($hash, 'confirmacion-v4-bajas'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
+        foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones', 'padron_bajas_asignaciones'] as $table) {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
                 hash_update($hash, 'ausente');
@@ -189,15 +189,17 @@ class PadronAplicacionService
             'establecimientos', 'dotacion_docente_asignaciones', 'declaracion_sostenedores', 'dotacion_docente_exclusiones',
             ...PadronHistorialService::DOCUMENTOS, 'reemplazos_personal_bloqueos',
         ], static fn (string $table): bool => Schema::hasTable($table)));
+        $tablasRevision = ['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'];
+        if (Schema::hasTable('padron_bajas_asignaciones')) { $tablasRevision[] = 'padron_bajas_asignaciones'; }
 
-        return DB::transaction(function () use ($revision, $usuario, $columns, $confirmacionHash, $tablasDependientes): PadronRevision {
+        return DB::transaction(function () use ($revision, $usuario, $columns, $confirmacionHash, $tablasDependientes, $tablasRevision): PadronRevision {
             // Un único escritor de cargas completas, incluso para revisiones distintas.
             DB::table('padron_aplicacion_control')->where('id', 1)->lockForUpdate()->firstOrFail();
             $revision = PadronRevision::whereKey($revision->id)->lockForUpdate()->firstOrFail();
             if ($revision->aplicada_at) {
                 return $revision; // Reintentos no duplican registros ni auditoría.
             }
-            foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'] as $table) {
+            foreach ($tablasRevision as $table) {
                 DB::table($table)->where('padron_revision_id', $revision->id)->orderBy('id')->lockForUpdate()->get(['id']);
             }
             // Se bloquean las mismas filas/rangos, pero solo se retiene su identidad.
@@ -278,6 +280,7 @@ class PadronAplicacionService
                 ], $columns));
                 $this->auditar($revision, $old->id, (array) $old, 'desactivacion', $usuario);
             }
+            app(PadronBajaAsignacionesService::class)->aplicar($revision, $plan['bajas'], $plan['conflictos']['bajas_asignaciones'] ?? [], $usuario);
             app(PadronPeriodoService::class)->despuesDeAplicar($revision, $usuario);
             $revision->forceFill(['aplicada_at' => now(), 'aplicada_por' => $usuario])->save();
             return $revision;
