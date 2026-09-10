@@ -11,6 +11,7 @@ use App\Services\Padron\PadronHistorialService;
 use App\Services\Padron\PadronRevisionService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Process\Process;
 
 /** Solo lo invoca el CLI privado; nunca se registra en el contenedor o las rutas. */
@@ -111,6 +112,13 @@ final class PadronRehearsal
                 fclose($file);
             }
             $bajas = $plan['bajas'];
+            $releases = [];
+            foreach ($plan['conflictos']['bajas_asignaciones'] ?? [] as $confirmation) {
+                if (! $confirmation['confirmada']) { continue; }
+                foreach ($confirmation['alcance']['asignaciones'] as $id => $hash) {
+                    $releases[$id] = ['hash' => $hash, 'confirmation' => $confirmation['ultima_id']];
+                }
+            }
             foreach ($bajas as $id) { $changes[$id] = true; }
         $destinations = count($plan['destinos']);
             unset($plan);
@@ -141,7 +149,7 @@ final class PadronRehearsal
             $seconds = round(microtime(true) - $started, 3);
             $peak = round(memory_get_peak_usage(true) / 1048576, 2);
             self::check($applied->aplicada_at !== null && (int) $applied->aplicada_por === $userId, 'completion_not_saved');
-            $result = self::verify($pdo, $source, $revisionId, $expected, $changes, $bajas, $destinations);
+            $result = self::verify($pdo, $source, $revisionId, $expected, $changes, $bajas, $destinations, $releases, $userId);
             $after = self::state();
             $writer->aplicar($revision, $userId, $token);
             self::check($after === self::state(), 'retry_not_idempotent');
@@ -165,7 +173,7 @@ final class PadronRehearsal
         return $candidate;
     }
 
-    private static function verify(\PDO $sourcePdo, string $source, int $revision, string $expected, array $changed, array $bajas, int $destinations): array
+    private static function verify(\PDO $sourcePdo, string $source, int $revision, string $expected, array $changed, array $bajas, int $destinations, array $releases, int $userId): array
     {
         $person = $sourcePdo->prepare('SELECT * FROM `'.$source.'`.reemplazos_personal WHERE id = ?');
         $oldCount = 0;
@@ -239,6 +247,7 @@ final class PadronRehearsal
         self::check(DB::table('reemplazos_personal')->count() === $oldCount + $newCount, 'personnel_count_mismatch');
         self::check(DB::table('padron_personal_cambios')->where('padron_revision_id', $revision)->count() === $destinations + $deactivations, 'audit_count_mismatch');
         $documents = 0;
+        $released = 0;
         foreach (['dotacion_docente_asignaciones', 'declaracion_sostenedores', 'dotacion_docente_exclusiones',
             'reemplazos_personal_bloqueos', 'padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones',
             ...PadronHistorialService::DOCUMENTOS] as $table) {
@@ -247,6 +256,20 @@ final class PadronRehearsal
                 $count++;
                 $current = (array) DB::table($table)->find($old['id']);
                 self::check($current !== [], 'related_row_missing');
+                if ($table === 'dotacion_docente_asignaciones' && isset($releases[$old['id']])) {
+                    $release = $releases[$old['id']];
+                    self::check(hash_equals($release['hash'], hash('sha256', json_encode($old, JSON_THROW_ON_ERROR)))
+                        && $old['estado'] === 'activa' && $current['estado'] === 'inactiva', 'release_scope_mismatch');
+                    $audit = DB::table('padron_asignacion_cambios')->where('padron_revision_id', $revision)->where('asignacion_id', $old['id'])->first();
+                    self::check($audit && (int) $audit->baja_asignaciones_id === $release['confirmation']
+                        && (int) $audit->usuario_id === $userId
+                        && json_decode($audit->antes, true, 512, JSON_THROW_ON_ERROR) === $old
+                        && json_decode($audit->despues, true, 512, JSON_THROW_ON_ERROR) === $current, 'release_audit_mismatch');
+                    $allowed = array_flip(['estado', 'updated_at', 'updated_by']);
+                    self::check(array_diff_key($old, $allowed) === array_diff_key($current, $allowed), 'release_changed_assignment_fields');
+                    $released++;
+                    continue;
+                }
                 if (in_array($table, PadronHistorialService::DOCUMENTOS, true)) {
                     $id = (int) ($old['reemplazo_personal_id'] ?? 0);
                     if ($old['padron_personal_snapshot'] === null && isset($changed[$id])) {
@@ -263,6 +286,16 @@ final class PadronRehearsal
                 self::check($old === $current, 'related_data_changed');
             }
             self::check(DB::table($table)->count() === $count, 'related_count_changed');
+        }
+        self::check($released === count($releases), 'planned_release_missing');
+        foreach (['padron_bajas_asignaciones', 'padron_asignacion_cambios'] as $table) {
+            if (! Schema::hasTable($table)) { continue; }
+            $count = 0;
+            foreach (self::sourceRows($sourcePdo, $source, $table) as $old) {
+                $count++;
+                self::check($old === (array) DB::table($table)->find($old['id']), 'previous_release_history_changed');
+            }
+            self::check(DB::table($table)->count() === $count + ($table === 'padron_asignacion_cambios' ? $released : 0), 'release_history_count_mismatch');
         }
         foreach (['padron_periodo_versiones', 'padron_periodo_personal'] as $table) {
             foreach (self::sourceRows($sourcePdo, $source, $table) as $old) {
@@ -312,7 +345,8 @@ final class PadronRehearsal
             'updates_verified' => $updates, 'reactivations_verified' => $reactivations,
             'deactivations_verified' => $deactivations, 'historical_documents_verified' => $documents,
             'period_versions_verified' => $versions, 'blocked_contracts_verified' => $blockedContracts,
-            'assignments_and_blocks_unchanged' => true];
+            'assignments_released_verified' => $released,
+            'assignments_and_blocks_unchanged' => $released === 0, 'unplanned_assignments_and_blocks_unchanged' => true];
     }
 
     private static function sourceRows(\PDO $pdo, string $source, string $table): \Generator
@@ -329,7 +363,8 @@ final class PadronRehearsal
     private static function state(): array
     {
         $state = PadronMySqlLab::state();
-        foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones'] as $table) {
+        foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones', 'padron_bajas_asignaciones', 'padron_asignacion_cambios'] as $table) {
+            if (! Schema::hasTable($table)) { continue; }
             $hash = hash_init('sha256');
             foreach (DB::table($table)->lazyById(100) as $row) { hash_update($hash, json_encode($row, JSON_THROW_ON_ERROR)."\n"); }
             $state[$table] = hash_final($hash);

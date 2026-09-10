@@ -78,6 +78,38 @@ destructiva automática, tampoco cuando falla la importación o una verificació
 
 ## Resultado local inicial
 
+### Bajas con liberación diferida (parche 2026.9.10.506)
+
+La revisión incorpora una confirmación explícita por RUT ausente de todo el
+archivo, con justificación y alcance de asignaciones del año revisado. Instalar
+la migración `2026_09_10_120000_create_padron_bajas_asignaciones.php` permite
+registrar estas decisiones; no habilita la aplicación definitiva.
+
+El ensayo admite esas liberaciones en el plan: exige la inactivación exacta de
+las asignaciones confirmadas, sin borrar filas ni modificar sus necesidades,
+horas, vínculos o años. Contrasta las imágenes antes/después y la confirmación
+de origen en `padron_asignacion_cambios`. Todas las demás asignaciones y las
+decisiones de baja deben permanecer idénticas. Las nuevas tablas también se
+incluyen en las huellas de rollback e idempotencia.
+
+Si cambia el alcance del RUT se requiere confirmar nuevamente; no se presume
+retiro si el RUT tiene alguna fila en otro establecimiento del archivo. Las
+pruebas de servicio con SQLite no certifican por sí solas la concurrencia ni
+el volumen real de este nuevo flujo en MariaDB/cPanel.
+
+Para el escenario sintético de baja con liberación en MariaDB, use
+`--action=rehearse-synthetic --synthetic-case=release` con el mismo `--root`
+privado. Solo ese fixture genera su confirmación; nunca autoriza bajas de la
+copia real. El reporte debe indicar `assignments_released_verified: 1` y
+`unplanned_assignments_and_blocks_unchanged: true`.
+
+Validación sintética local del 10/09/2026: MariaDB 10.11.18 completó la baja con
+una asignación liberada, seis documentos históricos protegidos y dos versiones
+mensuales. Rollback e idempotencia aprobados, origen sin cambios; pico de 32 MB
+bajo límite de 128 MB. No se aplicó una carga con datos reales.
+
+### Antecedentes del ensayo anterior
+
 - Ensayo sintético MariaDB: una actualización, una reactivación, una incorporación
   y una baja; seis documentos protegidos, dos versiones mensuales, un contrato
   bloqueado comprobado, rollback y repetición sin duplicados.

@@ -9,6 +9,7 @@ use App\Services\Padron\PadronRevisionService;
 use App\Services\Padron\PadronAplicacionService;
 use App\Services\Padron\PadronDependenciasService;
 use App\Services\Padron\PadronResolucionService;
+use App\Services\Padron\PadronBajaAsignacionesService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +92,9 @@ class PersonalImportController extends Controller
                 'confirmacionHash' => $plan['confirmacion_hash'] ?? null,
                 'conflictos' => $conflictos, 'conflictosPaginados' => $conflictosPaginados,
                 'cambiosAplicados' => $revision->aplicada_at ? DB::table('padron_personal_cambios')->where('padron_revision_id', $revision->id)->count() : 0,
+                'liberacionInstalada' => app(PadronBajaAsignacionesService::class)->instalado(),
+                'asignacionesLiberadas' => $revision->aplicada_at && app(PadronBajaAsignacionesService::class)->instalado()
+                    ? DB::table('padron_asignacion_cambios')->where('padron_revision_id', $revision->id)->count() : 0,
                 'autorizaciones' => DB::table('padron_revision_autorizaciones')->where('padron_revision_id', $revision->id)->get()->keyBy('rut'),
             ]));
         }
@@ -216,7 +220,26 @@ class PersonalImportController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate(['accion' => ['required', 'in:previsualizar,autorizar_exceso,resolver,resolver_varias,aplicar']]);
+        $request->validate(['accion' => ['required', 'in:previsualizar,autorizar_exceso,resolver,resolver_varias,aplicar,confirmar_baja_asignaciones,retirar_baja_asignaciones']]);
+        if (in_array($request->input('accion'), ['confirmar_baja_asignaciones', 'retirar_baja_asignaciones'], true)) {
+            $data = $request->validate([
+                'revision' => ['required', 'integer', 'min:1'], 'rut' => ['required', 'string', 'max:32'],
+                'alcance_hash' => ['required', 'regex:/^[a-f0-9]{64}$/'],
+                'decision_anterior' => ['required', 'integer', 'min:0'],
+                'justificacion' => ['required', 'string', 'min:10', 'max:2000'],
+                'confirmar_alcance' => ['accepted'],
+                'conflictos_page' => ['nullable', 'integer', 'min:1'],
+            ]);
+            $revision = PadronRevision::findOrFail($data['revision']);
+            $confirmar = $request->input('accion') === 'confirmar_baja_asignaciones';
+            app(PadronBajaAsignacionesService::class)->registrar($revision, $data['rut'], $data['alcance_hash'],
+                (int) $data['decision_anterior'], $data['justificacion'], (int) $request->user()->id, $confirmar);
+            return redirect()->to(route('reemplazos.personal.import', [
+                'revision' => $revision->id, 'conflictos_page' => $data['conflictos_page'] ?? 1,
+            ]).'#conflictos-asignaciones')->with('status', $confirmar
+                ? 'Baja y liberación diferida confirmadas. Solo se registró la decisión; los contratos y las asignaciones siguen sin cambios hasta aplicar el padrón.'
+                : 'Confirmación de liberación retirada. No se modificaron contratos ni asignaciones.');
+        }
         if (in_array($request->input('accion'), ['resolver', 'resolver_varias', 'aplicar'], true)) {
             $data = $request->validate(['revision' => ['required', 'integer', 'min:1']]);
             $revision = PadronRevision::findOrFail($data['revision']);
@@ -262,7 +285,7 @@ class PersonalImportController extends Controller
                 $request->validate(['confirmar_aplicacion' => ['accepted']]);
                 @set_time_limit(240);
                 $aplicador->aplicar($revision, (int) $request->user()->id, (string) $request->string('confirmacion_hash'));
-                $message = 'Padrón aplicado. Los IDs y las referencias históricas se conservaron; las asignaciones no se modificaron.';
+                $message = 'Padrón aplicado. Los IDs y las referencias históricas se conservaron. Solo se inactivaron las asignaciones incluidas en bajas con liberación confirmada.';
             }
             return redirect()->route('reemplazos.personal.import', ['revision' => $revision->id])->with('status', $message);
         }

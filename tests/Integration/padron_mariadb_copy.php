@@ -122,7 +122,7 @@ try {
     } else {
         if ($action === 'rehearse-synthetic') {
             $syntheticCase = $options['synthetic-case'] ?? 'success';
-            if (! in_array($syntheticCase, ['success', 'unresolved', 'stale', 'missing-user'], true)) {
+            if (! in_array($syntheticCase, ['success', 'release', 'unresolved', 'stale', 'missing-user'], true)) {
                 throw new RuntimeException('Caso sintético no permitido.');
             }
             // Fixture separado: no usa ni altera funcionarios de la copia real.
@@ -140,6 +140,18 @@ try {
             });
             DB::table('reemplazos_personal_bloqueos')->where('id', 1)->update(['rut' => '222222222']);
             $options['revision'] = Lab::revision()['revision'];
+            if ($syntheticCase === 'release') {
+                // Solo fixture sintético recién creado. No decide sobre la copia real.
+                (require dirname(__DIR__, 2).'/database/migrations/2026_09_10_120000_create_padron_bajas_asignaciones.php')->up();
+                DB::table('dotacion_docente_asignaciones')->insert([
+                    'id' => 502, 'anio' => 2026, 'establecimiento_id' => 1, 'reemplazos_personal_id' => 102,
+                    'docente_rut' => '222222222', 'estado' => 'activa', 'horas_contrato' => 37,
+                ]);
+                $review = PadronRevision::findOrFail($options['revision']);
+                $release = app(\App\Services\Padron\PadronConflictosAsignacionService::class)->analizar($review)['bajas_asignaciones']['222222222'];
+                app(\App\Services\Padron\PadronBajaAsignacionesService::class)->registrar($review, '222222222',
+                    $release['alcance_hash'], 0, 'Retiro y liberación exclusivamente sintéticos.', 7, true);
+            }
             $options['user'] = 7;
             $report['synthetic_only'] = true;
             $report['synthetic_case'] = $syntheticCase;

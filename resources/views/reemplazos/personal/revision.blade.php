@@ -27,9 +27,11 @@
         @if ($revision->aplicada_at)
             <strong>Carga aplicada el {{ $revision->aplicada_at }} por usuario #{{ $revision->aplicada_por }}.</strong>
             {{ $cambiosAplicados }} cambios auditados. Esta revisión está cerrada y conserva las propuestas originales.
+            {{ $asignacionesLiberadas ?? 0 }} asignaciones inactivadas por bajas con liberación confirmada, conservadas en la auditoría.
         @else
             <strong>Solo previsualización.</strong> No se modifican contratos, vigencias ni asignaciones.
             Las decisiones manuales y las autorizaciones de jornada tampoco aplican registros al padrón.
+            Las confirmaciones de baja con liberación también quedan diferidas hasta la aplicación definitiva.
             <div class="mt-2">Puede continuar esta misma revisión en distintas sesiones: no vence por el paso del tiempo ni por actividad en los documentos auditados.
                 Las decisiones registradas se conservan. Los conflictos de Dotación y las referencias históricas se consultan con los datos actuales al recargar;
                 antes de aplicar se revalidan. Si cambia el padrón contractual base, los establecimientos o las versiones de períodos, se exige un nuevo análisis.</div>

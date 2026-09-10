@@ -13,7 +13,10 @@
         @if ($obsoleta || $revision->errores)
             <div class="alert alert-warning">Diagnóstico orientativo: corrija el archivo o genere una revisión vigente antes de continuar.</div>
         @endif
-        <div class="alert alert-info">Para resolver: corrija la correspondencia de IDs cuando proceda; si las horas o vínculos son incorrectos, revíselos en Dotación con sus permisos habituales. Luego recargue esta misma revisión para recalcular los conflictos, conservando las decisiones y autorizaciones registradas. No se trasladan ni eliminan asignaciones automáticamente. Una autorización sobre 44 horas no levanta estos bloqueos.</div>
+        <div class="alert alert-info">Para resolver: corrija la correspondencia de IDs cuando proceda; si las horas o vínculos son incorrectos, revíselos en Dotación con sus permisos habituales. Luego recargue esta misma revisión para recalcular los conflictos, conservando las decisiones y autorizaciones registradas. Para un retiro completo puede confirmar la baja con liberación diferida: las asignaciones se inactivan solo al aplicar el padrón, sin borrar historial. Una autorización sobre 44 horas no levanta estos bloqueos.</div>
+        @if (! ($liberacionInstalada ?? false))
+            <div class="alert alert-warning">La confirmación de bajas con liberación requiere instalar la migración correspondiente con PHP 8.3. Esto no habilita la aplicación definitiva.</div>
+        @endif
         <div class="table-responsive">
             <table class="table table-sm table-bordered align-middle">
                 <thead><tr><th>Funcionario / asignaciones</th><th>Establecimiento</th><th>Cobertura actual y propuesta</th><th>Motivo / revisión</th></tr></thead>
@@ -60,6 +63,9 @@
                                 @endif
                                 @foreach ($item['motivos'] as $motivo)<div>{{ $motivo }}</div>@endforeach
                                 @foreach ($item['avisos'] as $aviso)<div>{{ $aviso }}</div>@endforeach
+                                @if ($item['baja_asignaciones'] ?? null)
+                                    @include('reemplazos.personal.partials.baja-asignaciones', ['baja' => $item['baja_asignaciones']])
+                                @endif
                             </td>
                         </tr>
                     @empty
