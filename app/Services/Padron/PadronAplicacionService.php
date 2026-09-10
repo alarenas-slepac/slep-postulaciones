@@ -72,7 +72,7 @@ class PadronAplicacionService
                 }
                 $id = $decisiones[$fila->id]->personal_id;
             }
-            if ($fila->accion === 'error' || PadronConciliador::tipo($fila->datos) === 'por_clasificar') {
+            if ($fila->accion === 'error' || app(PadronResolucionService::class)->tipoPropuesto($fila) === 'por_clasificar') {
                 $errores[] = 'Fila '.$fila->fila_excel.': corrija los datos o el tipo de contrato en el archivo.';
             }
             if ($id !== null && isset($usados[$id])) {

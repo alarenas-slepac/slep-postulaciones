@@ -78,22 +78,47 @@ class PadronResolucionService
 
     public function datosConservados(PadronRevision $revision, array $anterior): array
     {
-        if (! $revision->anio || $revision->mes < 1 || $revision->mes > 12
-            || (int) ($anterior['anio'] ?? 0) !== (int) $revision->anio
-            || (int) ($anterior['mes'] ?? 0) < 1 || (int) $anterior['mes'] > (int) $revision->mes
-            || ! ($anterior['vigente'] ?? true) || PadronConciliador::tipo($anterior) !== 'regular'
-            || ! is_numeric($anterior['jornada'] ?? null) || (float) $anterior['jornada'] < 0) {
-            $this->fail('Solo puede conservar un contrato regular vigente del mismo año y de un mes no posterior a la carga. Corrija los demás casos en el Excel.');
+        $id = 'ID '.($anterior['id'] ?? 'sin identificar').': ';
+        if (! $revision->anio || $revision->mes < 1 || $revision->mes > 12) {
+            $this->fail($id.'la revisión no tiene un período de carga válido.');
+        }
+        if ((int) ($anterior['anio'] ?? 0) !== (int) $revision->anio) {
+            $this->fail($id.'el año contractual '.($anterior['anio'] ?? 'sin informar').' no coincide con el año de carga '.$revision->anio.'. No se modifica historia de otro año con esta opción.');
+        }
+        if ((int) ($anterior['mes'] ?? 0) < 1 || (int) ($anterior['mes'] ?? 0) > 12) {
+            $this->fail($id.'el mes contractual no es válido; revise el registro de origen.');
+        }
+        if ((int) $anterior['mes'] > (int) $revision->mes) {
+            $this->fail($id.'el mes contractual '.$anterior['mes'].' es posterior al mes de carga '.$revision->mes.'. No se retrocede el período con esta opción.');
+        }
+        if (! ($anterior['vigente'] ?? true)) {
+            $this->fail($id.'el contrato está inactivo. Esta opción conserva contratos vigentes, no los reactiva.');
+        }
+        if (app(PadronConciliador::class)->contratoRegularHistorico($anterior) === null) {
+            $this->fail($id.'el tipo de contrato «'.($anterior['tipocontrato'] ?? 'sin informar').'» con financiamiento «'.($anterior['financiamiento'] ?? 'sin informar').'» no es regular reconocido. Los sufijos históricos SEP/PIE deben coincidir con el financiamiento; no se admiten reemplazos ni suplencias. Revise el Excel.');
+        }
+        if (! is_numeric($anterior['jornada'] ?? null) || (float) $anterior['jornada'] < 0) {
+            $this->fail($id.'la jornada contractual debe ser numérica y no negativa.');
         }
         $inicio = sprintf('%04d-%02d-01', $revision->anio, $revision->mes);
         if (! empty($anterior['fecha_termino']) && $anterior['fecha_termino'] < $inicio) {
-            $this->fail('El contrato terminó antes del mes de carga. No se puede prorrogar su fecha de término con esta opción; revise el Excel.');
+            $this->fail($id.'el contrato terminó el '.$anterior['fecha_termino'].', antes del mes de carga. No se puede prorrogar su fecha de término con esta opción; revise el Excel.');
         }
         $data = array_intersect_key($anterior, array_flip([...PadronExcelReader::REQUIRED, 'tramo', 'fecha_antiguedad']));
         $data['rut'] = PadronConciliador::rut($anterior['rut'] ?? '');
         $data['anio'] = (int) $revision->anio;
         $data['mes'] = (int) $revision->mes;
         return $data;
+    }
+
+    /** Reconoce etiquetas históricas solo en las conservaciones validadas, sin alterar sus datos. */
+    public function tipoPropuesto(object $fila): string
+    {
+        if ($fila->fila_excel === null && $fila->accion === 'conservacion_propuesta'
+            && app(PadronConciliador::class)->contratoRegularHistorico($fila->datos) !== null) {
+            return 'regular';
+        }
+        return PadronConciliador::tipo($fila->datos);
     }
 
     public function resolver(PadronRevision $revision, int $filaId, ?int $personalId, string $motivo, int $usuario, int $decisionAnterior = 0): void

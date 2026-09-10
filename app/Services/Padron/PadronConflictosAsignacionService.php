@@ -83,10 +83,11 @@ class PadronConflictosAsignacionService
                 continue;
             }
             $id = $selecciones[$fila->id];
+            $tipo = $resolucion->tipoPropuesto($fila);
             if ($id !== null) {
-                $destinos[(int) $id] = ['datos' => $data, 'establecimiento_id' => $estId, 'rut' => $rut, 'fila' => $fila->fila_excel];
+                $destinos[(int) $id] = ['datos' => $data, 'tipo' => $tipo, 'establecimiento_id' => $estId, 'rut' => $rut, 'fila' => $fila->fila_excel];
             }
-            if ($fila->accion !== 'error' && PadronConciliador::tipo($data) === 'regular' && $estId) {
+            if ($fila->accion !== 'error' && $tipo === 'regular' && $estId) {
                 $grupos[$key][] = $data;
             }
         }
@@ -153,7 +154,7 @@ class PadronConflictosAsignacionService
                     if ($destino['rut'] !== $rut) {
                         $motivos['rut_incompatible'] = 'El RUT del ID seleccionado no coincide con el RUT de la asignación.';
                     }
-                    if (PadronConciliador::tipo($destino['datos']) !== 'regular') {
+                    if ($destino['tipo'] !== 'regular') {
                         $motivos['contrato_excluido'] = 'El contrato pasaría a reemplazo/suplencia o a un tipo sin clasificar, no utilizable en Dotación.';
                     }
                     foreach (['tipocontrato' => 'Contrato', 'financiamiento' => 'Financiamiento', 'estatuto' => 'Estatuto'] as $field => $label) {
