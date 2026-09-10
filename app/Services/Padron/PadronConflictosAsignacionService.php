@@ -12,7 +12,7 @@ class PadronConflictosAsignacionService
     public function snapshot(?int $anio): array
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'cobertura-v5-bajas-diferidas');
+        hash_update($hash, 'cobertura-v6-aviso-sin-base-comparable');
         $read = static function (string $table, array $columns, bool $annual = false) use ($anio, $hash): array {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
@@ -182,6 +182,12 @@ class PadronConflictosAsignacionService
                 if ($total > $cobertura['horas'] + 0.01) {
                     if ($comparacion['estado'] === 'preexistente') {
                         $avisos[] = 'Exceso preexistente: '.$comparacion['exceso_actual'].' h antes y '.$comparacion['exceso_propuesto'].' h con la propuesta. La carga no lo agrava; revise las asignaciones en Dotación. Este exceso por sí solo no bloquea.';
+                    } elseif ($comparacion['estado'] === 'no_comparable' && $rows
+                        && $cobertura['horas'] > 0 && ! $cobertura['ambigua'] && $cobertura['estamento'] !== null) {
+                        // La ausencia de una base comparable no acredita un exceso
+                        // nuevo o agravado. Informar sin presumir preexistencia ni
+                        // levantar los demás motivos de este RUT/establecimiento.
+                        $avisos[] = 'Exceso sin base anterior comparable: '.$total.' h asignadas frente a '.$cobertura['horas'].' h de cobertura propuesta ('.$cobertura['fuente'].'); diferencia de '.$comparacion['exceso_propuesto'].' h. No se puede determinar si el exceso es preexistente. Este exceso por sí solo no bloquea la carga; revise las asignaciones en Dotación. No se modifican ni autorizan horas adicionales.';
                     } else {
                         $motivos['cobertura_insuficiente'] = $total.' h asignadas al RUT/establecimiento superan las '.$cobertura['horas'].' h de cobertura propuesta ('.$cobertura['fuente'].'). '
                             .match ($comparacion['estado']) {

@@ -9,7 +9,8 @@
         <p class="small">Diagnóstico de toda la carga y las decisiones actuales, independiente del filtro de filas.
             Las horas se contrastan por RUT y establecimiento, sin sumar Jornada Básica/Media nuevamente.
             La declaración tiene prioridad y no se suma al padrón; las exclusiones docentes se descuentan.
-            Un exceso preexistente que la carga no aumenta se informa como aviso. Los excesos nuevos o agravados y los problemas de vínculos mantienen el bloqueo.</p>
+            Un exceso preexistente que la carga no aumenta se informa como aviso. También se informa como aviso el exceso sin base anterior comparable cuando existe cobertura regular propuesta positiva y no ambigua, sin presumir que ya existía.
+            Los excesos nuevos o agravados acreditados por una comparación válida y los problemas de vínculos mantienen el bloqueo.</p>
         @if ($obsoleta || $revision->errores)
             <div class="alert alert-warning">Diagnóstico orientativo: corrija el archivo o genere una revisión vigente antes de continuar.</div>
         @endif

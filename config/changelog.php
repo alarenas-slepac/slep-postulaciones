@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.10.507',
+    'current_version' => '2026.9.10.508',
     'entries' => [
+        [
+            'version' => '2026.9.10.508',
+            'title' => 'Padrón: exceso sin cobertura anterior comparable como aviso',
+            'summary' => 'La falta de una base comparable no bloquea por sí sola cuando existe cobertura regular propuesta positiva y no ambigua.',
+            'roles' => ['admin'],
+            'items' => [
+                'Muestra las horas asignadas, la cobertura propuesta y su diferencia como aviso sin presumir que el exceso ya existía. Conserva el exceso anterior como No comparable.',
+                'Mantiene los bloqueos por excesos nuevos o agravados acreditados, falta de cobertura, correspondencias pendientes, pérdida de vínculos, traslados, identidad o estamento incompatibles y datos inválidos.',
+                'No modifica asignaciones ni contratos y no autoriza jornadas adicionales. La autorización de contratos superiores a 44 horas permanece independiente.',
+                'Se refleja al recargar la misma revisión, sin perder decisiones guardadas. Renueva la huella de confirmación final; no requiere migraciones ni habilita la aplicación definitiva.',
+            ],
+            'published_at' => '2026-09-10',
+        ],
         [
             'version' => '2026.9.10.507',
             'title' => 'Padrón: correspondencia automática por cambio de tipo contractual',
