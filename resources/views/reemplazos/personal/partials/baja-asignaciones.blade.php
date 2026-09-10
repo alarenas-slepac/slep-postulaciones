@@ -1,6 +1,7 @@
 <div class="border-top mt-3 pt-2">
     <strong>Baja por ausencia del padrón completo</strong>
     <div>Este RUT no tiene filas en el archivo, en ningún establecimiento.</div>
+    <div class="alert alert-info my-2">Si debe continuar en el padrón, use «Ver filas del RUT» y elija «Conservar este ID en el período de carga» para cada contrato que corresponda. No confirme la baja. Si ya autorizó la liberación, retírela primero.</div>
     <div>Alcance del año {{ $revision->anio }}: {{ $baja['cantidad'] }} asignaciones · {{ $baja['horas'] }} h · {{ $baja['establecimientos'] }} establecimiento(s).</div>
     <div>IDs contractuales a dar de baja: {{ implode(', ', $baja['alcance']['bajas']) }}.</div>
     @if ($baja['confirmada'])

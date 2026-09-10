@@ -49,7 +49,7 @@ class PadronAplicacionService
         if (! $revision->anio || ! $revision->mes || $filas->whereNotNull('fila_excel')->isEmpty()) {
             $errores[] = 'No se puede aplicar un padrón vacío o sin período válido.';
         }
-        $entrantes = $filas->whereNotNull('fila_excel')->values();
+        $entrantes = app(PadronResolucionService::class)->entrantes($revision, $filas, $decisiones);
         $vigenciaReemplazos = (new PadronReemplazosVigentes)->evaluar($entrantes->map(fn ($fila) => $fila->toArray())->all());
         foreach ($entrantes as $index => $fila) {
             if ((int) ($fila->datos['anio'] ?? 0) !== (int) $revision->anio || (int) ($fila->datos['mes'] ?? 0) !== (int) $revision->mes) {
@@ -83,9 +83,11 @@ class PadronAplicacionService
             }
             $destinos[] = ['fila' => $fila, 'id' => $id === null ? null : (int) $id];
         }
+        $estados = app(PadronResolucionService::class)->resumen($filas, $decisiones)['estados'];
         foreach ($filas->whereNull('fila_excel') as $fila) {
-            if (! isset($usados[$fila->personal_id]) && $fila->accion === 'ausencia_por_revisar' && ! $decisiones->has($fila->id)) {
-                $errores[] = 'ID '.$fila->personal_id.': confirme su baja o vincúlelo a una fila del archivo.';
+            if (! isset($usados[$fila->personal_id]) && ($estados[$fila->id] ?? '') === 'pendiente') {
+                $errores[] = 'ID '.$fila->personal_id.': confirme su baja, consérvelo en el período de carga o vincúlelo a una fila del archivo.';
+                continue;
             }
             if (! isset($usados[$fila->personal_id]) && ($fila->accion === 'baja_propuesta'
                 || ($fila->accion === 'ausencia_por_revisar' && $decisiones->has($fila->id)))) {
@@ -250,6 +252,12 @@ class PadronAplicacionService
                 $data['vigente'] = true;
                 $data['source_filename'] = $revision->archivo;
                 $data['updated_at'] = now()->toDateTimeString();
+                if ($fila->accion === 'conservacion_propuesta') {
+                    if ($before === null) { $this->fail('La conservación requiere un ID contractual existente.'); }
+                    // Esta decisión solo lleva el mismo contrato al mes revisado.
+                    // No corrige otros campos ni atribuye su origen al Excel.
+                    $data = ['mes' => (int) $revision->mes, 'updated_at' => $data['updated_at']];
+                }
                 if ($before === null) {
                     $data['created_at'] = now()->toDateTimeString();
                     $data['created_by'] = $usuario;

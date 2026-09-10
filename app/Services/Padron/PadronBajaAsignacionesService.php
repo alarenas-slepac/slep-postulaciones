@@ -34,7 +34,7 @@ class PadronBajaAsignacionesService
         $ausentes = [];
         foreach ($filas as $fila) {
             $rut = PadronConciliador::rut($fila->rut);
-            if ($fila->fila_excel !== null) {
+            if ($fila->fila_excel !== null || ($estados[$fila->id] ?? '') === 'conservada') {
                 // Incluso un reemplazo omitido o una línea inválida impide presumir retiro.
                 $entrantes[$rut] = true;
             } else {

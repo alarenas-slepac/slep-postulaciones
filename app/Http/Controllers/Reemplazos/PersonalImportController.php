@@ -130,7 +130,7 @@ class PersonalImportController extends Controller
             'casoRut' => $request->query('caso_rut'), 'casoEstablecimiento' => $request->query('caso_establecimiento'),
             'resolucionDisponible' => $disponible, 'decisiones' => $decisiones,
             'historialDecisiones' => $historial->groupBy('padron_revision_fila_id'),
-            'resumenResolucion' => $resolucion->resumen($revision->filas()->get(['id', 'fila_excel', 'accion', 'personal_id']), $decisiones),
+            'resumenResolucion' => $resolucion->resumen($revision->filas()->get(['id', 'fila_excel', 'accion', 'personal_id', 'rut']), $decisiones),
             'dependenciasHistoricas' => app(PadronDependenciasService::class)->paraPersonal($ids),
             'obsoleta' => ! $revision->aplicada_at && app(PadronRevisionService::class)->stale($revision),
         ];
