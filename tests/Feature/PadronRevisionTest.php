@@ -264,25 +264,20 @@ class PadronRevisionTest extends TestCase
         $service = app(\App\Services\Padron\PadronAplicacionService::class);
         $this->assertFalse($service->disponible());
 
-        // El bloqueo se aplica también al servicio, no solo al botón.
-        foreach (['aplicar', 'resolver'] as $action) {
-            try {
-                if ($action === 'aplicar') {
-                    $service->aplicar($revision, 1);
-                } else {
-                    $service->resolver($revision, $revision->filas->first()->id, 101, 'Justificación sintética de prueba.', 1);
-                }
-                $this->fail('No debe habilitar escrituras en esta entrega.');
-            } catch (ValidationException $exception) {
-                $this->assertArrayHasKey('revision', $exception->errors());
-            }
+        // Aplicar sigue bloqueado. Conservar una actualización registra solo una decisión.
+        try {
+            $service->aplicar($revision, 1);
+            $this->fail('No debe habilitar escrituras en esta entrega.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('revision', $exception->errors());
         }
+        $service->resolver($revision, $revision->filas->first()->id, 101, 'Justificación sintética de prueba.', 1);
 
         $this->withoutMiddleware();
         $user = new \App\Models\User;
         $user->id = 1;
         $this->actingAs($user);
-        foreach (['aplicar', 'resolver'] as $action) {
+        foreach (['aplicar'] as $action) {
             $this->post(route('reemplazos.personal.import.store'), [
                 'accion' => $action, 'revision' => $revision->id,
                 'confirmar_aplicacion' => 1, 'fila' => $revision->filas->first()->id,
@@ -300,7 +295,7 @@ class PadronRevisionTest extends TestCase
         $this->assertSame($before, DB::table('reemplazos_personal')->get()->toJson());
         $this->assertSame($assignments, DB::table('dotacion_docente_asignaciones')->get()->toJson());
         $this->assertDatabaseCount('padron_personal_cambios', 0);
-        $this->assertDatabaseCount('padron_revision_decisiones', 0);
+        $this->assertDatabaseCount('padron_revision_decisiones', 1);
         $this->assertNull($revision->fresh()->aplicada_at);
     }
 

@@ -12,6 +12,18 @@ Disponible en la revisión administrativa del padrón completo. Esta decisión s
 
 ## Efectos y protecciones
 
+### Conservar ante una actualización propuesta
+
+Desde 2026.9.11.511 también se puede conservar el contrato anterior de una fila **Actualización propuesta** con un ID ya identificado. En **Revisar actualización**, elegir **Conservar datos anteriores; solo actualizar mes** y justificar. Puede guardarse individualmente o con las selecciones del mismo RUT.
+
+La conservación sustituye los datos propuestos por los datos anteriores de ese ID; no agrega una segunda línea ni suma dos veces la jornada. Al aplicar se modifica solo el mes y la marca técnica de modificación. Se mantienen incluso las fechas originales de ingreso y término, nombre, financiamiento, estatuto, escalafón y antigüedad. La opción no corrige posibles inconsistencias de esos datos: el administrador debe verificar que corresponda mantenerlos.
+
+La vista conserva el número de fila y permite desplegar **Propuesta original del Excel (no se aplicará)**. Para revertir la elección, usar **Retomar actualización con los datos del Excel** con una nueva justificación. Esto mantiene el mismo ID, no crea un contrato nuevo ni borra la decisión anterior; vuelve a validar la cobertura del Excel.
+
+Solo se habilita en actualizaciones con ID identificado, no en incorporaciones, traslados, reactivaciones, reemplazos omitidos, errores o correspondencias ambiguas. Mantiene todas las validaciones de conservación y de Dotación. En particular, un contrato AAEE no se convierte en docente por conservarlo: cualquier incompatibilidad de estamento de sus asignaciones sigue requiriendo revisión.
+
+### Reglas comunes
+
 - En revisión solo se guardan decisiones auditadas, su justificación y, cuando corresponde, el nuevo total de jornada sujeto a autorización. El análisis original y el Excel no se reescriben.
 - La cobertura propuesta suma los contratos conservados. Las asignaciones permanecen activas; no se liberan, trasladan ni duplican. Los excesos de asignación siguen las reglas vigentes de avisos y bloqueos.
 - Se suman también las horas conservadas al control de más de 44 horas por RUT, en todos sus establecimientos. La autorización debe corresponder al total propuesto. Si cambia un total que ya estaba autorizado, se rechaza el cambio y se requiere una nueva revisión; no se sobrescribe la autorización anterior.

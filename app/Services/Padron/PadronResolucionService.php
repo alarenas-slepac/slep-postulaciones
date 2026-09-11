@@ -55,25 +55,32 @@ class PadronResolucionService
 
     public function conservada(object $fila, Collection $decisiones): bool
     {
-        return $fila->fila_excel === null && in_array($fila->accion, ['baja_propuesta', 'ausencia_por_revisar'], true)
+        return (($fila->fila_excel === null && in_array($fila->accion, ['baja_propuesta', 'ausencia_por_revisar'], true))
+                || $this->permiteConservarActualizacion($fila))
             && $fila->personal_id && (int) ($decisiones->get($fila->id)?->personal_id ?? 0) === (int) $fila->personal_id;
+    }
+
+    public function permiteConservarActualizacion(object $fila): bool
+    {
+        return $fila->fila_excel !== null && $fila->accion === 'actualizacion_propuesta' && (bool) $fila->personal_id;
     }
 
     /** Propuestas efectivas en memoria. No inventa números de fila Excel ni cambia el análisis original. */
     public function entrantes(PadronRevision $revision, Collection $filas, Collection $decisiones): Collection
     {
-        $entrantes = $filas->whereNotNull('fila_excel')->values();
+        $entrantes = $filas->whereNotNull('fila_excel')->keyBy('id');
         $conservadas = $filas->filter(fn ($fila) => $this->conservada($fila, $decisiones));
-        if ($conservadas->isEmpty()) { return $entrantes; }
+        if ($conservadas->isEmpty()) { return $entrantes->values(); }
         // Leer únicamente las imágenes de las ausencias seleccionadas, no duplicar todo el padrón en memoria.
         $originales = $revision->filas()->whereIn('id', $conservadas->pluck('id'))->get(['id', 'anterior'])->keyBy('id');
         foreach ($conservadas as $fila) {
             $propuesta = clone $fila;
             $propuesta->datos = $this->datosConservados($revision, $originales[$fila->id]->anterior ?? []);
             $propuesta->accion = 'conservacion_propuesta';
-            $entrantes->push($propuesta);
+            // Sustituir la propuesta del Excel, nunca sumar ambas versiones.
+            $entrantes->put($fila->id, $propuesta);
         }
-        return $entrantes;
+        return $entrantes->values();
     }
 
     public function datosConservados(PadronRevision $revision, array $anterior): array
@@ -114,7 +121,7 @@ class PadronResolucionService
     /** Reconoce etiquetas históricas solo en las conservaciones validadas, sin alterar sus datos. */
     public function tipoPropuesto(object $fila): string
     {
-        if ($fila->fila_excel === null && $fila->accion === 'conservacion_propuesta'
+        if ($fila->accion === 'conservacion_propuesta'
             && app(PadronConciliador::class)->contratoRegularHistorico($fila->datos) !== null) {
             return 'regular';
         }
@@ -145,7 +152,7 @@ class PadronResolucionService
             'decisiones' => ['required', 'array', 'min:1', 'max:50'],
             'decisiones.*' => ['required', 'array'],
             'decisiones.*.fila' => ['required', 'integer', 'min:1', 'distinct'],
-            // null solo representa una elección explícita de nueva línea/baja.
+            // null: nueva línea/baja en casos manuales; retomar Excel en una actualización automática.
             'decisiones.*.personal_id' => ['present', 'nullable', 'integer', 'min:1'],
             'decisiones.*.justificacion' => ['required', 'string', 'min:10', 'max:2000'],
             'decisiones.*.decision_anterior' => ['required', 'integer', 'min:0'],
@@ -167,7 +174,8 @@ class PadronResolucionService
             foreach ($entradas as $entrada) {
                 $fila = $objetivos->get((int) $entrada['fila']);
                 if ($fila) {
-                    $selecciones[$fila->id] = $entrada['personal_id'] === null ? null : (int) $entrada['personal_id'];
+                    $selecciones[$fila->id] = $this->permiteConservarActualizacion($fila)
+                        ? (int) $fila->personal_id : ($entrada['personal_id'] === null ? null : (int) $entrada['personal_id']);
                 }
             }
             $nuevas = [];
@@ -177,8 +185,9 @@ class PadronResolucionService
                 $motivo = trim($entrada['justificacion']);
                 $decisionAnterior = (int) $entrada['decision_anterior'];
                 $fila = $objetivos->get($filaId);
-                if (! $fila || ! in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar', 'baja_propuesta'], true)) {
-                    $this->fail('Solo puede resolver filas ambiguas o ausencias pertenecientes a esta revisión.');
+                if (! $fila || (! in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar', 'baja_propuesta'], true)
+                    && ! $this->permiteConservarActualizacion($fila))) {
+                    $this->fail('Solo puede resolver filas ambiguas, ausencias o actualizaciones propuestas pertenecientes a esta revisión.');
                 }
                 if ($rut !== null && PadronConciliador::rut($fila->rut) !== $rut) {
                     $this->fail('Todas las correspondencias del envío deben pertenecer al mismo RUT.');
@@ -190,10 +199,12 @@ class PadronResolucionService
                     $this->fail('Corrija el tipo de contrato desconocido en el Excel y vuelva a analizar.');
                 }
                 $candidatos = collect($fila->candidatos)->pluck('id')->map(fn ($id) => (int) $id)->all();
-                if ($personalId !== null && ($fila->fila_excel ? ! in_array($personalId, $candidatos, true) : $personalId !== (int) $fila->personal_id)) {
+                $conservacionActualizacion = $this->permiteConservarActualizacion($fila);
+                if ($personalId !== null && ($fila->fila_excel && ! $conservacionActualizacion
+                    ? ! in_array($personalId, $candidatos, true) : $personalId !== (int) $fila->personal_id)) {
                     $this->fail('El ID seleccionado no es un candidato válido para esta fila.');
                 }
-                if (! $fila->fila_excel && $personalId !== null) {
+                if ((! $fila->fila_excel || $conservacionActualizacion) && $personalId !== null) {
                     $datos = $this->datosConservados($revision, $fila->anterior ?? []);
                     $actualPersonal = DB::table('reemplazos_personal')->find($personalId);
                     if (! $actualPersonal || PadronConciliador::rut($actualPersonal->rut) !== PadronConciliador::rut($fila->rut)
@@ -230,8 +241,8 @@ class PadronResolucionService
             }
             if ($nuevas) {
                 DB::table('padron_revision_decisiones')->insert($nuevas);
-                $ausencias = $objetivos->whereNull('fila_excel');
-                if ($ausencias->isNotEmpty()) { $this->actualizarExcesosConservados($revision, $filas, $ausencias->pluck('rut')->all()); }
+                $conservables = $objetivos->filter(fn ($fila) => $fila->fila_excel === null || $this->permiteConservarActualizacion($fila));
+                if ($conservables->isNotEmpty()) { $this->actualizarExcesosConservados($revision, $filas, $conservables->pluck('rut')->all()); }
             }
 
             return count($nuevas);
