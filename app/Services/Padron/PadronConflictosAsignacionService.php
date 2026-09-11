@@ -211,7 +211,7 @@ class PadronConflictosAsignacionService
                 }
                 if ($traslado && $traslado['confirmada']) {
                     unset($motivos['traslado'], $motivos['sin_contrato_regular'], $motivos['cobertura_insuficiente']);
-                    $avisos[] = 'Traslado confirmado: estas asignaciones del RBD de origen se inactivarÃ¡n Ãºnicamente al aplicar el padrÃ³n. El contrato y su historial se conservan en el destino.';
+                    $avisos[] = 'Traslado confirmado: estas asignaciones del RBD de origen se inactivarán únicamente al aplicar el padrón. No se trasladan asignaciones ni documentos; los contratos se procesan según las correspondencias registradas.';
                 }
                 $item = [
                     'asignacion_id' => $a['id'], 'personal_id' => $id, 'rut' => $rut,
