@@ -150,12 +150,24 @@ class PadronBajaAsignacionesService
             $destinos[(int) $id][] = ['rut' => $rut, 'establecimiento_id' => $destino, 'rbd' => $fila->datos['rbd'] ?? null];
         }
 
+        $idsAsignaciones = array_values(array_unique(array_filter(array_map(
+            fn (array $asignacion) => (int) ($asignacion['reemplazos_personal_id'] ?? 0), $asignaciones,
+        ))));
+        $rutsContractuales = $idsAsignaciones
+            ? DB::table('reemplazos_personal')->whereIn('id', $idsAsignaciones)->pluck('rut', 'id')->map(fn ($rut) => PadronConciliador::rut($rut))
+            : collect();
         $porGrupo = [];
         foreach ($asignaciones as $asignacion) {
-            $rut = PadronConciliador::rut(($asignacion['docente_rut_normalizado'] ?? null) ?: ($asignacion['docente_rut'] ?? null));
+            $id = (int) ($asignacion['reemplazos_personal_id'] ?? 0);
+            $normalizado = PadronConciliador::rut($asignacion['docente_rut_normalizado'] ?? null);
+            $literal = PadronConciliador::rut($asignacion['docente_rut'] ?? null);
+            $contractual = PadronConciliador::rut($rutsContractuales->get($id));
+            $identidades = array_values(array_unique(array_filter([$normalizado, $literal, $contractual])));
+            $rut = $normalizado ?: ($literal ?: $contractual);
             if ($rut === '') {
                 continue;
             }
+            $asignacion['_traslado_rut_incompatible'] = count($identidades) > 1;
             $porGrupo[$rut.'|'.(int) $asignacion['establecimiento_id']][] = $asignacion;
         }
 
@@ -173,7 +185,8 @@ class PadronBajaAsignacionesService
                 $id = (int) ($asignacion['reemplazos_personal_id'] ?? 0);
                 $candidatosDestino = $destinos[$id] ?? [];
                 $destino = count($candidatosDestino) === 1 ? $candidatosDestino[0] : null;
-                $elegible = $elegible && $id > 0 && $destino && $destino['rut'] === $rut
+                $elegible = $elegible && ! ($asignacion['_traslado_rut_incompatible'] ?? false)
+                    && $id > 0 && $destino && $destino['rut'] === $rut
                     && (int) $destino['establecimiento_id'] !== (int) $origen
                     && (int) $asignacion['anio'] === (int) $revision->anio;
                 if ($destino) {
