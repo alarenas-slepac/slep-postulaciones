@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.11.517',
+    'current_version' => '2026.9.11.518',
     'entries' => [
+        [
+            'version' => '2026.9.11.518',
+            'title' => 'Padrón: aplicación controlada por terminal',
+            'summary' => 'Incorpora consulta previa y aplicación CLI explícita de revisiones resueltas, sin habilitar la aplicación web.',
+            'roles' => ['admin'],
+            'items' => [
+                'Exige administrador, entorno verificado, huella vigente del plan, confirmación de revisión y período e identificación del respaldo.',
+                'Reutiliza la escritura transaccional con protección de historial, auditoría, liberaciones confirmadas y reintentos sin duplicación.',
+                'Muestra solo conteos y metadatos técnicos; mantiene las decisiones existentes y rechaza bloqueos o confirmaciones desactualizadas.',
+                'Incluye guía operativa para PHP 8.3 con 256 MB por proceso y pruebas del comando. No requiere nuevas migraciones ni modifica producción.',
+            ],
+            'published_at' => '2026-09-11',
+        ],
         [
             'version' => '2026.9.11.517',
             'title' => 'Padrón: ensayo de liberaciones por baja y traslado',
