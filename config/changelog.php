@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.11.516',
+    'current_version' => '2026.9.11.517',
     'entries' => [
+        [
+            'version' => '2026.9.11.517',
+            'title' => 'Padrón: ensayo de liberaciones por baja y traslado',
+            'summary' => 'Completa el verificador del laboratorio para reconocer las liberaciones por traslado expresamente autorizadas.',
+            'roles' => ['admin'],
+            'items' => [
+                'El ensayo reúne ambos tipos de liberación y conserva las comprobaciones de origen, huellas, auditorías y asignaciones no afectadas.',
+                'Rechaza alcances superpuestos o incompletos y distingue en el informe las liberaciones por baja y por traslado.',
+                'Añade escenarios sintéticos de traslado y de baja más traslado en MariaDB, con comprobación de rollback e idempotencia.',
+                'Solo cambia herramientas de prueba. No altera decisiones, contratos ni asignaciones de producción y no habilita la aplicación definitiva.',
+            ],
+            'published_at' => '2026-09-11',
+        ],
         [
             'version' => '2026.9.11.516',
             'title' => 'Historial de cambios: carga diferida y menor consumo de memoria',

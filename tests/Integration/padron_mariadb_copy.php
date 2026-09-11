@@ -122,7 +122,7 @@ try {
     } else {
         if ($action === 'rehearse-synthetic') {
             $syntheticCase = $options['synthetic-case'] ?? 'success';
-            if (! in_array($syntheticCase, ['success', 'release', 'unresolved', 'stale', 'missing-user'], true)) {
+            if (! in_array($syntheticCase, ['success', 'release', 'transfer-release', 'mixed-release', 'unresolved', 'stale', 'missing-user'], true)) {
                 throw new RuntimeException('Caso sintético no permitido.');
             }
             // Fixture separado: no usa ni altera funcionarios de la copia real.
@@ -139,11 +139,18 @@ try {
                 $table->string('rut')->nullable(); $table->boolean('activo')->default(true);
             });
             DB::table('reemplazos_personal_bloqueos')->where('id', 1)->update(['rut' => '222222222']);
-            $options['revision'] = Lab::revision()['revision'];
-            if ($syntheticCase === 'release') {
-                // Solo fixture sintético recién creado. No decide sobre la copia real.
+            $withTransfer = in_array($syntheticCase, ['transfer-release', 'mixed-release'], true);
+            $withAbsence = in_array($syntheticCase, ['release', 'mixed-release'], true);
+            if ($withTransfer || $withAbsence) {
                 (require dirname(__DIR__, 2).'/database/migrations/2026_09_10_120000_create_padron_bajas_asignaciones.php')->up();
                 (require dirname(__DIR__, 2).'/database/migrations/2026_09_11_120000_add_padron_traslados_asignaciones.php')->up();
+            }
+            if ($withTransfer) {
+                DB::table('establecimientos')->insert(['id' => 2, 'rbd' => 99998]);
+            }
+            $options['revision'] = Lab::revision()['revision'];
+            if ($withAbsence) {
+                // Solo fixture sintético recién creado. No decide sobre la copia real.
                 DB::table('dotacion_docente_asignaciones')->insert([
                     'id' => 502, 'anio' => 2026, 'establecimiento_id' => 1, 'reemplazos_personal_id' => 102,
                     'docente_rut' => '222222222', 'estado' => 'activa', 'horas_contrato' => 37,
@@ -152,6 +159,14 @@ try {
                 $release = app(\App\Services\Padron\PadronConflictosAsignacionService::class)->analizar($review)['bajas_asignaciones']['222222222'];
                 app(\App\Services\Padron\PadronBajaAsignacionesService::class)->registrar($review, '222222222',
                     $release['alcance_hash'], 0, 'Retiro y liberación exclusivamente sintéticos.', 7, true);
+            }
+            if ($withTransfer) {
+                $review = PadronRevision::findOrFail($options['revision']);
+                $row = $review->filas()->where('fila_excel', 2)->firstOrFail();
+                $row->update(['datos' => array_replace($row->datos, ['rbd' => 99998]), 'accion' => 'traslado_propuesto']);
+                $transfer = app(\App\Services\Padron\PadronConflictosAsignacionService::class)->analizar($review)['traslados_asignaciones']['111111111|1'];
+                app(\App\Services\Padron\PadronBajaAsignacionesService::class)->registrarTraslado($review, '111111111',
+                    1, 2, $transfer['alcance_hash'], 0, 'Traslado exclusivamente sintético para el ensayo.', 7, true);
             }
             $options['user'] = 7;
             $report['synthetic_only'] = true;

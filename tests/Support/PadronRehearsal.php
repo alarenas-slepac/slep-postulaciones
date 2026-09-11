@@ -112,15 +112,9 @@ final class PadronRehearsal
                 fclose($file);
             }
             $bajas = $plan['bajas'];
-            $releases = [];
-            foreach ($plan['conflictos']['bajas_asignaciones'] ?? [] as $confirmation) {
-                if (! $confirmation['confirmada']) { continue; }
-                foreach ($confirmation['alcance']['asignaciones'] as $id => $hash) {
-                    $releases[$id] = ['hash' => $hash, 'confirmation' => $confirmation['ultima_id']];
-                }
-            }
+            $releases = self::expectedReleases($plan['conflictos']);
             foreach ($bajas as $id) { $changes[$id] = true; }
-        $destinations = count($plan['destinos']);
+            $destinations = count($plan['destinos']);
             unset($plan);
             // Falla después de la primera auditoría: ya hubo congelación, versiones
             // y escritura contractual, todo dentro de la transacción real.
@@ -171,6 +165,29 @@ final class PadronRehearsal
         self::check(PHP_SAPI === 'cli' && $allowed && $candidate
             && str_starts_with($candidate, $allowed.DIRECTORY_SEPARATOR), 'private_root_required');
         return $candidate;
+    }
+
+    /** Expectativas del ensayo, no autorizaciones: solo alcances confirmados por el plan. */
+    public static function expectedReleases(array $conflicts): array
+    {
+        $releases = [];
+        foreach (['bajas_asignaciones' => 'baja', 'traslados_asignaciones' => 'traslado'] as $key => $kind) {
+            foreach ($conflicts[$key] ?? [] as $confirmation) {
+                if (! ($confirmation['confirmada'] ?? false)) { continue; }
+                self::check((int) ($confirmation['ultima_id'] ?? 0) > 0
+                    && is_array($confirmation['alcance']['asignaciones'] ?? null), 'invalid_release_confirmation');
+                $origin = $kind === 'traslado' ? (int) ($confirmation['alcance']['origen'] ?? 0) : null;
+                self::check($kind !== 'traslado' || $origin > 0, 'invalid_transfer_origin');
+                foreach ($confirmation['alcance']['asignaciones'] as $id => $hash) {
+                    self::check(ctype_digit((string) $id) && (int) $id > 0
+                        && is_string($hash) && preg_match('/^[a-f0-9]{64}$/D', $hash) === 1, 'invalid_release_scope');
+                    self::check(! isset($releases[$id]), 'overlapping_release_scope');
+                    $releases[$id] = ['hash' => $hash, 'confirmation' => (int) $confirmation['ultima_id'],
+                        'kind' => $kind, 'origin' => $origin];
+                }
+            }
+        }
+        return $releases;
     }
 
     private static function verify(\PDO $sourcePdo, string $source, int $revision, string $expected, array $changed, array $bajas, int $destinations, array $releases, int $userId): array
@@ -248,6 +265,7 @@ final class PadronRehearsal
         self::check(DB::table('padron_personal_cambios')->where('padron_revision_id', $revision)->count() === $destinations + $deactivations, 'audit_count_mismatch');
         $documents = 0;
         $released = 0;
+        $releasedByKind = ['baja' => 0, 'traslado' => 0];
         foreach (['dotacion_docente_asignaciones', 'declaracion_sostenedores', 'dotacion_docente_exclusiones',
             'reemplazos_personal_bloqueos', 'padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones',
             ...PadronHistorialService::DOCUMENTOS] as $table) {
@@ -260,6 +278,8 @@ final class PadronRehearsal
                     $release = $releases[$old['id']];
                     self::check(hash_equals($release['hash'], hash('sha256', json_encode($old, JSON_THROW_ON_ERROR)))
                         && $old['estado'] === 'activa' && $current['estado'] === 'inactiva', 'release_scope_mismatch');
+                    self::check($release['kind'] !== 'traslado'
+                        || (int) $old['establecimiento_id'] === $release['origin'], 'transfer_origin_mismatch');
                     $audit = DB::table('padron_asignacion_cambios')->where('padron_revision_id', $revision)->where('asignacion_id', $old['id'])->first();
                     self::check($audit && (int) $audit->baja_asignaciones_id === $release['confirmation']
                         && (int) $audit->usuario_id === $userId
@@ -268,6 +288,7 @@ final class PadronRehearsal
                     $allowed = array_flip(['estado', 'updated_at', 'updated_by']);
                     self::check(array_diff_key($old, $allowed) === array_diff_key($current, $allowed), 'release_changed_assignment_fields');
                     $released++;
+                    $releasedByKind[$release['kind']]++;
                     continue;
                 }
                 if (in_array($table, PadronHistorialService::DOCUMENTOS, true)) {
@@ -346,6 +367,8 @@ final class PadronRehearsal
             'deactivations_verified' => $deactivations, 'historical_documents_verified' => $documents,
             'period_versions_verified' => $versions, 'blocked_contracts_verified' => $blockedContracts,
             'assignments_released_verified' => $released,
+            'assignments_released_by_absence_verified' => $releasedByKind['baja'],
+            'assignments_released_by_transfer_verified' => $releasedByKind['traslado'],
             'assignments_and_blocks_unchanged' => $released === 0, 'unplanned_assignments_and_blocks_unchanged' => true];
     }
 
