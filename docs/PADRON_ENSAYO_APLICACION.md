@@ -1,5 +1,70 @@
 # Ensayo de aplicación definitiva — laboratorio privado
 
+## Actualización 2026.9.11.517: liberaciones por traslado
+
+El verificador reúne las asignaciones de `bajas_asignaciones` y
+`traslados_asignaciones`, únicamente cuando su alcance está confirmado.
+Antes solo recogía las bajas: una liberación válida por traslado producía
+`related_data_changed` después de la aplicación local.
+
+La corrección no omite comparaciones: exige huella anterior, ID de confirmación,
+origen del traslado, estado inactivo, imágenes completas de auditoría y
+conservación de los demás campos y asignaciones. Rechaza alcances superpuestos,
+IDs/huellas inválidos y confirmaciones incompletas. No autoriza decisiones.
+
+Nuevos escenarios aislados (agregar al comando de laboratorio descrito abajo):
+
+```text
+--action=rehearse-synthetic --synthetic-case=transfer-release
+--action=rehearse-synthetic --synthetic-case=mixed-release
+```
+
+El primero debe verificar una liberación por traslado; el segundo, una por
+baja y una por traslado. Ambos conservan la prueba de rollback, el historial
+y la repetición sin duplicados. Los resultados distinguen
+`assignments_released_by_absence_verified` y
+`assignments_released_by_transfer_verified`, además del total existente.
+
+Los cambios se limitan al ensayo: no incorporan rutas, migraciones ni un
+interruptor para activar la aplicación en producción. El entorno cPanel y su
+margen efectivo de memoria/tiempos siguen requiriendo validación independiente.
+
+### Resultado del ensayo formal actualizado
+
+11/09/2026, revisión 21 de la copia autorizada, período 2026/8, MariaDB
+10.11.18, PHP 8.3.30 y límite de 128 MB. Se creó otra base independiente;
+no se reutilizó la copia aplicada durante el diagnóstico anterior.
+Resultado `completed`, sin instrumentación alternativa del verificador.
+
+| Comprobación | Resultado |
+| --- | ---: |
+| Destinos contractuales | 6.176 |
+| Actualizaciones / reactivaciones / incorporaciones | 5.555 / 100 / 521 |
+| Bajas | 91 |
+| Liberaciones por baja / traslado | 43 / 17 |
+| Copias documentales históricas verificadas | 4.684 |
+| Versiones mensuales verificadas | 6 |
+| Contratos con bloqueo personal comprobado | 91 |
+| Duración de la aplicación exitosa | 52,682 s |
+| Pico de la aplicación / previo | 126 / 126 MB |
+| Duración de todo el ensayo, incluida copia y comparación | 533,945 s |
+
+Rollback exacto, repetición idempotente y huellas de origen intactas. Las
+asignaciones no autorizadas para liberación y los bloqueos no cambiaron.
+La revisión de origen sigue sin aplicar. Datos, SQL y reportes privados no
+se incluyen en el repositorio. No se modificó producción ni `.env`.
+
+Regresión: 399 pruebas PHPUnit, 3.085 aserciones. Los escenarios MariaDB de
+baja, traslado y ambos juntos pasaron con 32 MB de pico. Los controles de
+revisión pendiente, revisión vencida y actor ausente rechazaron la ejecución.
+
+El pico de 126 MB deja solo 2 MB frente al límite probado: no certifica el
+margen real en cPanel. Antes de habilitar deben verificarse PHP web/CLI,
+memoria y tiempos efectivos, además de la coordinación de escritores. Este
+parche no cambia el límite de memoria ni habilita el ejecutor productivo.
+
+## Alcance del ejecutor
+
 El ejecutor está exclusivamente en `tests/Integration/padron_mariadb_copy.php`
 y `tests/Support/PadronRehearsal.php`. No incorpora rutas, comandos Artisan ni
 bindings de producción. `PadronAplicacionService::APLICACION_HABILITADA` sigue
@@ -14,8 +79,9 @@ en `false`. No usar este ejecutor en cPanel.
 - Revisión vigente, no aplicada, con todas sus decisiones y autorizaciones
   resueltas. Los IDs de producción no se presumen equivalentes a los locales.
 
-No se importan decisiones desde producción, no se seleccionan candidatos ni se
-autorizan jornadas automáticamente. Si la revisión está vencida, ya aplicada o
+Se utilizan las decisiones incluidas en la copia autorizada. No se trasladan
+decisiones entre revisiones, no se seleccionan candidatos ni se autorizan
+jornadas automáticamente. Si la revisión está vencida, ya aplicada o
 tiene bloqueos, el ensayo se detiene antes de crear una copia de aplicación.
 
 ## Ejecución
@@ -122,8 +188,8 @@ bajo límite de 128 MB. No se aplicó una carga con datos reales.
   El conjunto PHPUnit usó 152 MB; no debe confundirse con los procesos aislados
   del ensayo ejecutados bajo límite de 128 MB.
 
-La aplicación completa del Excel real permanece pendiente de resolver esa
-revisión. Una prueba sintética o un rechazo correcto no certifican la escritura
+En aquel ensayo, la aplicación completa del Excel real quedó pendiente de
+resolver esa revisión. Una prueba sintética o un rechazo correcto no certifican la escritura
 con volumen real, la concurrencia de todos los módulos, los cambios entre años
 ni los límites del hosting. Correo, notificaciones, colas y HTTP siguen
 interceptados: sus efectos externos tampoco quedan certificados aquí.
