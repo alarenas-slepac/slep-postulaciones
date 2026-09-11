@@ -15,6 +15,7 @@
             'propuesta_automatica' => 'Propuesta automática',
             'omitida_por_vigencia' => 'Omitida por vigencia (REEMPLAZO)',
             'conservada' => 'Conservar en el período de carga',
+            'nueva_linea_reemplazo' => 'REEMPLAZO: nueva línea automática',
         ];
     @endphp
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -60,11 +61,18 @@
             @if ($bloqueos)
                 <details class="alert alert-warning" id="bloqueos-padron"><summary><strong>{{ count($bloqueos) }} bloqueos por resolver</strong> · Ver primeros 10</summary>
                     <ul class="mb-0">
-                        @foreach (array_slice($bloqueos, 0, 10) as $bloqueo)
-                            <li>{{ $bloqueo }}</li>
+                        @foreach (array_slice($bloqueos, 0, 10) as $indice => $bloqueo)
+                            <li>{{ $bloqueo }}
+                                @if (isset($enlacesBloqueos[$indice]))
+                                    <a href="{{ $enlacesBloqueos[$indice] }}" data-padron-filas-link>Ver registro y resolver</a>
+                                @endif
+                            </li>
                         @endforeach
                     </ul>
                     @if (count($bloqueos) > 10)<div>Se muestran los primeros 10; los demás bloqueos siguen vigentes.</div>@endif
+                    @if ($pendientesCorrespondencia->total())
+                        <a class="btn btn-outline-primary btn-sm mt-2" href="#pendientes-correspondencia">Ver correspondencias pendientes ({{ $pendientesCorrespondencia->total() }})</a>
+                    @endif
                 </details>
             @elseif ($aplicacionDisponible && ! $obsoleta)
                 <form method="POST" action="{{ route('reemplazos.personal.import.store') }}">
@@ -91,10 +99,11 @@
         @endforeach
     </div>
 
-    <div class="card mb-3"><div class="card-body">
+    <div class="card mb-3" id="pendientes-correspondencia"><div class="card-body">
         <h5>Resolución de coincidencias</h5>
         <p>Seleccione el ID que corresponde a cada línea ambigua o confirme una nueva línea contractual. Cada decisión requiere justificación y conserva su historial. Un ID no puede ser seleccionado en dos filas.</p>
         <p>Si un funcionario fue omitido del Excel y debe continuar, abra sus filas y seleccione «Conservar este ID en el período de carga» en cada ausencia. Puede registrar juntas las selecciones del mismo RUT. Se mantienen los datos contractuales y se actualiza el mes solo al aplicar, sin duplicar IDs ni liberar sus asignaciones.</p>
+        <p>Las filas pendientes de tipo REEMPLAZO se proponen como nuevas líneas sin vincular contratos anteriores. Se respetan las correspondencias ya identificadas y las decisiones registradas. No se levantan errores del archivo, controles de jornada ni bajas pendientes; las exclusiones de los módulos no cambian con esta regla.</p>
         @if (! $resolucionDisponible)
             <div class="alert alert-warning">Ejecute las migraciones de revisión del padrón con PHP 8.3 para habilitar las decisiones manuales.</div>
         @endif
@@ -104,6 +113,19 @@
             @endforeach
         </div>
         <p class="small text-muted mt-2 mb-0">Estos conteos abarcan toda la revisión, no solo esta página. Resolver todas las coincidencias no habilita la aplicación definitiva. Los vínculos históricos se informan para revisión; no se consideran protegidos solo por conservar el ID.</p>
+        @if ($pendientesCorrespondencia->total())
+            <h6 class="mt-3">Correspondencias pendientes por resolver</h6>
+            <p class="small">Abra un registro para ver sus filas y registrar las decisiones. Esta lista incluye pendientes aunque no tengan conflictos de Dotación. Se muestran hasta 10 por página; al guardar se actualiza la lista.</p>
+            <ul class="list-group mb-2">
+                @foreach ($pendientesCorrespondencia as $pendiente)
+                    <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span>{{ $pendiente->fila_excel ? 'Fila Excel '.$pendiente->fila_excel : 'Ausente · ID '.$pendiente->personal_id }} · {{ $pendiente->rut }} · {{ $pendiente->nombre }}</span>
+                        <a class="btn btn-outline-primary btn-sm" data-padron-filas-link href="{{ route('reemplazos.personal.import', ['revision' => $revision->id, 'fila_revision' => $pendiente->id]) }}#filas-padron">Ver registro y resolver</a>
+                    </li>
+                @endforeach
+            </ul>
+            {{ $pendientesCorrespondencia->links() }}
+        @endif
     </div></div>
 
     <div class="card mb-3">

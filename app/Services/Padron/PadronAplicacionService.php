@@ -145,7 +145,7 @@ class PadronAplicacionService
     private function confirmacionHash(PadronRevision $revision): string
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'confirmacion-v5-bajas-traslados'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
+        hash_update($hash, 'confirmacion-v6-reemplazos-nuevos'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
         foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones', 'padron_bajas_asignaciones'] as $table) {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {

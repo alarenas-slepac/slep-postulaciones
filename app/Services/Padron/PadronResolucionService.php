@@ -44,6 +44,8 @@ class PadronResolucionService
             if ($fila->accion === 'revision_manual') {
                 if ($decisiones->has($fila->id)) {
                     $out[$fila->id] = $decisiones[$fila->id]->personal_id;
+                } elseif ($this->nuevoReemplazoAutomatico($fila, $decisiones)) {
+                    $out[$fila->id] = null;
                 }
             } else {
                 $out[$fila->id] = $fila->personal_id;
@@ -51,6 +53,14 @@ class PadronResolucionService
         }
 
         return $out;
+    }
+
+    /** Solo reemplazos pendientes; nunca reemplaza una correspondencia o decisión existente. */
+    public function nuevoReemplazoAutomatico(object $fila, Collection $decisiones): bool
+    {
+        return $fila->fila_excel !== null && $fila->accion === 'revision_manual'
+            && $fila->personal_id === null && ! $decisiones->has($fila->id)
+            && PadronConciliador::text($fila->tipo_contrato ?? ($fila->datos['tipocontrato'] ?? '')) === 'REEMPLAZO';
     }
 
     public function conservada(object $fila, Collection $decisiones): bool
@@ -69,6 +79,14 @@ class PadronResolucionService
     public function entrantes(PadronRevision $revision, Collection $filas, Collection $decisiones): Collection
     {
         $entrantes = $filas->whereNotNull('fila_excel')->keyBy('id');
+        foreach ($entrantes as $id => $fila) {
+            if ($this->nuevoReemplazoAutomatico($fila, $decisiones)) {
+                $propuesta = clone $fila;
+                $propuesta->accion = 'nueva_incorporacion';
+                $propuesta->personal_id = null;
+                $entrantes->put($id, $propuesta);
+            }
+        }
         $conservadas = $filas->filter(fn ($fila) => $this->conservada($fila, $decisiones));
         if ($conservadas->isEmpty()) { return $entrantes->values(); }
         // Leer únicamente las imágenes de las ausencias seleccionadas, no duplicar todo el padrón en memoria.
@@ -166,7 +184,7 @@ class PadronResolucionService
             if ($revision->aplicada_at || $revision->errores || $this->revisiones->stale($revision)) {
                 $this->fail('La revisión está cerrada, contiene errores o cambió la base. Genere un nuevo análisis.');
             }
-            $filas = $revision->filas()->orderBy('id')->get(['id', 'fila_excel', 'accion', 'personal_id', 'rut']);
+            $filas = $revision->filas()->orderBy('id')->get(['id', 'fila_excel', 'accion', 'personal_id', 'rut', 'datos->tipocontrato as tipo_contrato']);
             $objetivos = $revision->filas()->whereIn('id', array_column($entradas, 'fila'))->get()->keyBy('id');
             $decisiones = $this->decisiones($revision);
             $selecciones = $this->selecciones($filas, $decisiones);
@@ -290,6 +308,7 @@ class PadronResolucionService
             $estados[$fila->id] = match (true) {
                 $fila->accion === PadronReemplazosVigentes::OMITIDO => 'omitida_por_vigencia',
                 $fila->accion === 'error' => 'error',
+                $this->nuevoReemplazoAutomatico($fila, $decisiones) => 'nueva_linea_reemplazo',
                 $this->conservada($fila, $decisiones) => 'conservada',
                 ! $fila->fila_excel && isset($usados[$fila->personal_id]) => 'ausencia_vinculada',
                 $fila->accion === 'baja_propuesta' && ! $decisiones->has($fila->id)
