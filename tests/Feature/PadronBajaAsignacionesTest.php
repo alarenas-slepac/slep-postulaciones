@@ -391,4 +391,187 @@ class PadronBajaAsignacionesTest extends TestCase
         $this->assertDatabaseHas('padron_bajas_asignaciones', ['tipo' => 'traslado', 'rut' => '111111111', 'confirmada' => true]);
         $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 501, 'estado' => 'activa']);
     }
+
+    /** Contratos ya registrados en destino, asignaciones antiguas solo por RUT. */
+    private function revisionTrasladoRut(bool $nuevas = false): PadronRevision
+    {
+        DB::table('reemplazos_personal')->where('id', 101)->update([
+            'establecimiento_id' => 2, 'rbd' => 99998, 'jornada' => 40, 'jornada_basica' => 40,
+        ]);
+        DB::table('reemplazos_personal')->insert(['id' => 103, 'establecimiento_id' => 2, 'row_hash' => 'sintetico-103']
+            + $this->data(['rbd' => 99998, 'mes' => 8, 'jornada' => 3, 'jornada_basica' => 3, 'financiamiento' => 'PIE']));
+        DB::table('dotacion_docente_asignaciones')->whereIn('id', [501, 502])->update(['reemplazos_personal_id' => null]);
+        $revision = $this->revision([
+            $this->data(['rbd' => 99998, 'jornada' => 40, 'jornada_basica' => 40]),
+            $this->data(['rbd' => 99998, 'jornada' => 3, 'jornada_basica' => 3, 'financiamiento' => 'PIE']),
+            $this->data(['rut' => '222222222']),
+        ]);
+        $decisiones = [];
+        foreach ($revision->filas()->where('rut', '111111111')->whereNotNull('fila_excel')->get() as $fila) {
+            $id = (int) $fila->datos['jornada'] === 40 ? 101 : 103;
+            $fila->update(['accion' => 'revision_manual', 'personal_id' => null, 'candidatos' => [['id' => 101], ['id' => 103]]]);
+            $revision->filas()->create(['fila_excel' => null, 'rut' => '111111111', 'personal_id' => $id,
+                'accion' => 'ausencia_por_revisar', 'datos' => [], 'candidatos' => [], 'observaciones' => [], 'asignaciones' => [],
+                'anterior' => (array) DB::table('reemplazos_personal')->find($id)]);
+            $decisiones[] = ['fila' => $fila->id, 'personal_id' => $nuevas ? null : $id,
+                'justificacion' => 'Traslado sintético revisado.', 'decision_anterior' => 0];
+        }
+        foreach ($revision->filas()->where('rut', '111111111')->whereNull('fila_excel')->get() as $fila) {
+            // Reproduce el historial de bajas anterior a seleccionar IDs; el
+            // estado efectivo debe ser ausencia vinculada si el ID se usa.
+            DB::table('padron_revision_decisiones')->insert(['padron_revision_id' => $revision->id,
+                'padron_revision_fila_id' => $fila->id, 'personal_id' => null,
+                'justificacion' => 'Baja sintética anterior.', 'resuelta_por' => 7, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        app(\App\Services\Padron\PadronResolucionService::class)->resolverVarias($revision, '111111111', $decisiones, 7);
+        return $revision;
+    }
+
+    private function trasladoRut(PadronRevision $revision): array
+    {
+        return app(PadronConflictosAsignacionService::class)->analizar($revision)['traslados_asignaciones']['111111111|1'];
+    }
+
+    private function confirmarTrasladoRut(PadronRevision $revision): void
+    {
+        $c = $this->trasladoRut($revision);
+        app(PadronBajaAsignacionesService::class)->registrarTraslado($revision, '111111111', 1, 2,
+            $c['alcance_hash'], $c['ultima_id'], 'Traslado sintético con asignaciones por RUT.', 7, true);
+    }
+
+    public function test_rut_only_transfer_preserves_selected_ids_already_in_destination_and_their_history(): void
+    {
+        $revision = $this->revisionTrasladoRut();
+        $before = $this->estado();
+        $this->assertTrue($this->trasladoRut($revision)['elegible']);
+        $this->confirmarTrasladoRut($revision);
+        $this->assertSame($before, $this->estado());
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $this->assertTrue(app(PadronBajaAsignacionesService::class)->ultimas($revision)->isEmpty());
+        $writer = $this->writer();
+        $plan = $writer->plan($revision);
+        $this->assertSame([], $plan['errores']);
+        $this->assertSame([], $plan['bajas']);
+        $writer->aplicar($revision, 7, $plan['confirmacion_hash']);
+        foreach ([101, 103] as $id) {
+            $this->assertDatabaseHas('reemplazos_personal', ['id' => $id, 'vigente' => true, 'mes' => 9, 'establecimiento_id' => 2]);
+        }
+        $this->assertDatabaseCount('reemplazos_personal', 3);
+        $this->assertDatabaseHas('solicitudes_reemplazo', ['id' => 1, 'reemplazo_personal_id' => 101]);
+        foreach ([501, 502] as $id) { $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => $id, 'estado' => 'inactiva']); }
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 503, 'estado' => 'activa', 'anio' => 2025]);
+        $this->assertDatabaseCount('padron_asignacion_cambios', 2);
+    }
+
+    public function test_rut_only_transfer_with_explicit_new_lines_and_absences_still_requires_release_confirmation(): void
+    {
+        $revision = $this->revisionTrasladoRut(true);
+        $this->assertTrue($this->trasladoRut($revision)['elegible']);
+        $this->assertSame(2, $this->trasladoRut($revision)['nuevas_lineas']);
+        $this->assertNotEmpty($this->writer()->plan($revision)['errores']);
+        $this->withoutMiddleware();
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+        $this->get(route('reemplazos.personal.import', ['revision' => $revision->id]))->assertOk()
+            ->assertSee('Crear líneas nuevas y confirmar bajas no libera por sí solo')
+            ->assertSee('Confirmar traslado y liberar asignaciones al aplicar');
+        $this->confirmarTrasladoRut($revision);
+        $writer = $this->writer();
+        $plan = $writer->plan($revision);
+        $this->assertSame([], $plan['errores']);
+        $this->assertEqualsCanonicalizing([101, 103], $plan['bajas']);
+        $writer->aplicar($revision, 7, $plan['confirmacion_hash']);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'vigente' => false]);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 103, 'vigente' => false]);
+        $this->assertDatabaseHas('solicitudes_reemplazo', ['id' => 1, 'reemplazo_personal_id' => 101]);
+        $this->assertDatabaseCount('padron_asignacion_cambios', 2);
+    }
+
+    public function test_pending_rows_do_not_allow_a_partial_transfer_confirmation(): void
+    {
+        $revision = $this->revisionTrasladoRut();
+        $fila = $revision->filas()->where('rut', '111111111')->whereNotNull('fila_excel')->first();
+        DB::table('padron_revision_decisiones')->where('padron_revision_fila_id', $fila->id)->delete();
+        $this->assertFalse($this->trasladoRut($revision)['elegible']);
+        $this->rechaza(fn () => $this->confirmarTrasladoRut($revision));
+        $this->assertDatabaseCount('padron_bajas_asignaciones', 0);
+    }
+
+    public function test_explicit_assignment_id_cannot_be_replaced_by_an_unrelated_new_line(): void
+    {
+        $revision = $this->revisionTrasladoRut(true);
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['reemplazos_personal_id' => 101]);
+        $c = $this->trasladoRut($revision);
+        $this->assertFalse($c['elegible']);
+        $this->assertStringContainsString('Seleccione ese ID', implode(' ', $c['motivos']));
+        $this->rechaza(fn () => $this->confirmarTrasladoRut($revision));
+    }
+
+    public function test_destination_changes_invalidate_only_the_transfer_confirmation(): void
+    {
+        $revision = $this->revisionTrasladoRut();
+        $this->confirmarTrasladoRut($revision);
+        $old = $this->trasladoRut($revision);
+        $fila = $revision->filas()->where('rut', '111111111')->whereNotNull('fila_excel')->first();
+        $fila->update(['datos' => array_replace($fila->datos, ['jornada' => 39])]);
+        $this->assertFalse($this->trasladoRut($revision)['confirmada']);
+        $this->assertTrue($this->trasladoRut($revision)['desactualizada']);
+        $this->rechaza(fn () => app(PadronBajaAsignacionesService::class)->registrarTraslado($revision, '111111111', 1, 2,
+            $old['alcance_hash'], $old['ultima_id'], 'Confirmación con propuesta anterior.', 7, true));
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 501, 'estado' => 'activa']);
+    }
+
+    public function test_source_coverage_multiple_destinations_and_invalid_destination_rows_do_not_authorize_release(): void
+    {
+        $revision = $this->revisionTrasladoRut();
+        DB::table('establecimientos')->insert(['id' => 3, 'rbd' => 99997, 'nombre_establecimiento' => 'Escuela sintética C']);
+        $fila = $revision->filas()->where('rut', '111111111')->whereNotNull('fila_excel')->first();
+        $original = $fila->datos;
+        foreach ([['rbd' => 99999], ['rbd' => 99997], ['tipocontrato' => 'REEMPLAZO'], ['mes' => 8], ['jornada' => 0]] as $changes) {
+            $fila->update(['datos' => array_replace($original, $changes)]);
+            $diagnosis = app(PadronConflictosAsignacionService::class)->analizar($revision);
+            $c = $diagnosis['traslados_asignaciones']['111111111|1'] ?? null;
+            $this->assertFalse((bool) ($c['elegible'] ?? false), json_encode($changes));
+            if (($changes['rbd'] ?? null) !== 99999) {
+                $this->assertGreaterThan(0, $diagnosis['grupos_bloqueantes']);
+            }
+            $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 501, 'estado' => 'activa']);
+        }
+        $this->assertDatabaseCount('padron_bajas_asignaciones', 0);
+    }
+
+    public function test_contradictory_assignment_identity_prevents_rut_only_release(): void
+    {
+        $revision = $this->revisionTrasladoRut();
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['reemplazos_personal_id' => 102]);
+        $this->assertFalse($this->trasladoRut($revision)['elegible']);
+        $this->rechaza(fn () => $this->confirmarTrasladoRut($revision));
+    }
+
+    public function test_rut_transfer_release_is_revocable_and_rolls_back_with_its_audit(): void
+    {
+        $revision = $this->revisionTrasladoRut();
+        $this->confirmarTrasladoRut($revision);
+        $c = $this->trasladoRut($revision);
+        app(PadronBajaAsignacionesService::class)->registrarTraslado($revision, '111111111', 1, 2,
+            $c['alcance_hash'], $c['ultima_id'], 'Retirar traslado sintético.', 7, false);
+        $this->assertFalse($this->trasladoRut($revision)['confirmada']);
+        $this->assertNotEmpty($this->writer()->plan($revision)['errores']);
+        $this->confirmarTrasladoRut($revision);
+        $before = $this->estado();
+        $inject = true;
+        DB::listen(static function (QueryExecuted $event) use (&$inject): void {
+            if ($inject && str_starts_with(strtolower($event->sql), 'insert into "padron_asignacion_cambios"')) {
+                throw new \RuntimeException('fallo-sintetico-traslado');
+            }
+        });
+        try {
+            $writer = $this->writer();
+            $writer->aplicar($revision, 7, $writer->plan($revision)['confirmacion_hash']);
+            $this->fail('Debe revertir toda la aplicación.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('fallo-sintetico-traslado', $e->getMessage());
+        } finally { $inject = false; }
+        $this->assertSame($before, $this->estado());
+        $this->assertNull($revision->fresh()->aplicada_at);
+    }
 }

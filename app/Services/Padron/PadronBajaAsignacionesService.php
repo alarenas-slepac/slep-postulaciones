@@ -28,7 +28,9 @@ class PadronBajaAsignacionesService
     public function ultimas(PadronRevision $revision): Collection
     {
         return $this->instalado()
-            ? DB::table('padron_bajas_asignaciones')->where('padron_revision_id', $revision->id)->orderBy('id')->get()->keyBy('rut')
+            ? DB::table('padron_bajas_asignaciones')->where('padron_revision_id', $revision->id)
+                ->when($this->trasladoInstalado(), fn ($q) => $q->where('tipo', 'ausencia'))
+                ->orderBy('id')->get()->keyBy('rut')
             : collect();
     }
 
@@ -120,7 +122,8 @@ class PadronBajaAsignacionesService
 
     /**
      * Detecta asignaciones que permanecen activas en el RBD anterior mientras
-     * el mismo ID contractual fue resuelto en otro RBD del padrón. La decisión
+     * el RUT fue resuelto en otro RBD del padrón, incluso sin ID en la asignación.
+     * Si existe un vínculo contractual explícito, debe conservarse en el destino. La decisión
      * solo prepara una liberación diferida; nunca modifica Dotación aquí.
      */
     public function evaluarTraslados(PadronRevision $revision, Collection $filas, array $estados, array $asignaciones, ?Collection $decisiones = null): array
@@ -134,25 +137,38 @@ class PadronBajaAsignacionesService
         $selecciones = $resolucion->resumen($filas, $decisiones)['selecciones'];
         $establecimientos = DB::table('establecimientos')->pluck('id', 'rbd');
         $destinos = [];
+        $porRutDestino = [];
+        $pendientes = [];
         foreach ($filas as $fila) {
-            if ($fila->fila_excel === null && ($estados[$fila->id] ?? '') !== 'conservada') {
+            if (in_array($estados[$fila->id] ?? '', ['pendiente', 'error'], true)) {
+                $pendientes[PadronConciliador::rut($fila->rut)] = true;
+            }
+        }
+        $invalidos = [];
+        foreach ($resolucion->entrantes($revision, $filas, $decisiones) as $fila) {
+            if ($fila->accion === PadronReemplazosVigentes::OMITIDO || ! array_key_exists($fila->id, $selecciones)) {
                 continue;
             }
-            $id = $selecciones[$fila->id] ?? null;
-            if ($id === null) {
-                continue;
-            }
-            $destino = (int) ($establecimientos[$fila->datos['rbd'] ?? 0] ?? 0);
-            if (! $destino) {
-                continue;
-            }
+            $id = $selecciones[$fila->id];
             $rut = PadronConciliador::rut($fila->rut);
-            $destinos[(int) $id][] = ['rut' => $rut, 'establecimiento_id' => $destino, 'rbd' => $fila->datos['rbd'] ?? null];
+            $destino = (int) ($establecimientos[$fila->datos['rbd'] ?? 0] ?? 0);
+            if (! $destino || $resolucion->tipoPropuesto($fila) !== 'regular'
+                || (int) ($fila->datos['anio'] ?? 0) !== (int) $revision->anio
+                || (int) ($fila->datos['mes'] ?? 0) !== (int) $revision->mes
+                || ! is_numeric($fila->datos['jornada'] ?? null) || (float) $fila->datos['jornada'] <= 0) {
+                $invalidos[$rut] = true;
+                continue;
+            }
+            $propuesta = ['rut' => $rut, 'establecimiento_id' => $destino, 'personal_id' => $id === null ? null : (int) $id,
+                'huella' => hash('sha256', json_encode($fila->datos, JSON_THROW_ON_ERROR))];
+            $porRutDestino[$rut][$destino][$fila->id] = $propuesta;
+            if ($id !== null) { $destinos[(int) $id][] = $propuesta; }
         }
 
         $idsAsignaciones = array_values(array_unique(array_filter(array_map(
             fn (array $asignacion) => (int) ($asignacion['reemplazos_personal_id'] ?? 0), $asignaciones,
         ))));
+        $idsAsignaciones = array_unique([...$idsAsignaciones, ...array_keys($destinos)]);
         $rutsContractuales = $idsAsignaciones
             ? DB::table('reemplazos_personal')->whereIn('id', $idsAsignaciones)->pluck('rut', 'id')->map(fn ($rut) => PadronConciliador::rut($rut))
             : collect();
@@ -167,7 +183,7 @@ class PadronBajaAsignacionesService
             if ($rut === '') {
                 continue;
             }
-            $asignacion['_traslado_rut_incompatible'] = count($identidades) > 1;
+            $asignacion['_traslado_rut_incompatible'] = count($identidades) > 1 || ($id > 0 && ! $rutsContractuales->has($id));
             $porGrupo[$rut.'|'.(int) $asignacion['establecimiento_id']][] = $asignacion;
         }
 
@@ -177,20 +193,33 @@ class PadronBajaAsignacionesService
         $out = [];
         foreach ($porGrupo as $key => $rows) {
             [$rut, $origen] = explode('|', $key, 2);
-            $porDestino = [];
-            $elegible = true;
+            $opciones = $porRutDestino[$rut] ?? [];
+            // Nunca inferir retiro de un origen que aún tenga contrato propuesto,
+            // ni escoger entre varios establecimientos de destino.
+            if (count($opciones) !== 1 || isset($opciones[(int) $origen])) { continue; }
+            $destino = (int) array_key_first($opciones);
+            $propuestas = $opciones[$destino];
+            $motivos = [];
+            if (isset($pendientes[$rut])) { $motivos[] = 'Resuelva todas las correspondencias y ausencias pendientes de este RUT antes de confirmar el traslado.'; }
+            if (isset($invalidos[$rut])) { $motivos[] = 'El destino debe contener contratos regulares con jornada positiva y período válido; revise las filas del RUT.'; }
+            foreach ($propuestas as $propuesta) {
+                $id = $propuesta['personal_id'];
+                if ($id !== null && (count($destinos[$id]) !== 1 || $rutsContractuales->get($id) !== $rut)) {
+                    $motivos[] = 'El ID de destino debe ser único y corresponder al mismo RUT.';
+                }
+            }
             $huellas = [];
             $personalIds = [];
             foreach ($rows as $asignacion) {
                 $id = (int) ($asignacion['reemplazos_personal_id'] ?? 0);
                 $candidatosDestino = $destinos[$id] ?? [];
-                $destino = count($candidatosDestino) === 1 ? $candidatosDestino[0] : null;
-                $elegible = $elegible && ! ($asignacion['_traslado_rut_incompatible'] ?? false)
-                    && $id > 0 && $destino && $destino['rut'] === $rut
-                    && (int) $destino['establecimiento_id'] !== (int) $origen
-                    && (int) $asignacion['anio'] === (int) $revision->anio;
-                if ($destino) {
-                    $porDestino[(int) $destino['establecimiento_id']] = true;
+                if ($asignacion['_traslado_rut_incompatible'] || (int) $asignacion['anio'] !== (int) $revision->anio
+                    || ! is_numeric($asignacion['horas_contrato'] ?? null) || (float) $asignacion['horas_contrato'] < 0) {
+                    $motivos[] = 'Revise la identidad, el año y las horas de las asignaciones de origen.';
+                }
+                if ($id > 0 && (count($candidatosDestino) !== 1 || $candidatosDestino[0]['rut'] !== $rut
+                    || $candidatosDestino[0]['establecimiento_id'] !== $destino)) {
+                    $motivos[] = 'La asignación conserva un vínculo al ID '.$id.'. Seleccione ese ID en su fila de destino; darlo de baja y crear una línea nueva no sustituye el vínculo histórico.';
                 }
                 if (! empty($asignacion['_huella'])) {
                     $huellas[(int) $asignacion['id']] = $asignacion['_huella'];
@@ -199,25 +228,24 @@ class PadronBajaAsignacionesService
                     $personalIds[] = $id;
                 }
             }
-            // Un RUT con asignaciones repartidas a más de un destino requiere
-            // revisión manual: no se libera el grupo completo por inferencia.
-            $elegible = $elegible && count($porDestino) === 1 && count($huellas) === count($rows);
-            if (! $elegible) {
-                continue;
-            }
-            $destino = (int) array_key_first($porDestino);
+            if (count($huellas) !== count($rows)) { $motivos[] = 'Falta la huella de una asignación; vuelva a revisar el diagnóstico.'; }
+            $elegible = ! $motivos;
             ksort($huellas);
+            ksort($propuestas);
             sort($personalIds);
             $alcance = ['asignaciones' => $huellas, 'personal_ids' => array_values(array_unique($personalIds)),
-                'origen' => (int) $origen, 'destino' => $destino, 'anio' => (int) $revision->anio];
+                'origen' => (int) $origen, 'destino' => $destino, 'anio' => (int) $revision->anio,
+                'propuestas_destino' => $propuestas];
             $hash = hash('sha256', json_encode([$revision->id, $revision->base_hash, $rut, $alcance], JSON_THROW_ON_ERROR));
             $clave = $rut.'|'.$origen.'|'.$destino;
             $ultima = $ultimas->get($clave);
-            $confirmada = (bool) ($ultima && $ultima->confirmada && hash_equals($hash, $ultima->alcance_hash));
-            $out[$rut.'|'.$origen] = ['rut' => $rut, 'elegible' => true, 'confirmada' => $confirmada,
+            $confirmada = (bool) ($elegible && $ultima && $ultima->confirmada && hash_equals($hash, $ultima->alcance_hash));
+            $out[$rut.'|'.$origen] = ['rut' => $rut, 'elegible' => $elegible, 'confirmada' => $confirmada,
+                'motivos' => array_values(array_unique($motivos)),
+                'nuevas_lineas' => count(array_filter($propuestas, fn ($p) => $p['personal_id'] === null)),
                 'autorizada' => (bool) ($ultima && $ultima->confirmada), 'alcance' => $alcance,
                 'alcance_hash' => $hash, 'ultima_id' => (int) ($ultima->id ?? 0), 'destino' => $destino,
-                'destino_rbd' => DB::table('establecimientos')->where('id', $destino)->value('rbd'),
+                'destino_rbd' => $establecimientos->search($destino),
                 'cantidad' => count($rows), 'horas' => round(array_sum(array_map(fn ($a) => (float) ($a['horas_contrato'] ?? 0), $rows)), 2),
                 'justificacion' => $ultima->justificacion ?? null, 'usuario_id' => $ultima->usuario_id ?? null,
                 'desactualizada' => (bool) ($ultima && $ultima->confirmada && ! $confirmada)];

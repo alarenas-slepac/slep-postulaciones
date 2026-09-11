@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.11.512',
+    'current_version' => '2026.9.11.513',
     'entries' => [
+        [
+            'version' => '2026.9.11.513',
+            'title' => 'Padrón: traslados con asignaciones vinculadas solo por RUT',
+            'summary' => 'Reconoce asignaciones antiguas en el origen aunque los contratos ya estén en el destino, sin exigir un ID contractual en cada asignación.',
+            'roles' => ['admin'],
+            'items' => [
+                'Exige todas las correspondencias resueltas, un único destino regular y ausencia de contrato propuesto en el origen.',
+                'Admite nuevas líneas resueltas para asignaciones por RUT, advierte sobre la conservación de IDs y mantiene protegidos los vínculos contractuales explícitos.',
+                'Incluye las propuestas efectivas del destino en la huella de autorización y separa las confirmaciones de traslado de las bajas por ausencia.',
+                'Conserva las decisiones de la revisión existente; requiere confirmar la liberación del origen y solo la ejecuta al aplicar el padrón.',
+                'No requiere migraciones adicionales ni habilita la aplicación definitiva en producción.',
+            ],
+            'published_at' => '2026-09-11',
+        ],
         [
             'version' => '2026.9.11.512',
             'title' => 'Padrón: liberar asignaciones por traslado de establecimiento',

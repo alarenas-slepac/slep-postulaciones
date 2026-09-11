@@ -1,7 +1,10 @@
 <div class="border-top mt-3 pt-2">
     <strong>Liberación de asignaciones por traslado</strong>
-    <div>El contrato se conserva en el RBD {{ $traslado['destino_rbd'] ?? 'destino' }} y las asignaciones activas del establecimiento de origen se inactivarán al aplicar el padrón.</div>
-    <div class="alert alert-info my-2">Alcance: {{ $traslado['cantidad'] }} asignaciones · {{ $traslado['horas'] }} h. No se modifica el contrato, no se borran documentos y el historial de Dotación permanece disponible.</div>
+    <div>El RUT tiene propuestas en el RBD {{ $traslado['destino_rbd'] ?? 'destino' }}. Esta autorización permite inactivar únicamente las asignaciones del establecimiento de origen al aplicar el padrón.</div>
+    <div class="alert alert-info my-2">Alcance: {{ $traslado['cantidad'] }} asignaciones · {{ $traslado['horas'] }} h. La liberación no reasigna horas al destino ni borra documentos o historial. Los contratos se procesan según las correspondencias registradas.</div>
+    @if ($traslado['nuevas_lineas'] ?? 0)
+        <div class="alert alert-warning my-2">Hay {{ $traslado['nuevas_lineas'] }} línea(s) nueva(s) en el destino. Si corresponden a contratos existentes, seleccione sus IDs en «Ver filas del RUT» para conservarlos. Crear líneas nuevas y confirmar bajas no libera por sí solo las asignaciones anteriores.</div>
+    @endif
     @if ($traslado['confirmada'])
         <div class="text-success fw-semibold">Liberación por traslado confirmada, pendiente de aplicar.</div>
         <div>Usuario #{{ $traslado['usuario_id'] }}: {{ $traslado['justificacion'] }}</div>
@@ -9,7 +12,11 @@
         <div class="text-danger">El alcance cambió. Retire la confirmación anterior y registre nuevamente el traslado.</div>
     @endif
     @if ($traslado['confirmada'] || ! $traslado['elegible'])
-        @if (! $traslado['elegible'])<div class="text-danger">El traslado dejó de ser elegible; revise el RUT, el RBD de origen y las asignaciones activas.</div>@endif
+        @if (! $traslado['elegible'])
+            @foreach ($traslado['motivos'] ?? ['El traslado dejó de ser elegible; revise el RUT, el RBD de origen y las asignaciones activas.'] as $motivo)
+                <div class="text-danger">{{ $motivo }}</div>
+            @endforeach
+        @endif
     @endif
     @if (($traslado['elegible'] || $traslado['autorizada']) && ! $obsoleta && ! $revision->errores && ! $revision->aplicada_at)
         <details class="mt-2">
