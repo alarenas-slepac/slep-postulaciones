@@ -1,206 +1,94 @@
-@php
-    $allChangeLogEntries = $allChangeLogEntries ?? [];
-    $currentChangeLogEntries = $currentChangeLogEntries ?? [];
-    $previousChangeLogEntries = $previousChangeLogEntries ?? [];
-    $shouldShowChangeLogModal = $shouldShowChangeLogModal ?? false;
-    $currentAppVersion = $currentAppVersion ?? \App\Support\ChangeLog::currentVersion();
-@endphp
-
-@if (!empty($allChangeLogEntries))
-    <div class="modal fade" id="changeLogModal" tabindex="-1" aria-labelledby="changeLogModalLabel" aria-hidden="true">
+@if ($hasVisibleChangeLogEntries ?? false)
+    <div class="modal fade" id="changeLogModal" tabindex="-1" aria-labelledby="changeLogModalLabel" aria-hidden="true"
+         data-auto-show="{{ ($shouldShowChangeLogModal ?? false) ? '1' : '0' }}"
+         data-current-url="{{ route('changelog.entries', ['scope' => 'current']) }}"
+         data-history-url="{{ route('changelog.entries', ['scope' => 'history']) }}"
+         data-ack-url="{{ route('changelog.ack') }}" data-csrf="{{ csrf_token() }}">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title" id="changeLogModalLabel">Registro de cambios</h5>
-                        @if ($currentAppVersion)
-                            <div class="small text-muted">Versión actual: {{ $currentAppVersion }}</div>
-                        @endif
-                    </div>
+                    <div><h5 class="modal-title" id="changeLogModalLabel">Registro de cambios</h5>
+                        <div class="small text-muted">Versión actual: {{ $currentAppVersion }}</div></div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
-                    @if (!empty($currentChangeLogEntries))
-                        <div class="alert alert-primary d-flex align-items-start gap-2" role="alert">
-                            <i class="bi bi-megaphone"></i>
-                            <div>
-                                <div class="fw-semibold">Novedades visibles para tus roles en la versión {{ $currentAppVersion }}</div>
-                                <div class="small mb-0">Estas actualizaciones se muestran solo cuando el cambio impacta alguno de los roles asignados a tu usuario.</div>
-                            </div>
-                        </div>
-                    @endif
-
-                    <div class="d-flex flex-column gap-3">
-                        @foreach ($currentChangeLogEntries as $entry)
-                            @php
-                                $entryRoles = collect(data_get($entry, 'roles', []))
-                                    ->map(fn($role) => str_replace('_', ' ', (string) $role))
-                                    ->map(fn($role) => ucwords($role))
-                                    ->values();
-                            @endphp
-                            <div class="card shadow-sm border-start border-4 border-primary">
-                                <div class="card-body">
-                                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
-                                        <div>
-                                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                <h6 class="mb-0">{{ data_get($entry, 'title', 'Actualización') }}</h6>
-                                                <span class="badge text-bg-secondary">v{{ data_get($entry, 'version') }}</span>
-                                                <span class="badge text-bg-primary">Actual</span>
-                                            </div>
-                                            @if (data_get($entry, 'summary'))
-                                                <p class="mb-0 text-muted small mt-1">{{ data_get($entry, 'summary') }}</p>
-                                            @endif
-                                        </div>
-                                        <div class="text-end small text-muted">
-                                            @if (data_get($entry, 'published_at'))
-                                                <div>{{ \Carbon\Carbon::parse(data_get($entry, 'published_at'))->format('d-m-Y H:i') }}</div>
-                                            @endif
-                                        </div>
-                                    </div>
-
-                                    @if (!empty(data_get($entry, 'items', [])))
-                                        <ul class="mb-2 ps-3">
-                                            @foreach ((array) data_get($entry, 'items', []) as $item)
-                                                <li>{{ $item }}</li>
-                                            @endforeach
-                                        </ul>
-                                    @endif
-
-                                    @if ($entryRoles->isNotEmpty())
-                                        <div class="small text-muted">
-                                            <span class="fw-semibold">Roles impactados:</span>
-                                            {{ $entryRoles->implode(', ') }}
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-
-                    @if (!empty($previousChangeLogEntries))
-                        <div class="mt-4">
-                            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#changeLogHistory" aria-expanded="false" aria-controls="changeLogHistory" id="btnToggleChangeLogHistory">
-                                <i class="bi bi-clock-history"></i> Ver historial de cambios anteriores
-                            </button>
-
-                            <div class="collapse mt-3" id="changeLogHistory">
-                                <div class="card card-body bg-light-subtle border-0">
-                                    <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
-                                        <div>
-                                            <h6 class="mb-1">Historial de cambios anteriores</h6>
-                                            <div class="small text-muted">Solo ves versiones históricas cuyos cambios aplican a alguno de tus roles.</div>
-                                        </div>
-                                        <button class="btn btn-sm btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#changeLogHistory" aria-expanded="true" aria-controls="changeLogHistory">
-                                            Ocultar historial
-                                        </button>
-                                    </div>
-
-                                    <div class="accordion" id="changeLogHistoryAccordion">
-                                        @foreach ($previousChangeLogEntries as $entry)
-                                            @php
-                                                $historyId = 'historyVersion' . $loop->index;
-                                                $entryRoles = collect(data_get($entry, 'roles', []))
-                                                    ->map(fn($role) => str_replace('_', ' ', (string) $role))
-                                                    ->map(fn($role) => ucwords($role))
-                                                    ->values();
-                                            @endphp
-                                            <div class="accordion-item">
-                                                <h2 class="accordion-header" id="heading-{{ $historyId }}">
-                                                    <button class="accordion-button {{ $loop->first ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ $historyId }}" aria-expanded="{{ $loop->first ? 'true' : 'false' }}" aria-controls="collapse-{{ $historyId }}">
-                                                        <span class="fw-semibold me-2">v{{ data_get($entry, 'version') }}</span>
-                                                        <span>{{ data_get($entry, 'title', 'Actualización') }}</span>
-                                                    </button>
-                                                </h2>
-                                                <div id="collapse-{{ $historyId }}" class="accordion-collapse collapse {{ $loop->first ? 'show' : '' }}" aria-labelledby="heading-{{ $historyId }}" data-bs-parent="#changeLogHistoryAccordion">
-                                                    <div class="accordion-body">
-                                                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
-                                                            @if (data_get($entry, 'summary'))
-                                                                <p class="mb-0 text-muted small">{{ data_get($entry, 'summary') }}</p>
-                                                            @endif
-                                                            @if (data_get($entry, 'published_at'))
-                                                                <div class="small text-muted">{{ \Carbon\Carbon::parse(data_get($entry, 'published_at'))->format('d-m-Y H:i') }}</div>
-                                                            @endif
-                                                        </div>
-
-                                                        @if (!empty(data_get($entry, 'items', [])))
-                                                            <ul class="mb-2 ps-3">
-                                                                @foreach ((array) data_get($entry, 'items', []) as $item)
-                                                                    <li>{{ $item }}</li>
-                                                                @endforeach
-                                                            </ul>
-                                                        @endif
-
-                                                        @if ($entryRoles->isNotEmpty())
-                                                            <div class="small text-muted">
-                                                                <span class="fw-semibold">Roles impactados:</span>
-                                                                {{ $entryRoles->implode(', ') }}
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
+                    <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Secciones del registro de cambios">
+                        <a class="btn btn-outline-primary btn-sm" data-changelog-page href="{{ route('changelog.entries', ['scope' => 'current']) }}">Novedades actuales</a>
+                        @if ($hasPreviousChangeLogEntries ?? false)
+                            <a class="btn btn-outline-secondary btn-sm" data-changelog-page href="{{ route('changelog.entries', ['scope' => 'history']) }}">Historial de cambios anteriores</a>
+                        @endif
+                    </nav>
+                    <div id="changeLogContent" aria-live="polite"><p>Los cambios se cargan al abrir esta ventana, hasta diez por página.</p></div>
                 </div>
-                <div class="modal-footer justify-content-between">
-                    <div class="small text-muted">v{{ $currentAppVersion }}</div>
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button></div>
             </div>
         </div>
     </div>
 
     @push('scripts')
         <script>
-            document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('DOMContentLoaded', function () {
                 const modalEl = document.getElementById('changeLogModal');
-                const historyEl = document.getElementById('changeLogHistory');
-                const bootstrapModal = window.bootstrap?.Modal;
-                const bootstrapCollapse = window.bootstrap?.Collapse;
-                if (!modalEl || !bootstrapModal) return;
-
-                const modal = bootstrapModal.getOrCreateInstance(modalEl);
-                const shouldAutoShow = @json((bool) $shouldShowChangeLogModal);
+                const content = document.getElementById('changeLogContent');
+                const Modal = window.bootstrap?.Modal;
+                if (!modalEl || !content || !Modal) return;
+                let pending;
+                let loaded = false;
                 let acknowledged = false;
 
-                function acknowledge() {
-                    if (acknowledged) return;
-                    acknowledged = true;
-
-                    fetch(@json(route('changelog.ack')), {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': @json(csrf_token()),
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({ acknowledged: true })
-                    }).catch(() => {});
+                async function load(href) {
+                    const url = new URL(href, window.location.href);
+                    if (url.origin !== window.location.origin) return;
+                    if (pending) pending.abort();
+                    const controller = new AbortController();
+                    pending = controller;
+                    loaded = false;
+                    content.setAttribute('aria-busy', 'true');
+                    content.replaceChildren(Object.assign(document.createElement('p'), {textContent: 'Cargando cambios…'}));
+                    const timeout = setTimeout(() => controller.abort(), 20000);
+                    try {
+                        const response = await fetch(url.href, {credentials: 'same-origin', signal: controller.signal,
+                            headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                        if (!response.ok || response.redirected || response.headers.get('X-ChangeLog-Entries') !== '1') throw new Error('response');
+                        const html = await response.text();
+                        if (pending !== controller) return;
+                        content.innerHTML = html;
+                        loaded = true;
+                    } catch (error) {
+                        if (pending !== controller) return;
+                        const message = Object.assign(document.createElement('p'), {textContent: 'No fue posible cargar los cambios. Intente nuevamente.'});
+                        const retry = Object.assign(document.createElement('a'), {href: url.href, textContent: 'Reintentar', className: 'btn btn-outline-primary btn-sm'});
+                        retry.dataset.changelogPage = '';
+                        content.replaceChildren(message, retry);
+                    } finally {
+                        clearTimeout(timeout);
+                        if (pending === controller) content.removeAttribute('aria-busy');
+                    }
                 }
 
-                function setHistoryVisibility(show) {
-                    if (!historyEl || !bootstrapCollapse) return;
-                    const history = bootstrapCollapse.getOrCreateInstance(historyEl, { toggle: false });
-                    if (show) history.show();
-                    else history.hide();
-                }
-
-                modalEl.addEventListener('show.bs.modal', function(event) {
-                    const trigger = event.relatedTarget;
-                    const openHistory = trigger?.dataset?.changelogOpenHistory === '1';
-                    setHistoryVisibility(openHistory);
+                modalEl.addEventListener('show.bs.modal', function (event) {
+                    load(event.relatedTarget?.dataset?.changelogOpenHistory === '1' ? modalEl.dataset.historyUrl : modalEl.dataset.currentUrl);
                 });
-
-                modalEl.addEventListener('hidden.bs.modal', acknowledge);
-
-                if (shouldAutoShow) {
-                    setHistoryVisibility(false);
-                    modal.show();
-                }
+                modalEl.addEventListener('click', function (event) {
+                    const link = event.target.closest('a[data-changelog-page]');
+                    if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                    event.preventDefault();
+                    load(link.href);
+                });
+                modalEl.addEventListener('hidden.bs.modal', async function () {
+                    if (pending) pending.abort();
+                    pending = null;
+                    content.removeAttribute('aria-busy');
+                    if (!loaded || acknowledged) return;
+                    acknowledged = true;
+                    try {
+                        const response = await fetch(modalEl.dataset.ackUrl, {method: 'POST', credentials: 'same-origin',
+                            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': modalEl.dataset.csrf},
+                            body: JSON.stringify({acknowledged: true})});
+                        if (!response.ok || response.redirected) acknowledged = false;
+                    } catch (error) { acknowledged = false; }
+                });
+                if (modalEl.dataset.autoShow === '1') Modal.getOrCreateInstance(modalEl).show();
             });
         </script>
     @endpush

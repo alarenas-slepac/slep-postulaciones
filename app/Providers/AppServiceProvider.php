@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Route;
-use App\Support\ChangeLog;
+use App\Support\ChangeLogViewData;
+use App\Http\Controllers\ChangeLogController;
 use App\Models\Conversation;
 use App\Policies\ConversationPolicy;
 use App\Services\CentroOperaciones\IncidenciaCatalogo;
@@ -23,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(IncidenciaCatalogo::class);
         $this->app->scoped(\App\Services\Padron\PadronEscrituraService::class);
+        $this->app->scoped(ChangeLogViewData::class);
 
         // No bindear manualmente 'request' aquí.
         $this->app->singleton(Client::class, function () {
@@ -35,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Route::middleware(['web', 'auth'])->get('/changelog/entries', [ChangeLogController::class, 'entries'])
+            ->name('changelog.entries');
         Route::middleware(['web', 'auth', 'verified', 'ensure.role:admin|coordinador_gdp'])
             ->prefix('admin/correos-por-rol')
             ->name('admin.bulk-role-mail.')
@@ -57,33 +61,23 @@ class AppServiceProvider extends ServiceProvider
         // Paginación con Bootstrap 5
         Paginator::useBootstrap();
 
-        View::composer('*', function ($view) {
-            if (!auth()->check()) {
-                return;
-            }
-
-            $user = auth()->user();
-            $allEntries = ChangeLog::visibleEntriesForUser($user);
-            $currentEntries = ChangeLog::currentVersionEntriesForUser($user);
-            $previousEntries = ChangeLog::previousVersionEntriesForUser($user);
-            $currentVersion = ChangeLog::currentVersion();
-            $seenVersion = session('changelog_seen_version');
-            $shouldShow = !empty($currentEntries)
-                && (session('show_changelog_modal', false) || $seenVersion !== $currentVersion);
-
-            $view->with('allChangeLogEntries', $allEntries);
-            $view->with('currentChangeLogEntries', $currentEntries);
-            $view->with('previousChangeLogEntries', $previousEntries);
-            $view->with('currentAppVersion', $currentVersion);
-            $view->with('shouldShowChangeLogModal', $shouldShow);
-            $view->with('hasVisibleChangeLogEntries', !empty($allEntries));
-            $view->with('hasPreviousChangeLogEntries', !empty($previousEntries));
-        });
+        $this->registerChangeLogViews();
 
         // Forzar https sólo en producción (opcional)
         // if (config('app.env') === 'production') {
         //     URL::forceScheme('https');
         // }
+    }
+
+    /** También permite ejercitar en CLI la composición real usada por las peticiones web. */
+    public function registerChangeLogViews(): void
+    {
+        View::composer(['layouts.app', 'partials.footer', 'partials.changelog-modal'], function ($view) {
+            $data = app(ChangeLogViewData::class)->forUser(auth()->user());
+            $data['shouldShowChangeLogModal'] = $data['hasCurrentChangeLogEntries']
+                && (session('show_changelog_modal', false) || session('changelog_seen_version') !== $data['currentAppVersion']);
+            $view->with($data);
+        });
     }
     protected $policies = [
         \App\Models\UserDocument::class => \App\Policies\UserDocumentPolicy::class,
