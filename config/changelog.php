@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.10.510',
+    'current_version' => '2026.9.11.511',
     'entries' => [
+        [
+            'version' => '2026.9.11.511',
+            'title' => 'Padrón: conservar datos anteriores ante una actualización del Excel',
+            'summary' => 'Permite decidir conservar el contrato regular existente en vez de aceptar los datos de una actualización propuesta, cambiando solo el mes al aplicar.',
+            'roles' => ['admin'],
+            'items' => [
+                'Añade Revisar actualización y Conservar datos anteriores; solo actualizar mes, con justificación y registro individual o conjunto por RUT.',
+                'Sustituye la propuesta efectiva por la imagen anterior sin duplicar horas ni IDs. Mantiene visibles los datos originales del Excel y permite retomar esa propuesta con una nueva decisión auditada.',
+                'Recalcula cobertura y exceso de jornada con los datos elegidos. Mantiene las protecciones de vigencia, identidad, estamento, historial y concurrencia, sin liberar asignaciones automáticamente.',
+                'No requiere migraciones ni volver a analizar el archivo por este cambio. Conserva las decisiones de la revisión y no habilita la aplicación definitiva en producción.',
+            ],
+            'published_at' => '2026-09-11',
+        ],
         [
             'version' => '2026.9.10.510',
             'title' => 'Padrón: conservación de contratos históricos SEP y PIE',

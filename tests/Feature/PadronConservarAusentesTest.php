@@ -21,7 +21,7 @@ class PadronConservarAusentesTest extends TestCase
             $t->id(); $t->integer('establecimiento_id'); $t->integer('rbd');
             foreach (['rut', 'nombre', 'tipocontrato', 'estatuto', 'escalafon', 'financiamiento'] as $key) { $t->string($key); }
             foreach (['anio', 'mes', 'jornada', 'jornada_basica', 'jornada_media'] as $key) { $t->integer($key); }
-            $t->boolean('vigente')->default(true); $t->date('fecha_antiguedad')->nullable(); $t->date('fecha_termino')->nullable();
+            $t->boolean('vigente')->default(true); $t->date('fecha_antiguedad')->nullable(); $t->date('fecha_termino')->nullable(); $t->date('fecha_ingreso')->nullable();
             $t->string('row_hash')->unique(); $t->string('source_filename')->nullable(); $t->timestamps();
         });
         Schema::create('dotacion_docente_asignaciones', function (Blueprint $t) {
@@ -59,11 +59,11 @@ class PadronConservarAusentesTest extends TestCase
             'jornada' => $hours, 'jornada_basica' => $hours, 'jornada_media' => 0];
     }
 
-    private function revision(): PadronRevision
+    private function revision(?array $incoming = null): PadronRevision
     {
         $service = app(PadronRevisionService::class);
         $snapshot = (new \ReflectionMethod($service, 'snapshot'))->invoke($service, 202609);
-        $report = app(PadronConciliador::class)->reconcile([
+        $report = app(PadronConciliador::class)->reconcile($incoming ?? [
             ['fila_excel' => 2, 'datos' => array_replace($this->data('222222222', 22), ['mes' => 9]), 'observaciones' => []],
         ], $snapshot['personal'], $snapshot['establecimientos'], $snapshot['asignaciones']);
         $revision = PadronRevision::create(['archivo' => 'carga-sintetica.xlsx', 'archivo_hash' => str_repeat('a', 64),
@@ -369,6 +369,131 @@ class PadronConservarAusentesTest extends TestCase
             $this->assertStringContainsString($message, $exception->getMessage());
         }
         $this->assertDatabaseCount('padron_revision_decisiones', 0);
+    }
+
+    private function revisionActualizacion(int $horas = 44, bool $docente = false): PadronRevision
+    {
+        DB::table('reemplazos_personal')->where('id', 101)->update(['jornada' => $horas, 'jornada_basica' => $horas,
+            'estatuto' => $docente ? 'DOCENTE' : 'AAEE', 'escalafon' => 'PROFESIONAL', 'tipocontrato' => 'PLAZO FIJO',
+            'fecha_ingreso' => '2026-10-01', 'fecha_termino' => '2026-12-31']);
+        DB::table('reemplazos_personal')->where('id', 103)->update(['rut' => '333333333']);
+        // Solo fixtures en SQLite :memory:, ya verificado en setUp.
+        DB::table('dotacion_docente_asignaciones')->whereIn('id', [502, 503])->delete();
+        Schema::table('dotacion_docente_asignaciones', fn (Blueprint $t) => $t->string('estamento_cobertura')->default($docente ? 'docente' : 'asistente'));
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['horas_contrato' => 44]);
+        $incoming = DB::table('reemplazos_personal')->orderBy('id')->get()->map(function ($person, $index) {
+            $data = array_intersect_key((array) $person, array_flip([...\App\Services\Padron\PadronExcelReader::REQUIRED, 'tramo', 'fecha_antiguedad']));
+            $data['mes'] = 9;
+            if ($person->id === 101) {
+                $data = array_replace($data, ['tipocontrato' => 'REEMPLAZO', 'jornada' => 44, 'jornada_basica' => 44, 'fecha_ingreso' => '2026-03-05',
+                    'fecha_termino' => '2026-09-30', 'nombre' => 'Nombre sintético del Excel', 'financiamiento' => 'SUB.GENERAL',
+                    'fecha_antiguedad' => '2025-01-01']);
+            }
+            return ['fila_excel' => $index + 2, 'datos' => $data, 'observaciones' => []];
+        })->all();
+        return $this->revision($incoming);
+    }
+
+    public function test_keep_previous_aaee_data_instead_of_excel_update_changes_only_month_on_apply(): void
+    {
+        $revision = $this->revisionActualizacion();
+        $row = $revision->filas()->where('personal_id', 101)->firstOrFail();
+        $this->assertSame('actualizacion_propuesta', $row->accion);
+        $before = $this->estado();
+        $old = (array) DB::table('reemplazos_personal')->find(101);
+        $this->assertNotEmpty($this->writer()->plan($revision)['errores']);
+        $this->withoutMiddleware();
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+        $url = route('reemplazos.personal.import', ['revision' => $revision->id, 'q' => '111111111']);
+        $this->get($url)->assertOk()->assertSee('Conservar datos anteriores; solo actualizar mes · ID 101');
+        $this->actingAs((new \App\Models\User)->forceFill(['id' => 7]));
+        $this->post(route('reemplazos.personal.import.store'), ['accion' => 'resolver', 'revision' => $revision->id,
+            'fila' => $row->id, 'personal_id' => 101, 'decision_anterior' => 0, 'justificacion' => 'Conservar contrato actual verificado.'])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        app('auth')->forgetGuards();
+        $plan = $this->writer()->plan($revision->fresh());
+        $this->assertSame([], $plan['errores']);
+        $this->assertCount(3, $plan['destinos']); // No sumar Excel y versión conservada.
+        $this->assertSame([], $plan['bajas']);
+        $this->assertSame($before, $this->estado());
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $this->get($url)->assertOk()->assertSee('Propuesta original del Excel (no se aplicará)')
+            ->assertSee('mes: 8 → 9')->assertDontSee('Conservación propuesta (ausente del Excel)');
+        $this->writer()->aplicar($revision, 7, $plan['confirmacion_hash']);
+        $after = (array) DB::table('reemplazos_personal')->find(101);
+        $this->assertSame(array_replace($old, ['mes' => 9, 'updated_at' => $after['updated_at']]), $after);
+        $this->assertSame($before['dotacion_docente_asignaciones'], $this->estado()['dotacion_docente_asignaciones']);
+        $this->assertSame($before['padron_revision_filas'], $this->estado()['padron_revision_filas']);
+        $this->assertDatabaseHas('padron_periodo_personal', ['personal_id' => 101, 'mes' => 8, 'tipocontrato' => 'PLAZO FIJO']);
+        $this->assertDatabaseHas('padron_periodo_personal', ['personal_id' => 101, 'mes' => 9, 'tipocontrato' => 'PLAZO FIJO']);
+        $this->assertDatabaseCount('reemplazos_personal', 3);
+        $this->assertDatabaseCount('padron_asignacion_cambios', 0);
+    }
+
+    public function test_revert_conservation_restores_excel_without_new_contract_or_losing_decision_history(): void
+    {
+        $revision = $this->revisionActualizacion();
+        $row = $revision->filas()->where('personal_id', 101)->firstOrFail();
+        $service = app(PadronResolucionService::class);
+        $before = $this->estado();
+        $reason = 'Conservar datos originales verificados.';
+        $service->resolver($revision, $row->id, 101, $reason, 7);
+        $service->resolver($revision, $row->id, 101, $reason, 7); // Reenvío idempotente.
+        $this->assertDatabaseCount('padron_revision_decisiones', 1);
+        $version = (int) $service->decisiones($revision)->get($row->id)->id;
+        $this->rechaza(fn () => $service->resolver($revision, $row->id, null, 'Retomar datos del Excel verificados.', 7, 0));
+        $service->resolver($revision, $row->id, null, 'Retomar datos del Excel verificados.', 7, $version);
+        $plan = $this->writer()->plan($revision->fresh());
+        $this->assertNotEmpty($plan['errores']);
+        $destination = collect($plan['destinos'])->firstWhere('id', 101);
+        $this->assertSame('REEMPLAZO', $destination['fila']->datos['tipocontrato']);
+        $this->assertCount(3, $plan['destinos']);
+        $this->assertSame($before, $this->estado());
+        $this->assertDatabaseCount('padron_revision_decisiones', 2);
+    }
+
+    public function test_update_conservation_rejects_another_id_and_keeps_estamento_checks(): void
+    {
+        $revision = $this->revisionActualizacion();
+        $row = $revision->filas()->where('personal_id', 101)->firstOrFail();
+        $service = app(PadronResolucionService::class);
+        $this->rechaza(fn () => $service->resolver($revision, $row->id, 102, 'No se debe permitir otro ID.', 7));
+        $this->assertDatabaseCount('padron_revision_decisiones', 0);
+        $service->resolver($revision, $row->id, 101, 'Conservar datos originales verificados.', 7);
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['estamento_cobertura' => 'docente']);
+        $this->assertStringContainsString('la cobertura propuesta corresponde a asistente', implode(' ', $this->writer()->plan($revision->fresh())['errores']));
+    }
+
+    public function test_batch_can_keep_an_update_and_an_absence_for_the_same_rut(): void
+    {
+        $revision = $this->revision([
+            ['fila_excel' => 2, 'datos' => array_replace($this->data('111111111', 35), ['mes' => 9, 'nombre' => 'Nombre cambiado']), 'observaciones' => []],
+            ['fila_excel' => 3, 'datos' => array_replace($this->data('222222222', 22), ['mes' => 9]), 'observaciones' => []],
+        ]);
+        $row = $revision->filas()->whereNotNull('fila_excel')->where('personal_id', 101)->firstOrFail();
+        $this->assertSame('actualizacion_propuesta', $row->accion);
+        $entries = $this->entries($revision, [103]);
+        $entries[] = ['fila' => $row->id, 'personal_id' => 101, 'justificacion' => 'Conservar datos anteriores del contrato.', 'decision_anterior' => 0];
+        $service = app(PadronResolucionService::class);
+        $this->assertSame(2, $service->resolverVarias($revision, '111111111', $entries, 7));
+        $plan = $this->writer()->plan($revision->fresh());
+        $this->assertSame([], $plan['errores']);
+        $this->assertCount(3, $plan['destinos']);
+        $this->assertSame(38.0, $plan['conflictos']['grupos'][0]['cobertura']['horas']);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'mes' => 8, 'nombre' => 'Persona sintética']);
+    }
+
+    public function test_retained_update_hours_require_authorization_when_above_44(): void
+    {
+        $revision = $this->revisionActualizacion(50, true);
+        $this->assertSame([], $revision->excesos);
+        $row = $revision->filas()->where('personal_id', 101)->firstOrFail();
+        app(PadronResolucionService::class)->resolver($revision, $row->id, 101, 'Conservar contrato anterior verificado.', 7);
+        $revision->refresh();
+        $this->assertSame(50.0, (float) $revision->excesos['111111111']['total']);
+        $this->assertStringContainsString('faltan autorización', implode(' ', $this->writer()->plan($revision)['errores']));
+        app(PadronRevisionService::class)->authorize($revision, '111111111', 'Excepción de jornada sintética autorizada.', 7);
+        $this->assertSame([], $this->writer()->plan($revision->fresh())['errores']);
     }
 
     public function test_admin_form_offers_explicit_batch_conservation_and_displays_proposed_month(): void
