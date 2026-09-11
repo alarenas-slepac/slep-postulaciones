@@ -500,6 +500,13 @@ class PadronBajaAsignacionesTest extends TestCase
         }
         $fila->update(['datos' => $original]);
         DB::table('padron_revision_decisiones')->where('padron_revision_fila_id', $fila->id)->delete();
+        // REEMPLAZO pendiente ya es nueva línea automática, pero NO autoriza
+        // por sí solo la liberación de las asignaciones anteriores.
+        $this->assertTrue($this->candidato($revision)['elegible']);
+        $this->assertFalse($this->candidato($revision)['confirmada']);
+        $this->assertNotEmpty($this->writer()->plan($revision)['errores']);
+        // SUPLENCIA conserva el requisito de correspondencia explícita.
+        $fila->update(['datos' => array_replace($original, ['tipocontrato' => 'SUPLENCIA'])]);
         $this->assertArrayNotHasKey('111111111', app(PadronConflictosAsignacionService::class)->analizar($revision)['bajas_asignaciones']);
         $this->assertDatabaseCount('padron_bajas_asignaciones', 0);
     }

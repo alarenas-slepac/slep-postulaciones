@@ -12,6 +12,7 @@
             'propuesta_automatica' => 'Propuesta automática',
             'omitida_por_vigencia' => 'Omitida por vigencia (REEMPLAZO)',
             'conservada' => 'Conservar en el período de carga',
+            'nueva_linea_reemplazo' => 'REEMPLAZO: nueva línea automática',
         ];
     @endphp
 <div data-padron-filas>
@@ -68,8 +69,11 @@
                     @endphp
                     <tr @class(['table-danger' => $fila->accion === 'error', 'table-warning' => $estadoRevision === 'pendiente' || in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar']), 'table-secondary' => $fila->accion === 'reemplazo_anterior_omitido'])>
                         <td>{{ $fila->fila_excel ?? 'Ausente' }}<br><strong>{{ $fila->rut }}</strong><br>{{ $fila->nombre }}</td>
-                        <td>ID: {{ $fila->personal_id ?? 'Sin seleccionar' }}<br>{{ $estadoRevision === 'conservada' ? ($fila->fila_excel ? 'Conservar datos anteriores; solo actualizar mes' : 'Conservación propuesta (ausente del Excel)') : ($etiquetas[$fila->accion] ?? $fila->accion) }}
+                        <td>ID: {{ $estadoRevision === 'nueva_linea_reemplazo' ? 'Nuevo al aplicar' : ($fila->personal_id ?? 'Sin seleccionar') }}<br>{{ $estadoRevision === 'nueva_linea_reemplazo' ? 'Nueva incorporación propuesta' : ($estadoRevision === 'conservada' ? ($fila->fila_excel ? 'Conservar datos anteriores; solo actualizar mes' : 'Conservación propuesta (ausente del Excel)') : ($etiquetas[$fila->accion] ?? $fila->accion)) }}
                             <div class="fw-semibold">{{ $estadosRevision[$estadoRevision] ?? $estadoRevision }}</div>
+                            @if ($estadoRevision === 'nueva_linea_reemplazo')
+                                <div class="small text-success">Se incorporará con un ID nuevo al aplicar el padrón, sin vincular documentos ni asignaciones de contratos anteriores. No requiere seleccionar candidato.</div>
+                            @endif
                             @if ($estadoRevision === 'pendiente' && $fila->accion === 'baja_propuesta')
                                 <div class="small">Ya se conservó otro contrato de este RUT. Decida también si conserva este ID o confirma su baja; no se dará de baja automáticamente.</div>
                             @endif
@@ -88,7 +92,7 @@
                                     @endforeach
                                 </details>
                             @endif
-                            @if ($fila->candidatos)
+                            @if ($fila->candidatos && $estadoRevision !== 'nueva_linea_reemplazo')
                                 <details><summary>{{ count($fila->candidatos) }} candidatos</summary>
                                     @foreach ($fila->candidatos as $candidato)
                                         <div>ID {{ $candidato['id'] }} · RBD {{ $candidato['rbd'] ?? '—' }} · {{ $candidato['tipocontrato'] ?? '—' }} · {{ $candidato['jornada'] ?? '—' }} h · {{ $candidato['financiamiento'] ?? '—' }}</div>
@@ -98,7 +102,7 @@
                                     @endforeach
                                 </details>
                             @endif
-                            @if ($resolucionDisponible && ! $revision->aplicada_at && ! $obsoleta && ! $revision->errores && $estadoRevision !== 'ausencia_vinculada' && ($conservacionActualizacion || in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar', 'baja_propuesta'])) && (! $fila->fila_excel || \App\Services\Padron\PadronConciliador::tipo($fila->datos) !== 'por_clasificar'))
+                            @if ($resolucionDisponible && ! $revision->aplicada_at && ! $obsoleta && ! $revision->errores && ! in_array($estadoRevision, ['ausencia_vinculada', 'nueva_linea_reemplazo']) && ($conservacionActualizacion || in_array($fila->accion, ['revision_manual', 'ausencia_por_revisar', 'baja_propuesta'])) && (! $fila->fila_excel || \App\Services\Padron\PadronConciliador::tipo($fila->datos) !== 'por_clasificar'))
                                 <details><summary>{{ $conservacionActualizacion ? 'Revisar actualización' : ($fila->fila_excel ? 'Resolver correspondencia' : 'Resolver ausencia') }}</summary>
                                     <form method="POST" action="{{ route('reemplazos.personal.import.store') }}" class="mt-2" data-padron-decision-form data-rut="{{ $fila->rut }}">
                                         @csrf

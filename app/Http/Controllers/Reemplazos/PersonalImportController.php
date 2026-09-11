@@ -47,6 +47,7 @@ class PersonalImportController extends Controller
         if ($request->filled('revision')) {
             $request->validate(['revision' => ['integer', 'min:1'], 'q' => ['nullable', 'string', 'max:100'], 'accion_filtro' => ['nullable', 'string', 'max:50'], 'conflictos_page' => ['nullable', 'integer', 'min:1'],
                 'page' => ['nullable', 'integer', 'min:1'], 'solo_filas' => ['nullable', 'boolean'],
+                'fila_revision' => ['nullable', 'integer', 'min:1'], 'pendientes_page' => ['nullable', 'integer', 'min:1'],
                 'avanzar_caso' => ['nullable', 'boolean'],
                 'caso_rut' => ['nullable', 'string', 'max:32'], 'caso_establecimiento' => ['nullable', 'integer', 'min:1']]);
             $service = app(PadronRevisionService::class);
@@ -84,11 +85,26 @@ class PersonalImportController extends Controller
                 count($conflictos['grupos'] ?? []), 1, $paginaConflictos,
                 ['path' => $request->url(), 'pageName' => 'conflictos_page', 'query' => ['revision' => $revision->id], 'fragment' => 'conflictos-asignaciones'],
             );
-            return view('reemplazos.personal.revision', array_merge($this->datosFilas($revision, $request), [
+            $datosFilas = $this->datosFilas($revision, $request);
+            $enlacesBloqueos = [];
+            foreach (array_slice($plan['errores'] ?? [], 0, 10) as $indice => $mensaje) {
+                if (preg_match('/^Fila (\d+)(?:[: ]|$)/u', $mensaje, $match)) {
+                    $fila = $revision->filas()->where('fila_excel', (int) $match[1])->value('id');
+                } elseif (preg_match('/^ID (\d+):/u', $mensaje, $match)) {
+                    $fila = $revision->filas()->where('personal_id', (int) $match[1])->orderBy('id')->value('id');
+                } else {
+                    $fila = null;
+                }
+                if ($fila) {
+                    $enlacesBloqueos[$indice] = route('reemplazos.personal.import', ['revision' => $revision->id, 'fila_revision' => $fila]).'#filas-padron';
+                }
+            }
+            return view('reemplazos.personal.revision', array_merge($datosFilas, [
                 'revision' => $revision,
                 'paginaConflictos' => $paginaConflictos,
                 'aplicacionDisponible' => $disponible,
                 'bloqueos' => $plan['errores'] ?? [],
+                'enlacesBloqueos' => $enlacesBloqueos,
                 'confirmacionHash' => $plan['confirmacion_hash'] ?? null,
                 'conflictos' => $conflictos, 'conflictosPaginados' => $conflictosPaginados,
                 'cambiosAplicados' => $revision->aplicada_at ? DB::table('padron_personal_cambios')->where('padron_revision_id', $revision->id)->count() : 0,
@@ -108,12 +124,26 @@ class PersonalImportController extends Controller
         $disponible = $resolucion->disponible();
         $historial = $disponible ? $resolucion->historial($revision) : collect();
         $decisiones = $historial->keyBy('padron_revision_fila_id');
-        $mostrar = $request->filled('q');
+        // El acceso directo siempre pertenece a esta revisión, incluso en la carga parcial.
+        $filaObjetivo = $request->filled('fila_revision')
+            ? $revision->filas()->select(['id', 'rut'])->findOrFail($request->integer('fila_revision')) : null;
+        if ($filaObjetivo) {
+            $request->query->set('q', $filaObjetivo->rut);
+            $request->query->remove('accion_filtro');
+        }
+        $mostrar = $filaObjetivo !== null || $request->filled('q');
         $query = $revision->filas()->when(! $mostrar, fn ($q) => $q->whereRaw('1 = 0'))
-            ->when($mostrar, function ($q) use ($request) {
+            ->when($mostrar, function ($q) use ($request, $filaObjetivo) {
+                if ($filaObjetivo) {
+                    // Sin RUT no se mezclan registros de identidades desconocidas.
+                    return $filaObjetivo->rut ? $q->where('rut', $filaObjetivo->rut) : $q->whereKey($filaObjetivo->id);
+                }
                 $term = trim((string) $request->query('q'));
                 $q->where(fn ($sub) => $sub->where('rut', 'like', '%'.$term.'%')->orWhere('nombre', 'like', '%'.$term.'%'));
             })->when($request->filled('accion_filtro'), fn ($q) => $q->where('accion', $request->query('accion_filtro')));
+        if ($filaObjetivo && ! $request->filled('page')) {
+            $request->query->set('page', intdiv((clone $query)->where('id', '<', $filaObjetivo->id)->count(), 50) + 1);
+        }
         $filas = $query->orderBy('id')->paginate(50, ['*'], 'page', $request->integer('page', 1))
             ->withPath(route('reemplazos.personal.import'))->appends($request->except(['solo_filas', 'avanzar_caso']))->fragment('filas-padron');
         $ids = [];
@@ -124,13 +154,23 @@ class PersonalImportController extends Controller
                 $ids[] = $candidato['id'];
             }
         }
+        $resumen = $resolucion->resumen($revision->filas()->orderBy('id')->get(['id', 'fila_excel', 'accion', 'personal_id', 'rut', 'datos->tipocontrato as tipo_contrato']), $decisiones);
+        $idsPendientes = array_keys(array_filter($resumen['estados'], fn ($estado) => $estado === 'pendiente'));
+        $paginaPendientes = min(max(1, (int) ceil(count($idsPendientes) / 10)), $request->integer('pendientes_page', 1));
+        $pendientes = new \Illuminate\Pagination\LengthAwarePaginator(
+            $revision->filas()->whereIn('id', array_slice($idsPendientes, ($paginaPendientes - 1) * 10, 10))
+                ->orderBy('id')->get(['id', 'fila_excel', 'personal_id', 'rut', 'nombre']),
+            count($idsPendientes), 10, $paginaPendientes,
+            ['path' => route('reemplazos.personal.import'), 'pageName' => 'pendientes_page',
+                'query' => ['revision' => $revision->id], 'fragment' => 'pendientes-correspondencia'],
+        );
         return [
             'revision' => $revision, 'filas' => $filas, 'mostrarFilas' => $mostrar,
             'paginaConflictos' => $request->integer('conflictos_page', 1),
             'casoRut' => $request->query('caso_rut'), 'casoEstablecimiento' => $request->query('caso_establecimiento'),
             'resolucionDisponible' => $disponible, 'decisiones' => $decisiones,
             'historialDecisiones' => $historial->groupBy('padron_revision_fila_id'),
-            'resumenResolucion' => $resolucion->resumen($revision->filas()->get(['id', 'fila_excel', 'accion', 'personal_id', 'rut']), $decisiones),
+            'resumenResolucion' => $resumen, 'pendientesCorrespondencia' => $pendientes,
             'dependenciasHistoricas' => app(PadronDependenciasService::class)->paraPersonal($ids),
             'obsoleta' => ! $revision->aplicada_at && app(PadronRevisionService::class)->stale($revision),
         ];

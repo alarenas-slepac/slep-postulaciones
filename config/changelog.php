@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.11.514',
+    'current_version' => '2026.9.11.515',
     'entries' => [
+        [
+            'version' => '2026.9.11.515',
+            'title' => 'Padrón: acceso a pendientes y nuevas líneas de reemplazo',
+            'summary' => 'Permite abrir las correspondencias desde los bloqueos y propone como nuevas líneas los REEMPLAZO todavía pendientes, sin reutilizar contratos anteriores.',
+            'roles' => ['admin'],
+            'items' => [
+                'Añade accesos directos por fila y una lista paginada de diez correspondencias pendientes, independiente de los conflictos de Dotación.',
+                'Carga solo las filas del RUT seleccionado y abre la página que contiene el registro, también para ausencias del archivo.',
+                'Los REEMPLAZO ambiguos sin decisión se proponen como nuevas incorporaciones. Conserva correspondencias identificadas, decisiones registradas, errores y omisiones por vigencia.',
+                'Mantiene validaciones de jornadas, bajas, liberaciones e historial. No cambia las exclusiones existentes de los módulos.',
+                'No requiere migraciones ni volver a cargar el Excel y no habilita la aplicación definitiva en producción.',
+            ],
+            'published_at' => '2026-09-11',
+        ],
         [
             'version' => '2026.9.11.514',
             'title' => 'Padrón: liberar asignaciones antiguas al continuar como reemplazo',
