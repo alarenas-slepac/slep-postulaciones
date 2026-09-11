@@ -17,6 +17,14 @@ class PadronBajaAsignacionesService
         return Schema::hasTable('padron_bajas_asignaciones') && Schema::hasTable('padron_asignacion_cambios');
     }
 
+    public function trasladoInstalado(): bool
+    {
+        return $this->instalado()
+            && Schema::hasColumn('padron_bajas_asignaciones', 'tipo')
+            && Schema::hasColumn('padron_bajas_asignaciones', 'establecimiento_origen_id')
+            && Schema::hasColumn('padron_bajas_asignaciones', 'establecimiento_destino_id');
+    }
+
     public function ultimas(PadronRevision $revision): Collection
     {
         return $this->instalado()
@@ -110,6 +118,100 @@ class PadronBajaAsignacionesService
         return $out;
     }
 
+    /**
+     * Detecta asignaciones que permanecen activas en el RBD anterior mientras
+     * el mismo ID contractual fue resuelto en otro RBD del padrón. La decisión
+     * solo prepara una liberación diferida; nunca modifica Dotación aquí.
+     */
+    public function evaluarTraslados(PadronRevision $revision, Collection $filas, array $estados, array $asignaciones, ?Collection $decisiones = null): array
+    {
+        if (! $this->trasladoInstalado() || ! $revision->anio || $revision->errores || $filas->whereNotNull('fila_excel')->isEmpty()) {
+            return [];
+        }
+
+        $resolucion = app(PadronResolucionService::class);
+        $decisiones ??= $resolucion->decisiones($revision);
+        $selecciones = $resolucion->resumen($filas, $decisiones)['selecciones'];
+        $establecimientos = DB::table('establecimientos')->pluck('id', 'rbd');
+        $destinos = [];
+        foreach ($filas as $fila) {
+            if ($fila->fila_excel === null && ($estados[$fila->id] ?? '') !== 'conservada') {
+                continue;
+            }
+            $id = $selecciones[$fila->id] ?? null;
+            if ($id === null) {
+                continue;
+            }
+            $destino = (int) ($establecimientos[$fila->datos['rbd'] ?? 0] ?? 0);
+            if (! $destino) {
+                continue;
+            }
+            $rut = PadronConciliador::rut($fila->rut);
+            $destinos[(int) $id][] = ['rut' => $rut, 'establecimiento_id' => $destino, 'rbd' => $fila->datos['rbd'] ?? null];
+        }
+
+        $porGrupo = [];
+        foreach ($asignaciones as $asignacion) {
+            $rut = PadronConciliador::rut(($asignacion['docente_rut_normalizado'] ?? null) ?: ($asignacion['docente_rut'] ?? null));
+            if ($rut === '') {
+                continue;
+            }
+            $porGrupo[$rut.'|'.(int) $asignacion['establecimiento_id']][] = $asignacion;
+        }
+
+        $ultimas = DB::table('padron_bajas_asignaciones')
+            ->where('padron_revision_id', $revision->id)->where('tipo', 'traslado')->orderBy('id')->get()
+            ->keyBy(fn ($row) => $row->rut.'|'.$row->establecimiento_origen_id.'|'.$row->establecimiento_destino_id);
+        $out = [];
+        foreach ($porGrupo as $key => $rows) {
+            [$rut, $origen] = explode('|', $key, 2);
+            $porDestino = [];
+            $elegible = true;
+            $huellas = [];
+            $personalIds = [];
+            foreach ($rows as $asignacion) {
+                $id = (int) ($asignacion['reemplazos_personal_id'] ?? 0);
+                $candidatosDestino = $destinos[$id] ?? [];
+                $destino = count($candidatosDestino) === 1 ? $candidatosDestino[0] : null;
+                $elegible = $elegible && $id > 0 && $destino && $destino['rut'] === $rut
+                    && (int) $destino['establecimiento_id'] !== (int) $origen
+                    && (int) $asignacion['anio'] === (int) $revision->anio;
+                if ($destino) {
+                    $porDestino[(int) $destino['establecimiento_id']] = true;
+                }
+                if (! empty($asignacion['_huella'])) {
+                    $huellas[(int) $asignacion['id']] = $asignacion['_huella'];
+                }
+                if ($id > 0) {
+                    $personalIds[] = $id;
+                }
+            }
+            // Un RUT con asignaciones repartidas a más de un destino requiere
+            // revisión manual: no se libera el grupo completo por inferencia.
+            $elegible = $elegible && count($porDestino) === 1 && count($huellas) === count($rows);
+            if (! $elegible) {
+                continue;
+            }
+            $destino = (int) array_key_first($porDestino);
+            ksort($huellas);
+            sort($personalIds);
+            $alcance = ['asignaciones' => $huellas, 'personal_ids' => array_values(array_unique($personalIds)),
+                'origen' => (int) $origen, 'destino' => $destino, 'anio' => (int) $revision->anio];
+            $hash = hash('sha256', json_encode([$revision->id, $revision->base_hash, $rut, $alcance], JSON_THROW_ON_ERROR));
+            $clave = $rut.'|'.$origen.'|'.$destino;
+            $ultima = $ultimas->get($clave);
+            $confirmada = (bool) ($ultima && $ultima->confirmada && hash_equals($hash, $ultima->alcance_hash));
+            $out[$rut.'|'.$origen] = ['rut' => $rut, 'elegible' => true, 'confirmada' => $confirmada,
+                'autorizada' => (bool) ($ultima && $ultima->confirmada), 'alcance' => $alcance,
+                'alcance_hash' => $hash, 'ultima_id' => (int) ($ultima->id ?? 0), 'destino' => $destino,
+                'destino_rbd' => DB::table('establecimientos')->where('id', $destino)->value('rbd'),
+                'cantidad' => count($rows), 'horas' => round(array_sum(array_map(fn ($a) => (float) ($a['horas_contrato'] ?? 0), $rows)), 2),
+                'justificacion' => $ultima->justificacion ?? null, 'usuario_id' => $ultima->usuario_id ?? null,
+                'desactualizada' => (bool) ($ultima && $ultima->confirmada && ! $confirmada)];
+        }
+        return $out;
+    }
+
     public function registrar(PadronRevision $revision, string $rut, string $hash, int $anterior, string $motivo, int $usuario, bool $confirmar): void
     {
         $rut = PadronConciliador::rut($rut);
@@ -146,6 +248,42 @@ class PadronBajaAsignacionesService
         });
     }
 
+    public function registrarTraslado(PadronRevision $revision, string $rut, int $origen, int $destino, string $hash, int $anterior, string $motivo, int $usuario, bool $confirmar): void
+    {
+        $rut = PadronConciliador::rut($rut);
+        $motivo = trim($motivo);
+        Validator::make(compact('rut', 'origen', 'destino', 'hash', 'anterior', 'motivo', 'usuario'), [
+            'rut' => ['required', 'string', 'max:32'], 'origen' => ['required', 'integer', 'min:1'], 'destino' => ['required', 'integer', 'min:1'],
+            'hash' => ['required', 'regex:/^[a-f0-9]{64}$/'], 'anterior' => ['integer', 'min:0'],
+            'motivo' => ['required', 'string', 'min:10', 'max:2000'], 'usuario' => ['integer', 'min:1'],
+        ])->validate();
+        if (! $this->trasladoInstalado()) { $this->fail('Instale la migración de traslados y liberación de asignaciones con PHP 8.3.'); }
+        DB::transaction(function () use ($revision, $rut, $origen, $destino, $hash, $anterior, $motivo, $usuario, $confirmar): void {
+            $revision = PadronRevision::whereKey($revision->id)->lockForUpdate()->firstOrFail();
+            if ($revision->aplicada_at || $revision->errores || app(PadronRevisionService::class)->stale($revision)) {
+                $this->fail('La revisión está cerrada, contiene errores o cambió el padrón base.');
+            }
+            $ultima = DB::table('padron_bajas_asignaciones')->where('padron_revision_id', $revision->id)->where('tipo', 'traslado')
+                ->where('rut', $rut)->where('establecimiento_origen_id', $origen)->where('establecimiento_destino_id', $destino)->latest('id')->first();
+            if ((int) ($ultima->id ?? 0) !== $anterior) {
+                if ($ultima && (bool) $ultima->confirmada === $confirmar && $ultima->alcance_hash === $hash && $ultima->justificacion === $motivo && (int) $ultima->usuario_id === $usuario) { return; }
+                $this->fail('Otra decisión de traslado fue registrada. Recargue antes de confirmar o retirar la autorización.');
+            }
+            $candidato = app(PadronConflictosAsignacionService::class)->analizar($revision)['traslados_asignaciones'][$rut.'|'.$origen] ?? null;
+            if ($confirmar && (! $candidato || ! $candidato['elegible'] || (int) $candidato['destino'] !== $destino || ! hash_equals($candidato['alcance_hash'], $hash))) {
+                $this->fail('El traslado no es elegible o sus asignaciones cambiaron. Recargue y revise el alcance.');
+            }
+            if (! $confirmar && (! $ultima || ! $ultima->confirmada)) { $this->fail('No hay una liberación de traslado confirmada que retirar.'); }
+            DB::table('padron_bajas_asignaciones')->insert([
+                'padron_revision_id' => $revision->id, 'rut' => $rut, 'tipo' => 'traslado',
+                'establecimiento_origen_id' => $origen, 'establecimiento_destino_id' => $destino,
+                'confirmada' => $confirmar, 'alcance_hash' => $confirmar ? $hash : $ultima->alcance_hash,
+                'alcance' => $confirmar ? json_encode($candidato['alcance'], JSON_THROW_ON_ERROR) : $ultima->alcance,
+                'justificacion' => $motivo, 'usuario_id' => $usuario, 'created_at' => now(),
+            ]);
+        });
+    }
+
     /** Solo después de revalidar el plan y bajo los bloqueos del escritor. */
     public function aplicar(PadronRevision $revision, array $bajas, array $confirmaciones, int $usuario): void
     {
@@ -160,6 +298,34 @@ class PadronBajaAsignacionesService
                 if (! $antes || $antes->estado !== 'activa' || (int) $antes->anio !== (int) $revision->anio
                     || ! hash_equals($huella, hash('sha256', json_encode($antes, JSON_THROW_ON_ERROR)))) {
                     $this->fail('Una asignación cambió desde la confirmación de baja. No se aplicaron cambios.');
+                }
+                DB::table('dotacion_docente_asignaciones')->where('id', $id)->update(array_intersect_key([
+                    'estado' => 'inactiva', 'updated_by' => $usuario, 'updated_at' => now()->toDateTimeString(),
+                ], $columnas));
+                DB::table('padron_asignacion_cambios')->insert([
+                    'padron_revision_id' => $revision->id, 'baja_asignaciones_id' => $confirmacion['ultima_id'],
+                    'asignacion_id' => $id, 'antes' => json_encode($antes, JSON_THROW_ON_ERROR),
+                    'despues' => json_encode(DB::table('dotacion_docente_asignaciones')->find($id), JSON_THROW_ON_ERROR),
+                    'usuario_id' => $usuario, 'created_at' => now(),
+                ]);
+            }
+        }
+    }
+
+    /** Inactiva solo asignaciones del origen ya confirmadas como traslado. */
+    public function aplicarTraslados(PadronRevision $revision, array $confirmaciones, int $usuario): void
+    {
+        if (! $confirmaciones) { return; }
+        if (DB::transactionLevel() === 0 || ! $this->trasladoInstalado()) { $this->fail('La liberación por traslado requiere la transacción de aplicación.'); }
+        $columnas = array_flip(Schema::getColumnListing('dotacion_docente_asignaciones'));
+        foreach ($confirmaciones as $confirmacion) {
+            if (! ($confirmacion['confirmada'] ?? false)) { continue; }
+            foreach ($confirmacion['alcance']['asignaciones'] as $id => $huella) {
+                $antes = DB::table('dotacion_docente_asignaciones')->where('id', $id)->lockForUpdate()->first();
+                if (! $antes || $antes->estado !== 'activa' || (int) $antes->anio !== (int) $revision->anio
+                    || (int) $antes->establecimiento_id !== (int) $confirmacion['alcance']['origen']
+                    || ! hash_equals($huella, hash('sha256', json_encode($antes, JSON_THROW_ON_ERROR)))) {
+                    $this->fail('Una asignación del traslado cambió desde la confirmación. No se aplicaron cambios.');
                 }
                 DB::table('dotacion_docente_asignaciones')->where('id', $id)->update(array_intersect_key([
                     'estado' => 'inactiva', 'updated_by' => $usuario, 'updated_at' => now()->toDateTimeString(),

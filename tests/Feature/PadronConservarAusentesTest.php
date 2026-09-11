@@ -34,7 +34,7 @@ class PadronConservarAusentesTest extends TestCase
         });
         foreach (['2026_09_08_120000_create_padron_revisiones', '2026_09_08_130000_add_padron_aplicacion_segura',
             '2026_09_08_150000_add_padron_snapshot_to_documentos', '2026_09_08_160000_create_padron_periodo_versiones',
-            '2026_09_10_120000_create_padron_bajas_asignaciones'] as $migration) {
+            '2026_09_10_120000_create_padron_bajas_asignaciones', '2026_09_11_120000_add_padron_traslados_asignaciones'] as $migration) {
             (require base_path('database/migrations/'.$migration.'.php'))->up();
         }
         DB::table('establecimientos')->insert(['id' => 1, 'rbd' => 99999, 'nombre_establecimiento' => 'Escuela sintética']);

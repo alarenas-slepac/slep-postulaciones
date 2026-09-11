@@ -94,6 +94,9 @@ class PadronConflictosAsignacionService
         // El detalle agrupado no necesita conservar otra colección de modelos
         // ni nombres/fechas/documentos de todas las filas del archivo.
         $bajasAsignaciones = app(PadronBajaAsignacionesService::class)->evaluar($revision, $filas, $resumen['estados'], $snapshot['asignaciones']);
+        $trasladosAsignaciones = app(PadronBajaAsignacionesService::class)->evaluarTraslados(
+            $revision, $filas, $resumen['estados'], $snapshot['asignaciones'], $decisiones,
+        );
         unset($filas, $fila, $decisiones, $selecciones, $resumen, $data);
         $personal = DB::table('reemplazos_personal')->whereIn('id', array_filter(array_column($snapshot['asignaciones'], 'reemplazos_personal_id')))
             ->get(['id', 'rut', 'tipocontrato', 'financiamiento', 'estatuto', 'jornada'])->keyBy('id');
@@ -124,6 +127,7 @@ class PadronConflictosAsignacionService
             $rows = $grupos[$key] ?? [];
             $cobertura = $this->cobertura($rows, $rut, (string) ($est->rbd ?? ''), $estId, $snapshot);
             $rowsActuales = $actuales[$key] ?? [];
+            $traslado = $trasladosAsignaciones[$key] ?? null;
             $coberturaActual = $this->cobertura($rowsActuales, $rut, (string) ($est->rbd ?? ''), $estId, $snapshot);
             if ($coberturaActual['fuente'] === 'Padrón propuesto') {
                 $coberturaActual['fuente'] = 'Padrón actual';
@@ -205,6 +209,10 @@ class PadronConflictosAsignacionService
                     unset($motivos['id_sin_destino'], $motivos['sin_contrato_regular'], $motivos['cobertura_insuficiente']);
                     $avisos[] = 'Baja con liberación confirmada: estas asignaciones se inactivarán únicamente al aplicar el padrón. Sus horas quedarán disponibles; el historial se conserva.';
                 }
+                if ($traslado && $traslado['confirmada']) {
+                    unset($motivos['traslado'], $motivos['sin_contrato_regular'], $motivos['cobertura_insuficiente']);
+                    $avisos[] = 'Traslado confirmado: estas asignaciones del RBD de origen se inactivarÃ¡n Ãºnicamente al aplicar el padrÃ³n. El contrato y su historial se conservan en el destino.';
+                }
                 $item = [
                     'asignacion_id' => $a['id'], 'personal_id' => $id, 'rut' => $rut,
                     'establecimiento_id' => $estId, 'rbd' => $est->rbd ?? null,
@@ -239,12 +247,14 @@ class PadronConflictosAsignacionService
                 'bloqueante' => (bool) $motivosGrupo, 'asignaciones' => $detalles,
                 'correspondencias_pendientes' => $pendientes[$rut] ?? 0,
                 'baja_asignaciones' => $bajasAsignaciones[$rut] ?? null,
+                'traslado_asignaciones' => $traslado,
             ];
         }
         usort($gruposResultado, fn ($a, $b) => ((int) $b['bloqueante'] <=> (int) $a['bloqueante'])
             ?: strcmp($a['rut'], $b['rut']) ?: ($a['establecimiento_id'] <=> $b['establecimiento_id']));
         return ['items' => $items, 'grupos' => $gruposResultado, 'errores' => array_values(array_unique($errores)),
             'bajas_asignaciones' => $bajasAsignaciones,
+            'traslados_asignaciones' => $trasladosAsignaciones,
             'grupos_revisados' => count($porGrupo),
             'grupos_bloqueantes' => count(array_filter($gruposResultado, fn ($g) => $g['bloqueante'])),
             'grupos_avisos' => count(array_filter($gruposResultado, fn ($g) => ! $g['bloqueante'])),

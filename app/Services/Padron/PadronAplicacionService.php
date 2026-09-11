@@ -145,7 +145,7 @@ class PadronAplicacionService
     private function confirmacionHash(PadronRevision $revision): string
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'confirmacion-v4-bajas'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
+        hash_update($hash, 'confirmacion-v5-bajas-traslados'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
         foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones', 'padron_bajas_asignaciones'] as $table) {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
@@ -289,6 +289,7 @@ class PadronAplicacionService
                 $this->auditar($revision, $old->id, (array) $old, 'desactivacion', $usuario);
             }
             app(PadronBajaAsignacionesService::class)->aplicar($revision, $plan['bajas'], $plan['conflictos']['bajas_asignaciones'] ?? [], $usuario);
+            app(PadronBajaAsignacionesService::class)->aplicarTraslados($revision, $plan['conflictos']['traslados_asignaciones'] ?? [], $usuario);
             app(PadronPeriodoService::class)->despuesDeAplicar($revision, $usuario);
             $revision->forceFill(['aplicada_at' => now(), 'aplicada_por' => $usuario])->save();
             return $revision;

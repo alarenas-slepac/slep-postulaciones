@@ -220,7 +220,25 @@ class PersonalImportController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate(['accion' => ['required', 'in:previsualizar,autorizar_exceso,resolver,resolver_varias,aplicar,confirmar_baja_asignaciones,retirar_baja_asignaciones']]);
+        $request->validate(['accion' => ['required', 'in:previsualizar,autorizar_exceso,resolver,resolver_varias,aplicar,confirmar_baja_asignaciones,retirar_baja_asignaciones,confirmar_traslado_asignaciones,retirar_traslado_asignaciones']]);
+        if (in_array($request->input('accion'), ['confirmar_traslado_asignaciones', 'retirar_traslado_asignaciones'], true)) {
+            $data = $request->validate([
+                'revision' => ['required', 'integer', 'min:1'], 'rut' => ['required', 'string', 'max:32'],
+                'origen' => ['required', 'integer', 'min:1'], 'destino' => ['required', 'integer', 'min:1'],
+                'alcance_hash' => ['required', 'regex:/^[a-f0-9]{64}$/'], 'decision_anterior' => ['required', 'integer', 'min:0'],
+                'justificacion' => ['required', 'string', 'min:10', 'max:2000'], 'confirmar_alcance' => ['accepted'],
+                'conflictos_page' => ['nullable', 'integer', 'min:1'],
+            ]);
+            $revision = PadronRevision::findOrFail($data['revision']);
+            $confirmar = $request->input('accion') === 'confirmar_traslado_asignaciones';
+            app(PadronBajaAsignacionesService::class)->registrarTraslado($revision, $data['rut'], (int) $data['origen'], (int) $data['destino'],
+                $data['alcance_hash'], (int) $data['decision_anterior'], $data['justificacion'], (int) $request->user()->id, $confirmar);
+            return redirect()->to(route('reemplazos.personal.import', [
+                'revision' => $revision->id, 'conflictos_page' => $data['conflictos_page'] ?? 1,
+            ]).'#conflictos-asignaciones')->with('status', $confirmar
+                ? 'Traslado y liberación diferida confirmados. Las asignaciones de origen seguirán activas hasta aplicar el padrón.'
+                : 'Confirmación de traslado retirada. No se modificaron contratos ni asignaciones.');
+        }
         if (in_array($request->input('accion'), ['confirmar_baja_asignaciones', 'retirar_baja_asignaciones'], true)) {
             $data = $request->validate([
                 'revision' => ['required', 'integer', 'min:1'], 'rut' => ['required', 'string', 'max:32'],

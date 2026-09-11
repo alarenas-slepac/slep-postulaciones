@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.11.511',
+    'current_version' => '2026.9.11.512',
     'entries' => [
+        [
+            'version' => '2026.9.11.512',
+            'title' => 'Padrón: liberar asignaciones por traslado de establecimiento',
+            'summary' => 'Permite confirmar la inactivación diferida de asignaciones que permanecen en el RBD de origen cuando el mismo contrato fue trasladado a otro RBD.',
+            'roles' => ['admin'],
+            'items' => [
+                'Detecta grupos completos de asignaciones activas del mismo RUT cuyos IDs fueron resueltos en un único RBD de destino.',
+                'Exige alcance, huella, confirmación y justificación; no mueve contratos, no borra historial y no modifica Dotación durante la revisión.',
+                'Al aplicar, inactiva únicamente las asignaciones del origen verificadas bajo bloqueo transaccional y registra antes/después en la auditoría existente.',
+                'Mantiene bloqueado el caso si hay destinos múltiples, IDs sin correspondencia, cambios concurrentes o asignaciones fuera del alcance.',
+                'Agrega migración para registrar el tipo de liberación y conserva la aplicación definitiva deshabilitada hasta completar su validación operativa.',
+            ],
+            'published_at' => '2026-09-11',
+        ],
         [
             'version' => '2026.9.11.511',
             'title' => 'Padrón: conservar datos anteriores ante una actualización del Excel',

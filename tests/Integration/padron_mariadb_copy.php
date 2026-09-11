@@ -143,6 +143,7 @@ try {
             if ($syntheticCase === 'release') {
                 // Solo fixture sintético recién creado. No decide sobre la copia real.
                 (require dirname(__DIR__, 2).'/database/migrations/2026_09_10_120000_create_padron_bajas_asignaciones.php')->up();
+                (require dirname(__DIR__, 2).'/database/migrations/2026_09_11_120000_add_padron_traslados_asignaciones.php')->up();
                 DB::table('dotacion_docente_asignaciones')->insert([
                     'id' => 502, 'anio' => 2026, 'establecimiento_id' => 1, 'reemplazos_personal_id' => 102,
                     'docente_rut' => '222222222', 'estado' => 'activa', 'horas_contrato' => 37,

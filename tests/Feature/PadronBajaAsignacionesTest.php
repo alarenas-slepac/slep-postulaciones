@@ -46,7 +46,7 @@ class PadronBajaAsignacionesTest extends TestCase
         });
         foreach (['2026_09_08_120000_create_padron_revisiones', '2026_09_08_130000_add_padron_aplicacion_segura',
             '2026_09_08_150000_add_padron_snapshot_to_documentos', '2026_09_08_160000_create_padron_periodo_versiones',
-            '2026_09_10_120000_create_padron_bajas_asignaciones'] as $migration) {
+            '2026_09_10_120000_create_padron_bajas_asignaciones', '2026_09_11_120000_add_padron_traslados_asignaciones'] as $migration) {
             (require base_path('database/migrations/'.$migration.'.php'))->up();
         }
         DB::table('establecimientos')->insert([
@@ -330,5 +330,63 @@ class PadronBajaAsignacionesTest extends TestCase
         DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['establecimiento_id' => 2]);
         $this->get(route('reemplazos.personal.import', ['revision' => $revision->id]))->assertOk()
             ->assertSee('El alcance cambió.')->assertSee('Retirar confirmación de liberación');
+    }
+    public function test_transfer_can_confirm_deferred_release_of_source_assignments_without_deactivating_contract(): void
+    {
+        // El funcionario mantiene el contrato y aparece en el RBD 99998, pero
+        // sus dos asignaciones activas todavía pertenecen al RBD 99999.
+        DB::table('dotacion_docente_asignaciones')->where('id', 502)->update([
+            'reemplazos_personal_id' => 101, 'docente_rut' => '11.111.111-1', 'establecimiento_id' => 1,
+        ]);
+        $revision = $this->revision([$this->data(['rbd' => 99998])]);
+        $diagnosis = app(PadronConflictosAsignacionService::class)->analizar($revision);
+        $key = '111111111|1';
+        $traslado = $diagnosis['traslados_asignaciones'][$key];
+        $this->assertTrue($traslado['elegible']);
+        $this->assertFalse($traslado['confirmada']);
+        $this->assertSame(2, $traslado['destino']);
+        $this->assertSame([501, 502], array_keys($traslado['alcance']['asignaciones']));
+        $this->assertNotEmpty($diagnosis['grupos']);
+        $this->assertNotEmpty($diagnosis['grupos'][0]['motivos']);
+
+        $service = app(PadronBajaAsignacionesService::class);
+        $service->registrarTraslado($revision, '111111111', 1, 2, $traslado['alcance_hash'], $traslado['ultima_id'],
+            'Traslado al RBD destino verificado por Dotación.', 7, true);
+        $resolved = app(PadronConflictosAsignacionService::class)->analizar($revision);
+        $this->assertSame(0, $resolved['grupos_bloqueantes']);
+        $this->assertCount(1, $resolved['grupos']);
+        $this->assertTrue($resolved['traslados_asignaciones'][$key]['confirmada']);
+        $this->assertSame([], $this->writer()->plan($revision)['errores']);
+
+        $before = DB::table('reemplazos_personal')->find(101);
+        $writer = $this->writer();
+        $writer->aplicar($revision, 7, $writer->plan($revision)['confirmacion_hash']);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'vigente' => true, 'establecimiento_id' => 2]);
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 501, 'estado' => 'inactiva']);
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 502, 'estado' => 'inactiva']);
+        $this->assertDatabaseCount('padron_asignacion_cambios', 2);
+        $this->assertDatabaseHas('padron_bajas_asignaciones', ['tipo' => 'traslado', 'rut' => '111111111', 'confirmada' => true]);
+        $this->assertSame($before->vigente, DB::table('reemplazos_personal')->find(101)->vigente);
+    }
+
+    public function test_admin_route_requires_explicit_transfer_scope_acceptance(): void
+    {
+        DB::table('dotacion_docente_asignaciones')->where('id', 502)->update([
+            'reemplazos_personal_id' => 101, 'docente_rut' => '11.111.111-1', 'establecimiento_id' => 1,
+        ]);
+        $revision = $this->revision([$this->data(['rbd' => 99998])]);
+        $candidate = app(PadronConflictosAsignacionService::class)->analizar($revision)['traslados_asignaciones']['111111111|1'];
+        $this->withoutMiddleware();
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+        $this->get(route('reemplazos.personal.import', ['revision' => $revision->id]))->assertOk()
+            ->assertSee('Liberación de asignaciones por traslado');
+        $this->actingAs((new \App\Models\User)->forceFill(['id' => 7]));
+        $payload = ['accion' => 'confirmar_traslado_asignaciones', 'revision' => $revision->id, 'rut' => '111111111',
+            'origen' => 1, 'destino' => 2, 'alcance_hash' => $candidate['alcance_hash'], 'decision_anterior' => 0,
+            'justificacion' => 'Traslado verificado por administración.', 'conflictos_page' => 1];
+        $this->post(route('reemplazos.personal.import.store'), $payload)->assertSessionHasErrors('confirmar_alcance');
+        $this->post(route('reemplazos.personal.import.store'), $payload + ['confirmar_alcance' => 1])->assertRedirect();
+        $this->assertDatabaseHas('padron_bajas_asignaciones', ['tipo' => 'traslado', 'rut' => '111111111', 'confirmada' => true]);
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 501, 'estado' => 'activa']);
     }
 }

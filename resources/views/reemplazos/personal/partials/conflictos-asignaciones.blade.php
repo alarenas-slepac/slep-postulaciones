@@ -67,6 +67,9 @@
                                 @if ($item['baja_asignaciones'] ?? null)
                                     @include('reemplazos.personal.partials.baja-asignaciones', ['baja' => $item['baja_asignaciones']])
                                 @endif
+                                @if ($item['traslado_asignaciones'] ?? null)
+                                    @include('reemplazos.personal.partials.traslado-asignaciones', ['traslado' => $item['traslado_asignaciones']])
+                                @endif
                             </td>
                         </tr>
                     @empty
