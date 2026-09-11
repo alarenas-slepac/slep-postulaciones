@@ -336,8 +336,9 @@ class PadronBajaAsignacionesTest extends TestCase
         // El funcionario mantiene el contrato y aparece en el RBD 99998, pero
         // sus dos asignaciones activas todavía pertenecen al RBD 99999.
         DB::table('dotacion_docente_asignaciones')->where('id', 502)->update([
-            'reemplazos_personal_id' => 101, 'docente_rut' => '11.111.111-1', 'establecimiento_id' => 1,
+            'reemplazos_personal_id' => 101, 'docente_rut' => null, 'docente_rut_normalizado' => null, 'establecimiento_id' => 1,
         ]);
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['docente_rut' => null, 'docente_rut_normalizado' => null]);
         $revision = $this->revision([$this->data(['rbd' => 99998])]);
         $diagnosis = app(PadronConflictosAsignacionService::class)->analizar($revision);
         $key = '111111111|1';
@@ -372,8 +373,9 @@ class PadronBajaAsignacionesTest extends TestCase
     public function test_admin_route_requires_explicit_transfer_scope_acceptance(): void
     {
         DB::table('dotacion_docente_asignaciones')->where('id', 502)->update([
-            'reemplazos_personal_id' => 101, 'docente_rut' => '11.111.111-1', 'establecimiento_id' => 1,
+            'reemplazos_personal_id' => 101, 'docente_rut' => null, 'docente_rut_normalizado' => null, 'establecimiento_id' => 1,
         ]);
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['docente_rut' => null, 'docente_rut_normalizado' => null]);
         $revision = $this->revision([$this->data(['rbd' => 99998])]);
         $candidate = app(PadronConflictosAsignacionService::class)->analizar($revision)['traslados_asignaciones']['111111111|1'];
         $this->withoutMiddleware();
