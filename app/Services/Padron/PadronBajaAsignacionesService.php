@@ -45,13 +45,14 @@ class PadronBajaAsignacionesService
         foreach ($filas as $fila) {
             $rut = PadronConciliador::rut($fila->rut);
             if ($fila->fila_excel !== null || ($estados[$fila->id] ?? '') === 'conservada') {
-                // Incluso un reemplazo omitido o una línea inválida impide presumir retiro.
+                // Figurar en el archivo impide presumir retiro completo.
                 $entrantes[$rut] = true;
             } else {
                 $ausentes[$rut][] = $fila;
             }
         }
-        $ausentes = array_diff_key($ausentes, $entrantes);
+        $continuidades = $this->continuidadesReemplazo($revision, $filas, array_intersect_key($entrantes, $ausentes));
+        $ausentes = array_diff_key($ausentes, array_diff_key($entrantes, $continuidades));
         unset($ausentes['']);
         if (! $ausentes) {
             return [];
@@ -107,10 +108,14 @@ class PadronBajaAsignacionesService
             }
             sort($bajas); ksort($huellas);
             $alcance = ['bajas' => array_values(array_unique($bajas)), 'asignaciones' => $huellas, 'anio' => (int) $revision->anio];
+            // No altera huellas de bajas completas ya confirmadas. La excepción
+            // vincula la autorización a las nuevas líneas de reemplazo resueltas.
+            if (isset($continuidades[$rut])) { $alcance['continuidad_reemplazo'] = $continuidades[$rut]; }
             $hash = hash('sha256', json_encode([$revision->id, $revision->base_hash, (string) $rut, $alcance], JSON_THROW_ON_ERROR));
             $ultima = $ultimas->get($rut);
             $confirmada = $elegible && $ultima && $ultima->confirmada && hash_equals($hash, $ultima->alcance_hash);
             $out[$rut] = ['rut' => (string) $rut, 'elegible' => (bool) $elegible, 'confirmada' => (bool) $confirmada,
+                'continuidad_reemplazo' => isset($continuidades[$rut]),
                 'autorizada' => (bool) ($ultima && $ultima->confirmada),
                 'alcance' => $alcance, 'alcance_hash' => $hash, 'ultima_id' => (int) ($ultima->id ?? 0),
                 'horas' => round($horas, 2), 'cantidad' => count($rows), 'establecimientos' => count($establecimientos),
@@ -118,6 +123,42 @@ class PadronBajaAsignacionesService
                 'desactualizada' => (bool) ($ultima && $ultima->confirmada && ! $confirmada)];
         }
         return $out;
+    }
+
+    /** Bajas anteriores con continuidad exclusivamente como nuevas líneas excluidas de Dotación. */
+    private function continuidadesReemplazo(PadronRevision $revision, Collection $filas, array $candidatos): array
+    {
+        if (! $candidatos) { return []; }
+        $resolucion = app(PadronResolucionService::class);
+        if (! $resolucion->disponible()) { return []; }
+        $filas = $filas->filter(fn ($fila) => isset($candidatos[PadronConciliador::rut($fila->rut)]));
+        $decisiones = $resolucion->decisiones($revision);
+        $selecciones = $resolucion->selecciones($filas, $decisiones);
+        $establecimientos = DB::table('establecimientos')->pluck('id', 'rbd');
+        $out = $invalidos = [];
+        foreach ($resolucion->entrantes($revision, $filas, $decisiones) as $fila) {
+            $rut = PadronConciliador::rut($fila->rut);
+            $data = $fila->datos;
+            // No confundir pendientes con nuevas líneas, ni liberar un ID que
+            // continúa seleccionado. Conservaciones, regulares, errores y
+            // reemplazos omitidos requieren resolver otro flujo explícito.
+            if ($fila->accion === PadronReemplazosVigentes::OMITIDO || $fila->accion === 'error'
+                || ! array_key_exists($fila->id, $selecciones) || $selecciones[$fila->id] !== null
+                || $resolucion->tipoPropuesto($fila) !== 'reemplazo_suplencia'
+                || PadronConciliador::rut($data['rut'] ?? '') !== $rut
+                || (int) ($data['anio'] ?? 0) !== (int) $revision->anio
+                || (int) ($data['mes'] ?? 0) !== (int) $revision->mes
+                || ! isset($establecimientos[$data['rbd'] ?? 0])
+                || ! is_numeric($data['jornada'] ?? null) || (float) $data['jornada'] <= 0) {
+                $invalidos[$rut] = true;
+                continue;
+            }
+            $out[$rut][$fila->id] = ['fila_excel' => $fila->fila_excel,
+                'huella' => hash('sha256', json_encode($data, JSON_THROW_ON_ERROR))];
+        }
+        foreach ($out as &$propuestas) { ksort($propuestas); }
+        unset($propuestas);
+        return array_diff_key($out, $invalidos);
     }
 
     /**
@@ -277,7 +318,7 @@ class PadronBajaAsignacionesService
             }
             $candidato = app(PadronConflictosAsignacionService::class)->analizar($revision)['bajas_asignaciones'][$rut] ?? null;
             if ($confirmar && (! $candidato || ! $candidato['elegible'] || ! hash_equals($candidato['alcance_hash'], $hash))) {
-                $this->fail('El RUT no es una baja completa elegible o sus asignaciones cambiaron. Recargue y revise el alcance.');
+                $this->fail('Las bajas no son elegibles para liberar asignaciones o cambió el alcance. Recargue y revise las correspondencias y propuestas del RUT.');
             }
             if (! $confirmar && (! $ultima || ! $ultima->confirmada)) { $this->fail('No hay una liberación confirmada que retirar.'); }
             DB::table('padron_bajas_asignaciones')->insert([
