@@ -97,6 +97,23 @@ class PadronMemoriaTest extends TestCase
         $this->assertFalse($data['obsoleta']);
         $this->assertFalse(app(PadronAplicacionService::class)->disponible());
         $this->assertSame(0, DB::table('padron_personal_cambios')->count());
+        // Render real con usuario administrador y el composer web: antes solo
+        // se preparaba la vista y se omitía precisamente el modal que agotaba memoria.
+        $user = \Mockery::mock(\App\Models\User::class)->makePartial();
+        $user->forceFill(['id' => 999, 'nombres' => 'Administrador sintético']);
+        $user->shouldReceive('hasRole')->with('admin')->andReturnTrue();
+        $user->shouldReceive('activeRoleName')->andReturn('admin');
+        $user->shouldReceive('availableRoleContexts')->andReturn(collect(['admin']));
+        $user->shouldReceive('canModule')->andReturnFalse();
+        $this->actingAs($user);
+        $this->app->getProvider(\App\Providers\AppServiceProvider::class)->registerChangeLogViews();
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+        $html = $view->render();
+        $this->assertStringContainsString('id="changeLogModal"', $html);
+        $this->assertStringContainsString('data-history-url=', $html);
+        $this->assertStringNotContainsString('id="changeLogHistoryAccordion"', $html);
+        $this->assertLessThan(512 * 1024, strlen($html));
+        unset($html);
         unset($view, $data);
         $response = app(PersonalImportController::class)->create(Request::create('/prueba', 'GET', [
             'revision' => $revision->id, 'q' => $rut, 'solo_filas' => 1,

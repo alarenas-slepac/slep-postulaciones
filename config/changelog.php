@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.11.515',
+    'current_version' => '2026.9.11.516',
     'entries' => [
+        [
+            'version' => '2026.9.11.516',
+            'title' => 'Historial de cambios: carga diferida y menor consumo de memoria',
+            'summary' => 'Evita generar todo el historial al abrir páginas como la revisión del padrón.',
+            'roles' => [],
+            'items' => [
+                'Carga las novedades y el historial al abrir el modal, con un máximo de diez entradas por página y filtros por roles.',
+                'Calcula los indicadores del historial una sola vez por usuario y petición, únicamente para las vistas que los utilizan.',
+                'Permite reintentar errores de carga y cancela consultas pendientes al cerrar o cambiar de página.',
+                'Añade pruebas de renderizado completo del padrón con límite de 128 MB. No modifica contratos ni decisiones registradas y no requiere migraciones.',
+            ],
+            'published_at' => '2026-09-11',
+        ],
         [
             'version' => '2026.9.11.515',
             'title' => 'Padrón: acceso a pendientes y nuevas líneas de reemplazo',
