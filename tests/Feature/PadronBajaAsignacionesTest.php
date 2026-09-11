@@ -392,6 +392,159 @@ class PadronBajaAsignacionesTest extends TestCase
         $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 501, 'estado' => 'activa']);
     }
 
+    /** Tres bajas anteriores y un nuevo reemplazo, sin datos personales reales. */
+    private function revisionContinuidadReemplazo(string $tipo = 'REEMPLAZO'): PadronRevision
+    {
+        DB::table('reemplazos_personal')->where('id', 101)->update(['tipocontrato' => 'CONTRATA (S)', 'jornada' => 30, 'jornada_basica' => 30]);
+        foreach ([103 => ['CONTRATA PIE (S)', 'PIE', 3], 104 => ['CONTRATA SEP (S)', 'SEP', 5]] as $id => [$contrato, $fin, $horas]) {
+            DB::table('reemplazos_personal')->insert(['id' => $id, 'establecimiento_id' => 1, 'row_hash' => 'sintetico-'.$id]
+                + $this->data(['mes' => 8, 'tipocontrato' => $contrato, 'financiamiento' => $fin, 'jornada' => $horas, 'jornada_basica' => $horas]));
+        }
+        DB::table('dotacion_docente_asignaciones')->where('id', 501)->update(['horas_contrato' => 14]);
+        for ($id = 505; $id <= 512; $id++) { $this->assignment($id, ['horas_contrato' => 2, 'reemplazos_personal_id' => $id % 2 ? 103 : null]); }
+        $revision = $this->revision([$this->data(['rut' => '222222222']),
+            $this->data(['tipocontrato' => $tipo, 'jornada' => 32, 'jornada_basica' => 32])]);
+        $filas = $revision->filas()->where('rut', '111111111')->get();
+        $this->assertCount(4, $filas);
+        $this->assertSame('revision_manual', $filas->whereNotNull('fila_excel')->first()->accion);
+        app(\App\Services\Padron\PadronResolucionService::class)->resolverVarias($revision, '111111111',
+            $filas->map(fn ($fila) => ['fila' => $fila->id, 'personal_id' => null,
+                'justificacion' => 'Contratos anteriores terminados, nuevo reemplazo.', 'decision_anterior' => 0])->all(), 7);
+        return $revision;
+    }
+
+    public function test_replacement_continuity_release_is_explicit_preserves_new_line_and_old_documents(): void
+    {
+        $revision = $this->revisionContinuidadReemplazo();
+        $c = $this->candidato($revision);
+        $this->assertTrue($c['elegible']);
+        $this->assertTrue($c['continuidad_reemplazo']);
+        $this->assertSame(10, $c['cantidad']);
+        $this->assertSame(32.0, $c['horas']);
+        $this->assertSame([101, 103, 104], $c['alcance']['bajas']);
+        $this->assertNotEmpty($this->writer()->plan($revision)['errores']);
+        $before = $this->estado();
+        $this->confirmar($revision);
+        $this->assertSame($before, $this->estado());
+        $this->assertFalse(app(PadronRevisionService::class)->stale($revision));
+        $writer = $this->writer();
+        $plan = $writer->plan($revision);
+        $this->assertSame([], $plan['errores']);
+        $writer->aplicar($revision, 7, $plan['confirmacion_hash']);
+        foreach ([101, 103, 104] as $id) { $this->assertDatabaseHas('reemplazos_personal', ['id' => $id, 'vigente' => false]); }
+        $nuevo = DB::table('reemplazos_personal')->where('rut', '111111111')->where('vigente', true)->sole();
+        $this->assertSame('REEMPLAZO', $nuevo->tipocontrato);
+        $this->assertSame(32, (int) $nuevo->jornada);
+        $this->assertSame(9, (int) $nuevo->mes);
+        $this->assertSame(0, DB::table('dotacion_docente_asignaciones')->where('reemplazos_personal_id', $nuevo->id)->count());
+        $this->assertSame(0, DB::table('dotacion_docente_asignaciones')->where('anio', 2026)->where('estado', 'activa')->count());
+        $this->assertDatabaseCount('padron_asignacion_cambios', 10);
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 503, 'estado' => 'activa', 'anio' => 2025]);
+        $doc = DB::table('solicitudes_reemplazo')->find(1);
+        $this->assertSame(101, (int) $doc->reemplazo_personal_id);
+        $this->assertNotNull($doc->padron_personal_snapshot);
+        $after = $this->estado();
+        $writer->aplicar($revision, 7, $plan['confirmacion_hash']);
+        $this->assertSame($after, $this->estado());
+    }
+
+    public function test_replacement_continuity_form_and_endpoint_require_explicit_scope_and_allow_revocation(): void
+    {
+        $revision = $this->revisionContinuidadReemplazo('SUPLENCIA');
+        $this->withoutMiddleware();
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+        $this->get(route('reemplazos.personal.import', ['revision' => $revision->id]))->assertOk()
+            ->assertSee('Baja de contratos anteriores con continuidad como reemplazo/suplencia')
+            ->assertSee('sin trasladarlas al nuevo reemplazo/suplencia')
+            ->assertDontSee('Este RUT no tiene filas en el archivo');
+        $this->actingAs((new \App\Models\User)->forceFill(['id' => 7]));
+        $c = $this->candidato($revision);
+        $payload = ['accion' => 'confirmar_baja_asignaciones', 'revision' => $revision->id, 'rut' => '111111111',
+            'alcance_hash' => $c['alcance_hash'], 'decision_anterior' => 0, 'justificacion' => 'Término de contratos anteriores verificado.'];
+        $before = $this->estado();
+        $this->post(route('reemplazos.personal.import.store'), $payload)->assertSessionHasErrors('confirmar_alcance');
+        $this->assertDatabaseCount('padron_bajas_asignaciones', 0);
+        $this->post(route('reemplazos.personal.import.store'), $payload + ['confirmar_alcance' => 1])->assertRedirect();
+        $this->assertTrue($this->candidato($revision)['confirmada']);
+        $c = $this->candidato($revision);
+        $this->post(route('reemplazos.personal.import.store'), array_replace($payload, ['accion' => 'retirar_baja_asignaciones',
+            'decision_anterior' => $c['ultima_id'], 'confirmar_alcance' => 1]))->assertRedirect();
+        $this->assertFalse($this->candidato($revision)['confirmada']);
+        $this->assertSame($before, $this->estado());
+    }
+
+    public function test_pending_absence_and_changed_replacement_proposal_cannot_reuse_authorization(): void
+    {
+        $revision = $this->revisionContinuidadReemplazo();
+        $this->confirmar($revision);
+        $c = $this->candidato($revision);
+        $fila = $revision->filas()->where('rut', '111111111')->whereNotNull('fila_excel')->first();
+        $fila->update(['datos' => array_replace($fila->datos, ['jornada' => 31])]);
+        $this->assertTrue($this->candidato($revision)['desactualizada']);
+        $this->rechaza(fn () => app(PadronBajaAsignacionesService::class)->registrar($revision, '111111111', $c['alcance_hash'],
+            $c['ultima_id'], 'No reutilizar alcance anterior.', 7, true));
+        $ausente = $revision->filas()->where('personal_id', 103)->whereNull('fila_excel')->first();
+        DB::table('padron_revision_decisiones')->where('padron_revision_fila_id', $ausente->id)->delete();
+        $this->assertFalse($this->candidato($revision)['elegible']);
+        $this->rechaza(fn () => $this->confirmar($revision));
+    }
+
+    public function test_pending_new_line_regular_or_invalid_proposal_do_not_allow_continuity_release(): void
+    {
+        $revision = $this->revisionContinuidadReemplazo();
+        $fila = $revision->filas()->where('rut', '111111111')->whereNotNull('fila_excel')->first();
+        $original = $fila->datos;
+        foreach ([['tipocontrato' => 'PLANTA'], ['tipocontrato' => 'DESCONOCIDO'], ['mes' => 8], ['rbd' => 123], ['jornada' => 0]] as $change) {
+            $fila->update(['datos' => array_replace($original, $change)]);
+            $this->assertArrayNotHasKey('111111111', app(PadronConflictosAsignacionService::class)->analizar($revision)['bajas_asignaciones']);
+        }
+        $fila->update(['datos' => $original]);
+        DB::table('padron_revision_decisiones')->where('padron_revision_fila_id', $fila->id)->delete();
+        $this->assertArrayNotHasKey('111111111', app(PadronConflictosAsignacionService::class)->analizar($revision)['bajas_asignaciones']);
+        $this->assertDatabaseCount('padron_bajas_asignaciones', 0);
+    }
+
+    public function test_regular_line_elsewhere_or_reused_id_cannot_be_treated_as_replacement_only_continuity(): void
+    {
+        $revision = $this->revisionContinuidadReemplazo();
+        $fila = $revision->filas()->where('rut', '111111111')->whereNotNull('fila_excel')->first();
+        $resolucion = app(\App\Services\Padron\PadronResolucionService::class);
+        $decision = $resolucion->decisiones($revision)->get($fila->id);
+        $resolucion->resolver($revision, $fila->id, 101, 'Se selecciona el ID anterior para revisión.', 7, $decision->id);
+        $this->assertArrayNotHasKey('111111111', app(PadronConflictosAsignacionService::class)->analizar($revision)['bajas_asignaciones']);
+        $decision = $resolucion->decisiones($revision)->get($fila->id);
+        $resolucion->resolver($revision, $fila->id, null, 'Nuevo reemplazo independiente del anterior.', 7, $decision->id);
+        $revision->filas()->create(['fila_excel' => 10, 'rut' => '111111111', 'accion' => 'alta_propuesta', 'personal_id' => null,
+            'datos' => $this->data(['rbd' => 99998, 'jornada' => 1]), 'candidatos' => [], 'asignaciones' => [], 'observaciones' => []]);
+        $this->assertArrayNotHasKey('111111111', app(PadronConflictosAsignacionService::class)->analizar($revision)['bajas_asignaciones']);
+    }
+
+    public function test_replacement_continuity_audit_failure_rolls_back_and_does_not_release_other_people(): void
+    {
+        $revision = $this->revisionContinuidadReemplazo();
+        $this->assignment(513, ['reemplazos_personal_id' => 102, 'docente_rut' => '222222222', 'horas_contrato' => 4]);
+        $this->confirmar($revision);
+        $before = $this->estado();
+        $inject = true;
+        DB::listen(static function (QueryExecuted $event) use (&$inject): void {
+            if ($inject && str_starts_with(strtolower($event->sql), 'insert into "padron_asignacion_cambios"')) {
+                throw new \RuntimeException('fallo-sintetico-continuidad');
+            }
+        });
+        $writer = $this->writer();
+        try {
+            $writer->aplicar($revision, 7, $writer->plan($revision)['confirmacion_hash']);
+            $this->fail('Debe revertir la aplicación.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('fallo-sintetico-continuidad', $e->getMessage());
+        } finally { $inject = false; }
+        $this->assertSame($before, $this->estado());
+        $this->assertNull($revision->fresh()->aplicada_at);
+        $writer->aplicar($revision, 7, $writer->plan($revision)['confirmacion_hash']);
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 513, 'estado' => 'activa']);
+        $this->assertDatabaseCount('padron_asignacion_cambios', 10);
+    }
+
     /** Contratos ya registrados en destino, asignaciones antiguas solo por RUT. */
     private function revisionTrasladoRut(bool $nuevas = false): PadronRevision
     {

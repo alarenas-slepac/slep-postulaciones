@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.11.513',
+    'current_version' => '2026.9.11.514',
     'entries' => [
+        [
+            'version' => '2026.9.11.514',
+            'title' => 'Padrón: liberar asignaciones antiguas al continuar como reemplazo',
+            'summary' => 'Permite confirmar bajas y liberar sus asignaciones aunque el funcionario continúe en el archivo únicamente con nuevas líneas de reemplazo o suplencia.',
+            'roles' => ['admin'],
+            'items' => [
+                'Exige correspondencias resueltas, bajas anteriores válidas y ausencia de contratos regulares o conservados propuestos para el RUT.',
+                'Muestra una confirmación específica de término de contratos anteriores, sin confundirla con retiro completo del funcionario.',
+                'Conserva el reemplazo en el padrón, excluido de Dotación y de la selección de titulares; no le traslada asignaciones antiguas.',
+                'Vincula la autorización a las propuestas de reemplazo y mantiene liberación diferida, revocación, auditoría y protección del historial.',
+                'No requiere nuevas migraciones ni volver a cargar el Excel. No habilita la aplicación definitiva en producción.',
+            ],
+            'published_at' => '2026-09-11',
+        ],
         [
             'version' => '2026.9.11.513',
             'title' => 'Padrón: traslados con asignaciones vinculadas solo por RUT',

@@ -1,7 +1,13 @@
 <div class="border-top mt-3 pt-2">
-    <strong>Baja por ausencia del padrón completo</strong>
-    <div>Este RUT no tiene filas en el archivo, en ningún establecimiento.</div>
-    <div class="alert alert-info my-2">Si debe continuar en el padrón, use «Ver filas del RUT» y elija «Conservar este ID en el período de carga» para cada contrato que corresponda. No confirme la baja. Si ya autorizó la liberación, retírela primero.</div>
+    @if ($baja['continuidad_reemplazo'] ?? false)
+        <strong>Baja de contratos anteriores con continuidad como reemplazo/suplencia</strong>
+        <div>El RUT continúa únicamente con nuevas líneas de reemplazo/suplencia, excluidas de Dotación. Las bajas anteriores no liberan automáticamente sus asignaciones.</div>
+        <div class="alert alert-info my-2">Confirme la liberación de las asignaciones antiguas si los contratos anteriores terminaron. El nuevo reemplazo permanece en el padrón, sin heredar estas asignaciones ni habilitarse como titular. Si debe conservar un contrato anterior, retire primero esta autorización y corrija sus correspondencias.</div>
+    @else
+        <strong>Baja por ausencia del padrón completo</strong>
+        <div>Este RUT no tiene filas en el archivo, en ningún establecimiento.</div>
+        <div class="alert alert-info my-2">Si debe continuar en el padrón, use «Ver filas del RUT» y elija «Conservar este ID en el período de carga» para cada contrato que corresponda. No confirme la baja. Si ya autorizó la liberación, retírela primero.</div>
+    @endif
     <div>Alcance del año {{ $revision->anio }}: {{ $baja['cantidad'] }} asignaciones · {{ $baja['horas'] }} h · {{ $baja['establecimientos'] }} establecimiento(s).</div>
     <div>IDs contractuales a dar de baja: {{ implode(', ', $baja['alcance']['bajas']) }}.</div>
     @if ($baja['confirmada'])
@@ -11,7 +17,7 @@
         <div class="text-danger">El alcance cambió. La confirmación anterior no libera estas asignaciones; retírela y confirme nuevamente el alcance actualizado.</div>
     @endif
     @if (! $baja['elegible'])
-        <div class="text-danger">Revise todas las ausencias del RUT y los vínculos de sus asignaciones. No se permite liberar IDs de otro funcionario, otro establecimiento contractual o de años anteriores.</div>
+        <div class="text-danger">Resuelva todas las ausencias y correspondencias del RUT y revise los vínculos de sus asignaciones. No se permite liberar IDs de otro funcionario, otro establecimiento contractual o de años anteriores.</div>
     @endif
     @if (($baja['elegible'] || $baja['autorizada']) && ! $obsoleta && ! $revision->errores && ! $revision->aplicada_at)
         <details class="mt-2">
@@ -29,7 +35,13 @@
                 </label>
                 <label class="d-block my-2">
                     <input type="checkbox" name="confirmar_alcance" value="1" required>
-                    {{ $baja['autorizada'] ? 'Confirmo retirar esta autorización; la baja seguirá bloqueada si mantiene asignaciones.' : 'Confirmo el retiro del funcionario y autorizo liberar este alcance solo al aplicar definitivamente el padrón.' }}
+                    @if ($baja['autorizada'])
+                        Confirmo retirar esta autorización; la baja seguirá bloqueada si mantiene asignaciones.
+                    @elseif ($baja['continuidad_reemplazo'] ?? false)
+                        Confirmo el término de los contratos anteriores y autorizo liberar sus asignaciones solo al aplicar el padrón, sin trasladarlas al nuevo reemplazo/suplencia.
+                    @else
+                        Confirmo el retiro del funcionario y autorizo liberar este alcance solo al aplicar definitivamente el padrón.
+                    @endif
                 </label>
                 <button class="btn btn-outline-danger btn-sm">{{ $baja['autorizada'] ? 'Retirar confirmación' : 'Registrar baja con liberación diferida' }}</button>
             </form>
