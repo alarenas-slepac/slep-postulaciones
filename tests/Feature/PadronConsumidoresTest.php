@@ -89,14 +89,16 @@ class PadronConsumidoresTest extends TestCase
         $this->actingAs($user);
     }
 
-    public function test_dotacion_filters_contracts_without_changing_declaration_priority(): void
+    public function test_dotacion_filters_contracts_and_uses_roster_hours_without_changing_references(): void
     {
         $establishment = Establecimiento::findOrFail(1);
         $teachers = DotacionEstablecimientoCalculator::docentes($establishment, 2026);
         $assistants = DotacionEstablecimientoCalculator::asistentes($establishment, 2026);
         $this->assertSame(['111111111'], $teachers->pluck('rut_normalizado')->all());
-        $this->assertSame(40.0, $teachers->first()['horas_contrato']);
-        $this->assertSame('declaracion_sostenedor', $teachers->first()['fuente_contrato']);
+        $this->assertSame(44.0, $teachers->first()['horas_contrato']);
+        $this->assertSame('reemplazos_personal', $teachers->first()['fuente_contrato']);
+        $this->assertTrue($teachers->first()['tiene_declaracion']);
+        $this->assertSame(40, $teachers->first()['declaracion']->horas_contratadas);
         $this->assertSame(['555555555'], $assistants->pluck('rut_normalizado')->all());
         $this->assertSame(44.0, $assistants->first()['horas_contrato']);
         $this->assertDatabaseCount('reemplazos_personal', 6);

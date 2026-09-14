@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.519',
+    'current_version' => '2026.9.14.520',
     'entries' => [
+        [
+            'version' => '2026.9.14.520',
+            'title' => 'Dotación: contrato docente desde el padrón vigente',
+            'summary' => 'Las horas contractuales docentes se obtienen exclusivamente de las jornadas vigentes consolidadas del padrón, sin sustituirlas por la Declaración de Sostenedores.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani', 'coordinador_plani', 'funcionario_estab'],
+            'items' => [
+                'Suma las líneas contractuales por RUT y establecimiento en el período consultado; mantiene las exclusiones de Dotación y de reemplazos/suplencias.',
+                'Conserva IDs, asignaciones y referencias a la declaración para identidad, título, función y clasificación. No modifica contratos ni datos históricos.',
+                'Actualiza la fuente y el desglose de horas del detalle docente; los indicadores de Aula, Parvularia, PIE y el resumen Excel consumen la misma base contractual.',
+                'No recupera horas de la declaración cuando la jornada del padrón es cero o no está informada. Mantiene sin cambios la prioridad contractual de asistentes y las reglas de revisión del padrón.',
+                'Incluye pruebas de consolidación, exclusiones, referencias preservadas y resultados de exportación. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.519',
             'title' => 'Padrón: confirmación CLI con revalidación transaccional',

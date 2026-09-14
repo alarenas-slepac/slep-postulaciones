@@ -221,7 +221,7 @@ class PadronPeriodoTest extends TestCase
         $this->assertDatabaseCount('padron_periodo_personal', 0);
     }
 
-    public function test_yearly_version_preserves_components_and_existing_declaration_priority(): void
+    public function test_yearly_version_preserves_roster_hours_and_components_with_existing_declaration(): void
     {
         DB::table('reemplazos_personal')->where('id', 101)->update(['jornada' => 30]);
         $this->personal(105, ['jornada' => 14, 'financiamiento' => 'SEP']);
@@ -239,8 +239,10 @@ class PadronPeriodoTest extends TestCase
         ]);
         $this->resetCaches();
         $docente = DotacionEstablecimientoCalculator::docentes($est, 2026)->first();
-        $this->assertSame(40.0, $docente['horas_contrato']);
-        $this->assertSame('declaracion_sostenedor', $docente['fuente_contrato']);
+        $this->assertSame(44.0, $docente['horas_contrato']);
+        $this->assertSame('reemplazos_personal', $docente['fuente_contrato']);
+        $this->assertSame(2, $docente['registros_contrato']);
+        $this->assertSame(40, (int) $docente['declaracion']->horas_contratadas);
     }
 
     public function test_incomplete_versions_are_not_exposed_as_history(): void

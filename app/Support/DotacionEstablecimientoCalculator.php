@@ -854,10 +854,10 @@ class DotacionEstablecimientoCalculator
             $row = $grupo['representante'];
             $rut = self::normalizeRut($row->rut);
             $declaracion = $declaraciones[$rut] ?? null;
-            $horasContratoBase = self::firstPositive([
-                $declaracion?->horas_contratadas ?? null,
-                $grupo['jornada_total'] ?? null,
-            ]);
+            // La base contractual docente proviene exclusivamente del padrón
+            // vigente consolidado. La declaración conserva identidad, título y
+            // función, pero no sustituye ni completa la jornada (tampoco en cero).
+            $horasContratoBase = max(0.0, (float) ($grupo['jornada_total'] ?? 0));
             $exclusionDocente = $exclusionesPorRut[$rut] ?? null;
             $ajusteContrato = self::ajustarHorasContratoPorExclusion(
                 $horasContratoBase,
@@ -949,14 +949,10 @@ class DotacionEstablecimientoCalculator
                 'es_titular' => (bool) ($titularidad['es_titular'] ?? false),
                 'mes' => (int) ($grupo['mes'] ?? $row->mes ?? 0),
                 'anio' => (int) ($grupo['anio'] ?? $row->anio ?? 0),
-                'fuente_contrato' => $declaracion ? 'declaracion_sostenedor' : 'reemplazos_personal',
+                'fuente_contrato' => 'reemplazos_personal',
                 'registros_contrato' => (int) ($grupo['registros'] ?? 1),
-                'horas_contrato_componentes' => $declaracion
-                    ? [(float) $horasContratoBase]
-                    : collect($grupo['componentes_jornada'] ?? [])->values()->all(),
-                'horas_contrato_detalle' => $declaracion
-                    ? null
-                    : self::detalleComposicionContrato($grupo['componentes_jornada'] ?? [], $horasContratoBase),
+                'horas_contrato_componentes' => collect($grupo['componentes_jornada'] ?? [])->values()->all(),
+                'horas_contrato_detalle' => self::detalleComposicionContrato($grupo['componentes_jornada'] ?? [], $horasContratoBase),
                 'niveles_declarados' => self::nivelesDeclarados($declaracion),
                 'tiene_declaracion' => (bool) $declaracion,
                 'declaracion' => $declaracion,
