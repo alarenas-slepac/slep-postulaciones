@@ -20,7 +20,7 @@ class PadronAplicarRevision extends Command
         {revision : ID de la revisión ya resuelta}
         {--usuario= : ID del administrador responsable}
         {--aplicar : Ejecutar la escritura definitiva; sin esta opción solo consulta}
-        {--confirmacion= : SHA-256 del plan consultado previamente}
+        {--confirmacion= : SHA-256 de la propuesta y decisiones consultadas previamente}
         {--confirmar= : Frase APLICAR:revision:anio:mes mostrada en la consulta}
         {--respaldo-sha256= : SHA-256 del respaldo completo reciente, verificado por el operador}';
 
@@ -44,7 +44,7 @@ class PadronAplicarRevision extends Command
                 return self::SUCCESS; // No recalcular ni volver a escribir una revisión aplicada.
             }
             $this->exigir(! app(PadronRevisionService::class)->stale($revision), 'La base contractual cambió; esta revisión requiere un nuevo análisis.');
-            $plan = app(PadronAplicacionService::class)->plan($revision);
+            $plan = $this->ejecutor()->plan($revision);
             $frase = 'APLICAR:'.$revision->id.':'.$revision->anio.':'.$revision->mes;
             $liberaciones = [];
             foreach (['bajas_asignaciones', 'traslados_asignaciones'] as $tipo) {
@@ -57,6 +57,7 @@ class PadronAplicarRevision extends Command
             }
             $resumen = ['estado' => $plan['errores'] ? 'bloqueada' : 'lista_para_confirmar',
                 'solo_lectura' => ! $this->option('aplicar'), 'web_habilitada' => false,
+                'confirmacion_tipo' => 'propuesta_con_revalidacion_transaccional',
                 'revision' => $revision->id, 'anio' => $revision->anio, 'mes' => $revision->mes,
                 'destinos' => count($plan['destinos']), 'bajas' => count($plan['bajas']),
                 'asignaciones_a_liberar' => $liberaciones,
@@ -75,7 +76,7 @@ class PadronAplicarRevision extends Command
                 $this->emitir($resumen + ['confirmacion' => $hash, 'confirmar' => $frase]);
                 return self::SUCCESS;
             }
-            $this->exigir(hash_equals($hash, (string) $this->option('confirmacion')), 'El plan cambió o falta --confirmacion. Consulte nuevamente sin --aplicar; se conservan sus decisiones.');
+            $this->exigir(hash_equals($hash, (string) $this->option('confirmacion')), 'La propuesta o sus decisiones cambiaron, o falta --confirmacion. Consulte nuevamente sin --aplicar; se conservan sus decisiones.');
             $this->exigir($this->option('confirmar') === $frase, 'Falta la frase exacta --confirmar='.$frase.'.');
             $respaldo = (string) $this->option('respaldo-sha256');
             $this->exigir((bool) preg_match('/^[a-f0-9]{64}$/D', $respaldo), 'Indique --respaldo-sha256 del respaldo completo reciente y verificado.');
@@ -134,6 +135,13 @@ class PadronAplicarRevision extends Command
             public function disponible(): bool
             {
                 return PHP_SAPI === 'cli' && app()->runningInConsole();
+            }
+
+            protected function vincularDependenciasEnConfirmacion(): bool
+            {
+                // No habilita HTTP ni salta controles: el plan definitivo se
+                // recalcula dentro de aplicar(), con dependencias ya bloqueadas.
+                return false;
             }
         };
     }

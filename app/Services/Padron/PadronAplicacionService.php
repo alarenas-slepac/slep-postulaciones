@@ -142,10 +142,18 @@ class PadronAplicacionService
         return $errores;
     }
 
+    /** El CLI confirma la propuesta y revalida las dependencias bajo los bloqueos del escritor. */
+    protected function vincularDependenciasEnConfirmacion(): bool
+    {
+        return true;
+    }
+
     private function confirmacionHash(PadronRevision $revision): string
     {
         $hash = hash_init('sha256');
-        hash_update($hash, 'confirmacion-v6-reemplazos-nuevos'.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
+        $vincularDependencias = $this->vincularDependenciasEnConfirmacion();
+        $version = $vincularDependencias ? 'confirmacion-v6-reemplazos-nuevos' : 'confirmacion-cli-v1-revalidacion';
+        hash_update($hash, $version.json_encode(DB::table('padron_revisiones')->find($revision->id), JSON_THROW_ON_ERROR));
         foreach (['padron_revision_filas', 'padron_revision_decisiones', 'padron_revision_autorizaciones', 'padron_bajas_asignaciones'] as $table) {
             hash_update($hash, $table);
             if (! Schema::hasTable($table)) {
@@ -156,10 +164,15 @@ class PadronAplicacionService
                 hash_update($hash, json_encode($row, JSON_THROW_ON_ERROR)."\n");
             }
         }
-        // La actividad de otros módulos no vence la revisión manual, pero una
-        // confirmación final solo sirve para las dependencias que se revisaron.
-        hash_update($hash, app(PadronDependenciasService::class)->snapshot()['hash']);
-        hash_update($hash, app(PadronConflictosAsignacionService::class)->snapshot($revision->anio)['hash']);
+        if ($vincularDependencias) {
+            // Compatibilidad del servicio original/web y de los ensayos existentes.
+            hash_update($hash, app(PadronDependenciasService::class)->snapshot()['hash']);
+            hash_update($hash, app(PadronConflictosAsignacionService::class)->snapshot($revision->anio)['hash']);
+        }
+        // En CLI la huella sigue cubriendo filas, decisiones, autorizaciones,
+        // liberaciones y base_hash de la revisión. aplicar() valida la base actual
+        // y recalcula TODOS los conflictos después de bloquear las dependencias;
+        // un cambio de documentos no autoriza ignorar un conflicto nuevo.
         return hash_final($hash);
     }
 

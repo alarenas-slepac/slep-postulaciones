@@ -12,6 +12,15 @@ use Symfony\Component\Process\Process;
 
 final class PadronMySqlWorker
 {
+    public static function writer(bool $cliRevalidation = false): \App\Services\Padron\PadronAplicacionService
+    {
+        PadronMySqlLab::guard();
+        if (! $cliRevalidation) { return PadronMySqlLab::writer(); }
+        // Misma capacidad privada del comando, únicamente en el fixture aislado.
+        return (new \ReflectionMethod(\App\Console\Commands\PadronAplicarRevision::class, 'ejecutor'))
+            ->invoke(app(\App\Console\Commands\PadronAplicarRevision::class));
+    }
+
     public static function emit(string $event, array $data = []): void
     {
         echo json_encode(['event' => $event] + $data, JSON_THROW_ON_ERROR)."\n";
@@ -58,7 +67,7 @@ final class PadronMySqlWorker
                         self::barrier($stage);
                     }
                 });
-                PadronMySqlLab::writer()->aplicar(PadronRevision::findOrFail($job['revision']), 7, $job['token']);
+                self::writer($job['cli_revalidation'] ?? false)->aplicar(PadronRevision::findOrFail($job['revision']), 7, $job['token']);
             } elseif ($job['mode'] === 'coordinated') {
                 app(\App\Services\Padron\PadronEscrituraService::class)->ejecutar(function () use ($job): void {
                     if (($job['pause'] ?? '') === 'coordinator_locked') { self::barrier('coordinator_locked'); }

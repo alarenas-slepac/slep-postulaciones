@@ -86,8 +86,10 @@ class PadronAplicarRevisionCommandTest extends TestCase
 
     private function confirmed(): array
     {
+        $this->assertSame(0, Artisan::call('padron:aplicar-revision', $this->arguments()));
+        $plan = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
         return $this->arguments() + ['--aplicar' => true,
-            '--confirmacion' => app(PadronAplicacionService::class)->plan($this->revision)['confirmacion_hash'],
+            '--confirmacion' => $plan['confirmacion'],
             '--confirmar' => 'APLICAR:'.$this->revision->id.':2026:8', '--respaldo-sha256' => str_repeat('b', 64)];
     }
 
@@ -161,6 +163,98 @@ class PadronAplicarRevisionCommandTest extends TestCase
         DB::table('reemplazos_personal')->where('id', 101)->update(['jornada' => 31]);
         $this->assertSame(1, Artisan::call('padron:aplicar-revision', $this->arguments()));
         $this->assertStringContainsString('base contractual cambió', Artisan::output());
+        $this->assertUnchanged();
+    }
+
+    public function test_document_activity_does_not_expire_cli_confirmation_and_latest_references_are_protected(): void
+    {
+        $this->command();
+        $args = $this->confirmed();
+        $legacy = app(PadronAplicacionService::class)->plan($this->revision)['confirmacion_hash'];
+        foreach (PadronHistorialService::DOCUMENTOS as $table) {
+            DB::table($table)->insert(['id' => 1, 'reemplazo_personal_id' => 101, 'updated_at' => now()]);
+        }
+        $this->assertFalse(app(PadronAplicacionService::class)->confirmacionVigente($this->revision, $legacy));
+        $this->assertSame($args['--confirmacion'], $this->confirmed()['--confirmacion']);
+        $this->assertSame(0, Artisan::call('padron:aplicar-revision', $args), Artisan::output());
+        foreach (PadronHistorialService::DOCUMENTOS as $table) {
+            $copy = json_decode(DB::table($table)->where('id', 1)->value('padron_personal_snapshot'), true);
+            $this->assertSame(101, $copy['personal']['id']);
+            $this->assertSame(7, $copy['personal']['mes']);
+        }
+    }
+
+    public function test_document_arriving_after_preflight_is_included_by_transactional_revalidation(): void
+    {
+        $this->command();
+        $args = $this->confirmed();
+        Log::shouldReceive('info')->with('padron.cli.aplicacion_solicitada', \Mockery::any())->once()
+            ->andReturnUsing(function (): void {
+                DB::table('solicitudes_reemplazo')->insert(['id' => 2, 'reemplazo_personal_id' => 101]);
+            });
+        $this->assertSame(0, Artisan::call('padron:aplicar-revision', $args), Artisan::output());
+        $this->assertNotNull(DB::table('solicitudes_reemplazo')->where('id', 2)->value('padron_personal_snapshot'));
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'mes' => 8]);
+    }
+
+    public function test_document_changes_during_plan_do_not_create_a_false_block(): void
+    {
+        $this->command();
+        $changed = false;
+        DB::listen(function ($event) use (&$changed): void {
+            if (! $changed && str_contains($event->sql, 'from "padron_revision_filas"')) {
+                $changed = true;
+                DB::table('solicitudes_reemplazo')->insert(['id' => 1, 'reemplazo_personal_id' => 101]);
+            }
+        });
+        $status = Artisan::call('padron:aplicar-revision', $this->arguments());
+        $output = Artisan::output();
+        $this->assertSame(0, $status, $output);
+        $this->assertTrue($changed);
+        $this->assertSame(0, json_decode($output, true)['cantidad_errores']);
+        $this->assertUnchanged();
+    }
+
+    public function test_new_assignment_conflict_after_preflight_blocks_inside_transaction(): void
+    {
+        Schema::create('dotacion_docente_asignaciones', function (Blueprint $t): void {
+            $t->id(); $t->integer('anio'); $t->integer('establecimiento_id'); $t->integer('reemplazos_personal_id')->nullable();
+            $t->string('docente_rut'); $t->string('estado'); $t->decimal('horas_contrato');
+        });
+        $this->command();
+        $args = $this->confirmed();
+        Log::shouldReceive('info')->with('padron.cli.aplicacion_solicitada', \Mockery::any())->once()
+            ->andReturnUsing(function (): void {
+                DB::table('dotacion_docente_asignaciones')->insert(['id' => 501, 'anio' => 2026, 'establecimiento_id' => 1,
+                    'reemplazos_personal_id' => null, 'docente_rut' => '222222222', 'estado' => 'activa', 'horas_contrato' => 10]);
+            });
+        $this->assertSame(1, Artisan::call('padron:aplicar-revision', $args));
+        $this->assertStringContainsString('revalidación impidió', Artisan::output());
+        $this->assertUnchanged();
+        $this->assertDatabaseHas('dotacion_docente_asignaciones', ['id' => 501, 'estado' => 'activa']);
+    }
+
+    public function test_proposal_changed_after_preflight_still_invalidates_confirmation(): void
+    {
+        $this->command();
+        $args = $this->confirmed();
+        Log::shouldReceive('info')->with('padron.cli.aplicacion_solicitada', \Mockery::any())->once()
+            ->andReturnUsing(function (): void {
+                $fila = $this->revision->filas()->whereNotNull('fila_excel')->firstOrFail();
+                $fila->update(['datos' => array_replace($fila->datos, ['nombre' => 'Otra persona sintética'])]);
+            });
+        $this->assertSame(1, Artisan::call('padron:aplicar-revision', $args));
+        $this->assertUnchanged();
+    }
+
+    public function test_changed_authorization_requires_new_confirmation_even_when_it_adds_no_error(): void
+    {
+        $this->command();
+        $args = $this->confirmed();
+        DB::table('padron_revision_autorizaciones')->insert(['padron_revision_id' => $this->revision->id,
+            'rut' => '111111111', 'jornada_total' => 30, 'justificacion' => 'Autorización sintética.', 'autorizado_por' => 7]);
+        $this->assertSame(1, Artisan::call('padron:aplicar-revision', $args));
+        $this->assertStringContainsString('propuesta o sus decisiones cambiaron', Artisan::output());
         $this->assertUnchanged();
     }
 

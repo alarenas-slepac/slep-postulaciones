@@ -92,7 +92,8 @@ try {
         'personal_update', 'document_update', 'assignment_update', 'declaration_update', 'exclusion_update',
         'personal_insert', 'document_insert', 'assignment_insert', 'declaration_insert', 'exclusion_insert',
         'coordinated_personal_insert', 'coordinated_document_insert', 'coordinated_assignment_insert',
-        'coordinated_declaration_insert', 'coordinated_exclusion_insert', 'coordinated_writer_first', 'coordinated_timeout'];
+        'coordinated_declaration_insert', 'coordinated_exclusion_insert', 'coordinated_writer_first', 'coordinated_timeout',
+        'cli_document_update', 'cli_conflict_insert', 'cli_personal_update'];
     if ($only !== null) { $cases = array_values(array_intersect($cases, [$only])); }
     check((bool) $cases && (bool) $isolations, 'Filtro de casos o aislamiento vacío.');
     $index = 0;
@@ -111,9 +112,44 @@ try {
                 $entry['engines'] = DB::select('SELECT table_name, engine FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name');
                 $r = Lab::revision();
                 $job = ['database' => $database, 'isolation' => $isolation, 'mode' => 'apply'] + $r;
+                if (str_starts_with($case, 'cli_')) {
+                    $job['cli_revalidation'] = true;
+                    $job['token'] = Worker::writer(true)->plan(PadronRevision::findOrFail($r['revision']))['confirmacion_hash'];
+                }
                 $spawn = function (array $data) use (&$children): Child { $child = new Child($data); $children[] = $child; return $child; };
                 $before = Lab::state();
-                if ($case === 'baseline') {
+                if (str_starts_with($case, 'cli_')) {
+                    $operation = match ($case) {
+                        'cli_document_update' => 'document_update',
+                        'cli_personal_update' => 'personal_update',
+                        'cli_conflict_insert' => 'assignment_insert',
+                    };
+                    $b = $spawn(array_replace($job, ['mode' => 'edit', 'operation' => $operation, 'pause' => 'after_sql']));
+                    $bId = $b->wait('started')['connection']; $b->wait('after_sql');
+                    $a = $spawn($job + ['trace' => true, 'pause' => 'dependencies_locked']);
+                    $aId = $a->wait('started')['connection'];
+                    $entry['lock_wait_verified'] = lockWait($admin, $aId, $bId);
+                    check($entry['lock_wait_verified'], 'El CLI no esperó al escritor concurrente.');
+                    $b->go(); $entry['b'] = $b->wait('result'); $a->wait('dependencies_locked');
+                    check($entry['b']['status'] === 'committed', 'El escritor externo no confirmó.');
+                    check(Worker::writer(true)->confirmacionVigente(PadronRevision::findOrFail($r['revision']), $job['token']),
+                        'La actividad externa alteró la huella de propuesta CLI.');
+                    $afterExternal = Lab::state();
+                    $a->go(); $entry['a'] = $a->wait('result');
+                    assertReadBoundary($entry['a']);
+                    if ($case === 'cli_document_update') {
+                        check($entry['a']['status'] === 'committed', 'El CLI rechazó actividad documental sin conflictos.');
+                        appliedOnce();
+                        check(DB::table('solicitudes_reemplazo')->where('id', 1)->value('estado') === 'aprobado', 'Se perdió el cambio documental.');
+                        $after = Lab::state();
+                        $entry['retry'] = $spawn($job)->wait('result');
+                        check($entry['retry']['status'] === 'committed' && $after === Lab::state(), 'Reintento CLI no idempotente.');
+                    } else {
+                        check($entry['a']['status'] === 'rejected' && $entry['a']['type'] === \Illuminate\Validation\ValidationException::class,
+                            'El CLI omitió el conflicto nuevo o la base contractual modificada.');
+                        check($afterExternal === Lab::state(), 'El rechazo CLI dejó escrituras o deshizo al escritor concurrente.');
+                    }
+                } elseif ($case === 'baseline') {
                     $a = $spawn($job + ['trace' => true]);
                     $entry['a'] = $a->wait('result');
                     check($entry['a']['status'] === 'committed', 'Aplicación básica rechazada.');

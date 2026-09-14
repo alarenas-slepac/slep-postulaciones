@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.11.518',
+    'current_version' => '2026.9.14.519',
     'entries' => [
+        [
+            'version' => '2026.9.14.519',
+            'title' => 'Padrón: confirmación CLI con revalidación transaccional',
+            'summary' => 'Evita que la actividad documental normal invalide la confirmación por terminal, manteniendo la validación final de los datos actuales.',
+            'roles' => ['admin'],
+            'items' => [
+                'La huella CLI conserva la propuesta, decisiones, autorizaciones y liberaciones; ya no exige detener la actividad documental para mantenerla vigente.',
+                'Recalcula todos los conflictos bajo los bloqueos existentes antes de escribir; rechaza errores reales, cambios contractuales y alcances de liberación desactualizados.',
+                'Mantiene auditoría, historial, rollback e idempotencia. Las escrituras concurrentes aún pueden esperar durante la transacción.',
+                'Añade regresiones de cambios concurrentes y guía operativa. No habilita la aplicación web ni requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.11.518',
             'title' => 'Padrón: aplicación controlada por terminal',
