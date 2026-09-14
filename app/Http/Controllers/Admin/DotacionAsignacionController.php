@@ -163,6 +163,16 @@ class DotacionAsignacionController extends Controller
             $data
         );
 
+        if ($tipo === 'pie_colaborativo' && (int) $establecimientoCursoId > 0) {
+            $cursoPie = EstablecimientoCurso::with(['curso', 'planEstudio'])
+                ->where('establecimiento_id', $establecimiento->id)->find($establecimientoCursoId);
+            if ($cursoPie && DotacionProfesionDocenteResolver::esCursoNt($cursoPie)
+                && ! \App\Support\DotacionParvulariaCalculator::conJec($cursoPie)
+                && ($estamentoCobertura !== 'docente' || ! DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos'])) {
+                throw ValidationException::withMessages(['docente_rut' => 'NT1/NT2 sin JEC solo admite cobertura por Educadoras de Párvulos, incluido el trabajo colaborativo PIE.']);
+            }
+        }
+
         if ($tipo === 'plan_estudio') {
             $cursoId = (int) ($data['establecimiento_curso_id'] ?? 0);
             if ($cursoId <= 0) {
@@ -240,11 +250,17 @@ class DotacionAsignacionController extends Controller
                 $cursoCombinadoAsignaturaIdValidado = ! empty($necesidadCombinada['dotacion_curso_combinado_asignatura_id'])
                     ? (int) $necesidadCombinada['dotacion_curso_combinado_asignatura_id']
                     : null;
-                $subtipo = 'curso_combinado';
+                $subtipo = ! empty($necesidadCombinada['curso_combinado_libre_disposicion'])
+                    ? 'libre_disposicion' : 'curso_combinado';
                 $planEstudioId = $necesidadCombinada['plan_estudio_id'] ?? null;
                 $planBloqueId = null;
                 $asignaturaId = $necesidadCombinada['asignatura_id'] ?? null;
                 $asignaturaNombre = $necesidadCombinada['asignatura_nombre'] ?? $necesidadCombinada['titulo'] ?? $asignaturaNombre;
+            }
+
+            if ($subtipo === 'libre_disposicion' && DotacionProfesionDocenteResolver::esCursoNt($curso)
+                && ! \App\Support\DotacionParvulariaCalculator::conJec($curso, $necesidadCombinada['proporcion_key'] ?? null)) {
+                throw ValidationException::withMessages(['subtipo_asignacion' => 'NT1/NT2 sin JEC no contempla libre disposición. Revise el plan asociado.']);
             }
 
             $horasPlan = max(0.0, (float) ($horasPlan ?? 0));
@@ -255,6 +271,10 @@ class DotacionAsignacionController extends Controller
             }
 
             if ($estamentoCobertura === 'asistente') {
+                if (DotacionProfesionDocenteResolver::esCursoNt($curso)
+                    && ! \App\Support\DotacionParvulariaCalculator::conJec($curso, $necesidadCombinada['proporcion_key'] ?? null)) {
+                    throw ValidationException::withMessages(['docente_rut' => 'NT1/NT2 sin JEC solo admite cobertura por Educadoras de Párvulos.']);
+                }
                 $horasContrato = max(0.0, (float) ($data['horas_contrato'] ?? 0));
                 if ($horasContrato <= 0) {
                     throw ValidationException::withMessages([
@@ -268,14 +288,24 @@ class DotacionAsignacionController extends Controller
                 $proporcionConfigurada = $cursoCombinado
                     ? (string) ($necesidadCombinada['proporcion_key'] ?? '')
                     : null;
+                if (DotacionProfesionDocenteResolver::esCursoNt($curso)
+                    && ! \App\Support\DotacionParvulariaCalculator::conJec($curso, $proporcionConfigurada)
+                    && ! DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos']) {
+                    throw ValidationException::withMessages(['docente_rut' => 'NT1/NT2 sin JEC solo admite cobertura por Educadoras de Párvulos. Revise el título declarado.']);
+                }
                 $calculoNt = DotacionProfesionDocenteResolver::conversionNt(
                     $curso,
                     $horasPlan,
                     $docente,
-                    $proporcionConfigurada
+                    $proporcionConfigurada,
+                    $necesidadCombinada
                 );
 
                 if ($calculoNt !== null) {
+                    if (DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos']
+                        && (float) ($calculoNt['parvularia_horas_plan_total'] ?? 0) <= 0) {
+                        throw ValidationException::withMessages(['horas_plan_pedagogicas' => 'Configure el total del plan de Parvularia antes de asignar horas.']);
+                    }
                     $horasContrato = (float) ($calculoNt['horas_contrato_equivalente_redondeado'] ?? 0);
                     $horasCronologicas = (float) ($calculoNt['horas_aula_cronologicas'] ?? 0);
                     $proporcion = (string) ($calculoNt['proporcion_label'] ?? '65/35');

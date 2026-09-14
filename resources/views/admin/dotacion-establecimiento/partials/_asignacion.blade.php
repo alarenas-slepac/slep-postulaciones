@@ -27,6 +27,7 @@
                 'estamento' => $estamento,
                 'label' => $persona['nombre'].' · '.$persona['rut'].$detalleTitulo.' · '.$fmt($contrato).' contrato'.$origenContrato.' / '.$fmt($asignadas).' asignadas / '.($saldo >= 0 ? $fmt($saldo).' disponibles' : '+'.$fmt(abs($saldo)).' excedidas'),
                 'titulo' => $titulo,
+                'es_parvularia' => \App\Support\DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos'],
                 'saldo' => $saldo,
             ];
         })->values();
@@ -61,7 +62,8 @@
             <div class="alert alert-success rounded-4">{{ session('success') }}</div>
         @endif
         <div class="alert alert-info rounded-4 small">
-            <strong>Regla NT1/NT2:</strong> la regla especial de Educación Parvularia se aplica únicamente cuando el título registrado en Declaración de Sostenedores es <em>Pedagogía en Educación de Párvulos</em>. Para cualquier otro título o cuando no exista profesión declarada, las horas asignadas se convierten mediante 65/35.
+            <strong>Regla NT1/NT2:</strong> para <em>Pedagogía en Educación de Párvulos</em>, el contrato asignado se distribuye proporcionalmente: horas de plan asignadas / total del plan × base contractual. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición de otro docente con JEC mantiene 65/35 y se contabiliza en Plan General, una vez por grupo combinado.
+            <span class="d-block mt-1">Las asignaciones históricas conservan sus valores guardados hasta que se revisen y actualicen o se ejecute un recálculo explícito. La nueva necesidad no modifica contratos del padrón.</span>
         </div>
         <div class="row g-3">
             <div class="col-xl-2 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Horas aula plan</div><div class="h4 fw-bold mb-0">{{ $fmt($resumenAsignacion['horas_aula_requeridas'] ?? 0) }}</div><div class="small text-muted">Asignaturas</div></div></div>
@@ -194,6 +196,10 @@
                                             $estado = $item['estado'] ?? ['class' => 'text-bg-secondary', 'label' => 'Pendiente'];
                                             $pendingPlan = $item['horas_plan_pendientes'] ?? $item['horas_plan_requeridas'] ?? null;
                                             $bloqueActual = $item['bloque'] ?? 'Sin bloque';
+                                            $cursoNt = $item['curso'] ?? null;
+                                            $soloParvularia = $cursoNt instanceof \App\Models\EstablecimientoCurso
+                                                && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)
+                                                && ! \App\Support\DotacionParvulariaCalculator::conJec($cursoNt, $item['proporcion_key'] ?? null);
                                         @endphp
                                         @if ($lastBloque !== $bloqueActual)
                                             <tr class="table-secondary">
@@ -225,6 +231,9 @@
                                                 <div class="small text-muted">{{ $item['fuente'] ?? '' }}</div>
                                                 @if (!empty($item['proporcion']))<span class="badge rounded-pill text-bg-light border">{{ $item['proporcion'] }}</span>@endif
                                                 @if (!empty($item['origen_proporcion_label']))<div class="small text-muted mt-1">{{ $item['origen_proporcion_label'] }}</div>@endif
+                                                @if ($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt))
+                                                    <div class="small text-muted">Contrato de referencia: {{ $fmt($item['horas_contrato_requeridas'] ?? 0) }} h para cubrir esta parte del plan.</div>
+                                                @endif
                                             </td>
                                             <td class="text-end fw-bold">{{ $item['horas_plan_requeridas'] !== null ? $fmt($item['horas_plan_requeridas']) : '—' }}</td>
                                             <td class="text-end text-primary fw-semibold">{{ $fmt($item['horas_plan_asignadas'] ?? 0) }}</td>
@@ -248,17 +257,19 @@
                                                     <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
                                                     <select name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                                         <option value="docente">Cubierto por docente</option>
-                                                        <option value="asistente">Cubierto por Asistente de la Educación</option>
+                                                        @unless ($soloParvularia)<option value="asistente">Cubierto por Asistente de la Educación</option>@endunless
                                                     </select>
                                                     <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura" required>
                                                         <option value="">Seleccione persona...</option>
                                                         <optgroup label="Docentes">
                                                             @foreach ($docenteOptions as $doc)
+                                                                @continue($soloParvularia && !$doc['es_parvularia'])
                                                                 <option value="{{ $doc['rut'] }}" data-estamento="docente" data-titulo="{{ $doc['titulo'] }}">{{ $doc['label'] }}</option>
                                                             @endforeach
                                                         </optgroup>
                                                         <optgroup label="Asistentes de la Educación">
                                                             @foreach ($asistenteOptions as $asistente)
+                                                                @continue($soloParvularia)
                                                                 <option value="{{ $asistente['rut'] }}" data-estamento="asistente">{{ $asistente['label'] }}</option>
                                                             @endforeach
                                                         </optgroup>
@@ -290,7 +301,7 @@
                                                     <div class="small fw-semibold mb-2">Asignaciones registradas para esta asignatura</div>
                                                     <div class="table-responsive">
                                                         <table class="table table-sm mb-0">
-                                                            <thead><tr><th>Personal</th><th>Estamento</th><th>Subvención</th><th class="text-end">Horas aula asignadas</th><th class="text-end">Contrato AAEE</th><th>Obs.</th><th></th></tr></thead>
+                                                            <thead><tr><th>Personal</th><th>Estamento</th><th>Subvención</th><th class="text-end">Horas aula asignadas</th><th class="text-end">Contrato asignado</th><th>Obs.</th><th></th></tr></thead>
                                                             <tbody>
                                                                 @foreach ($item['asignaciones'] as $asig)
                                                                     <tr>
@@ -298,7 +309,7 @@
                                                                         <td><span class="badge rounded-pill {{ ($asig->estamento_cobertura ?? 'docente') === 'asistente' ? 'text-bg-info' : 'text-bg-primary' }}">{{ ($asig->estamento_cobertura ?? 'docente') === 'asistente' ? 'Asistente' : 'Docente' }}</span></td>
                                                                         <td>{{ $asig->subvencion }}</td>
                                                                         <td class="text-end fw-semibold text-primary">{{ $asig->horas_plan_pedagogicas !== null ? $fmt($asig->horas_plan_pedagogicas) : '—' }}</td>
-                                                                        <td class="text-end">{{ ($asig->estamento_cobertura ?? 'docente') === 'asistente' ? $fmt($asig->horas_contrato) : '—' }}</td>
+                                                                        <td class="text-end">{{ $fmt($asig->horas_contrato) }}</td>
                                                                         <td>{{ $asig->observacion }}</td>
                                                                         <td class="text-end">
                                                                             <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" onsubmit="return confirm('¿Eliminar esta asignación?');">

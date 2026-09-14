@@ -25,7 +25,7 @@ class DotacionCursoCombinadoCalculator
         }
 
         $grupos = DotacionCursoCombinado::query()
-            ->with(['miembros.curso.curso', 'asignaturas'])
+            ->with(['miembros.curso.curso', 'miembros.curso.planEstudio', 'asignaturas'])
             ->where('establecimiento_id', $establecimiento->id)
             ->where('anio', $anio)
             ->where('activo', true)
@@ -86,6 +86,11 @@ class DotacionCursoCombinadoCalculator
                 $hours = self::resolvedHours($mode, $courseTotals, $rule, $maxHours);
                 $proportion = self::resolvedProportion($grupo->proporcion, $subjectItems);
                 $conversion = self::conversionForProportion($proportion['key'], $hours);
+                $baseParvularia = str_starts_with($proportion['key'], 'parvularia_')
+                    ? (float) $grupo->miembros->max(fn ($miembro) => $miembro->curso
+                        ? DotacionParvulariaCalculator::base($miembro->curso, $proportion['key'] === 'parvularia_jec_especial_65_35_ld')
+                        : 0.0)
+                    : null;
                 $needKey = self::needKey((int) $grupo->id, (string) $subjectKey);
                 $assigned = $asignaciones->where('necesidad_key', $needKey)->values();
                 $assignedPlan = round((float) $assigned->sum(
@@ -133,6 +138,8 @@ class DotacionCursoCombinadoCalculator
                     'origen_proporcion_label' => $proportion['origin_label'],
                     'motivo_proporcion' => $proportion['reason'],
                     'curso_combinado' => true,
+                    'parvularia_base_contrato' => $baseParvularia,
+                    'curso_combinado_libre_disposicion' => $subjectItems->every(fn ($item) => ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion'),
                     'curso_combinado_nombre' => $grupo->nombre,
                     'curso_combinado_modalidad' => $mode,
                     'curso_combinado_asignatura_key' => $subjectKey,
@@ -156,7 +163,7 @@ class DotacionCursoCombinadoCalculator
             }
         }
 
-        return $result
+        return self::distribuirBaseParvularia($result)
             ->sortBy(fn (array $row) => sprintf(
                 '%s|%s|%s',
                 $row['curso_label'] ?? '',
@@ -413,6 +420,30 @@ class DotacionCursoCombinadoCalculator
         return round((float) $independent + (float) $groups, 2);
     }
 
+    public static function distribuirBaseParvularia(Collection $items): Collection
+    {
+        $grupos = $items->filter(fn ($row) => ! empty($row['dotacion_curso_combinado_id']))
+            ->groupBy('dotacion_curso_combinado_id');
+
+        return $items->map(function (array $row) use ($grupos): array {
+            if (empty($row['dotacion_curso_combinado_id']) || ! str_starts_with((string) ($row['proporcion_key'] ?? ''), 'parvularia_')) {
+                return $row;
+            }
+            $rows = $grupos->get($row['dotacion_curso_combinado_id']);
+            $total = (float) $rows->sum('horas_plan_requeridas');
+            $conJec = $row['proporcion_key'] === 'parvularia_jec_especial_65_35_ld';
+            $base = (float) ($rows->max('parvularia_base_contrato') ?: ($conJec ? 55 : 35));
+            $conversion = DotacionParvulariaCalculator::convertir((float) $row['horas_plan_requeridas'], $total, $base, $conJec);
+            $row['parvularia_base_contrato'] = $base;
+            $row['parvularia_horas_plan_total'] = $total;
+            $row['horas_contrato_requeridas'] = $conversion['horas_contrato_equivalente'];
+            $row['horas_contrato_pendientes'] = max(0.0, round($row['horas_contrato_requeridas'] - (float) ($row['horas_contrato_asignadas'] ?? 0), 2));
+            $row['motivo_proporcion'] = $conversion['motivo'];
+
+            return $row;
+        });
+    }
+
     public static function subjectKey(array $item): string
     {
         $canonical = trim((string) ($item['plan_comun_asociado'] ?? ''));
@@ -470,6 +501,11 @@ class DotacionCursoCombinadoCalculator
                 $hours = round((float) $proportionRows->sum(
                     fn (array $row) => (float) ($row['horas_plan_requeridas'] ?? 0)
                 ), 2);
+                if (str_starts_with($proportion, 'parvularia_')) {
+                    return $hours > 0
+                        ? (float) ($proportionRows->max('parvularia_base_contrato') ?: ($proportion === 'parvularia_jec_especial_65_35_ld' ? 55 : 35))
+                        : 0.0;
+                }
                 $conversion = self::conversionForProportion($proportion, $hours);
 
                 return (float) ($conversion['horas_contrato'] ?? 0);
@@ -530,6 +566,11 @@ class DotacionCursoCombinadoCalculator
         }
 
         $keys = $items->map(function (array $row) {
+            $curso = $row['curso'] ?? null;
+            if ($curso instanceof EstablecimientoCurso && DotacionProfesionDocenteResolver::esCursoNt($curso)) {
+                return DotacionParvulariaCalculator::conJec($curso)
+                    ? 'parvularia_jec_especial_65_35_ld' : 'parvularia_sin_jec_especial_65_35_ld';
+            }
             return self::normalizeProportionKey($row['proporcion_key'] ?? $row['proporcion'] ?? null);
         })->filter()->unique()->values();
 
@@ -599,25 +640,8 @@ class DotacionCursoCombinadoCalculator
         }
 
         $withJec = $proportion === 'parvularia_jec_especial_65_35_ld';
-        $baseHours = min($hours, 32.0);
-        $freeHours = max(0.0, $hours - 32.0);
-        $baseContractReference = $withJec ? 50.0 : 47.0;
-        $baseChronologicalReference = $withJec ? 32.25 : 30.0;
-        $baseContract = round(($baseHours / 32.0) * $baseContractReference, 4);
-        $baseChronological = round(($baseHours / 32.0) * $baseChronologicalReference, 4);
-        $freeChronological = round($freeHours * 45 / 60, 4);
-        $freeContract = $freeHours > 0
-            ? round($freeChronological / 0.65, 4)
-            : 0.0;
-        $contract = round($baseContract + $freeContract, 4);
 
-        return [
-            'horas_contrato' => $contract,
-            'horas_contrato_redondeadas' => $contract > 0 ? (float) ceil($contract) : 0.0,
-            'horas_aula_cronologicas' => round($baseChronological + $freeChronological, 4),
-            'motivo' => ($withJec ? 'NT1/NT2 con JEC' : 'NT1/NT2 sin JEC')
-                .': se aplica la regla especial de Educación Parvularia al bloque consolidado; las horas sobre 32 se convierten con 65/35.',
-        ];
+        return DotacionParvulariaCalculator::convertir($hours, $hours, $withJec ? 55.0 : 35.0, $withJec);
     }
 
     private static function resolvedSubsidy(Collection $items): string

@@ -32,6 +32,7 @@ class DotacionProporcionRecalculationService
             $total = 0;
             $actualizadas = 0;
             $omitidas = 0;
+            $necesidadesCombinadas = [];
 
             DotacionDocenteAsignacion::query()
                 ->with(['establecimientoCurso.curso', 'establecimientoCurso.planEstudio', 'declaracionSostenedor'])
@@ -47,7 +48,7 @@ class DotacionProporcionRecalculationService
                     })
                 )
                 ->orderBy('id')
-                ->chunkById(100, function ($asignaciones) use (&$total, &$actualizadas, &$omitidas, $porcentajePrioritarios, $userId): void {
+                ->chunkById(100, function ($asignaciones) use (&$total, &$actualizadas, &$omitidas, &$necesidadesCombinadas, $establecimiento, $anio, $porcentajePrioritarios, $userId): void {
                     foreach ($asignaciones as $asignacion) {
                         $total++;
 
@@ -68,12 +69,38 @@ class DotacionProporcionRecalculationService
                             'titulo' => $asignacion->declaracionSostenedor?->nombre_titulo ?: 'Sin título declarado',
                             'declaracion' => $asignacion->declaracionSostenedor,
                         ];
+                        $contextoGrupo = null;
+                        if ((int) $asignacion->dotacion_curso_combinado_id > 0 && DotacionProfesionDocenteResolver::esCursoNt($curso)) {
+                            $key = (string) $asignacion->necesidad_key;
+                            if (! array_key_exists($key, $necesidadesCombinadas)) {
+                                $necesidadesCombinadas[$key] = \App\Support\DotacionAsignacionCalculator::planNeedForKey($establecimiento, $anio, $key);
+                            }
+                            $contextoGrupo = $necesidadesCombinadas[$key];
+                            if (! $contextoGrupo || (float) ($contextoGrupo['parvularia_horas_plan_total'] ?? 0) <= 0) {
+                                $omitidas++;
+                                continue;
+                            }
+                        }
+                        // Los casos históricos no elegibles requieren revisión, no conversión silenciosa.
+                        if (DotacionProfesionDocenteResolver::esCursoNt($curso)
+                            && ! \App\Support\DotacionParvulariaCalculator::conJec($curso, $contextoGrupo['proporcion_key'] ?? null)
+                            && ! DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos']) {
+                            $omitidas++;
+                            continue;
+                        }
                         $calculoNt = DotacionProfesionDocenteResolver::conversionNt(
                             $curso,
                             $horasAula,
                             $persona,
-                            (string) ($asignacion->proporcion_aplicada ?? '')
+                            $contextoGrupo['proporcion_key'] ?? (string) ($asignacion->proporcion_aplicada ?? ''),
+                            $contextoGrupo
                         );
+
+                        if ($calculoNt !== null && array_key_exists('parvularia_horas_plan_total', $calculoNt)
+                            && $calculoNt['parvularia_horas_plan_total'] <= 0) {
+                            $omitidas++;
+                            continue;
+                        }
                         $calculo = $calculoNt ?? DotacionEstablecimientoCalculator::contratoEquivalenteAsignacion(
                             $curso,
                             $horasAula,

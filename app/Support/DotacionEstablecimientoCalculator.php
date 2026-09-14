@@ -517,6 +517,13 @@ class DotacionEstablecimientoCalculator
 
         $horasPorCurso = self::horasLibreDisposicionNtOtroDocente($cursos, $query->get());
 
+        if (DotacionCursoCombinadoCalculator::tablesReady()) {
+            $grupos = \App\Models\DotacionCursoCombinado::query()->with('miembros')
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
+                ->where('activo', true)->get();
+            $horasPorCurso = DotacionParvulariaCalculator::consolidarRefuerzos($horasPorCurso, $grupos);
+        }
+
         return collect($horasPorCurso)
             ->map(function (array $detalle): array {
                 $conversion = DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula(
@@ -1585,7 +1592,7 @@ class DotacionEstablecimientoCalculator
             || str_contains($texto, 'JEC');
     }
 
-    private static function horasCurso(EstablecimientoCurso $curso): array
+    public static function horasCurso(EstablecimientoCurso $curso): array
     {
         $plan = DotacionPlanEstudioResolver::resolve($curso);
         $planEsReferencial = DotacionPlanEstudioResolver::isReferential($curso, $plan);
@@ -1697,59 +1704,20 @@ class DotacionEstablecimientoCalculator
     {
         $nivel = self::nivelMeta($curso);
         $nivelKey = $nivel['key'] ?? null;
+        if (in_array($nivelKey, ['NT1', 'NT2'], true)) {
+            $totalPlan = (float) (self::horasCurso($curso)['horas'] ?? 0);
+
+            return DotacionParvulariaCalculator::convertir(
+                $horasPlan, $totalPlan, DotacionParvulariaCalculator::base($curso),
+                DotacionParvulariaCalculator::conJec($curso)
+            );
+        }
         $referencia = DocenteHorasNoLectivasCalculator::referenceFor(
             $curso,
             $porcentajePrioritarios,
             DocenteHorasNoLectivasCalculator::HORAS_CONTRATO_REFERENCIA,
             true
         );
-        $excepcionInstitucional = ($referencia['origen_proporcion'] ?? null) === 'excepcion_institucional';
-
-        // Regla especial para Educación Parvularia NT1/NT2:
-        // - Las primeras 32 horas del plan se tratan como horas de plan de estudio
-        //   de Educación Parvularia, excluyendo libre disposición de la regla especial.
-        // - Si el curso es Con JEC/JECD: 32 h plan requieren 32 h 15 m cronológicas,
-        //   equivalentes a 50 h de contrato (41 h + 9 h).
-        // - Si el curso es Sin JEC: 32 h plan requieren 30 h cronológicas,
-        //   equivalentes a 47 h de contrato (41 h + 6 h).
-        // - Las horas por sobre 32, normalmente libre disposición, se convierten
-        //   aparte con la proporción general 65/35.
-        if (! $excepcionInstitucional && in_array($nivelKey, ['NT1', 'NT2'], true) && $horasPlan > 0) {
-            $horasBaseParvularia = min($horasPlan, 32.0);
-            $horasLibreDisposicion = max(0.0, $horasPlan - 32.0);
-            $cursoConJec = self::cursoTieneJec($curso);
-            $contratoBaseReferencia = $cursoConJec ? 50.0 : 47.0;
-            $cronologicasBaseReferencia = $cursoConJec ? 32.25 : 30.0;
-            $contratoBaseParvularia = round(($horasBaseParvularia / 32.0) * $contratoBaseReferencia, 4);
-            $cronologicasBaseParvularia = round(($horasBaseParvularia / 32.0) * $cronologicasBaseReferencia, 4);
-            $cronologicasLibreDisposicion = $horasLibreDisposicion > 0 ? round($horasLibreDisposicion * 45 / 60, 4) : 0.0;
-            $contratoLibreDisposicion = $horasLibreDisposicion > 0
-                ? round($cronologicasLibreDisposicion / 0.65, 4)
-                : 0.0;
-            $horasContratoDecimal = round($contratoBaseParvularia + $contratoLibreDisposicion, 4);
-            $horasAulaCronologicas = round($cronologicasBaseParvularia + $cronologicasLibreDisposicion, 4);
-            $regimenLabel = $cursoConJec ? 'Con JEC' : 'Sin JEC';
-
-            return [
-                'proporcion' => $cursoConJec ? 'parvularia_jec_especial_65_35_ld' : 'parvularia_sin_jec_especial_65_35_ld',
-                'proporcion_label' => $horasLibreDisposicion > 0 ? 'NT '.$regimenLabel.' especial + 65/35 LD' : 'NT '.$regimenLabel.' especial',
-                'origen_proporcion' => 'regla_especial_parvularia',
-                'origen_proporcion_label' => 'Regla especial Educación Parvularia',
-                'horas_aula_cronologicas' => $horasAulaCronologicas,
-                'horas_contrato_equivalente' => $horasContratoDecimal,
-                'horas_contrato_equivalente_redondeado' => $horasContratoDecimal > 0 ? (float) ceil($horasContratoDecimal) : 0.0,
-                'motivo' => $horasLibreDisposicion > 0
-                    ? 'NT1/NT2 '.$regimenLabel.': 32 h plan se calculan con regla especial de aula cronológica; las horas de libre disposición se convierten con 65/35.'
-                    : 'NT1/NT2 '.$regimenLabel.': 32 h plan se calculan con regla especial de aula cronológica.',
-                'horas_base_parvularia' => $horasBaseParvularia,
-                'horas_libre_disposicion_parvularia' => $horasLibreDisposicion,
-                'cronologicas_base_parvularia' => $cronologicasBaseParvularia,
-                'cronologicas_libre_disposicion_parvularia' => $cronologicasLibreDisposicion,
-                'contrato_base_parvularia' => $contratoBaseParvularia,
-                'contrato_libre_disposicion_parvularia' => $contratoLibreDisposicion,
-                'regimen_parvularia' => $cursoConJec ? 'con_jec' : 'sin_jec',
-            ];
-        }
 
         $proporcion = $referencia['proporcion'] ?? DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL;
         $horasAulaCronologicas = $horasPlan > 0 ? round($horasPlan * 45 / 60, 2) : 0.0;
