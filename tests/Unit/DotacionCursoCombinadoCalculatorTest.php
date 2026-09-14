@@ -7,7 +7,7 @@ use Tests\TestCase;
 
 class DotacionCursoCombinadoCalculatorTest extends TestCase
 {
-    public function test_redondea_hacia_arriba_una_sola_vez_el_contrato_especial_del_grupo(): void
+    public function test_aplica_una_sola_base_contractual_completa_al_grupo(): void
     {
         $resultado = DotacionCursoCombinadoCalculator::adjustedContractRequired([
             [
@@ -24,8 +24,8 @@ class DotacionCursoCombinadoCalculatorTest extends TestCase
             ],
         ]);
 
-        $this->assertSame(57.0, $resultado);
-        $this->assertSame(60.0, $resultado + 3.0);
+        $this->assertSame(55.0, $resultado);
+        $this->assertSame(58.0, $resultado + 3.0);
     }
 
     public function test_consolida_el_trabajo_colaborativo_pie_y_conserva_asignaciones_historicas(): void

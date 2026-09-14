@@ -15,13 +15,15 @@ class DotacionProfesionDocenteResolver
      * La regla especial de Educación Parvularia se aplica exclusivamente cuando
      * el título registrado en Declaración de Sostenedores corresponde a
      * "Pedagogía en Educación de Párvulos". Para cualquier otro título, ausencia
-     * de título o ausencia de declaración, la asignación se convierte por 65/35.
+     * de título o ausencia de declaración, la equivalencia se obtiene por 65/35.
+     * El controlador restringe nuevas coberturas sin JEC a Educadoras de Párvulos.
      */
     public static function conversionNt(
         EstablecimientoCurso $curso,
         float $horasAula,
         array $persona,
-        ?string $proporcionConfigurada = null
+        ?string $proporcionConfigurada = null,
+        ?array $contextoGrupo = null
     ): ?array {
         if (! self::esCursoNt($curso)) {
             return null;
@@ -57,18 +59,17 @@ class DotacionProfesionDocenteResolver
             ];
         }
 
-        $conJec = self::reglaConfiguradaConJec($proporcionConfigurada)
-            ?? self::cursoTieneJec($curso);
-        $especial = self::conversionEspecial($horasAula, $conJec);
+        $conJec = DotacionParvulariaCalculator::conJec($curso, $proporcionConfigurada);
+        $totalPlan = (float) ($contextoGrupo['parvularia_horas_plan_total']
+            ?? DotacionEstablecimientoCalculator::horasCurso($curso)['horas'] ?? 0);
+        $base = (float) ($contextoGrupo['parvularia_base_contrato']
+            ?? DotacionParvulariaCalculator::base($curso, $conJec));
+        $especial = DotacionParvulariaCalculator::convertir($horasAula, $totalPlan, $base, $conJec);
 
         return array_merge($especial, [
             'titulo_declarado' => $perfil['titulo_declarado'],
             'fuente_titulo' => $perfil['fuente_titulo'],
-            'motivo' => ($conJec ? 'NT1/NT2 con JEC' : 'NT1/NT2 sin JEC')
-                .': se aplica la regla especial exclusivamente por registrar el título "Pedagogía en Educación de Párvulos" en Declaración de Sostenedores.'
-                .($especial['horas_libre_disposicion_parvularia'] > 0
-                    ? ' Las horas por sobre 32 se convierten mediante 65/35.'
-                    : ''),
+            'motivo' => $especial['motivo'].' Regla exclusiva para Pedagogía en Educación de Párvulos.',
         ]);
     }
 
@@ -105,74 +106,6 @@ class DotacionProfesionDocenteResolver
 
         return str_contains($texto, 'NT1') || str_contains($texto, 'NT2');
     }
-
-    private static function conversionEspecial(float $horasAula, bool $conJec): array
-    {
-        $horasBase = min($horasAula, 32.0);
-        $horasLibreDisposicion = max(0.0, $horasAula - 32.0);
-        $contratoBaseReferencia = $conJec ? 50.0 : 47.0;
-        $cronologicasBaseReferencia = $conJec ? 32.25 : 30.0;
-        $contratoBase = round(($horasBase / 32.0) * $contratoBaseReferencia, 4);
-        $cronologicasBase = round(($horasBase / 32.0) * $cronologicasBaseReferencia, 4);
-        $cronologicasLibreDisposicion = round($horasLibreDisposicion * 45 / 60, 4);
-        $contratoLibreDisposicion = $horasLibreDisposicion > 0
-            ? round($cronologicasLibreDisposicion / 0.65, 4)
-            : 0.0;
-        $contrato = round($contratoBase + $contratoLibreDisposicion, 4);
-        $regimen = $conJec ? 'con_jec' : 'sin_jec';
-        $regimenLabel = $conJec ? 'Con JEC' : 'Sin JEC';
-
-        return [
-            'proporcion' => $conJec
-                ? 'parvularia_jec_especial_65_35_ld'
-                : 'parvularia_sin_jec_especial_65_35_ld',
-            'proporcion_label' => 'NT '.$regimenLabel.' · regla especial por profesión',
-            'origen_proporcion' => 'regla_especial_parvularia_por_profesion',
-            'origen_proporcion_label' => 'Pedagogía en Educación de Párvulos',
-            'horas_aula_cronologicas' => round($cronologicasBase + $cronologicasLibreDisposicion, 4),
-            'horas_contrato_equivalente' => $contrato,
-            'horas_contrato_equivalente_redondeado' => $contrato > 0 ? (float) ceil($contrato) : 0.0,
-            'horas_base_parvularia' => $horasBase,
-            'horas_libre_disposicion_parvularia' => $horasLibreDisposicion,
-            'cronologicas_base_parvularia' => $cronologicasBase,
-            'cronologicas_libre_disposicion_parvularia' => $cronologicasLibreDisposicion,
-            'contrato_base_parvularia' => $contratoBase,
-            'contrato_libre_disposicion_parvularia' => $contratoLibreDisposicion,
-            'regimen_parvularia' => $regimen,
-        ];
-    }
-
-    private static function reglaConfiguradaConJec(?string $proporcion): ?bool
-    {
-        return match (trim((string) $proporcion)) {
-            'nt_jec', 'parvularia_jec_especial_65_35_ld' => true,
-            'nt_sin_jec', 'parvularia_sin_jec_especial_65_35_ld' => false,
-            default => null,
-        };
-    }
-
-    private static function cursoTieneJec(EstablecimientoCurso $curso): bool
-    {
-        $plan = $curso->planEstudio;
-        $texto = Str::of(collect([
-            $curso->regimen_jec ?? null,
-            $curso->jornada ?? null,
-            $curso->tipo_jornada ?? null,
-            $plan?->nombre ?? null,
-            $plan?->regimen_jec ?? null,
-            $plan?->jornada ?? null,
-            $plan?->tipo_jornada ?? null,
-        ])->filter()->implode(' '))->ascii()->upper()->squish()->toString();
-
-        if (str_contains($texto, 'SIN JEC')) {
-            return false;
-        }
-
-        return str_contains($texto, 'CON JEC')
-            || str_contains($texto, 'JECD')
-            || str_contains($texto, 'JEC');
-    }
-
     private static function normalizarTitulo(?string $titulo): string
     {
         return Str::of((string) $titulo)

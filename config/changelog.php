@@ -4110,8 +4110,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.523',
+    'current_version' => '2026.9.14.524',
     'entries' => [
+        [
+            'version' => '2026.9.14.524',
+            'title' => 'Dotación: nuevas bases contractuales de Educación Parvularia',
+            'summary' => 'Actualiza las horas necesarias del plan completo y su reparto entre Educadoras de Párvulos, con reglas por nivel y régimen JEC.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani', 'coordinador_plani', 'funcionario_estab'],
+            'items' => [
+                'Con JEC: 55 h de contrato de plan por curso o grupo combinado. Sin JEC: NT1 35 h, NT2 31 h y combinado NT1 + NT2 35 h. Se agregan 3 h PIE cuando corresponda, una sola vez por curso o grupo.',
+                'Distribuye la base contractual proporcionalmente a las horas de plan asignadas, sin reaplicar 65/35 ni redondear cada asignación a la hora entera superior. Sin JEC solo admite Educadoras de Párvulos y no admite libre disposición.',
+                'Mantiene el refuerzo de libre disposición de otro docente con JEC en Plan General, convertido por 65/35; consolida el mayor refuerzo de los integrantes del combinado, con máximo de 6 h de plan, sin duplicarlo.',
+                'Resumen, PDF y Excel consumen las mismas necesidades actualizadas. Conserva los valores de asignaciones guardadas hasta su modificación o recálculo explícito; no modifica contratos del padrón, IDs ni referencias históricas.',
+                'Incluye pruebas de bases, PIE, combinados, refuerzo y exportación. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.523',
             'title' => 'Menú lateral: más espacio para las opciones',
