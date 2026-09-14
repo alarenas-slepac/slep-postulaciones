@@ -8,9 +8,11 @@ historial, períodos y liberaciones por baja/traslado.
 ## Antes de escribir en producción
 
 1. Desplegar y comprobar PHP 8.3, MariaDB 10.11 y el diagnóstico técnico sin errores.
-2. Coordinar una ventana breve sin cambios de padrón, decisiones, Dotación o sus
-   documentos relacionados. El escritor bloquea dependencias; otras operaciones
-   pueden esperar o agotar su tiempo de espera. No iniciar otras cargas en paralelo.
+2. No es necesario detener producción ni poner la aplicación en mantenimiento.
+   La actividad documental normal no vence la confirmación CLI. El escritor sigue
+   bloqueando dependencias durante la transacción: otras escrituras pueden esperar
+   o agotar su tiempo de espera; no se garantiza ausencia de demoras. No iniciar
+   otras cargas completas en paralelo ni modificar las decisiones ya confirmadas.
 3. Obtener un respaldo completo reciente **después de las últimas resoluciones**,
    guardar su SHA-256 fuera del repositorio y comprobar que puede restaurarse en
    un entorno aislado. No restaurar sobre producción como prueba.
@@ -34,7 +36,7 @@ El límite de 256 MB afecta únicamente a este proceso; no requiere cambiar cPan
 El comando rechaza un límite inferior o ilimitado. El consumo exacto depende de
 la base y del entorno. La serie MariaDB 10.11 es la validada para esta entrada.
 
-La salida contiene conteos, estado, `confirmacion` (huella del plan) y la frase
+La salida contiene conteos, estado, `confirmacion` (huella de la propuesta) y la frase
 `confirmar`. No imprime nombres, RUT, contratos ni credenciales. Si hay errores,
 devuelve código 1; consultar sus detalles en la revisión autenticada de la web.
 Los avisos por sí solos no impiden aplicar. `ya_aplicada` devuelve fecha/autor sin
@@ -51,11 +53,23 @@ valores reales; no usar una huella de laboratorio ni inventar un respaldo.
 
 `--respaldo-sha256` es una declaración explícita del operador y queda registrada;
 el comando valida su formato, pero **no crea, abre ni certifica el respaldo**.
-No hay opción para forzar bloqueos ni para saltarse una huella desactualizada.
-Si cambian las dependencias, consultar nuevamente y revisar el plan actualizado;
-las decisiones siguen guardadas. Si cambia la base contractual, se exige un nuevo
-análisis. La confirmación se comprueba nuevamente dentro de la transacción bajo
-los bloqueos del escritor, no solo antes de entrar.
+No hay opción para forzar bloqueos ni para saltarse decisiones desactualizadas.
+Desde el parche 2026.9.14.519, la confirmación CLI corresponde a la revisión,
+filas, decisiones, autorizaciones y liberaciones aprobadas. La salida identifica
+`confirmacion_tipo: propuesta_con_revalidacion_transaccional`. Obtener una nueva
+confirmación tras instalar este parche; las huellas del formato anterior no sirven.
+
+Los cambios en documentos, declaraciones o asignaciones ya no invalidan por sí
+solos esta huella. Al aplicar, el escritor adquiere los bloqueos y recalcula el
+plan con los datos actuales: si aparece un conflicto real, falta cobertura o cambia
+el alcance de una liberación, rechaza toda la operación. Los documentos nuevos
+se protegen con la imagen contractual vigente. No se omite ninguna validación.
+
+Si cambian las filas, decisiones, autorizaciones o confirmaciones de liberación,
+se necesita consultar y confirmar nuevamente. Si cambia la base contractual,
+se exige un nuevo análisis. Se conservan las decisiones ya registradas.
+La web continúa deshabilitada y conserva su diagnóstico de huella completa;
+su mensaje transitorio de cambio durante el cálculo no sustituye el diagnóstico CLI.
 
 ## Resultado y auditoría
 
@@ -80,6 +94,23 @@ Pruebas aisladas del comando: consulta sin escritura, confirmaciones obligatoria
 usuario administrador, base/plan cambiados, bloqueos, rechazo HTTP y SQLite,
 límite de memoria, escritura auditada, rollback y repetición idempotente.
 El escritor conserva además su suite de regresión transaccional existente.
+
+El parche 2026.9.14.519 añade pruebas de actividad documental durante/después de
+la consulta, captura de referencias nuevas y rechazo de conflictos o decisiones
+modificadas antes de la escritura. La matriz MariaDB admite los casos
+`cli_document_update`, `cli_conflict_insert` y `cli_personal_update`, con dos
+conexiones y observación de espera real sobre los bloqueos.
+
+Validación local del 14/09/2026: los tres casos pasaron en MariaDB 10.11.18 tanto
+con REPEATABLE READ como con READ COMMITTED (seis escenarios). El cambio
+documental previo se conserva y la aplicación no duplica datos al reintentar;
+los conflictos nuevos y cambios del contrato base se rechazan sin escrituras.
+Esto no garantiza ausencia de esperas o timeouts en el hosting.
+
+El respaldo actualizado del 14/09/2026 también se restauró en una base local nueva:
+159 tablas presentes y comprobadas, revisión 21 sin aplicar, 366 decisiones,
+6.176 destinos, 91 bajas, 60 liberaciones confirmadas y cero errores. La consulta
+de esa copia usó una sesión SQL de solo lectura; no se aplicó el padrón real.
 
 Consulta del nuevo comando sobre la copia local de la revisión 21, con MariaDB
 10.11.18 y sesión SQL de solo lectura: 6.176 destinos, 91 bajas, 60 asignaciones
