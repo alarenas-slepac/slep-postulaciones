@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.521',
+    'current_version' => '2026.9.14.522',
     'entries' => [
+        [
+            'version' => '2026.9.14.522',
+            'title' => 'Padrón individual: corrige apertura sin RUT',
+            'summary' => 'Corrige el error 500 al ingresar a la gestión individual antes de consultar un RUT.',
+            'roles' => ['admin'],
+            'items' => [
+                'Inicializa los registros con una colección Eloquent vacía, compatible con la carga de relaciones del establecimiento.',
+                'Agrega regresiones para apertura inicial, RUT vacío o nulo y búsqueda válida sin resultados, verificando el renderizado y la ausencia de escrituras.',
+                'No modifica contratos, asignaciones ni reglas de validación. No requiere nuevas migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.521',
             'title' => 'Padrón: ingreso y actualización individual por RUT',

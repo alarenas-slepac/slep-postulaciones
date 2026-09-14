@@ -298,6 +298,43 @@ class PadronIndividualTest extends TestCase
         $this->assertDatabaseHas('reemplazos_personal', ['id' => 101, 'jornada' => 30]);
     }
 
+    public static function consultasSinRegistros(): array
+    {
+        return [
+            'apertura inicial' => [[], false],
+            'rut vacío' => [['rut' => ''], false],
+            'rut nulo' => [['rut' => null], false],
+            'rut válido sin coincidencias' => [['rut' => '222222222'], true],
+        ];
+    }
+
+    #[DataProvider('consultasSinRegistros')]
+    public function test_apertura_y_busqueda_sin_registros_renderizan_sin_escrituras(array $query, bool $busqueda): void
+    {
+        $service = $this->service();
+        if (! $busqueda) {
+            $service = \Mockery::mock(PadronIndividualService::class)->makePartial();
+            $service->shouldNotReceive('registros');
+        }
+        $antes = DB::table('reemplazos_personal')->get()->toJson();
+        $view = app(PadronIndividualController::class)->index(Request::create('/', 'GET', $query), $service);
+        $datos = $view->getData();
+        $this->assertCount(0, $datos['registros']);
+        $this->assertCount(0, $datos['editables']);
+        $this->assertNull($datos['item']);
+        $source = file_get_contents(resource_path('views/reemplazos/personal/individual.blade.php'));
+        $html = Blade::render(str_replace(["@extends('layouts.app')", "@section('content')", '@endsection'], '', $source), $datos + ['errors' => new \Illuminate\Support\ViewErrorBag]);
+        $this->assertStringContainsString('Validar RUT y consultar registros', $html);
+        if ($busqueda) {
+            $this->assertStringContainsString('Este RUT no tiene registros', $html);
+            $this->assertStringContainsString('Crear nuevo registro', $html);
+        } else {
+            $this->assertStringNotContainsString('Crear nuevo registro', $html);
+        }
+        $this->assertSame($antes, DB::table('reemplazos_personal')->get()->toJson());
+        $this->assertDatabaseCount('padron_individual_cambios', 0);
+    }
+
     public function test_vista_busqueda_y_formulario_sin_escrituras(): void
     {
         $request = Request::create('/', 'GET', ['rut' => '11.111.111-1', 'personal_id' => 101]);
