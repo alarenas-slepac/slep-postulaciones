@@ -11,6 +11,9 @@
                 <i class="bi bi-search"></i> Ir al buscador de postulantes y funcionarios
             </a>
             @role('admin')
+                <a href="{{ route('reemplazos.individual.index') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-person-plus"></i> Gestionar registro individual
+                </a>
                 <a href="{{ route('reemplazos.personal.import') }}" class="btn btn-primary">
                     <i class="bi bi-upload"></i> Carga masiva
                 </a>

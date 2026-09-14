@@ -4110,8 +4110,23 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.520',
+    'current_version' => '2026.9.14.521',
     'entries' => [
+        [
+            'version' => '2026.9.14.521',
+            'title' => 'Padrón: ingreso y actualización individual por RUT',
+            'summary' => 'Permite al administrador consultar un RUT, ingresar reemplazos nuevos y actualizar contratos regulares del período abierto conservando su ID.',
+            'roles' => ['admin'],
+            'items' => [
+                'Valida el dígito verificador, muestra las líneas existentes y exige seleccionar el contrato regular que se modificará. Los reemplazos se incorporan con un ID nuevo, sin sobrescribir registros previos.',
+                'Permite modificar establecimiento, fechas, jornada, financiamiento, estatuto, escalafón, bienios y tramo. Conserva RUT, IDs, bloqueos y referencias; protege las copias contractuales de documentos existentes.',
+                'Controla duplicados, cambios concurrentes y jornadas docentes simultáneas superiores a 44 horas entre establecimientos, con autorización explícita y justificación para excepciones.',
+                'Muestra asignaciones agrupadas por RBD y establecimiento y permite seleccionar su liberación por traslado, con confirmación y justificación. Solo inactiva las seleccionadas fuera del destino, sin borrar historial ni crear asignaciones nuevas.',
+                'Registra contrato y liberaciones con auditoría antes/después en una transacción coordinada con la carga completa. Revalida las asignaciones seleccionadas y revierte toda la operación ante errores. No abre meses nuevos.',
+                'Requiere la migración aditiva padron_individual_cambios. Los contratos de períodos anteriores siguen protegidos; no se modifica producción durante las pruebas.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.520',
             'title' => 'Dotación: contrato docente desde el padrón vigente',
