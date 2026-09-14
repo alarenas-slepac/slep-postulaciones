@@ -80,8 +80,6 @@
         .slep-menu-link:hover { background: #f1f6ff; color: #0d47a1; }
         .slep-menu-link.active { background: #eaf2ff; color: #0d47a1; box-shadow: inset 3px 0 0 #0d6efd; }
         .slep-menu-link i { width: 1.35rem; text-align: center; font-size: 1.05rem; }
-        .slep-sidebar-help { margin: .85rem; border: 1px solid #cfe0ff; border-radius: 18px; background: #eff6ff; padding: 1rem; color: #1e3a8a; }
-        .slep-help-icon { width: 2rem; height: 2rem; border-radius: 999px; display:inline-flex; align-items:center; justify-content:center; background:#0d6efd; color:#fff; margin-bottom:.5rem; }
         .slep-main { padding-left: var(--slep-sidebar); min-height: 100vh; transition: padding-left .22s ease; }
         .slep-topbar { height: var(--slep-topbar); position: sticky; top: 0; z-index: 1030; background: rgba(255,255,255,.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--slep-border); display: flex; align-items: center; gap: 1rem; padding: 0 1.5rem; }
         .slep-sidebar-toggle { border: 1px solid var(--slep-border); background: #fff; color:#334155; width: 42px; height: 42px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; transition: .18s ease; }
@@ -148,7 +146,6 @@
 
         .slep-icon-btn.is-changelog { color:#1d4ed8; background:#eff6ff; border-color:#cfe0ff; }
         .slep-icon-btn.is-changelog:hover { background:#dbeafe; color:#0d47a1; }
-        .slep-sidebar-help .btn[data-bs-toggle="modal"] { font-weight:800; }
 
         .sga-guest-shell { min-height: 100vh; position: relative; overflow: hidden; background: radial-gradient(circle at 78% 22%, rgba(13,110,253,.14), transparent 28rem), linear-gradient(135deg, #f8fbff 0%, #eef3f9 100%); }
         .sga-guest-shell::before { content:''; position:absolute; inset:0; background: linear-gradient(120deg, rgba(255,255,255,.85) 0%, rgba(255,255,255,.72) 48%, rgba(239,246,255,.8) 100%); pointer-events:none; }
@@ -249,17 +246,6 @@
                         @endforeach
                     </div>
                 @endforeach
-            </div>
-
-            <div class="slep-sidebar-help">
-                <span class="slep-help-icon"><i class="bi bi-question-lg"></i></span>
-                <div class="fw-bold mb-1">¿Necesitas ayuda?</div>
-                <div class="small mb-3">Consulta manuales, soporte interno o revisa el historial del sistema.</div>
-                @if (!empty($hasVisibleChangeLogEntries ?? false))
-                    <button type="button" class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#changeLogModal" data-changelog-open-history="1">Ver changelog</button>
-                @else
-                    <a href="{{ Route::has('dashboard') ? route('dashboard') : url('/') }}" class="btn btn-sm btn-outline-primary w-100">Centro de ayuda</a>
-                @endif
             </div>
         </aside>
         <div class="slep-overlay" data-slep-close></div>
