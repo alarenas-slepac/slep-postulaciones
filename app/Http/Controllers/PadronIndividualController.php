@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Establecimiento;
 use App\Services\Padron\PadronIndividualService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -17,7 +18,7 @@ class PadronIndividualController extends Controller
             'personal_id' => ['nullable', 'integer', 'min:1'],
         ]);
         $rut = ! empty($validated['rut']) ? $service->rut($validated['rut']) : null;
-        $registros = $rut ? $service->registros($rut) : collect();
+        $registros = $rut ? $service->registros($rut) : new Collection();
         $periodo = $service->periodo();
         $editables = $registros->filter(fn ($p) => $service->editable($p, $periodo));
         $item = ! empty($validated['personal_id']) ? $editables->firstWhere('id', (int) $validated['personal_id']) : null;
