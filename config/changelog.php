@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.522',
+    'current_version' => '2026.9.14.523',
     'entries' => [
+        [
+            'version' => '2026.9.14.523',
+            'title' => 'Menú lateral: más espacio para las opciones',
+            'summary' => 'Retira la tarjeta de ayuda del menú lateral para aprovechar su altura en escritorio y móviles.',
+            'roles' => [],
+            'items' => [
+                'Elimina el cuadro ¿Necesitas ayuda? y su botón Ver changelog, sin reservar espacio al pie del menú.',
+                'Mantiene los accesos al changelog y al historial en la barra superior y el menú de usuario, con sus permisos habituales.',
+                'No modifica rutas, permisos ni datos. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.522',
             'title' => 'Padrón individual: corrige apertura sin RUT',

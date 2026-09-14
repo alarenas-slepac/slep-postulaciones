@@ -84,4 +84,27 @@ class ChangeLogLazyTest extends TestCase
         $this->assertFalse($summary->forUser($this->user(false))['hasCurrentChangeLogEntries']);
         $this->assertFalse($summary->forUser(null)['hasVisibleChangeLogEntries']);
     }
+
+    public function test_sidebar_has_no_help_card_and_keeps_changelog_access_outside_it(): void
+    {
+        $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+        $this->assertSame(1, preg_match('/<aside class="slep-sidebar".*?<\/aside>/s', $layout, $matches));
+
+        foreach ([true, false] as $visible) {
+            $html = \Illuminate\Support\Facades\Blade::render($matches[0], [
+                'layoutSidebarLogoUrl' => '/branding/test.svg',
+                'layoutMenuGroups' => [],
+                'hasVisibleChangeLogEntries' => $visible,
+            ]);
+            $this->assertStringContainsString('slep-nav-scroll', $html);
+            $this->assertStringNotContainsString('slep-sidebar-help', $html);
+            $this->assertStringNotContainsString('¿Necesitas ayuda?', $html);
+            $this->assertStringNotContainsString('changeLogModal', $html);
+            $this->assertStringNotContainsString('Centro de ayuda', $html);
+        }
+
+        $this->assertStringContainsString('class="slep-icon-btn is-changelog"', $layout);
+        $this->assertStringContainsString('Historial de cambios</button>', $layout);
+        $this->assertStringContainsString("@include('partials.changelog-modal')", $layout);
+    }
 }
