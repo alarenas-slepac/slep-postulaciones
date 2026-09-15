@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.15.469' => [
+        'date' => '2026-09-15',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Indicadores de cursos preparados para 2027',
+        'files' => [
+            'config/changelog.php',
+            'database/migrations/2026_09_15_120000_copy_indicadores_cursos_to_2027.php',
+            'tests/Feature/IndicadoresCursos2027MigrationTest.php',
+        ],
+        'changes' => [
+            'Copia el porcentaje de alumnos prioritarios 2026 al 2027 solo cuando el establecimiento ya tiene cursos activos en 2027.',
+            'Copia los registros de Estudiantes PIE únicamente a la misma sección activa de 2027, identificada por establecimiento, curso y letra.',
+            'No crea cursos, no sobrescribe porcentajes ni registros PIE existentes en 2027 y conserva el vínculo con el plan de estudio 2027 del curso destino.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Directivo Establecimiento'],
+    ],
     '2026.9.15.468' => [
         'date' => '2026-09-15',
         'module' => 'Planes de Estudio',
