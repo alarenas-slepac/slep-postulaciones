@@ -325,7 +325,7 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         ], $resultado);
     }
 
-    public function test_vista_ofrece_todos_los_motivos_y_limita_horas_al_saldo_sin_asignar(): void
+    public function test_vista_ofrece_todos_los_motivos_y_distribuye_el_contrato_original(): void
     {
         $establecimiento = new Establecimiento(['nombre_establecimiento' => 'Establecimiento de prueba']);
         $establecimiento->id = 10;
@@ -357,8 +357,9 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         }
 
         $this->assertStringContainsString('name="horas"', $html);
-        $this->assertStringContainsString('max="14"', $html);
-        $this->assertStringContainsString('Máximo sin asignar: 14 h.', $html);
+        $this->assertStringContainsString('name="horas_necesarias"', $html);
+        $this->assertStringContainsString('max="44"', $html);
+        $this->assertStringContainsString('Horas necesarias + horas no necesarias = 44 h', $html);
     }
 
     private function personal(int $id, string $rut, int $anio, int $mes, string $tipo, int $jornada, string $hash): ReemplazoPersonal

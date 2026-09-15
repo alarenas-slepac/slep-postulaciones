@@ -28,7 +28,7 @@
             <div>
                 <div class="dotacion-eyebrow">Base docente contractual</div>
                 <h2 class="h5 fw-bold mb-1">Docentes vigentes del establecimiento</h2>
-                <div class="text-muted small">La nómina considera los registros vigentes del último mes. Las situaciones docentes excluyen del cálculo sólo las horas indicadas, manteniendo visible el contrato original.</div>
+                <div class="text-muted small">La nómina considera los registros vigentes del último mes. Las situaciones docentes distribuyen el contrato original entre horas necesarias y no necesarias; sólo las necesarias suman al bloque contractual correspondiente.</div>
             </div>
         </div>
     </div>
@@ -115,17 +115,18 @@
                         $horasPlanta = (float) ($docente['horas_planta'] ?? 0);
                         $horasContrata = (float) ($docente['horas_contrata'] ?? 0);
                         $horasContratoBaseDocente = (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0);
-                        $horasAsignadasDocente = (float) ($docente['horas_asignadas_total'] ?? 0);
-                        $horasDisponiblesExclusion = max(0, round($horasContratoBaseDocente - $horasAsignadasDocente, 2));
                         $exclusionDocente = $docente['exclusion_docente'] ?? null;
                         $formConErrores = old('docente_rut') === ($docente['rut'] ?? null);
                         $motivoSeleccionado = $formConErrores ? old('motivo') : ($exclusionDocente['motivo'] ?? '');
-                        $horasSeleccionadas = $formConErrores ? old('horas') : ($exclusionDocente['horas'] ?? $horasDisponiblesExclusion);
+                        $horasSeleccionadas = $formConErrores ? old('horas') : ($exclusionDocente['horas'] ?? 0);
+                        $horasNecesariasSeleccionadas = $formConErrores ? old('horas_necesarias') : ($docente['horas_contrato'] ?? $horasContratoBaseDocente);
+                        $continuaDotacion = ($continuidadPorRut ?? [])[$docente['rut_normalizado'] ?? \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? '')] ?? true;
+                        $continuidadSeleccionada = $formConErrores ? old('considerar_dotacion_siguiente', $continuaDotacion) : $continuaDotacion;
                         $funcionesTecnicoPedagogicasDetalle = collect($docente['funciones_tecnico_pedagogicas_detalle'] ?? []);
                         $otrasFuncionesDetalle = collect($docente['otras_funciones_detalle'] ?? []);
                     @endphp
                     <tr>
-                        <td><button class="btn btn-sm btn-outline-primary rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="false" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down"></i></button></td>
+                        <td><button class="btn btn-sm btn-outline-primary rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $formConErrores ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down"></i></button></td>
                         <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
                         <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="text-muted small">{{ $docente['niveles_declarados'] }}</div></td>
                         <td><div class="fw-semibold">{{ $docente['funcion'] }}</div><div class="text-muted small">{{ $docente['titulo'] }}</div></td>
@@ -160,9 +161,12 @@
                             @if ($exclusionDocente)
                                 <div class="small text-warning mt-1">{{ $exclusionDocente['motivo_label'] }} · {{ $fmt($exclusionDocente['horas']) }} h</div>
                             @endif
+                            @if (!$continuaDotacion)
+                                <div class="badge text-bg-secondary mt-1">No continúa en {{ ($anio ?? $docente['anio']) + 1 }}</div>
+                            @endif
                         </td>
                     </tr>
-                    <tr class="collapse" id="{{ $collapseId }}">
+                    <tr class="collapse{{ $formConErrores ? ' show' : '' }}" id="{{ $collapseId }}">
                         <td colspan="{{ $tableColspan }}" class="bg-light">
                             <div class="p-3">
                                 <div class="row g-3">
@@ -172,8 +176,8 @@
                                                 <div class="fw-semibold mb-2">Datos contractuales</div>
                                                 <div class="small text-muted">Horas contrato originales</div><div class="fw-bold">{{ $fmt($horasContratoBaseDocente) }}</div>
                                                 @if ($exclusionDocente)
-                                                    <div class="d-flex justify-content-between text-warning mt-2"><span>Horas no consideradas</span><strong>-{{ $fmt($exclusionDocente['horas']) }}</strong></div>
-                                                    <div class="d-flex justify-content-between"><span>Contrato considerado</span><strong class="text-success">{{ $fmt($docente['horas_contrato']) }}</strong></div>
+                                                    <div class="d-flex justify-content-between text-warning mt-2"><span>Horas no necesarias</span><strong>{{ $fmt($exclusionDocente['horas']) }}</strong></div>
+                                                    <div class="d-flex justify-content-between"><span>Horas necesarias / contrato considerado</span><strong class="text-success">{{ $fmt($docente['horas_contrato']) }}</strong></div>
                                                     <div class="small text-muted mb-2">{{ $exclusionDocente['motivo_label'] }}</div>
                                                 @endif
                                                 @if (!empty($docente['horas_contrato_detalle']))
@@ -205,6 +209,9 @@
                                         <div class="card border-0 shadow-sm h-100">
                                             <div class="card-body">
                                                 <div class="fw-semibold mb-2">Cálculo de asignación</div>
+                                                @if ($exclusionDocente)
+                                                    <div class="small text-muted mb-2">Estas asignaciones se conservan como referencia de cobertura. Su cantidad de horas no modifica el aporte contractual definido en Situación docente.</div>
+                                                @endif
                                                 <div class="d-flex justify-content-between"><span>Aula asignada real</span><strong class="text-primary">{{ $fmt($docente['horas_aula']) }}</strong></div>
                                                 <div class="d-flex justify-content-between"><span>Aula 65/35</span><strong>{{ $fmt($docente['horas_aula_65_35'] ?? 0) }}</strong></div>
                                                 <div class="d-flex justify-content-between"><span>Contrato 65/35</span><strong class="text-info">{{ $fmt($docente['horas_contrato_65_35'] ?? 0) }}</strong></div>
@@ -262,25 +269,26 @@
                                             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                                                 <div>
                                                     <div class="fw-semibold"><i class="bi bi-person-dash text-warning"></i> Situación docente</div>
-                                                    <div class="small text-muted">Permite no considerar horas contractuales que todavía no están asignadas. Las asignaciones ya registradas se mantienen intactas.</div>
+                                                    <div class="small text-muted">Distribuya el contrato original entre horas necesarias y no necesarias. Las necesarias suman a Horas contrato aula, Educación Parvularia o Docente PIE según corresponda; las no necesarias quedan fuera de esos totales.</div>
+                                                    <div class="small text-muted">Las horas asignadas no limitan ni se agregan a este aporte contractual. Las asignaciones registradas se conservan.</div>
                                                 </div>
                                                 @if ($exclusionDocente)
                                                     <span class="badge text-bg-warning">Situación vigente</span>
                                                 @else
-                                                    <span class="badge text-bg-light border">{{ $fmt($horasDisponiblesExclusion) }} h disponibles</span>
+                                                    <span class="badge text-bg-light border">Contrato original: {{ $fmt($horasContratoBaseDocente) }} h</span>
                                                 @endif
                                             </div>
 
                                             @if (!($docenteExclusionesTableReady ?? false))
                                                 <div class="alert alert-warning mb-0 py-2">La función estará disponible después de ejecutar la migración del parche.</div>
-                                            @elseif ($horasDisponiblesExclusion >= 0.25)
+                                            @elseif ($horasContratoBaseDocente > 0)
                                                 <form method="POST" action="{{ route('admin.dotacion-establecimiento.docentes.exclusiones.store', $establecimiento) }}" class="row g-2 align-items-end">
                                                     @csrf
                                                     <input type="hidden" name="anio" value="{{ $anio }}">
                                                     <input type="hidden" name="docente_rut" value="{{ $docente['rut'] }}">
-                                                    <div class="col-lg-5">
-                                                        <label class="form-label small fw-semibold">Motivo</label>
-                                                        <select name="motivo" class="form-select @if($formConErrores && $errors->has('motivo')) is-invalid @endif" required>
+                                                    <div class="col-lg-6">
+                                                        <label for="{{ $collapseId }}-motivo" class="form-label small fw-semibold">Motivo</label>
+                                                        <select id="{{ $collapseId }}-motivo" name="motivo" class="form-select @if($formConErrores && $errors->has('motivo')) is-invalid @endif" required>
                                                             <option value="">Seleccione una situación</option>
                                                             @foreach (($motivosExclusionDocente ?? []) as $motivoValue => $motivoLabel)
                                                                 <option value="{{ $motivoValue }}" @selected($motivoSeleccionado === $motivoValue)>{{ $motivoLabel }}</option>
@@ -289,17 +297,35 @@
                                                         @if ($formConErrores) @error('motivo')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                     </div>
                                                     <div class="col-lg-3">
-                                                        <label class="form-label small fw-semibold">Horas que no se considerarán</label>
-                                                        <input type="number" name="horas" class="form-control @if($formConErrores && $errors->has('horas')) is-invalid @endif" min="0.25" max="{{ $horasDisponiblesExclusion }}" step="0.25" value="{{ $horasSeleccionadas }}" required>
-                                                        <div class="form-text">Máximo sin asignar: {{ $fmt($horasDisponiblesExclusion) }} h.</div>
+                                                        <label for="{{ $collapseId }}-necesarias" class="form-label small fw-semibold">Horas necesarias</label>
+                                                        <input id="{{ $collapseId }}-necesarias" type="number" name="horas_necesarias" class="form-control @if($formConErrores && $errors->has('horas_necesarias')) is-invalid @endif" min="0" max="{{ $horasContratoBaseDocente }}" step="0.01" value="{{ $horasNecesariasSeleccionadas }}" aria-describedby="{{ $collapseId }}-suma" required>
+                                                        @if ($formConErrores) @error('horas_necesarias')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
+                                                    </div>
+                                                    <div class="col-lg-3">
+                                                        <label for="{{ $collapseId }}-no-necesarias" class="form-label small fw-semibold">Horas no necesarias</label>
+                                                        <input id="{{ $collapseId }}-no-necesarias" type="number" name="horas" class="form-control @if($formConErrores && $errors->has('horas')) is-invalid @endif" min="0" max="{{ $horasContratoBaseDocente }}" step="0.01" value="{{ $horasSeleccionadas }}" aria-describedby="{{ $collapseId }}-suma" required>
                                                         @if ($formConErrores) @error('horas')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                     </div>
-                                                    <div class="col-lg-4 d-flex flex-wrap gap-2">
+                                                    <div class="col-12 small text-muted" id="{{ $collapseId }}-suma">Horas necesarias + horas no necesarias = {{ $fmt($horasContratoBaseDocente) }} h de contrato original. Cada valor puede ser cero, siempre que la suma coincida con el contrato.</div>
+                                                    <div class="col-12 mt-3">
+                                                        @if ($continuidadDisponible ?? false)
+                                                            <input type="hidden" name="considerar_dotacion_siguiente" value="0">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input @if($formConErrores && $errors->has('considerar_dotacion_siguiente')) is-invalid @endif" type="checkbox" id="{{ $collapseId }}-continuidad" name="considerar_dotacion_siguiente" value="1" @checked($continuidadSeleccionada) aria-describedby="{{ $collapseId }}-continuidad-ayuda">
+                                                                <label class="form-check-label fw-semibold" for="{{ $collapseId }}-continuidad">Contemplar a este docente y sus horas en dotación {{ $anio + 1 }}</label>
+                                                                @if ($formConErrores) @error('considerar_dotacion_siguiente')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
+                                                            </div>
+                                                            <div class="form-text" id="{{ $collapseId }}-continuidad-ayuda">Al desmarcar, su contrato y sus asignaciones dejan de cubrir la proyección {{ $anio + 1 }}. Las horas necesarias del plan de estudio y de las funciones normativas se mantienen. La dotación {{ $anio }} conserva sus registros.</div>
+                                                        @else
+                                                            <div class="alert alert-warning py-2 mb-0">La continuidad para dotación {{ $anio + 1 }} estará disponible después de instalar la migración de continuidad docente.</div>
+                                                        @endif
+                                                    </div>
+                                                    <div class="col-12 d-flex flex-wrap gap-2">
                                                         <button type="submit" class="btn btn-warning"><i class="bi bi-check2-circle"></i> {{ $exclusionDocente ? 'Actualizar situación' : 'Guardar situación' }}</button>
                                                     </div>
                                                 </form>
                                             @else
-                                                <div class="alert alert-light border mb-0 py-2">Este docente no tiene horas contractuales pendientes de asignación. No es posible registrar una nueva exclusión.</div>
+                                                <div class="alert alert-light border mb-0 py-2">Este docente no tiene horas de contrato original para distribuir.</div>
                                             @endif
 
                                             @if ($exclusionDocente && ($docenteExclusionesTableReady ?? false) && Route::has('admin.dotacion-establecimiento.docentes.exclusiones.destroy'))

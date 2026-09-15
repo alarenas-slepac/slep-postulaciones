@@ -4110,8 +4110,36 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.524',
+    'current_version' => '2026.9.14.526',
     'entries' => [
+        [
+            'version' => '2026.9.14.526',
+            'title' => 'Dotación: continuidad docente y vista completa de proyección',
+            'summary' => 'Proyecta el contrato y las coberturas del año siguiente conservando las necesidades del establecimiento del año base.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Agrega en Situación docente un check de continuidad para el año siguiente, marcado por defecto y guardado por docente, establecimiento y año base.',
+                'La vista completa muestra contratos de Aula, Educación Parvularia y Docente PIE, brechas, coberturas por necesidad y continuidad individual.',
+                'Al desmarcar a un docente, retira su contrato y su cobertura proyectados. Conserva las horas necesarias del plan de estudio, funciones normativas, funciones declaradas y PIE, además de los registros del año base.',
+                'Las salidas por Proceso BIR se registran mediante el check; el motivo no cambia automáticamente la continuidad. Volver a marcarlo restablece su participación.',
+                'Incluye migración aditiva con continuidad activada para los datos históricos, documentación y pruebas de persistencia, cálculos y presentación.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
+        [
+            'version' => '2026.9.14.525',
+            'title' => 'Dotación: horas necesarias y no necesarias en Situación docente',
+            'summary' => 'Permite distribuir el contrato original completo y contabilizar sólo las horas necesarias en el bloque contractual correspondiente.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Exige que las horas necesarias y no necesarias sumen exactamente el contrato original vigente; admite cero en cualquiera de los dos valores.',
+                'Permite registrar la situación aunque existan horas asignadas. Su cantidad no limita ni se suma al aporte contractual definido para Aula, Educación Parvularia o Docente PIE.',
+                'La coordinación PIE con situación aporta las horas necesarias una sola vez. Las Educadoras de Párvulos conservan su aporte en Parvularia y las escuelas especiales mantienen los contratos diferenciales en Aula.',
+                'Conserva contratos del padrón, asignaciones y situaciones históricas. Las horas necesarias se obtienen como contrato vigente menos horas no necesarias; eliminar la situación restablece el cálculo habitual.',
+                'Incluye pruebas de validación, actualización, eliminación, formulario y totales por categoría y Excel. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.524',
             'title' => 'Dotación: nuevas bases contractuales de Educación Parvularia',

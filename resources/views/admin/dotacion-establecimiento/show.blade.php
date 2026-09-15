@@ -138,6 +138,9 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
+                <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'proyeccion' => 1]) }}">
+                    <i class="bi bi-calendar2-range" aria-hidden="true"></i> Proyección {{ $anio + 1 }}
+                </a>
                 @if (Route::has('admin.dotacion-funciones.show') && $activeRole !== 'supervisor_plani')
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Funciones y planes
