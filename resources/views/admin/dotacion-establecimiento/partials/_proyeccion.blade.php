@@ -61,7 +61,7 @@
                     <dt class="col-8 fw-normal">Horas contrato {{ $baseProyeccion }}</dt><dd class="col-4 text-end">{{ $fmtProyeccion($proyeccion['contratos_base'][$key]) }}</dd>
                     <dt class="col-8 fw-normal">Horas contrato {{ $destinoProyeccion }}</dt><dd class="col-4 text-end fw-bold">{{ $fmtProyeccion($proyeccion['contratos'][$key]) }}</dd>
                 </dl>
-                <div class="border-top pt-2"><div class="fs-2 fw-bold {{ $brecha > 0.01 ? 'text-danger' : 'text-primary' }}">{{ $fmtProyeccion(abs($brecha)) }} <span class="fs-6">h</span></div><div class="small">{{ $brecha > 0.01 ? 'Horas por contratar' : ($brecha < -0.01 ? 'Horas de sobredotación' : 'Dotación cuadrada') }}</div></div>
+                <div class="border-top pt-2"><div class="fs-2 fw-bold {{ $brecha > 0 ? 'text-success' : ($brecha < 0 ? 'text-danger' : 'text-primary') }}">{{ $fmtProyeccion(abs($brecha)) }} <span class="fs-6">h</span></div><div class="small">{{ $brecha > 0 ? 'Horas por contratar' : ($brecha < 0 ? 'Horas de sobredotación' : 'Dotación cuadrada') }}</div></div>
             </div></div>
         @endforeach
     </div>

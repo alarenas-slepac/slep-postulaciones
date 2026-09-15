@@ -4110,8 +4110,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.526',
+    'current_version' => '2026.9.14.527',
     'entries' => [
+        [
+            'version' => '2026.9.14.527',
+            'title' => 'Dotación: colores de la brecha proyectada',
+            'summary' => 'Ajusta los colores de Contrato disponible y brecha en la proyección del año siguiente.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Muestra verde cuando las horas necesarias superan las contratadas, rojo cuando las contratadas superan las necesarias y azul cuando la diferencia es cero.',
+                'Aplica el criterio a Aula, Educación Parvularia y Docente PIE, incluidas diferencias de 0,01 horas. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.526',
             'title' => 'Dotación: continuidad docente y vista completa de proyección',
