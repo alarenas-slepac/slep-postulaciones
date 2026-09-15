@@ -21,6 +21,8 @@ class DotacionDocenteExclusion extends Model
         'proceso_bir' => 'Proceso BIR',
         'horas_lactancia' => 'Horas de lactancia',
         'horas_gremiales' => 'Horas gremiales',
+        // Reducción de horas cronológicas de docencia de aula en virtud del art. 69 de la Ley 19.070.
+        'horas_catedra_art_69' => 'Hrs. de Cátedra - Art. 69',
     ];
 
     protected $fillable = [

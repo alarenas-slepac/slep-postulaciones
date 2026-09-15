@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.15.537',
+    'current_version' => '2026.9.15.538',
     'entries' => [
+        [
+            'version' => '2026.9.15.538',
+            'title' => 'Situación docente: horas de cátedra del artículo 69',
+            'summary' => 'Agrega el motivo de reducción de horas cronológicas de docencia de aula en virtud del art. 69 de la Ley 19.070.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'El listado muestra Hrs. de Cátedra - Art. 69 y permite guardar y consultar este motivo en Situación docente.',
+                'Este motivo no protege las horas del contrato frente a propuestas de reducción o ajuste.',
+                'Utiliza las reglas existentes de distribución contractual, continuidad y conservación de horas. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-15',
+        ],
         [
             'version' => '2026.9.15.537',
             'title' => 'Dotación: horas incluidas según el total asignado',

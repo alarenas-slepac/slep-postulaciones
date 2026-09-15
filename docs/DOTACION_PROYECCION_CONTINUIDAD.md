@@ -16,7 +16,12 @@ En **Docentes → Situación docente** hay dos decisiones independientes:
   La persona no se reincorpora a la nómina ni a la cobertura.
 
 Ambas están marcadas por defecto. El motivo Proceso BIR no registra automáticamente
-la salida; Fuero maternal y Horas gremiales tampoco implican que la persona salga.
+la salida; Fuero maternal, Horas gremiales y Hrs. de Cátedra - Art. 69 tampoco implican que la persona salga.
+
+**Hrs. de Cátedra - Art. 69** identifica la reducción de horas cronológicas de
+docencia de aula en virtud del art. 69 de la Ley 19.070. Este motivo no protege
+las horas del contrato frente a propuestas de reducción o ajuste. La protección
+contractual se mantiene para Fuero maternal y Horas gremiales.
 
 ## Efectos
 
