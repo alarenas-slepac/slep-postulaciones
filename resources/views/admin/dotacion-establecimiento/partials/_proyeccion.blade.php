@@ -57,6 +57,47 @@
             <thead class="table-light"><tr><th scope="col">Docente que sale</th><th scope="col">Categoría</th><th scope="col" class="text-end">Vacantes conservadas</th><th scope="col" class="text-end">Ya incluidas en necesidades</th><th scope="col" class="text-end">Necesarias adicionales</th></tr></thead>
             <tbody>@foreach ($proyeccion['reservas'] as $reserva)
                 <tr><th scope="row" class="fw-normal">{{ $reserva['nombre'] }}</th><td>{{ $categoriasProyeccion[$reserva['categoria']] }}</td><td class="text-end text-success-emphasis fw-bold">{{ $fmtProyeccion($reserva['horas_necesarias']) }}</td><td class="text-end">{{ $fmtProyeccion($reserva['ya_contempladas']) }}</td><td class="text-end">{{ $fmtProyeccion($reserva['adicionales']) }}</td></tr>
+                <tr><td colspan="5" class="pt-0">
+                    @php $referencia = $reserva['asignaciones_referencia']; @endphp
+                    <details class="border rounded-3 bg-light mb-2">
+                        <summary class="p-3 text-primary fw-semibold">
+                            Ver asignaciones {{ $baseProyeccion }}
+                            <span class="visually-hidden">de {{ $reserva['nombre'] }}</span>
+                            <span class="fw-normal small ms-2">{{ count($referencia['items']) }} registro(s) · {{ $fmtProyeccion($referencia['total_contrato']) }} h contrato</span>
+                        </summary>
+                        <div class="px-3 pb-3">
+                            <p class="small text-muted">Referencia de las asignaciones del año base. Sus horas pueden diferir de las {{ $fmtProyeccion($reserva['horas_necesarias']) }} h conservadas como vacantes. Este desglose no modifica el contrato proyectado ni reincorpora al docente.</p>
+                            @if (count($referencia['items']) > 0)
+                                <div class="table-responsive bg-white rounded-3 border">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <caption class="visually-hidden">Asignaciones {{ $baseProyeccion }} de {{ $reserva['nombre'] }}</caption>
+                                        <thead class="table-light"><tr><th scope="col">Tipo</th><th scope="col">Función / asignatura / plan</th><th scope="col">Curso / ámbito</th><th scope="col">Subvención</th><th scope="col" class="text-end">Hrs pedagógicas</th><th scope="col" class="text-end">Hrs contrato</th></tr></thead>
+                                        <tbody>
+                                            @foreach ($referencia['items'] as $detalle)
+                                                <tr>
+                                                    <td class="small">{{ $detalle['tipo'] }}</td>
+                                                    <th scope="row" class="fw-normal">
+                                                        <div class="fw-semibold">{{ $detalle['titulo'] }}</div>
+                                                        @if ($detalle['fuente'])<div class="small text-muted">{{ $detalle['fuente'] }}</div>@endif
+                                                        @if ($detalle['sin_necesidad_vigente'])<div class="small text-muted">Sin necesidad vigente vinculada</div>@endif
+                                                        @if ($detalle['observacion'])<div class="small text-muted">Observación: {{ $detalle['observacion'] }}</div>@endif
+                                                    </th>
+                                                    <td class="small">{{ $detalle['curso'] }}</td>
+                                                    <td class="small">{{ $detalle['subvencion'] }}</td>
+                                                    <td class="text-end">{{ $detalle['horas_pedagogicas'] === null ? '—' : $fmtProyeccion($detalle['horas_pedagogicas']) }}@if ($detalle['proporcion'])<div class="small text-muted">{{ $detalle['proporcion'] }}</div>@endif</td>
+                                                    <td class="text-end fw-semibold">{{ $fmtProyeccion($detalle['horas_contrato']) }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                        <tfoot class="table-light"><tr><th scope="row" colspan="4">Total asignado {{ $baseProyeccion }}</th><td class="text-end fw-semibold">{{ $fmtProyeccion($referencia['total_pedagogicas']) }}</td><td class="text-end fw-semibold">{{ $fmtProyeccion($referencia['total_contrato']) }}</td></tr></tfoot>
+                                    </table>
+                                </div>
+                            @else
+                                <p class="small mb-0">No hay asignaciones registradas para este docente en {{ $baseProyeccion }}. Las horas necesarias conservadas permanecen como vacantes por cubrir.</p>
+                            @endif
+                        </div>
+                    </details>
+                </td></tr>
             @endforeach</tbody>
         </table></div>
     </section>
