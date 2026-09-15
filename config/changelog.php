@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.15.468' => [
+        'date' => '2026-09-15',
+        'module' => 'Planes de Estudio',
+        'title' => 'Preparación de planes y cursos para 2027',
+        'files' => [
+            'config/changelog.php',
+            'database/migrations/2026_09_15_110000_copy_planes_estudio_to_2027.php',
+            'tests/Feature/PlanEstudio2027MigrationTest.php',
+        ],
+        'changes' => [
+            'Copia hacia 2027 los planes de estudio de 2026 que todavía no tengan una versión para el mismo curso y régimen JEC.',
+            'Conserva las asignaturas y bloques de cada plan copiado, sin modificar los planes que ya fueron creados o ajustados para 2027.',
+            'Asigna el plan 2027 activo compatible a los cursos 2027 que estaban sin plan, según curso y régimen JEC; No aplica usa el plan Sin JEC.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP'],
+    ],
     '2026.9.15.467' => [
         'date' => '2026-09-15',
         'module' => 'Dotación Establecimiento',
