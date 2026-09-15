@@ -189,7 +189,7 @@ class DotacionProyeccionTest extends TestCase
         $this->assertSame(44.0, $proyeccion['necesarias']['funciones_normativas']);
         $this->assertSame(44.0, $proyeccion['horas_vacantes_por_cubrir']);
         $this->assertSame(0.0, $proyeccion['necesarias_adicionales']['aula']);
-        $this->assertSame(44.0, $proyeccion['reservas'][0]['ya_contempladas']);
+        $this->assertSame(5.0, $proyeccion['reservas'][0]['ya_contempladas']);
         $this->assertSame(88.0, $proyeccion['contratos']['total']);
         $sinReserva = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false], ['111111111' => false]);
         $this->assertFalse($sinReserva['docentes'][0]['continua']);
@@ -234,8 +234,8 @@ class DotacionProyeccionTest extends TestCase
         $base['resumen']['contrato_plan_general_mas_trabajo_colaborativo_pie'] = 0;
         $proyeccion = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false, '222222222' => false]);
         $this->assertSame(88.0, $proyeccion['horas_vacantes_por_cubrir']);
-        $this->assertSame(44.0, $proyeccion['necesarias_adicionales']['aula']);
-        $this->assertSame(0.0, $proyeccion['brechas']['aula']);
+        $this->assertSame(0.0, $proyeccion['necesarias_adicionales']['aula']);
+        $this->assertSame(-44.0, $proyeccion['brechas']['aula']);
         $this->assertSame(88.0, $proyeccion['contratos']['total']);
         $plan = DotacionProyeccionCalculator::build($this->base(), 2026, ['222222222' => false]);
         $this->assertSame(44.0, $plan['horas_vacantes_por_cubrir']);

@@ -39,9 +39,11 @@ la salida; Fuero maternal y Horas gremiales tampoco implican que la persona salg
   mediante las asignaciones del año base, hasta el total contractual requerido
   de esa necesidad. La cantidad de horas asignadas no limita la reserva manual.
   Una necesidad compartida se reconoce una sola vez entre los docentes que salen.
-- Si parte de las horas conservadas no estaba incluida en una necesidad vinculada,
+- Si parte de las horas conservadas no estaba incluida en las asignaciones ni en una necesidad vinculada,
   se agrega como necesidad adicional de Aula, Parvularia o PIE según el docente.
-  El detalle muestra cuánto ya estaba contemplado y cuánto se agrega a la brecha.
+  La columna «Ya incluidas en necesidades» muestra el total contractual asignado
+  del año base, calculado por bloques y limitado a las vacantes conservadas,
+  y «Necesarias adicionales» lo que se agrega a la brecha.
 - Desmarcar la conservación evita generar una reserva por esa situación. No borra
   las necesidades propias de los planes y funciones configurados en el año base.
 - La cobertura de otras personas permanece. Las horas pendientes se calculan
@@ -95,6 +97,13 @@ Las reglas especiales y los registros sin proporción o sin horas pedagógicas
 conservan el contrato registrado, identificado en un subtotal separado.
 Las asignaciones originales permanecen intactas. El total del detalle es una
 referencia: no modifica el contrato proyectado ni las vacantes conservadas.
+La columna **Ya incluidas en necesidades** usa el menor valor entre el **Total asignado 2026**
+y las vacantes conservadas: con 35 vacantes y 38 asignadas, muestra 35 incluidas.
+El detalle conserva las 38 horas asignadas como referencia.
+Con cuatro asignaturas de 2 h aula en 65/35, el bloque de 8 h aula equivale a 9 h
+contrato. Si se conservan 9 vacantes, muestra **9 incluidas y 0 adicionales**.
+Las adicionales excluyen tanto lo asignado por bloque como las necesidades ya
+configuradas, para no volver a sumar una función normativa existente.
 Sin asignaciones, informa esa condición y mantiene la reserva necesaria.
 
 ## Contrato de Educación Diferencial con funciones normativas

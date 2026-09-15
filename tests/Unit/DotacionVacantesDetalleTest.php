@@ -112,6 +112,8 @@ class DotacionVacantesDetalleTest extends TestCase
         $this->assertSame(28.0, $detalle['total_pedagogicas']);
         $this->assertSame(35.0, $detalle['bloques_aula'][0]['horas_contrato']);
         $this->assertSame(38.0, $detalle['total_contrato']);
+        $this->assertSame(35.0, $p['reservas'][0]['ya_contempladas']);
+        $this->assertSame(0.0, $p['reservas'][0]['adicionales']);
         $this->assertSame(35.0, $p['horas_vacantes_por_cubrir']);
         $this->assertSame(35.0, $p['contratos']['total']);
         $this->assertSame($antes, serialize($base));
@@ -119,6 +121,56 @@ class DotacionVacantesDetalleTest extends TestCase
         $this->assertStringContainsString('10 registro(s) · 38 h contrato', $html);
         $this->assertStringContainsString('Total aula y conversión · 60/40', $html);
         $this->assertLessThan(strpos($html, 'Horas de contrato · PIE y funciones'), strpos($html, 'Total aula y conversión · 60/40'));
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $xpath = new \DOMXPath($dom);
+        $fila = '//section[@aria-labelledby="proyeccion-reservas"]/div/table/tbody/tr[1]';
+        $this->assertSame('35', trim($xpath->evaluate('string('.$fila.'/td[3])')));
+        $this->assertSame('38', trim($xpath->evaluate('string(//section[@aria-labelledby="proyeccion-reservas"]//details//tfoot/tr/td[2])')));
+        $base['docentes'][0]['horas_contrato'] = 0.0;
+        $sinVacantes = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false]);
+        $this->assertSame(0.0, $sinVacantes['reservas'][0]['ya_contempladas']);
+        $this->assertSame(38.0, $sinVacantes['reservas'][0]['asignaciones_referencia']['total_contrato']);
+    }
+
+    public function test_incluidas_coincide_con_total_65_35_y_no_genera_adicional_por_conversion(): void
+    {
+        $base = self::base();
+        $filas = [];
+        $necesidades = [];
+        foreach (range(1, 4) as $i) {
+            $fila = (new DotacionDocenteAsignacion)->forceFill([
+                'id' => 100 + $i, 'docente_rut' => '11111111-1', 'tipo_asignacion' => 'plan_estudio',
+                'asignatura_nombre' => 'Asignatura de ejemplo', 'proporcion_aplicada' => '65/35',
+                'horas_plan_pedagogicas' => 2, 'horas_contrato' => 2,
+            ]);
+            $filas[] = $fila;
+            $necesidades[] = ['titulo' => 'Asignatura de ejemplo', 'horas_contrato_requeridas' => 2, 'asignaciones' => [$fila]];
+        }
+        $base['docentes'][0]['horas_contrato'] = 9.0;
+        $base['docentes'][0]['asignaciones'] = $filas;
+        $base['asignacion'] = ['asignaciones' => collect($filas), 'necesidades' => ['plan_estudio' => $necesidades]];
+        $base['resumen'] = ['contrato_plan_general_mas_trabajo_colaborativo_pie' => 9];
+        $p = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false]);
+        $reserva = $p['reservas'][0];
+        $this->assertSame(9.0, $reserva['ya_contempladas']);
+        $this->assertSame($reserva['asignaciones_referencia']['total_contrato'], $reserva['ya_contempladas']);
+        $this->assertSame(0.0, $reserva['adicionales']);
+        $this->assertSame(0.0, $p['necesarias_adicionales']['aula']);
+        $this->assertSame(0.0, $p['brechas']['aula']);
+        $this->assertSame(9.0, $p['horas_vacantes_por_cubrir']);
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="UTF-8">'.$this->render($base));
+        $xpath = new \DOMXPath($dom);
+        $fila = '//section[@aria-labelledby="proyeccion-reservas"]/div/table/tbody/tr[1]';
+        $this->assertSame('9', trim($xpath->evaluate('string('.$fila.'/td[3])')));
+        $this->assertSame('0', trim($xpath->evaluate('string('.$fila.'/td[4])')));
+
+        // Solo el exceso sobre lo asignado y las necesidades vigentes es adicional.
+        $base['docentes'][0]['horas_contrato'] = 12.0;
+        $p = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false]);
+        $this->assertSame(9.0, $p['reservas'][0]['ya_contempladas']);
+        $this->assertSame(3.0, $p['reservas'][0]['adicionales']);
     }
 
     public function test_separa_proporciones_y_conserva_contratos_especiales_o_sin_datos(): void

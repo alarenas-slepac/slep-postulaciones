@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.15.536',
+    'current_version' => '2026.9.15.537',
     'entries' => [
+        [
+            'version' => '2026.9.15.537',
+            'title' => 'Dotación: horas incluidas según el total asignado',
+            'summary' => 'Calcula las horas ya incluidas en necesidades desde el total contractual asignado del año base, con tope en las vacantes conservadas.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Utiliza el menor valor entre el total convertido por bloques y las vacantes conservadas. El detalle mantiene el total asignado completo.',
+                'Evita horas adicionales artificiales por diferencias entre conversiones individuales y por bloque. Respeta las categorías Aula, Parvularia y PIE.',
+                'Mantiene las vacantes y el contrato proyectado; no vuelve a agregar necesidades normativas ya configuradas.',
+            ],
+            'published_at' => '2026-09-15',
+        ],
         [
             'version' => '2026.9.15.536',
             'title' => 'Dotación: conversión por bloques en el detalle de vacantes',
