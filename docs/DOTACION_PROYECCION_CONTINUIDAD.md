@@ -7,7 +7,8 @@ En **Docentes → Situación docente** hay dos decisiones independientes:
 
 - **El docente continúa en dotación 2027**: desmarcar registra la salida de la persona.
 - **Contemplar horas necesarias en dotación 2027**: conserva las horas necesarias
-  de quien sale como vacantes por cubrir, sin reincorporarlo al contrato proyectado.
+  de quien sale dentro del contrato proyectado, identificadas como vacantes por cubrir.
+  La persona no se reincorpora a la nómina ni a la cobertura.
 
 Ambas están marcadas por defecto. El motivo Proceso BIR no registra automáticamente
 la salida; Fuero maternal y Horas gremiales tampoco implican que la persona salga.
@@ -16,11 +17,19 @@ la salida; Fuero maternal y Horas gremiales tampoco implican que la persona salg
 
 - Las horas necesarias y no necesarias siguen sumando el contrato original.
 - Desmarcar la continuidad retira el aporte contractual del docente y toda
-  su cobertura asignada de la proyección. No elimina ni modifica sus registros.
+  su cobertura asignada de la proyección. Si se conservan sus horas necesarias,
+  estas permanecen en el contrato proyectado del establecimiento como vacantes.
+  No elimina ni modifica sus registros.
 - Se conservan las necesidades de cursos, plan de estudio, funciones normativas,
   funciones declaradas y PIE del año base, aunque el docente que las cubría salga.
 - El indicador verde **Hrs vacantes por cubrir 2027** suma las horas necesarias
   conservadas de las personas que no continúan. Excluye sus horas no necesarias.
+- **Horas de contrato proyectadas** suma el contrato considerado de quienes continúan
+  y las vacantes conservadas. Estas vacantes están incluidas en el total, no se
+  restan de él. Los totales de Aula, Parvularia y PIE aplican la misma regla.
+- La brecha compara las necesidades con ese contrato proyectado. Puede ser cero
+  aunque existan vacantes por cubrir: la cobertura por persona sigue mostrándolas
+  como pendientes. El desglose indica contrato de quienes continúan y vacantes.
 - Para evitar duplicaciones, se reconoce la necesidad de plan o función vinculada
   mediante las asignaciones del año base, hasta el total contractual requerido
   de esa necesidad. La cantidad de horas asignadas no limita la reserva manual.
@@ -50,11 +59,18 @@ asignadas a una función normativa. Al registrar Proceso BIR, desmarcar la conti
 y marcar **Contemplar horas necesarias en dotación 2027**:
 
 - En 2026 conserva 44 de contrato y 44 asignadas.
-- En la proyección 2027 aporta 0 de contrato y 0 de cobertura.
+- En la proyección 2027 la persona aporta 0 de contrato y 0 de cobertura, pero
+  el establecimiento mantiene sus 44 horas dentro del contrato proyectado como vacantes.
 - La función normativa continúa necesitando 44 horas. Sin otra cobertura,
   las 44 horas quedan pendientes. El mismo criterio se aplica al plan de estudio.
 - El indicador de vacantes muestra 44 horas en verde. La necesidad normativa sigue
   siendo 44 horas, no 88; marcar conservación no reincorpora a la persona.
+
+Si el contrato original es 44, con 34 necesarias y 10 no necesarias, al marcar
+conservación y registrar la salida se mantienen **34 horas de contrato 2027** y
+**34 vacantes por cubrir**. Solo se descuentan las 10 no necesarias del original.
+Si la persona continúa, las mismas 34 horas cuentan una vez y no generan vacantes.
+Si sale y se desmarca conservación, su contrato proyectado y su reserva son cero.
 
 ## Instalación
 
