@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.534',
+    'current_version' => '2026.9.14.535',
     'entries' => [
+        [
+            'version' => '2026.9.14.535',
+            'title' => 'Dotación: horas normativas de Educación Diferencial en Aula',
+            'summary' => 'Separa del contrato PIE las horas asignadas a funciones normativas de docentes de Educación Diferencial y las contabiliza en Aula.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Mantiene Coordinación PIE y el saldo contractual diferencial en PIE. Las funciones declaradas no producen este traslado.',
+                'Aplica el reparto al contrato efectivo, sin reincorporar horas no necesarias ni aumentar el contrato total. Conserva la excepción de escuelas especiales.',
+                'Mantiene las categorías en el resumen, sobredotación, exportaciones y proyección anual, incluidas las vacantes conservadas y sus necesidades adicionales.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.534',
             'title' => 'Dotación: desglose de asignaciones de las vacantes',

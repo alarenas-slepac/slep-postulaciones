@@ -91,6 +91,20 @@ y 30 necesarias conservadas, muestra las 44 como referencia y mantiene 30 vacant
 No distribuye automáticamente las vacantes entre asignaciones ni altera el cálculo.
 Sin asignaciones, informa esa condición y mantiene la reserva necesaria.
 
+## Contrato de Educación Diferencial con funciones normativas
+
+Las horas asignadas a funciones normativas de docentes con título de Educación
+Diferencial se contabilizan en **Horas contrato aula**. **Coordinación PIE** sigue
+en **Horas contrato docente PIE**, junto con el saldo contractual diferencial.
+Las funciones declaradas no generan este traslado. El reparto usa el contrato
+efectivo, después de descontar horas no necesarias, y nunca supera ese contrato.
+
+Por ejemplo, un contrato de 44 h con 20 h normativas distintas de Coordinación PIE
+aporta **20 h a Aula y 24 h a PIE**. Si sale y conserva sus horas necesarias,
+mantiene **44 h vacantes**, desglosadas en las mismas categorías. Las necesidades
+normativas vinculadas absorben solo la parte Aula; no duplican ni absorben la parte PIE.
+Las escuelas especiales mantienen el contrato diferencial completo en Aula.
+
 ## Instalación
 
 La migración `2026_09_14_160000_add_continuidad_to_dotacion_docente_exclusiones.php`

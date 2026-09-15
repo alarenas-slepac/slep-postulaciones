@@ -193,8 +193,17 @@ class DotacionAsignacionCalculator
         $coordinacionPie += (float) $situaciones
             ->reject(fn (array $docente) => self::esDocenteDiferencial($docente))
             ->sum(fn (array $docente) => self::contratoPiePorDocente($docente));
-        $educadorasDiferenciales = (float) $diferenciales
-            ->sum(fn (array $docente) => max(0.0, (float) ($docente['horas_contrato'] ?? 0)));
+        $asignacionesPorRut = $asignacionesDocentes->groupBy(fn ($row) => DotacionEstablecimientoCalculator::normalizeRut(
+            data_get($row, 'docente_rut_normalizado') ?: data_get($row, 'docente_rut', '')
+        ));
+        $educadorasDiferenciales = (float) $diferenciales->sum(function (array $docente) use ($asignacionesPorRut): float {
+            $rut = DotacionEstablecimientoCalculator::normalizeRut(($docente['rut_normalizado'] ?? null) ?: ($docente['rut'] ?? ''));
+            if ($rut !== '' && $asignacionesPorRut->has($rut)) {
+                $docente['asignaciones'] = $asignacionesPorRut->get($rut);
+            }
+
+            return self::contratoPiePorDocente($docente);
+        });
 
         return [
             'coordinacion_pie' => round($coordinacionPie, 2),
@@ -213,7 +222,23 @@ class DotacionAsignacionCalculator
     public static function contratoPiePorDocente(array $docente): float
     {
         if (self::esDocenteDiferencial($docente)) {
-            return round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2);
+            // Reparte el contrato efectivo: las funciones normativas van a Aula.
+            // Coordinación PIE y el saldo del contrato diferencial permanecen en PIE.
+            $rut = DotacionEstablecimientoCalculator::normalizeRut(($docente['rut_normalizado'] ?? null) ?: ($docente['rut'] ?? ''));
+            $normativas = collect($docente['asignaciones'] ?? [])
+                ->filter(fn ($row) => self::esAsignacionNormativaAula($row))
+                ->filter(function ($row) use ($rut): bool {
+                    $rutAsignacion = DotacionEstablecimientoCalculator::normalizeRut(
+                        data_get($row, 'docente_rut_normalizado') ?: data_get($row, 'docente_rut', '')
+                    );
+
+                    return $rut === '' || $rutAsignacion === '' || $rut === $rutAsignacion;
+                })
+                ->unique(fn ($row) => data_get($row, 'id') ? 'id:'.data_get($row, 'id')
+                    : (is_object($row) ? 'obj:'.spl_object_id($row) : 'array:'.sha1(serialize($row))))
+                ->sum(fn ($row) => max(0.0, (float) data_get($row, 'horas_contrato', 0)));
+
+            return round(max(0.0, (float) ($docente['horas_contrato'] ?? 0) - $normativas), 2);
         }
 
         $coordinaciones = collect($docente['asignaciones'] ?? [])
@@ -236,7 +261,19 @@ class DotacionAsignacionCalculator
             ->sum(fn ($row) => max(0.0, (float) data_get($row, 'horas_contrato', 0))), 2);
     }
 
-    private static function esAsignacionCoordinacionPie(object|array $asignacion): bool
+    /** Sigue la distinción histórica entre funciones normativas y funciones declaradas. */
+    public static function esAsignacionNormativaAula(object|array $asignacion): bool
+    {
+        return self::coverageEstamento($asignacion) === 'docente'
+            && (data_get($asignacion, 'estado') ?? 'activa') === 'activa'
+            && in_array(data_get($asignacion, 'tipo_asignacion'), [
+                'funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion',
+            ], true)
+            && (int) data_get($asignacion, 'dotacion_funcion_id', 0) === 0
+            && ! self::esAsignacionCoordinacionPie($asignacion);
+    }
+
+    public static function esAsignacionCoordinacionPie(object|array $asignacion): bool
     {
         if (data_get($asignacion, 'tipo_asignacion') !== 'funcion_tecnico_pedagogica') {
             return false;

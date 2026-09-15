@@ -212,6 +212,9 @@ class DotacionProyeccionTest extends TestCase
             $base['docentes'][0]['exclusion_docente']['horas'] = 24.0;
             $base['resumen'] = ['establecimiento_especial' => $especial];
             $base['asignacion']['necesidades'] = [];
+            // Esta prueba cubre contratos sin funciones normativas asignadas.
+            $base['docentes'][0]['asignaciones'] = [];
+            $base['asignacion']['asignaciones'] = collect();
             $proyeccion = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false], ['111111111' => true]);
             $this->assertSame(20.0, $proyeccion['horas_vacantes_por_cubrir']);
             $this->assertSame(20.0, $proyeccion['necesarias_adicionales'][$categoria]);
