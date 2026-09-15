@@ -97,8 +97,8 @@ class DotacionDiferencialNormativaTest extends TestCase
         $this->assertSame($antes, serialize($base));
         unset($base['asignacion']['necesidades']['pie_educadora_diferencial']);
         $p = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false]);
-        $this->assertSame(['aula' => 0.0, 'parvularia' => 0.0, 'pie' => 24.0], $p['necesarias_adicionales']);
-        $this->assertSame(20.0, $p['reservas'][0]['ya_contempladas']);
+        $this->assertSame(['aula' => 0.0, 'parvularia' => 0.0, 'pie' => 0.0], $p['necesarias_adicionales']);
+        $this->assertSame(44.0, $p['reservas'][0]['ya_contempladas']);
         $p = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false], ['111111111' => false]);
         $this->assertSame(0.0, $p['contratos']['total']);
         $this->assertSame(0.0, $p['horas_vacantes_por_cubrir']);

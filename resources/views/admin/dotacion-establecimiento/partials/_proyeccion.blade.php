@@ -52,7 +52,7 @@
 
 @if (count($proyeccion['reservas']) > 0)
     <section class="border rounded-3 bg-white mb-4" aria-labelledby="proyeccion-reservas">
-        <div class="p-3"><h2 id="proyeccion-reservas" class="h5 fw-bold">Horas necesarias conservadas de docentes que no continúan</h2><p class="small text-muted mb-0">Estas horas se proyectan como vacantes. Las ya incluidas en el plan o las funciones se cuentan una sola vez; solo las adicionales incrementan la necesidad de la categoría correspondiente.</p></div>
+        <div class="p-3"><h2 id="proyeccion-reservas" class="h5 fw-bold">Horas necesarias conservadas de docentes que no continúan</h2><p class="small text-muted mb-0">«Ya incluidas en necesidades» muestra el Total asignado {{ $baseProyeccion }}, convertido por bloques, hasta el máximo de vacantes conservadas. Solo se agregan horas adicionales cuando no están contempladas en las asignaciones ni en las necesidades vigentes de la categoría correspondiente.</p></div>
         <div class="table-responsive"><table class="table align-middle mb-0">
             <thead class="table-light"><tr><th scope="col">Docente que sale</th><th scope="col">Categoría</th><th scope="col" class="text-end">Vacantes conservadas</th><th scope="col" class="text-end">Ya incluidas en necesidades</th><th scope="col" class="text-end">Necesarias adicionales</th></tr></thead>
             <tbody>@foreach ($proyeccion['reservas'] as $reserva)

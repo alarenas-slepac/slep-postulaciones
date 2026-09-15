@@ -138,12 +138,27 @@ class DotacionProyeccionCalculator
             }
 
             $horas = round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2);
-            $contrato = self::contratos(collect([$docente]), collect($asignacionesPorRut->get($rut, $docente['asignaciones'] ?? [])), $especial);
+            $asignacionesDocente = collect($asignacionesPorRut->get($rut, $docente['asignaciones'] ?? []));
+            $referencia = self::detalleAsignaciones($asignacionesDocente, $contextos, $rut);
+            $contrato = self::contratos(collect([$docente]), $asignacionesDocente, $especial);
             $porCategoria = array_intersect_key($contrato, $adicionales);
             $porIncorporarCategoria = $porCategoria;
             $categorias = array_keys(array_filter($porCategoria, fn ($cantidad) => $cantidad > 0));
             $categoriaPrincipal = $categorias[0] ?? 'aula';
             $esDiferencial = DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_diferencial'];
+            $categoriaAsignacion = function ($row) use ($categorias, $categoriaPrincipal, $esDiferencial, $contrato): string {
+                if (count($categorias) <= 1) {
+                    return $categoriaPrincipal;
+                }
+                if ($esDiferencial) {
+                    return DotacionAsignacionCalculator::esAsignacionNormativaAula($row) ? 'aula' : 'pie';
+                }
+
+                return DotacionAsignacionCalculator::esAsignacionCoordinacionPie($row)
+                    ? 'pie' : ($contrato['parvularia'] > 0 ? 'parvularia' : 'aula');
+            };
+            $asignadasPorCategoria = $asignacionesDocente->groupBy($categoriaAsignacion)
+                ->map(fn (Collection $filas) => self::detalleAsignaciones($filas, $contextos, $rut)['total_contrato']);
             // La asignación identifica la necesidad, pero su cantidad no limita
             // las horas necesarias definidas en Situación docente.
             foreach ($necesidades as $index => $necesidad) {
@@ -170,6 +185,11 @@ class DotacionProyeccionCalculator
             }
 
             foreach ($porIncorporarCategoria as $categoria => $cantidad) {
+                // El total asignado usa la misma conversión por bloques que el detalle.
+                // Tampoco se duplican necesidades configuradas mayores que lo asignado.
+                $sinAsignacion = max(0.0, round($porCategoria[$categoria] - (float) $asignadasPorCategoria->get($categoria, 0), 2));
+                $cantidad = min($cantidad, $sinAsignacion);
+                $porIncorporarCategoria[$categoria] = $cantidad;
                 $adicionales[$categoria] = round($adicionales[$categoria] + $cantidad, 2);
             }
             $porIncorporar = round(array_sum($porIncorporarCategoria), 2);
@@ -177,10 +197,8 @@ class DotacionProyeccionCalculator
             $reservas[] = [
                 'rut' => $docente['rut'] ?? '', 'nombre' => $docente['nombre'] ?? 'Docente',
                 'categoria' => $categoriaPrincipal, 'contratos_por_categoria' => $porCategoria, 'horas_necesarias' => $horas,
-                'ya_contempladas' => round($horas - $porIncorporar, 2), 'adicionales' => $porIncorporar,
-                'asignaciones_referencia' => self::detalleAsignaciones(
-                    collect($asignacionesPorRut->get($rut, $docente['asignaciones'] ?? [])), $contextos, $rut
-                ),
+                'ya_contempladas' => min($horas, $referencia['total_contrato']), 'adicionales' => $porIncorporar,
+                'asignaciones_referencia' => $referencia,
             ];
         }
 
