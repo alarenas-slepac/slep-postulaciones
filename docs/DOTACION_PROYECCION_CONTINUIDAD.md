@@ -77,6 +77,20 @@ conservación y registrar la salida se mantienen **34 horas de contrato 2027** y
 Si la persona continúa, las mismas 34 horas cuentan una vez y no generan vacantes.
 Si sale y se desmarca conservación, su contrato proyectado y su reserva son cero.
 
+## Referencia de asignaciones de vacantes
+
+Cada docente en **Horas necesarias conservadas de docentes que no continúan**
+incluye un desplegable **Ver asignaciones 2026** (año base). Muestra las asignaciones
+activas de esa persona como docente: función/asignatura/plan, curso —incluidos los
+combinados—, subvención, horas pedagógicas, proporción y horas de contrato.
+También muestra fuente y observación cuando existen, y señala los registros sin
+necesidad vigente vinculada. Las horas pedagógicas y contractuales se totalizan por separado.
+
+El detalle conserva las cantidades asignadas del año base: si hay 44 horas asignadas
+y 30 necesarias conservadas, muestra las 44 como referencia y mantiene 30 vacantes.
+No distribuye automáticamente las vacantes entre asignaciones ni altera el cálculo.
+Sin asignaciones, informa esa condición y mantiene la reserva necesaria.
+
 ## Instalación
 
 La migración `2026_09_14_160000_add_continuidad_to_dotacion_docente_exclusiones.php`

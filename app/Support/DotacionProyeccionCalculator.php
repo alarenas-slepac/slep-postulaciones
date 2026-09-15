@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\DotacionDocenteAsignacion;
 use Illuminate\Support\Collection;
 
 /** Proyección de solo lectura sobre la configuración del año base. */
@@ -114,6 +115,20 @@ class DotacionProyeccionCalculator
         $adicionales = ['aula' => 0.0, 'parvularia' => 0.0, 'pie' => 0.0];
         $reservas = [];
         $vacantes = 0.0;
+        $asignacionesPorRut = collect(data_get($base, 'asignacion.asignaciones', []))
+            ->filter(fn ($row) => DotacionAsignacionCalculator::coverageEstamento($row) === 'docente')
+            ->groupBy(fn ($row) => self::rut($row));
+        $contextos = [];
+        foreach ($necesidades as $necesidad) {
+            foreach ($necesidad['asignaciones'] ?? [] as $asignacion) {
+                // Usa los vínculos ya resueltos, incluidos cursos combinados y funciones históricas.
+                $contextos[self::asignacionKey($asignacion)] ??= [
+                    'titulo' => $necesidad['titulo'] ?? $necesidad['asignatura_nombre'] ?? '',
+                    'curso' => $necesidad['curso_label'] ?? '',
+                    'fuente' => $necesidad['fuente'] ?? '',
+                ];
+            }
+        }
 
         foreach ($base['docentes'] ?? [] as $docente) {
             $rut = self::rut($docente);
@@ -145,10 +160,56 @@ class DotacionProyeccionCalculator
                 'rut' => $docente['rut'] ?? '', 'nombre' => $docente['nombre'] ?? 'Docente',
                 'categoria' => $categoria, 'horas_necesarias' => $horas,
                 'ya_contempladas' => round($horas - $porIncorporar, 2), 'adicionales' => $porIncorporar,
+                'asignaciones_referencia' => self::detalleAsignaciones(
+                    collect($asignacionesPorRut->get($rut, $docente['asignaciones'] ?? [])), $contextos, $rut
+                ),
             ];
         }
 
         return ['adicionales' => $adicionales, 'vacantes' => $vacantes, 'docentes' => $reservas];
+    }
+
+    /** Detalle informativo del año base; no limita ni modifica las horas conservadas. */
+    private static function detalleAsignaciones(Collection $asignaciones, array $contextos, string $rut): array
+    {
+        $items = $asignaciones
+            ->filter(fn ($row) => self::rut($row) === $rut
+                && DotacionAsignacionCalculator::coverageEstamento($row) === 'docente'
+                && (data_get($row, 'estado') ?? 'activa') === 'activa')
+            ->unique(fn ($row) => self::asignacionKey($row))
+            ->map(function ($row) use ($contextos): array {
+                $contexto = $contextos[self::asignacionKey($row)] ?? null;
+                $tipo = (string) data_get($row, 'tipo_asignacion', '');
+                $esCurso = in_array($tipo, ['plan_estudio', 'pie_colaborativo'], true)
+                    || data_get($row, 'establecimiento_curso_id') || data_get($row, 'dotacion_curso_combinado_id');
+
+                return [
+                    'tipo' => DotacionDocenteAsignacion::TIPOS[$tipo] ?? 'Asignación',
+                    'titulo' => ($contexto['titulo'] ?? '') ?: (data_get($row, 'asignatura_nombre') ?: 'Sin nombre registrado'),
+                    'curso' => ($contexto['curso'] ?? '') ?: ($esCurso ? 'Curso sin identificar' : 'Establecimiento'),
+                    'fuente' => $contexto['fuente'] ?? '',
+                    'subvencion' => data_get($row, 'subvencion') ?: 'Sin clasificar',
+                    'horas_contrato' => round((float) data_get($row, 'horas_contrato', 0), 2),
+                    'horas_pedagogicas' => $tipo === 'plan_estudio' && data_get($row, 'horas_plan_pedagogicas') !== null
+                        ? round((float) data_get($row, 'horas_plan_pedagogicas'), 2) : null,
+                    'proporcion' => $tipo === 'plan_estudio' ? (data_get($row, 'proporcion_aplicada') ?: '') : '',
+                    'observacion' => data_get($row, 'observacion') ?: '',
+                    'sin_necesidad_vigente' => $contexto === null,
+                ];
+            })->values();
+
+        return [
+            'items' => $items->all(),
+            'total_contrato' => round((float) $items->sum('horas_contrato'), 2),
+            'total_pedagogicas' => round((float) $items->sum('horas_pedagogicas'), 2),
+        ];
+    }
+
+    private static function asignacionKey(object|array $row): string
+    {
+        $id = data_get($row, 'id');
+
+        return $id ? 'id:'.$id : (is_object($row) ? 'obj:'.spl_object_id($row) : 'array:'.sha1(serialize($row)));
     }
 
     private static function contratos(Collection $docentes, Collection $asignaciones, bool $especial): array

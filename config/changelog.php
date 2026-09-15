@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.533',
+    'current_version' => '2026.9.14.534',
     'entries' => [
+        [
+            'version' => '2026.9.14.534',
+            'title' => 'Dotación: desglose de asignaciones de las vacantes',
+            'summary' => 'Agrega un detalle desplegable por docente que sale para consultar dónde estaban asignadas sus horas en el año base.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Muestra función, asignatura o plan, curso o ámbito, subvención, horas pedagógicas, proporción y horas de contrato, con totales separados.',
+                'Incluye referencias normativas, observaciones y asignaciones sin necesidad vigente vinculada. Informa cuando no hay asignaciones registradas.',
+                'Conserva el cálculo de vacantes, contrato y necesidades. El detalle es una referencia del año base y puede sumar horas distintas de la reserva necesaria.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.533',
             'title' => 'Dotación: restringir acceso a la proyección anual',
