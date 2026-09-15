@@ -260,11 +260,14 @@ class DotacionEstablecimientoController extends Controller
         $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
         $continuidadDisponible = DotacionDocenteExclusion::continuidadDisponible();
         $continuidadPorRut = DotacionDocenteExclusion::continuidadPorRut((int) $establecimiento->id, $anio);
+        $conservacionHorasDisponible = DotacionDocenteExclusion::conservacionHorasDisponible();
+        $conservacionHorasPorRut = DotacionDocenteExclusion::conservacionHorasPorRut((int) $establecimiento->id, $anio);
         if ($request->boolean('proyeccion')) {
             return view('admin.dotacion-establecimiento.proyeccion', [
                 'establecimiento' => $establecimiento,
                 'continuidadDisponible' => $continuidadDisponible,
-                'proyeccion' => DotacionProyeccionCalculator::build($data, $anio, $continuidadPorRut),
+                'conservacionHorasDisponible' => $conservacionHorasDisponible,
+                'proyeccion' => DotacionProyeccionCalculator::build($data, $anio, $continuidadPorRut, $conservacionHorasPorRut),
             ]);
         }
         $sobredotacionTipo = (string) $request->query('sobredotacion_tipo', 'aula');
@@ -328,6 +331,8 @@ class DotacionEstablecimientoController extends Controller
             'canManageDocenteExclusiones' => in_array($activeRole, $this->allowedRoles, true),
             'continuidadDisponible' => $continuidadDisponible,
             'continuidadPorRut' => $continuidadPorRut,
+            'conservacionHorasDisponible' => $conservacionHorasDisponible,
+            'conservacionHorasPorRut' => $conservacionHorasPorRut,
             'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS,
             'alertas' => $data['alertas'],
         ]);

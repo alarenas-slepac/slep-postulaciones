@@ -147,6 +147,62 @@ class DotacionProyeccionTest extends TestCase
         ];
     }
 
+    public function test_conservar_necesidad_utp_no_reincorpora_persona_ni_duplica_las_44_horas(): void
+    {
+        $base = $this->base();
+        $base['asignacion']['necesidades']['funciones'][0]['asignaciones'][0]->horas_contrato = 5;
+        $proyeccion = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false], ['111111111' => true]);
+        $this->assertFalse($proyeccion['docentes'][0]['continua']);
+        $this->assertSame(0.0, $proyeccion['docentes'][0]['contrato_proyectado']);
+        $this->assertSame(44.0, $proyeccion['necesarias']['funciones_normativas']);
+        $this->assertSame(44.0, $proyeccion['horas_vacantes_por_cubrir']);
+        $this->assertSame(0.0, $proyeccion['necesarias_adicionales']['aula']);
+        $this->assertSame(44.0, $proyeccion['reservas'][0]['ya_contempladas']);
+        $sinReserva = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false], ['111111111' => false]);
+        $this->assertFalse($sinReserva['docentes'][0]['continua']);
+        $this->assertSame(0.0, $sinReserva['horas_vacantes_por_cubrir']);
+        $this->assertSame(44.0, $sinReserva['necesarias']['funciones_normativas']);
+        $continua = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => true], ['111111111' => true]);
+        $this->assertSame(44.0, $continua['docentes'][0]['contrato_proyectado']);
+        $this->assertSame(0.0, $continua['horas_vacantes_por_cubrir']);
+    }
+
+    public function test_horas_conservadas_sin_necesidad_previa_incrementan_su_categoria(): void
+    {
+        foreach ([['Profesor de Educación Básica', false, 'aula'], ['Pedagogía en Educación de Párvulos', false, 'parvularia'], ['Educadora Diferencial', false, 'pie'], ['Educadora Diferencial', true, 'aula']] as [$titulo, $especial, $categoria]) {
+            $base = $this->base();
+            $base['docentes'] = [$base['docentes'][0]];
+            $base['docentes'][0]['titulo'] = $titulo;
+            $base['docentes'][0]['horas_contrato'] = 20.0;
+            $base['docentes'][0]['exclusion_docente']['horas'] = 24.0;
+            $base['resumen'] = ['establecimiento_especial' => $especial];
+            $base['asignacion']['necesidades'] = [];
+            $proyeccion = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false], ['111111111' => true]);
+            $this->assertSame(20.0, $proyeccion['horas_vacantes_por_cubrir']);
+            $this->assertSame(20.0, $proyeccion['necesarias_adicionales'][$categoria]);
+            $this->assertSame(20.0, $proyeccion['brechas'][$categoria]);
+            $this->assertSame(0.0, $proyeccion['contratos']['total']);
+            $this->assertSame(44.0, $proyeccion['docentes'][0]['contrato_base']);
+        }
+    }
+
+    public function test_necesidad_compartida_se_descuenta_una_sola_vez_y_plan_no_se_duplica(): void
+    {
+        $base = $this->base();
+        $base['asignacion']['necesidades']['plan_estudio'] = [];
+        $base['asignacion']['necesidades']['funciones'][0]['asignaciones']->push($base['asignacion']['asignaciones'][1]);
+        $base['resumen']['contrato_plan_general_mas_trabajo_colaborativo_pie'] = 0;
+        $proyeccion = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false, '222222222' => false]);
+        $this->assertSame(88.0, $proyeccion['horas_vacantes_por_cubrir']);
+        $this->assertSame(44.0, $proyeccion['necesarias_adicionales']['aula']);
+        $this->assertSame(88.0, $proyeccion['brechas']['aula']);
+        $plan = DotacionProyeccionCalculator::build($this->base(), 2026, ['222222222' => false]);
+        $this->assertSame(44.0, $plan['horas_vacantes_por_cubrir']);
+        $this->assertSame(0.0, $plan['necesarias_adicionales']['aula']);
+        $this->assertSame(44.0, $plan['necesarias']['plan_general']);
+        $this->assertSame(30.0, $plan['coberturas']['plan_estudio'][0]['pendientes']);
+    }
+
     private function asignacion(string $rut, string $nombre, string $tipo, float $contrato, float $aula = 0): DotacionDocenteAsignacion
     {
         return new DotacionDocenteAsignacion([

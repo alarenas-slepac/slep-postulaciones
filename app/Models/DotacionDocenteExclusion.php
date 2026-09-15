@@ -32,6 +32,7 @@ class DotacionDocenteExclusion extends Model
         'motivo',
         'horas',
         'considerar_dotacion_siguiente',
+        'conservar_horas_necesarias',
         'created_by',
         'updated_by',
     ];
@@ -41,6 +42,7 @@ class DotacionDocenteExclusion extends Model
         'anio' => 'integer',
         'horas' => 'decimal:2',
         'considerar_dotacion_siguiente' => 'boolean',
+        'conservar_horas_necesarias' => 'boolean',
         'created_by' => 'integer',
         'updated_by' => 'integer',
     ];
@@ -73,6 +75,25 @@ class DotacionDocenteExclusion extends Model
     public function creadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public static function conservacionHorasDisponible(): bool
+    {
+        return Schema::hasColumn('dotacion_docente_exclusiones', 'conservar_horas_necesarias');
+    }
+
+    public static function conservacionHorasPorRut(int $establecimientoId, int $anio): array
+    {
+        if (! self::conservacionHorasDisponible()) {
+            return [];
+        }
+
+        return self::query()->where('establecimiento_id', $establecimientoId)->where('anio', $anio)
+            ->get(['docente_rut', 'docente_rut_normalizado', 'conservar_horas_necesarias'])
+            ->mapWithKeys(fn (self $situacion) => [
+                DotacionEstablecimientoCalculator::normalizeRut($situacion->docente_rut_normalizado ?: $situacion->docente_rut)
+                    => $situacion->conservar_horas_necesarias ?? true,
+            ])->all();
     }
 
     public function actualizadoPor(): BelongsTo
