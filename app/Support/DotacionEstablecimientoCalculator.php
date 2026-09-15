@@ -49,6 +49,7 @@ class DotacionEstablecimientoCalculator
 
     public static function build(Establecimiento $establecimiento, int $anio, bool $incluirResumenAsignaturas = true): array
     {
+        $anioPadron = app(PadronPeriodoService::class)->anioDisponibleParaDotacion($anio) ?? $anio;
         $proporcionExcepcion = DocenteHorasNoLectivasCalculator::activeExceptionFor((int) $establecimiento->id, $anio);
         $cursos = self::cursosPorNivel($establecimiento, $anio);
         $bloques = self::bloquesDotacion($establecimiento, $anio);
@@ -195,6 +196,7 @@ class DotacionEstablecimientoCalculator
         $horasContratoCoberturaTotal = round($horasContratoCalculado + $horasContratoAsistentes, 2);
 
         $resumen = [
+            'anio_padron' => $anioPadron,
             'establecimiento_especial' => (bool) $establecimiento->especial,
             'matricula_total' => (int) ($cursos['totales']['matricula'] ?? 0),
             'cursos_total' => (int) ($cursos['totales']['cursos'] ?? 0),
@@ -819,7 +821,9 @@ class DotacionEstablecimientoCalculator
             return collect();
         }
 
-        $query = app(PadronPeriodoService::class)
+        $padronPeriodo = app(PadronPeriodoService::class);
+        $anioPadron = $padronPeriodo->anioDisponibleParaDotacion($anio) ?? $anio;
+        $query = $padronPeriodo
             ->consultaAnualParaDotacion((int) $establecimiento->id, $anio)->sinReemplazoSuplencia();
 
         if (self::schemaHasColumn('reemplazos_personal', 'vigente')) {
@@ -832,6 +836,22 @@ class DotacionEstablecimientoCalculator
             ->get();
 
         $personalConsolidado = self::consolidarPersonalUltimoPeriodo($personal);
+        // Mientras 2027 use el padrón vigente de 2026, una situación marcada
+        // como "no continúa" no puede reincorporar a la persona en la nómina
+        // del año proyectado. Al existir padrón propio del año, éste es la fuente
+        // autoritativa y se conserva sin este filtro.
+        if ($anioPadron < $anio && DotacionDocenteExclusion::continuidadDisponible()) {
+            $continuidadPorRut = DotacionDocenteExclusion::continuidadPorRut(
+                (int) $establecimiento->id,
+                $anioPadron
+            );
+            $personalConsolidado = $personalConsolidado->reject(function (array $grupo) use ($continuidadPorRut): bool {
+                /** @var ReemplazoPersonal $row */
+                $row = $grupo['representante'];
+
+                return ($continuidadPorRut[self::normalizeRut($row->rut)] ?? true) === false;
+            })->values();
+        }
         $exclusionesPorRut = self::exclusionesDocentesPorRut($establecimiento, $anio);
 
         $declaraciones = self::declaracionesPorRut(

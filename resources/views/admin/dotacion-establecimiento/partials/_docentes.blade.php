@@ -19,7 +19,24 @@
     $countFaltan = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'faltan_horas')->count();
     $countSobrecarga = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'sobrecarga')->count();
     $countSinInfo = $docentes->filter(fn ($docente) => in_array(($docente['estado_cuadratura']['key'] ?? null), ['sin_declaracion', 'sin_horas_contrato'], true))->count();
+    $vacanciasPorNoContinuidad = $vacanciasPorNoContinuidad ?? null;
+    $horasVacantesPorNoContinuidad = (float) data_get($vacanciasPorNoContinuidad, 'horas_vacantes_por_cubrir', 0);
 @endphp
+
+@if ($vacanciasPorNoContinuidad && $horasVacantesPorNoContinuidad > 0.01)
+    <div class="alert alert-warning border-warning-subtle mb-4" role="status">
+        <div class="d-flex align-items-start gap-2">
+            <i class="bi bi-person-dash fs-5"></i>
+            <div>
+                <div class="fw-bold">Vacancias por cubrir {{ $vacanciasPorNoContinuidad['anio_proyeccion'] }}</div>
+                <div>{{ $fmt($horasVacantesPorNoContinuidad) }} horas necesarias corresponden a docentes que no continúan desde {{ $vacanciasPorNoContinuidad['anio_base'] }}. No se incluyen en la nómina de {{ $vacanciasPorNoContinuidad['anio_proyeccion'] }}.</div>
+                @if (count($vacanciasPorNoContinuidad['reservas'] ?? []) > 0)
+                    <div class="small mt-1">{{ collect($vacanciasPorNoContinuidad['reservas'])->map(fn ($reserva) => ($reserva['nombre'] ?? 'Docente').' · '.$fmt($reserva['horas_necesarias'] ?? 0).' h')->implode(' | ') }}</div>
+                @endif
+            </div>
+        </div>
+    </div>
+@endif
 
 <div class="card dotacion-section mb-4">
     <div class="dotacion-section-header">

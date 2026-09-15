@@ -46,6 +46,8 @@ class DotacionContratoPadronTest extends TestCase
             $t->id(); $t->integer('establecimiento_id'); $t->integer('anio');
             $t->string('docente_rut'); $t->string('docente_rut_normalizado');
             $t->string('motivo'); $t->integer('horas');
+            $t->boolean('considerar_dotacion_siguiente')->default(true);
+            $t->boolean('conservar_horas_necesarias')->default(true);
         });
         Schema::create('dotacion_docente_asignaciones', function (Blueprint $t): void {
             $t->id(); $t->integer('establecimiento_id'); $t->integer('anio');
@@ -185,6 +187,40 @@ class DotacionContratoPadronTest extends TestCase
         $this->assertSame('traslado', $docente['exclusion_docente']['motivo']);
         $this->assertCount(0, $docente['asignaciones']);
         $this->assertSame(2026, $docente['anio']);
+    }
+
+    public function test_dotacion_2027_excluye_docente_que_no_continua_del_padron_2026(): void
+    {
+        $this->personal(101, ['anio' => 2026, 'mes' => 8]);
+        $this->declaracion();
+        DB::table('dotacion_docente_exclusiones')->insert([
+            'id' => 301, 'establecimiento_id' => 1, 'anio' => 2026,
+            'docente_rut' => '111111111', 'docente_rut_normalizado' => '111111111',
+            'motivo' => 'proceso_bir', 'horas' => 0,
+            'considerar_dotacion_siguiente' => false, 'conservar_horas_necesarias' => true,
+        ]);
+
+        $docentes2027 = DotacionEstablecimientoCalculator::docentes(Establecimiento::findOrFail(1), 2027);
+
+        $this->assertCount(0, $docentes2027);
+        $this->assertCount(1, DotacionEstablecimientoCalculator::docentes(Establecimiento::findOrFail(1), 2026));
+    }
+
+    public function test_vista_indica_las_horas_vacantes_de_docentes_que_no_continuan(): void
+    {
+        $html = view('admin.dotacion-establecimiento.partials._docentes', [
+            'docentes' => collect(),
+            'vacanciasPorNoContinuidad' => [
+                'anio_base' => 2026,
+                'anio_proyeccion' => 2027,
+                'horas_vacantes_por_cubrir' => 44.0,
+                'reservas' => [['nombre' => 'Docente que no continúa', 'horas_necesarias' => 44.0]],
+            ],
+        ])->render();
+
+        $this->assertStringContainsString('Vacancias por cubrir 2027', $html);
+        $this->assertStringContainsString('44 horas necesarias', $html);
+        $this->assertStringContainsString('Docente que no continúa', $html);
     }
 
     public function test_docente_sin_declaracion_conserva_horas_del_padron(): void
