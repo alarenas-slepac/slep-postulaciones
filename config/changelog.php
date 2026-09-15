@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.532',
+    'current_version' => '2026.9.14.533',
     'entries' => [
+        [
+            'version' => '2026.9.14.533',
+            'title' => 'Dotación: restringir acceso a la proyección anual',
+            'summary' => 'Retira el acceso a la proyección y su botón para el rol Directivo de establecimiento.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Oculta el botón Proyección para funcionario_directivo_estab y rechaza con 403 el acceso por enlace directo.',
+                'Mantiene acceso a la proyección para Administrador, Coordinador UATP, Coordinador GDP y Supervisor Planificación según el rol activo.',
+                'Conserva el acceso del directivo al resto de Dotación Establecimiento y a Situación docente. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.532',
             'title' => 'Dotación: conservar las vacantes dentro del contrato proyectado',

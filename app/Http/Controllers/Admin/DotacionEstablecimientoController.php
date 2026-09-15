@@ -246,6 +246,9 @@ class DotacionEstablecimientoController extends Controller
     {
         $activeRole = $this->authorizeDotacionAccess($request);
         $this->authorizeEstablecimientoScope($request, $establecimiento);
+        if ($request->boolean('proyeccion')) {
+            abort_unless(DotacionProyeccionCalculator::canView($activeRole), 403);
+        }
         $anio = (int) $request->query('anio', now()->year);
         $requestedTab = (string) $request->query('tab', 'resumen');
         $canViewSobredotacion = DotacionSobredotacionCalculator::canView($activeRole);

@@ -7,6 +7,11 @@ use Illuminate\Support\Collection;
 /** Proyección de solo lectura sobre la configuración del año base. */
 class DotacionProyeccionCalculator
 {
+    public static function canView(?string $activeRole): bool
+    {
+        return in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true);
+    }
+
     public static function build(array $base, int $anio, array $continuidadPorRut, array $conservacionHorasPorRut = []): array
     {
         $noContinuan = collect($continuidadPorRut)->filter(fn ($continua) => ! $continua)->keys()->flip()->all();
