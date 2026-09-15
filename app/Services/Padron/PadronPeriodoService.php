@@ -177,12 +177,19 @@ class PadronPeriodoService
      */
     public function consultaAnualParaDotacion(int $establecimientoId, int $anio): Builder
     {
-        $anioPadron = $this->periodos()
+        return $this->consultaAnual($establecimientoId, $this->anioDisponibleParaDotacion($anio) ?? $anio);
+    }
+
+    /**
+     * Año del padrón que respalda la base contractual de una dotación.
+     * La dotación conserva su propio año para situaciones y asignaciones.
+     */
+    public function anioDisponibleParaDotacion(int $anio): ?int
+    {
+        return $this->periodos()
             ->map(fn ($periodo) => (int) $periodo->anio)
             ->filter(fn (int $anioDisponible) => $anioDisponible <= $anio)
             ->first();
-
-        return $this->consultaAnual($establecimientoId, $anioPadron ?? $anio);
     }
 
     /** La huella de revisión incluye el catálogo de versiones, sin cargar sus filas. */

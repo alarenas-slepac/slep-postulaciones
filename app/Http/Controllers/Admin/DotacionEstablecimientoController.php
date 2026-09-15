@@ -273,6 +273,17 @@ class DotacionEstablecimientoController extends Controller
                 'proyeccion' => DotacionProyeccionCalculator::build($data, $anio, $continuidadPorRut, $conservacionHorasPorRut),
             ]);
         }
+        $vacanciasPorNoContinuidad = null;
+        $anioPadron = (int) data_get($data, 'resumen.anio_padron', $anio);
+        if ($continuidadDisponible && $anioPadron === $anio - 1) {
+            $baseVacancias = DotacionEstablecimientoCalculator::build($establecimiento, $anioPadron);
+            $vacanciasPorNoContinuidad = DotacionProyeccionCalculator::build(
+                $baseVacancias,
+                $anioPadron,
+                DotacionDocenteExclusion::continuidadPorRut((int) $establecimiento->id, $anioPadron),
+                DotacionDocenteExclusion::conservacionHorasPorRut((int) $establecimiento->id, $anioPadron)
+            );
+        }
         $sobredotacionTipo = (string) $request->query('sobredotacion_tipo', 'aula');
         if (! in_array($sobredotacionTipo, DotacionSobredotacionCalculator::TIPOS, true)) {
             $sobredotacionTipo = 'aula';
@@ -336,6 +347,7 @@ class DotacionEstablecimientoController extends Controller
             'continuidadPorRut' => $continuidadPorRut,
             'conservacionHorasDisponible' => $conservacionHorasDisponible,
             'conservacionHorasPorRut' => $conservacionHorasPorRut,
+            'vacanciasPorNoContinuidad' => $vacanciasPorNoContinuidad,
             'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS,
             'alertas' => $data['alertas'],
         ]);

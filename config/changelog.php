@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.15.467' => [
+        'date' => '2026-09-15',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Vacancias 2027 para docentes que no continúan',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Services/Padron/PadronPeriodoService.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'tests/Feature/DotacionContratoPadronTest.php',
+        ],
+        'changes' => [
+            'Cuando la dotación 2027 usa el padrón vigente de 2026, excluye de la nómina a los docentes marcados como no continúan.',
+            'Muestra las horas necesarias conservadas de esas personas como vacancias por cubrir, sin reincorporarlas a la dotación.',
+            'Al existir padrón propio de 2027, éste continúa siendo la fuente contractual autoritativa.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.15.466' => [
         'date' => '2026-09-15',
         'module' => 'Dotación Establecimiento',
