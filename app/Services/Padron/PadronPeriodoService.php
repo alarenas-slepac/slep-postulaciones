@@ -170,6 +170,21 @@ class PadronPeriodoService
         return $query;
     }
 
+    /**
+     * Base contractual para la proyección anual de dotación. Mientras aún no
+     * exista padrón para el año proyectado, utiliza el último padrón disponible
+     * hasta ese año. Los registros de dotación siguen usando el año proyectado.
+     */
+    public function consultaAnualParaDotacion(int $establecimientoId, int $anio): Builder
+    {
+        $anioPadron = $this->periodos()
+            ->map(fn ($periodo) => (int) $periodo->anio)
+            ->filter(fn (int $anioDisponible) => $anioDisponible <= $anio)
+            ->first();
+
+        return $this->consultaAnual($establecimientoId, $anioPadron ?? $anio);
+    }
+
     /** La huella de revisión incluye el catálogo de versiones, sin cargar sus filas. */
     public function huella(): string
     {

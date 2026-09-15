@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.15.466' => [
+        'date' => '2026-09-15',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Padrón vigente como base para la dotación 2027',
+        'files' => [
+            'app/Services/Padron/PadronPeriodoService.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'tests/Feature/DotacionContratoPadronTest.php',
+        ],
+        'changes' => [
+            'Cuando todavía no existe padrón para el año proyectado, Dotación utiliza el último padrón disponible hasta ese año como base contractual.',
+            'Mantiene las asignaciones y situaciones docentes asociadas al año de dotación, aunque el contrato provenga del padrón vigente anterior.',
+            'Al cargarse un padrón 2027, éste pasa a ser automáticamente la fuente contractual del cálculo 2027.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.15.465' => [
         'date' => '2026-09-15',
         'module' => 'Dotación Establecimiento',

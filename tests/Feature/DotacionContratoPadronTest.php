@@ -162,7 +162,7 @@ class DotacionContratoPadronTest extends TestCase
 
     public function test_dotacion_2027_conserva_situaciones_sin_heredar_asignaciones_de_2026(): void
     {
-        $this->personal(101, ['anio' => 2027, 'mes' => 3]);
+        $this->personal(101, ['anio' => 2026, 'mes' => 8]);
         $this->declaracion();
         DB::table('dotacion_docente_exclusiones')->insert([
             'id' => 301, 'establecimiento_id' => 1, 'anio' => 2027,
@@ -184,6 +184,7 @@ class DotacionContratoPadronTest extends TestCase
         $this->assertSame(28.0, $docente['horas_contrato']);
         $this->assertSame('traslado', $docente['exclusion_docente']['motivo']);
         $this->assertCount(0, $docente['asignaciones']);
+        $this->assertSame(2026, $docente['anio']);
     }
 
     public function test_docente_sin_declaracion_conserva_horas_del_padron(): void
