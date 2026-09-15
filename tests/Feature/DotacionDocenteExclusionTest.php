@@ -17,7 +17,7 @@ use Tests\TestCase;
 
 class DotacionDocenteExclusionTest extends TestCase
 {
-    public function test_situacion_descuenta_hasta_el_saldo_contractual_sin_asignar(): void
+    public function test_situacion_exige_distribuir_el_contrato_original_completo(): void
     {
         $this->createTables();
 
@@ -56,10 +56,10 @@ class DotacionDocenteExclusionTest extends TestCase
 
             try {
                 $controller->store($this->request(['horas' => 15]), $establecimiento);
-                $this->fail('Se esperaba una validación por superar las horas pendientes de asignación.');
+                $this->fail('Se esperaba una validación porque 30 necesarias + 15 no necesarias supera el contrato original.');
             } catch (ValidationException $exception) {
                 $this->assertSame(
-                    'Sólo puede excluir horas contractuales sin asignación. El docente dispone de 14 hora(s) por asignar.',
+                    'Las horas necesarias y no necesarias deben sumar el contrato original vigente de 44 hora(s), que debe ser mayor que cero.',
                     $exception->errors()['horas'][0]
                 );
             }
@@ -96,6 +96,7 @@ class DotacionDocenteExclusionTest extends TestCase
             'anio' => 2026,
             'docente_rut' => '11111111-1',
             'motivo' => 'sumario_administrativo',
+            'horas_necesarias' => 30,
             'horas' => 14,
         ], $overrides));
         $request->setUserResolver(fn () => new class

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\DotacionEstablecimientoCalculator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 class DotacionDocenteExclusion extends Model
 {
@@ -29,6 +31,7 @@ class DotacionDocenteExclusion extends Model
         'docente_nombre',
         'motivo',
         'horas',
+        'considerar_dotacion_siguiente',
         'created_by',
         'updated_by',
     ];
@@ -37,6 +40,7 @@ class DotacionDocenteExclusion extends Model
         'establecimiento_id' => 'integer',
         'anio' => 'integer',
         'horas' => 'decimal:2',
+        'considerar_dotacion_siguiente' => 'boolean',
         'created_by' => 'integer',
         'updated_by' => 'integer',
     ];
@@ -44,6 +48,26 @@ class DotacionDocenteExclusion extends Model
     public function establecimiento(): BelongsTo
     {
         return $this->belongsTo(Establecimiento::class, 'establecimiento_id');
+    }
+
+    public static function continuidadDisponible(): bool
+    {
+        return Schema::hasColumn('dotacion_docente_exclusiones', 'considerar_dotacion_siguiente');
+    }
+
+    /** La decisión pertenece al establecimiento y año base, no al padrón global. */
+    public static function continuidadPorRut(int $establecimientoId, int $anio): array
+    {
+        if (! self::continuidadDisponible()) {
+            return [];
+        }
+
+        return self::query()->where('establecimiento_id', $establecimientoId)->where('anio', $anio)
+            ->get(['docente_rut', 'docente_rut_normalizado', 'considerar_dotacion_siguiente'])
+            ->mapWithKeys(fn (self $situacion) => [
+                DotacionEstablecimientoCalculator::normalizeRut($situacion->docente_rut_normalizado ?: $situacion->docente_rut)
+                    => $situacion->considerar_dotacion_siguiente ?? true,
+            ])->all();
     }
 
     public function creadoPor(): BelongsTo

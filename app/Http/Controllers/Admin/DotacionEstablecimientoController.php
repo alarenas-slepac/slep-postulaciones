@@ -12,6 +12,7 @@ use App\Models\Establecimiento;
 use App\Support\DotacionAsignaturaResumenCalculator;
 use App\Support\DotacionEstablecimientoAvanceCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionProyeccionCalculator;
 use App\Support\DotacionSobredotacionCalculator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -257,6 +258,15 @@ class DotacionEstablecimientoController extends Controller
         }
         $tab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'resumen';
         $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
+        $continuidadDisponible = DotacionDocenteExclusion::continuidadDisponible();
+        $continuidadPorRut = DotacionDocenteExclusion::continuidadPorRut((int) $establecimiento->id, $anio);
+        if ($request->boolean('proyeccion')) {
+            return view('admin.dotacion-establecimiento.proyeccion', [
+                'establecimiento' => $establecimiento,
+                'continuidadDisponible' => $continuidadDisponible,
+                'proyeccion' => DotacionProyeccionCalculator::build($data, $anio, $continuidadPorRut),
+            ]);
+        }
         $sobredotacionTipo = (string) $request->query('sobredotacion_tipo', 'aula');
         if (! in_array($sobredotacionTipo, DotacionSobredotacionCalculator::TIPOS, true)) {
             $sobredotacionTipo = 'aula';
@@ -316,6 +326,8 @@ class DotacionEstablecimientoController extends Controller
             'canManageProporcionExcepcion' => $canManageProporcionExcepcion,
             'docenteExclusionesTableReady' => $docenteExclusionesTableReady,
             'canManageDocenteExclusiones' => in_array($activeRole, $this->allowedRoles, true),
+            'continuidadDisponible' => $continuidadDisponible,
+            'continuidadPorRut' => $continuidadPorRut,
             'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS,
             'alertas' => $data['alertas'],
         ]);

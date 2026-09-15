@@ -156,7 +156,7 @@ class DotacionAsignacionCalculator
     /**
      * @return array{coordinacion_pie: float, educadoras_diferenciales: float, total: float}
      */
-    private static function resumenContratoDocentePie(Collection $asignaciones, Collection $docentes, bool $especial = false): array
+    public static function resumenContratoDocentePie(Collection $asignaciones, Collection $docentes, bool $especial = false): array
     {
         // En escuelas especiales los contratos diferenciales pertenecen a Aula,
         // incluso si se conservan asignaciones PIE de períodos históricos.
@@ -171,6 +171,11 @@ class DotacionAsignacionCalculator
             ->map(fn (array $docente) => DotacionEstablecimientoCalculator::normalizeRut(
                 ($docente['rut_normalizado'] ?? null) ?: ($docente['rut'] ?? '')
             ))->filter()->unique();
+        $situaciones = $docentes->filter(fn (array $docente) => ! empty($docente['exclusion_docente']));
+        $rutsSituaciones = $situaciones
+            ->map(fn (array $docente) => DotacionEstablecimientoCalculator::normalizeRut(
+                ($docente['rut_normalizado'] ?? null) ?: ($docente['rut'] ?? '')
+            ))->filter()->unique();
         $asignacionesDocentes = $asignaciones
             ->filter(fn ($row) => self::coverageEstamento($row) === 'docente');
         // La coordinación de un diferencial ya forma parte de su contrato completo.
@@ -179,7 +184,15 @@ class DotacionAsignacionCalculator
             ->reject(fn ($row) => $rutsDiferenciales->contains(DotacionEstablecimientoCalculator::normalizeRut(
                 data_get($row, 'docente_rut_normalizado') ?: data_get($row, 'docente_rut', '')
             )))
+            ->reject(fn ($row) => $rutsSituaciones->contains(DotacionEstablecimientoCalculator::normalizeRut(
+                data_get($row, 'docente_rut_normalizado') ?: data_get($row, 'docente_rut', '')
+            )))
             ->sum(fn ($row) => (float) data_get($row, 'horas_contrato', 0));
+        // La situación sustituye el aporte contractual de coordinación PIE.
+        // Las asignaciones sólo identifican la función, nunca su cantidad de horas.
+        $coordinacionPie += (float) $situaciones
+            ->reject(fn (array $docente) => self::esDocenteDiferencial($docente))
+            ->sum(fn (array $docente) => self::contratoPiePorDocente($docente));
         $educadorasDiferenciales = (float) $diferenciales
             ->sum(fn (array $docente) => max(0.0, (float) ($docente['horas_contrato'] ?? 0)));
 
@@ -203,9 +216,23 @@ class DotacionAsignacionCalculator
             return round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2);
         }
 
-        return round((float) collect($docente['asignaciones'] ?? [])
+        $coordinaciones = collect($docente['asignaciones'] ?? [])
             ->filter(fn ($row) => self::coverageEstamento($row) === 'docente'
-                && self::esAsignacionCoordinacionPie($row))
+                && self::esAsignacionCoordinacionPie($row));
+
+        if (! empty($docente['exclusion_docente'])) {
+            // Las Educadoras de Párvulos aportan sus horas necesarias completas
+            // a Parvularia, aunque mantengan asignaciones históricas de coordinación.
+            if (DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos']) {
+                return 0.0;
+            }
+
+            return $coordinaciones->isNotEmpty()
+                ? round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2)
+                : 0.0;
+        }
+
+        return round((float) $coordinaciones
             ->sum(fn ($row) => max(0.0, (float) data_get($row, 'horas_contrato', 0))), 2);
     }
 
