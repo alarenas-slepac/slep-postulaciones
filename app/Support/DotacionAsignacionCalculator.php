@@ -1375,7 +1375,7 @@ class DotacionAsignacionCalculator
         return $value === 'asistente' ? 'asistente' : 'docente';
     }
 
-    private static function proportionGroup(?string $proporcion): string
+    public static function proportionGroup(?string $proporcion): string
     {
         $valor = Str::of((string) $proporcion)
             ->ascii()

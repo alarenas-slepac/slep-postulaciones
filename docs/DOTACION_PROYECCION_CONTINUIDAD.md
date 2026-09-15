@@ -86,9 +86,15 @@ combinados—, subvención, horas pedagógicas, proporción y horas de contrato.
 También muestra fuente y observación cuando existen, y señala los registros sin
 necesidad vigente vinculada. Las horas pedagógicas y contractuales se totalizan por separado.
 
-El detalle conserva las cantidades asignadas del año base: si hay 44 horas asignadas
-y 30 necesarias conservadas, muestra las 44 como referencia y mantiene 30 vacantes.
-No distribuye automáticamente las vacantes entre asignaciones ni altera el cálculo.
+El detalle suma primero las horas pedagógicas de cada bloque **60/40** y **65/35**
+y convierte cada subtotal con la tabla vigente del módulo. Después agrega las
+horas contractuales de PIE y funciones. Las conversiones individuales del plan
+no se suman, para evitar acumular redondeos: **28 h aula 60/40 → 35 h contrato,
+más 3 h PIE → 38 h de contrato asignado**.
+Las reglas especiales y los registros sin proporción o sin horas pedagógicas
+conservan el contrato registrado, identificado en un subtotal separado.
+Las asignaciones originales permanecen intactas. El total del detalle es una
+referencia: no modifica el contrato proyectado ni las vacantes conservadas.
 Sin asignaciones, informa esa condición y mantiene la reserva necesaria.
 
 ## Contrato de Educación Diferencial con funciones normativas
