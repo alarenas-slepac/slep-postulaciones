@@ -202,6 +202,7 @@ class DotacionProyeccionCalculator
                     || data_get($row, 'establecimiento_curso_id') || data_get($row, 'dotacion_curso_combinado_id');
 
                 return [
+                    'es_plan' => $tipo === 'plan_estudio',
                     'tipo' => DotacionDocenteAsignacion::TIPOS[$tipo] ?? 'Asignación',
                     'titulo' => ($contexto['titulo'] ?? '') ?: (data_get($row, 'asignatura_nombre') ?: 'Sin nombre registrado'),
                     'curso' => ($contexto['curso'] ?? '') ?: ($esCurso ? 'Curso sin identificar' : 'Establecimiento'),
@@ -216,9 +217,35 @@ class DotacionProyeccionCalculator
                 ];
             })->values();
 
+        $bloques = $items->where('es_plan', true)->groupBy(function (array $item): string {
+            if ($item['horas_pedagogicas'] === null || trim($item['proporcion']) === '') {
+                return 'sin_conversion';
+            }
+
+            return DotacionAsignacionCalculator::proportionGroup($item['proporcion']);
+        })->map(function (Collection $filas, string $grupo): array {
+            $pedagogicas = round((float) $filas->sum('horas_pedagogicas'), 2);
+            $convertido = in_array($grupo, ['65_35', '60_40'], true);
+            $contrato = $convertido
+                ? DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula($grupo, $pedagogicas)['horas_contrato']
+                : $filas->sum('horas_contrato');
+
+            return [
+                'label' => match ($grupo) {
+                    '65_35' => '65/35', '60_40' => '60/40',
+                    'especial' => 'Reglas especiales', default => 'Sin datos de conversión',
+                },
+                'convertido' => $convertido, 'items' => $filas->values()->all(),
+                'horas_pedagogicas' => $pedagogicas, 'horas_contrato' => round((float) $contrato, 2),
+            ];
+        })->sortKeys()->values();
+        $directos = $items->where('es_plan', false)->values();
+
         return [
             'items' => $items->all(),
-            'total_contrato' => round((float) $items->sum('horas_contrato'), 2),
+            'bloques_aula' => $bloques->all(),
+            'contratos_directos' => $directos->all(),
+            'total_contrato' => round((float) $bloques->sum('horas_contrato') + (float) $directos->sum('horas_contrato'), 2),
             'total_pedagogicas' => round((float) $items->sum('horas_pedagogicas'), 2),
         ];
     }

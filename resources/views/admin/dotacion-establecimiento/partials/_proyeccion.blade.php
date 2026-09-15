@@ -75,26 +75,25 @@
                         <div class="px-3 pb-3">
                             <p class="small text-muted">Referencia de las asignaciones del año base. Sus horas pueden diferir de las {{ $fmtProyeccion($reserva['horas_necesarias']) }} h conservadas como vacantes. Este desglose no modifica el contrato proyectado ni reincorpora al docente.</p>
                             @if (count($referencia['items']) > 0)
+                                <p class="small text-muted">Las horas pedagógicas se suman por proporción y cada bloque se convierte una sola vez. Luego se agregan las horas de contrato de PIE y funciones. Las reglas especiales y los registros sin datos de conversión conservan sus horas de contrato registradas.</p>
                                 <div class="table-responsive bg-white rounded-3 border">
                                     <table class="table table-sm align-middle mb-0">
                                         <caption class="visually-hidden">Asignaciones {{ $baseProyeccion }} de {{ $reserva['nombre'] }}</caption>
                                         <thead class="table-light"><tr><th scope="col">Tipo</th><th scope="col">Función / asignatura / plan</th><th scope="col">Curso / ámbito</th><th scope="col">Subvención</th><th scope="col" class="text-end">Hrs pedagógicas</th><th scope="col" class="text-end">Hrs contrato</th></tr></thead>
                                         <tbody>
-                                            @foreach ($referencia['items'] as $detalle)
-                                                <tr>
-                                                    <td class="small">{{ $detalle['tipo'] }}</td>
-                                                    <th scope="row" class="fw-normal">
-                                                        <div class="fw-semibold">{{ $detalle['titulo'] }}</div>
-                                                        @if ($detalle['fuente'])<div class="small text-muted">{{ $detalle['fuente'] }}</div>@endif
-                                                        @if ($detalle['sin_necesidad_vigente'])<div class="small text-muted">Sin necesidad vigente vinculada</div>@endif
-                                                        @if ($detalle['observacion'])<div class="small text-muted">Observación: {{ $detalle['observacion'] }}</div>@endif
-                                                    </th>
-                                                    <td class="small">{{ $detalle['curso'] }}</td>
-                                                    <td class="small">{{ $detalle['subvencion'] }}</td>
-                                                    <td class="text-end">{{ $detalle['horas_pedagogicas'] === null ? '—' : $fmtProyeccion($detalle['horas_pedagogicas']) }}@if ($detalle['proporcion'])<div class="small text-muted">{{ $detalle['proporcion'] }}</div>@endif</td>
-                                                    <td class="text-end fw-semibold">{{ $fmtProyeccion($detalle['horas_contrato']) }}</td>
-                                                </tr>
+                                            @foreach ($referencia['bloques_aula'] as $bloque)
+                                                <tr class="table-light"><th colspan="6" scope="colgroup">Plan de estudio · {{ $bloque['label'] }}</th></tr>
+                                                @foreach ($bloque['items'] as $detalle)
+                                                    @include('admin.dotacion-establecimiento.partials._vacante-asignacion', ['convertido' => $bloque['convertido']])
+                                                @endforeach
+                                                <tr class="table-light"><th scope="row" colspan="4">{{ $bloque['convertido'] ? 'Total aula y conversión' : 'Subtotal contrato registrado' }} · {{ $bloque['label'] }}</th><td class="text-end fw-semibold">{{ $fmtProyeccion($bloque['horas_pedagogicas']) }}</td><td class="text-end fw-semibold">{{ $fmtProyeccion($bloque['horas_contrato']) }}</td></tr>
                                             @endforeach
+                                            @if (count($referencia['contratos_directos']) > 0)
+                                                <tr class="table-light"><th colspan="6" scope="colgroup">Horas de contrato · PIE y funciones</th></tr>
+                                                @foreach ($referencia['contratos_directos'] as $detalle)
+                                                    @include('admin.dotacion-establecimiento.partials._vacante-asignacion', ['convertido' => false])
+                                                @endforeach
+                                            @endif
                                         </tbody>
                                         <tfoot class="table-light"><tr><th scope="row" colspan="4">Total asignado {{ $baseProyeccion }}</th><td class="text-end fw-semibold">{{ $fmtProyeccion($referencia['total_pedagogicas']) }}</td><td class="text-end fw-semibold">{{ $fmtProyeccion($referencia['total_contrato']) }}</td></tr></tfoot>
                                     </table>

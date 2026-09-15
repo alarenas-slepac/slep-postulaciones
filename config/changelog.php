@@ -4110,8 +4110,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.535',
+    'current_version' => '2026.9.15.536',
     'entries' => [
+        [
+            'version' => '2026.9.15.536',
+            'title' => 'Dotación: conversión por bloques en el detalle de vacantes',
+            'summary' => 'Corrige el total contractual del detalle de vacantes agrupando las horas pedagógicas antes de convertirlas.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Suma las horas aula por proporción 60/40 y 65/35, convierte cada bloque una sola vez y luego agrega el contrato de PIE y funciones.',
+                'Muestra subtotales por proporción y conserva las horas registradas para reglas especiales o registros sin datos de conversión.',
+                'Mantiene las asignaciones originales, las vacantes conservadas y los indicadores del contrato proyectado.',
+            ],
+            'published_at' => '2026-09-15',
+        ],
         [
             'version' => '2026.9.14.535',
             'title' => 'Dotación: horas normativas de Educación Diferencial en Aula',

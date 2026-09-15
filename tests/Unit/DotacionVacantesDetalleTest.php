@@ -5,10 +5,28 @@ namespace Tests\Unit;
 use App\Models\DotacionDocenteAsignacion;
 use App\Models\Establecimiento;
 use App\Support\DotacionProyeccionCalculator;
+use App\Support\DocenteHorasNoLectivasCalculator;
+use Illuminate\Support\Facades\DB;
+use ReflectionProperty;
 use Tests\TestCase;
 
 class DotacionVacantesDetalleTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->assertSame(':memory:', DB::connection()->getDatabaseName());
+        (new ReflectionProperty(DocenteHorasNoLectivasCalculator::class, 'proportionRowsCache'))->setValue(null, []);
+        (require database_path('migrations/2026_05_25_183000_create_docente_horas_proporciones_table.php'))->up();
+        (require database_path('migrations/2026_07_23_170000_sync_docente_horas_proporciones_cpeip.php'))->up();
+    }
+
+    protected function tearDown(): void
+    {
+        (new ReflectionProperty(DocenteHorasNoLectivasCalculator::class, 'proportionRowsCache'))->setValue(null, []);
+        parent::tearDown();
+    }
+
     public function test_desglose_identifica_cursos_funciones_y_horas_sin_modificar_vacantes(): void
     {
         $base = self::base();
@@ -16,7 +34,7 @@ class DotacionVacantesDetalleTest extends TestCase
         $proyeccion = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false]);
         $detalle = $proyeccion['reservas'][0]['asignaciones_referencia'];
         $this->assertCount(3, $detalle['items']);
-        $this->assertSame(44.0, $detalle['total_contrato']);
+        $this->assertSame(37.0, $detalle['total_contrato']); // 20 aula 65/35 -> 23 contrato + 14 funciones.
         $this->assertSame(20.0, $detalle['total_pedagogicas']);
         $this->assertSame('Lenguaje y Comunicación', $detalle['items'][0]['titulo']);
         $this->assertSame('1° y 2° Básico A · Curso combinado', $detalle['items'][0]['curso']);
@@ -47,12 +65,12 @@ class DotacionVacantesDetalleTest extends TestCase
         $this->assertSame(1, $xpath->query($path)->length);
         $this->assertFalse($xpath->evaluate('boolean('.$path.'/@open)'));
         $this->assertStringContainsString('Ver asignaciones 2026', $xpath->evaluate('string('.$path.'/summary)'));
-        $this->assertSame(3, $xpath->query($path.'//tbody/tr')->length);
+        $this->assertSame(3, $xpath->query($path.'//tbody/tr[@data-asignacion-referencia]')->length);
         foreach (['Lenguaje y Comunicación', 'Curso combinado', 'Jefe UTP', 'Taller histórico', 'Hrs pedagógicas', 'Hrs contrato', 'Total asignado 2026', '30 h conservadas'] as $texto) {
             $this->assertStringContainsString($texto, $html);
         }
         $this->assertSame('20', trim($xpath->evaluate('string('.$path.'//tfoot/tr/td[1])')));
-        $this->assertSame('44', trim($xpath->evaluate('string('.$path.'//tfoot/tr/td[2])')));
+        $this->assertSame('37', trim($xpath->evaluate('string('.$path.'//tfoot/tr/td[2])')));
         $this->assertStringNotContainsString('<script>alert(1)</script>', $html);
         $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
     }
@@ -67,6 +85,65 @@ class DotacionVacantesDetalleTest extends TestCase
         $this->assertSame(0.0, $proyeccion['reservas'][0]['asignaciones_referencia']['total_contrato']);
         $this->assertSame(30.0, $proyeccion['horas_vacantes_por_cubrir']);
         $this->assertStringContainsString('No hay asignaciones registradas para este docente en 2026', $this->render($base));
+    }
+
+    public function test_28_horas_aula_60_40_mas_3_pie_suman_38_contrato(): void
+    {
+        $base = self::base();
+        $filas = [];
+        foreach ([[2, 3], [3, 4], [3, 4], [8, 10], [6, 8], [1, 1], [2, 3], [2, 3], [1, 1]] as $i => [$aula, $contrato]) {
+            $filas[] = (new DotacionDocenteAsignacion)->forceFill([
+                'id' => $i + 10, 'docente_rut' => '11111111-1', 'tipo_asignacion' => 'plan_estudio',
+                'asignatura_nombre' => 'Asignatura de ejemplo '.($i + 1), 'proporcion_aplicada' => '60/40',
+                'horas_plan_pedagogicas' => $aula, 'horas_contrato' => $contrato,
+            ]);
+        }
+        $filas[] = (new DotacionDocenteAsignacion)->forceFill([
+            'id' => 20, 'docente_rut' => '11111111-1', 'tipo_asignacion' => 'pie_colaborativo',
+            'asignatura_nombre' => 'Trabajo colaborativo PIE', 'horas_contrato' => 3,
+        ]);
+        $base['docentes'][0]['horas_contrato'] = 35.0;
+        $base['docentes'][0]['asignaciones'] = $filas;
+        $base['asignacion']['asignaciones'] = collect($filas);
+        $antes = serialize($base);
+        $p = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false]);
+        $detalle = $p['reservas'][0]['asignaciones_referencia'];
+        $this->assertSame(40.0, (float) collect($filas)->sum('horas_contrato'));
+        $this->assertSame(28.0, $detalle['total_pedagogicas']);
+        $this->assertSame(35.0, $detalle['bloques_aula'][0]['horas_contrato']);
+        $this->assertSame(38.0, $detalle['total_contrato']);
+        $this->assertSame(35.0, $p['horas_vacantes_por_cubrir']);
+        $this->assertSame(35.0, $p['contratos']['total']);
+        $this->assertSame($antes, serialize($base));
+        $html = $this->render($base);
+        $this->assertStringContainsString('10 registro(s) · 38 h contrato', $html);
+        $this->assertStringContainsString('Total aula y conversión · 60/40', $html);
+        $this->assertLessThan(strpos($html, 'Horas de contrato · PIE y funciones'), strpos($html, 'Total aula y conversión · 60/40'));
+    }
+
+    public function test_separa_proporciones_y_conserva_contratos_especiales_o_sin_datos(): void
+    {
+        $base = self::base();
+        $filas = [];
+        foreach ([['60/40', 2, 3], ['60_40', 2, 3], ['65/35', 3, 4], ['65-35', 3, 4], ['NT1/NT2', 2, 6], ['', null, 5]] as $i => [$proporcion, $aula, $contrato]) {
+            $filas[] = (new DotacionDocenteAsignacion)->forceFill([
+                'id' => $i + 10, 'docente_rut' => '11111111-1', 'tipo_asignacion' => 'plan_estudio',
+                'proporcion_aplicada' => $proporcion, 'horas_plan_pedagogicas' => $aula, 'horas_contrato' => $contrato,
+            ]);
+        }
+        $filas[] = (new DotacionDocenteAsignacion)->forceFill([
+            'id' => 20, 'docente_rut' => '11111111-1', 'tipo_asignacion' => 'pie_colaborativo', 'horas_contrato' => 3,
+        ]);
+        $filas[] = (new DotacionDocenteAsignacion)->forceFill([
+            'id' => 21, 'docente_rut' => '11111111-1', 'tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 4,
+        ]);
+        $base['asignacion']['asignaciones'] = collect($filas);
+        $base['docentes'][0]['asignaciones'] = $filas;
+        $detalle = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false])['reservas'][0]['asignaciones_referencia'];
+        $this->assertSame([5.0, 7.0, 6.0, 5.0], array_column($detalle['bloques_aula'], 'horas_contrato'));
+        $this->assertSame(12.0, $detalle['total_pedagogicas']);
+        $this->assertSame(30.0, $detalle['total_contrato']);
+        $this->assertCount(2, $detalle['contratos_directos']);
     }
 
     public static function base(): array
