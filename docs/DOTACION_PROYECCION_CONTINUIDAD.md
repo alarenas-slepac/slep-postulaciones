@@ -3,6 +3,11 @@
 Desde Dotación Establecimiento del año base, el botón **Proyección 2027**
 (si el año base es 2026) abre una vista completa de solo lectura.
 
+El botón y la vista requieren el rol activo `admin`, `coordinador_uatp`,
+`coordinador_gdp` o `supervisor_plani`. El rol `funcionario_directivo_estab`
+no ve el botón y recibe 403 al intentar acceder por URL. Conserva su acceso
+al resto de Dotación Establecimiento, incluida Situación docente.
+
 En **Docentes → Situación docente** hay dos decisiones independientes:
 
 - **El docente continúa en dotación 2027**: desmarcar registra la salida de la persona.
