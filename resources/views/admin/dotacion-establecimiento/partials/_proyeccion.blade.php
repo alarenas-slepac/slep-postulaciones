@@ -19,7 +19,7 @@
     <div class="p-4">
         <h1 class="h2 fw-bold mb-2">Proyección dotación {{ $destinoProyeccion }}</h1>
         <p class="fw-semibold mb-2">{{ $establecimiento->rbd }} · {{ $establecimiento->nombre_establecimiento }}</p>
-        <p class="text-muted mb-3">Mantiene los cursos, planes de estudio y necesidades de funciones de {{ $baseProyeccion }}. Proyecta el contrato y la cobertura con las personas que continuarán en {{ $destinoProyeccion }}. No reemplaza la configuración anual de {{ $destinoProyeccion }}.</p>
+        <p class="text-muted mb-3">Mantiene los cursos, planes de estudio y necesidades de funciones de {{ $baseProyeccion }}. El contrato proyectado incluye las horas de quienes continúan y las horas necesarias conservadas como vacantes. La cobertura considera a las personas que continuarán en {{ $destinoProyeccion }}. No reemplaza la configuración anual de {{ $destinoProyeccion }}.</p>
         <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-primary" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $baseProyeccion, 'tab' => 'docentes']) }}"><i class="bi bi-person-check me-1" aria-hidden="true"></i> Revisar continuidad docente</a>
             <a class="btn btn-outline-secondary" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $baseProyeccion]) }}">Volver a dotación {{ $baseProyeccion }}</a>
@@ -43,6 +43,7 @@
             <div class="col-sm-6 col-xl-3"><div class="border rounded-3 bg-white p-3 h-100"><div class="{{ $color ?: 'text-muted' }} small"><i class="bi bi-{{ $icon }} me-1" aria-hidden="true"></i>{{ $label }}</div><div class="fs-2 fw-bold mt-1 {{ $color }}">{{ $value }}</div></div></div>
         @endforeach
     </div>
+    <p class="small text-muted mt-2">Las vacantes conservadas están incluidas en las horas de contrato proyectadas. Las horas no necesarias quedan excluidas; la persona que sale no aporta cobertura.</p>
 </section>
 
 @if (!($conservacionHorasDisponible ?? false))
@@ -84,12 +85,14 @@
                     @endif
                     <dt class="col-8 fw-normal">Horas contrato {{ $baseProyeccion }}</dt><dd class="col-4 text-end">{{ $fmtProyeccion($proyeccion['contratos_base'][$key]) }}</dd>
                     <dt class="col-8 fw-normal">Horas contrato {{ $destinoProyeccion }}</dt><dd class="col-4 text-end fw-bold">{{ $fmtProyeccion($proyeccion['contratos'][$key]) }}</dd>
+                    <dt class="col-8 fw-normal text-muted">De docentes que continúan</dt><dd class="col-4 text-end text-muted">{{ $fmtProyeccion($proyeccion['contratos_cubiertos'][$key]) }}</dd>
+                    <dt class="col-8 fw-normal text-success-emphasis">Incluye vacantes por cubrir</dt><dd class="col-4 text-end text-success-emphasis">{{ $fmtProyeccion($proyeccion['contratos_vacantes'][$key]) }}</dd>
                 </dl>
                 <div class="border-top pt-2"><div class="fs-2 fw-bold {{ $brecha > 0 ? 'text-success-emphasis' : ($brecha < 0 ? 'text-danger' : 'text-primary') }}">{{ $fmtProyeccion(abs($brecha)) }} <span class="fs-6">h</span></div><div class="small">{{ $brecha > 0 ? 'Horas por contratar' : ($brecha < 0 ? 'Horas de sobredotación' : 'Dotación cuadrada') }}</div></div>
             </div></div>
         @endforeach
     </div>
-    <p class="small text-muted mt-2">La brecha general compara plan general, funciones normativas y horas adicionales conservadas con el contrato de aula disponible. Las funciones no normativas conservan su necesidad y se detallan en cobertura.</p>
+    <p class="small text-muted mt-2">La brecha compara las necesidades con el contrato proyectado, que incluye las vacantes conservadas. Una brecha cero puede tener vacantes pendientes de cubrir. Las funciones no normativas conservan su necesidad y se detallan en cobertura.</p>
 </section>
 
 <section aria-labelledby="proyeccion-coberturas" class="mb-4">
@@ -127,7 +130,7 @@
     <h2 id="proyeccion-nomina" class="h5 fw-bold p-3 mb-0">Continuidad por docente</h2>
     <div class="table-responsive"><table class="table align-middle mb-0">
         <caption class="visually-hidden">Participación docente en la proyección {{ $destinoProyeccion }}</caption>
-        <thead class="table-light"><tr><th scope="col">Docente / función</th><th scope="col">Situación</th><th scope="col" class="text-end">Contrato original</th><th scope="col" class="text-end">Contrato considerado {{ $baseProyeccion }}</th><th scope="col" class="text-end">Aporte {{ $destinoProyeccion }}</th><th scope="col">Continuidad</th></tr></thead>
+        <thead class="table-light"><tr><th scope="col">Docente / función</th><th scope="col">Situación</th><th scope="col" class="text-end">Contrato original</th><th scope="col" class="text-end">Contrato considerado {{ $baseProyeccion }}</th><th scope="col" class="text-end">Aporte de la persona {{ $destinoProyeccion }}</th><th scope="col">Continuidad</th></tr></thead>
         <tbody>
         @forelse ($proyeccion['docentes'] as $docente)
             <tr><th scope="row" class="fw-normal"><div class="fw-semibold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['rut'] }} · {{ $docente['funcion'] }}</div></th><td>{{ $docente['motivo'] ?: 'Sin situación registrada' }}</td><td class="text-end">{{ $fmtProyeccion($docente['contrato_base']) }}</td><td class="text-end">{{ $fmtProyeccion($docente['contrato_considerado']) }}</td><td class="text-end fw-semibold">{{ $fmtProyeccion($docente['contrato_proyectado']) }}</td><td><span class="badge {{ $docente['continua'] ? 'text-bg-primary' : 'text-bg-danger' }}">{{ $docente['continua'] ? 'Se contempla' : 'No continúa' }}</span></td></tr>

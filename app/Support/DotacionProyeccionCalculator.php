@@ -18,7 +18,7 @@ class DotacionProyeccionCalculator
         $asignacionesProyectadas = $asignaciones->filter($continuaAsignacion)->values();
         $resumen = $base['resumen'] ?? [];
         $especial = (bool) ($resumen['establecimiento_especial'] ?? false);
-        $contratos = self::contratos($docentesProyectados, $asignacionesProyectadas, $especial);
+        $contratosCubiertos = self::contratos($docentesProyectados, $asignacionesProyectadas, $especial);
         $contratosBase = self::contratos($docentes, $asignaciones, $especial);
 
         // La salida de personas no altera la configuración curricular ni normativa.
@@ -30,6 +30,17 @@ class DotacionProyeccionCalculator
             'pie' => (float) ($resumen['horas_contrato_pie_necesarias'] ?? 0),
         ];
         $reservas = self::reservasNecesarias($base, $noContinuan, $conservacionHorasPorRut, $especial);
+        // El contrato proyectado conserva las plazas necesarias aunque estén vacantes.
+        // Las horas no necesarias ya están descontadas en horas_contrato.
+        $contratosVacantes = ['total' => $reservas['vacantes'], 'aula' => 0.0, 'parvularia' => 0.0, 'pie' => 0.0];
+        foreach ($reservas['docentes'] as $reserva) {
+            $categoria = $reserva['categoria'];
+            $contratosVacantes[$categoria] = round($contratosVacantes[$categoria] + $reserva['horas_necesarias'], 2);
+        }
+        $contratos = [];
+        foreach ($contratosCubiertos as $categoria => $horas) {
+            $contratos[$categoria] = round($horas + $contratosVacantes[$categoria], 2);
+        }
 
         $coberturas = collect(data_get($base, 'asignacion.necesidades', []))
             ->map(fn ($items, $grupo) => collect($items)->map(function (array $item) use ($grupo, $continuaAsignacion): array {
@@ -61,6 +72,8 @@ class DotacionProyeccionCalculator
             'anio_proyeccion' => $anio + 1,
             'contratos_base' => $contratosBase,
             'contratos' => $contratos,
+            'contratos_cubiertos' => $contratosCubiertos,
+            'contratos_vacantes' => $contratosVacantes,
             'necesarias' => $necesarias,
             'necesarias_adicionales' => $reservas['adicionales'],
             'horas_vacantes_por_cubrir' => $reservas['vacantes'],

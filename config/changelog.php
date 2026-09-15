@@ -4110,8 +4110,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.531',
+    'current_version' => '2026.9.14.532',
     'entries' => [
+        [
+            'version' => '2026.9.14.532',
+            'title' => 'Dotación: conservar las vacantes dentro del contrato proyectado',
+            'summary' => 'Las horas necesarias conservadas de docentes que salen permanecen en el contrato del año siguiente como vacantes por cubrir.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Mantiene las horas necesarias conservadas en el contrato proyectado de Aula, Educación Parvularia o PIE. Descuenta solo las horas no necesarias del contrato original cuando se conserva la vacante.',
+                'Desglosa el contrato proyectado entre docentes que continúan y vacantes incluidas. Las vacantes permanecen pendientes de cobertura y no reincorporan a la persona.',
+                'Con 44 horas originales, 34 necesarias y 10 no necesarias, conserva 34 horas de contrato y 34 vacantes. Mantiene las necesidades sin duplicarlas y calcula la brecha contra el contrato proyectado.',
+                'Incluye pruebas de guardado, categorías, continuidad, conservación, horas decimales y valores mostrados. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.531',
             'title' => 'Dotación: contraste del estado No continúa',

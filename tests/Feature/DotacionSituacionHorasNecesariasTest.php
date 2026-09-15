@@ -8,6 +8,7 @@ use App\Models\DotacionDocenteExclusion;
 use App\Models\Establecimiento;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionProyeccionCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -366,6 +367,52 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
         (require database_path('migrations/2026_09_14_170000_add_conservar_horas_to_dotacion_docente_exclusiones.php'))->up();
         $this->expectException(ValidationException::class);
         $this->guardar(['conservar_horas_necesarias' => 'tal vez']);
+    }
+
+    #[DataProvider('categorias')]
+    public function test_contrato_proyectado_conserva_vacantes_y_descuenta_solo_no_necesarias(
+        string $titulo, bool $coordinacion, bool $especial, float $aula, float $parvularia, float $pie
+    ): void {
+        $this->instalarContinuidad();
+        (require database_path('migrations/2026_09_14_170000_add_conservar_horas_to_dotacion_docente_exclusiones.php'))->up();
+        DB::table('declaracion_sostenedores')->update(['nombre_titulo' => $titulo]);
+        if ($coordinacion) {
+            DB::table('dotacion_docente_asignaciones')->update([
+                'tipo_asignacion' => 'funcion_tecnico_pedagogica', 'subtipo_asignacion' => 'pie',
+                'asignatura_nombre' => 'Coordinador PIE',
+            ]);
+        }
+        $categoria = $pie > 0 ? 'pie' : ($parvularia > 0 ? 'parvularia' : 'aula');
+        $padron = DB::table('reemplazos_personal')->get()->toJson();
+        $asignaciones = DB::table('dotacion_docente_asignaciones')->get()->toJson();
+        foreach ([34.0, 0.0, 44.0, 19.37] as $necesarias) {
+            foreach ([[0, 1], [0, 0], [1, 1], [1, 0]] as [$continua, $conserva]) {
+                $this->guardar([
+                    'horas_necesarias' => $necesarias, 'horas' => 44 - $necesarias,
+                    'considerar_dotacion_siguiente' => $continua, 'conservar_horas_necesarias' => $conserva,
+                ]);
+                $base = [
+                    'docentes' => collect([$this->docente()]),
+                    'resumen' => ['establecimiento_especial' => $especial],
+                    'asignacion' => ['asignaciones' => DotacionAsignacionCalculator::assignmentsFor(Establecimiento::findOrFail(1), 2026)],
+                ];
+                $proyeccion = DotacionProyeccionCalculator::build($base, 2026,
+                    DotacionDocenteExclusion::continuidadPorRut(1, 2026), DotacionDocenteExclusion::conservacionHorasPorRut(1, 2026));
+                $contrato = $continua || $conserva ? $necesarias : 0.0;
+                $vacantes = ! $continua && $conserva ? $necesarias : 0.0;
+                $this->assertSame($contrato, $proyeccion['contratos']['total']);
+                $this->assertSame($contrato, $proyeccion['contratos'][$categoria]);
+                $this->assertSame($vacantes, $proyeccion['horas_vacantes_por_cubrir']);
+                $this->assertSame($vacantes, $proyeccion['contratos_vacantes'][$categoria]);
+                $this->assertSame($continua ? $necesarias : 0.0, $proyeccion['contratos_cubiertos']['total']);
+                $this->assertSame($continua ? $necesarias : 0.0, $proyeccion['docentes'][0]['contrato_proyectado']);
+                $this->assertSame((bool) $continua, $proyeccion['docentes'][0]['continua']);
+                $this->assertSame(44.0, $proyeccion['docentes'][0]['contrato_base']);
+                $this->assertSame($contrato, round(array_sum(array_intersect_key($proyeccion['contratos'], array_flip(['aula', 'parvularia', 'pie']))), 2));
+            }
+        }
+        $this->assertSame($padron, DB::table('reemplazos_personal')->get()->toJson());
+        $this->assertSame($asignaciones, DB::table('dotacion_docente_asignaciones')->get()->toJson());
     }
 
     private function guardar(array $data = []): \Illuminate\Http\RedirectResponse

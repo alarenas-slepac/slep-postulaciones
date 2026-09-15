@@ -317,7 +317,7 @@
                                                                 <label class="form-check-label fw-semibold" for="{{ $collapseId }}-continuidad">El docente continúa en dotación {{ $anio + 1 }}</label>
                                                                 @if ($formConErrores) @error('considerar_dotacion_siguiente')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                             </div>
-                                                            <div class="form-text" id="{{ $collapseId }}-continuidad-ayuda">Desmarque si la persona no continúa: su contrato y sus asignaciones dejan de cubrir la proyección {{ $anio + 1 }}. Conservar sus horas necesarias no reincorpora al docente.</div>
+                                                            <div class="form-text" id="{{ $collapseId }}-continuidad-ayuda">Desmarque si la persona no continúa: sus asignaciones dejan de cubrir la proyección {{ $anio + 1 }}. Puede conservar sus horas necesarias dentro del contrato proyectado como vacantes, sin reincorporar al docente.</div>
                                                         @else
                                                             <div class="alert alert-warning py-2 mb-0">La continuidad para dotación {{ $anio + 1 }} estará disponible después de instalar la migración de continuidad docente.</div>
                                                         @endif
@@ -330,7 +330,7 @@
                                                                 <label class="form-check-label fw-semibold" for="{{ $collapseId }}-conservar-horas">Contemplar horas necesarias en dotación {{ $anio + 1 }}</label>
                                                                 @if ($formConErrores) @error('conservar_horas_necesarias')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                             </div>
-                                                            <div class="form-text" id="{{ $collapseId }}-conservar-horas-ayuda">Si el docente no continúa, conserva sus horas necesarias como vacantes por cubrir. Las horas ya incluidas en sus necesidades de plan o funciones se cuentan una sola vez. Al desmarcar, no se agrega una reserva por esta situación; los planes y funciones configurados conservan sus propias necesidades.</div>
+                                                            <div class="form-text" id="{{ $collapseId }}-conservar-horas-ayuda">Si el docente no continúa, mantiene sus horas necesarias en Horas de contrato {{ $anio + 1 }} y las identifica como vacantes por cubrir. Del contrato original se descuentan solo las horas no necesarias. Las necesidades de plan o funciones se cuentan una sola vez. Al desmarcar, no se conserva este contrato vacante; los planes y funciones configurados conservan sus propias necesidades.</div>
                                                         @else
                                                             <div class="alert alert-warning py-2 mb-0">La conservación independiente de horas estará disponible después de instalar su migración.</div>
                                                         @endif
