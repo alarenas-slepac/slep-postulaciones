@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 
 class DotacionFuncionesCalculator
 {
+    private const ANIO_SIN_TRANSICION_EDUCATIVA = 2027;
+
     public static function contexto(Establecimiento $establecimiento, int $anio): array
     {
         $matriculaTotal = (int) DB::table('establecimiento_cursos')
@@ -62,7 +64,7 @@ class DotacionFuncionesCalculator
         $items = collect();
 
         foreach ($rules as $rule) {
-            if ($rule->declarable) {
+            if ($rule->declarable || ! self::reglaAplicaEnAnio($rule, $anio)) {
                 continue;
             }
 
@@ -83,6 +85,14 @@ class DotacionFuncionesCalculator
         }
 
         return $items;
+    }
+
+    private static function reglaAplicaEnAnio(DotacionFuncionRegla $rule, int $anio): bool
+    {
+        // La regla se conserva para consultar y reconstruir las dotaciones históricas.
+        // Desde 2027 Transición educativa no integra las horas normativas requeridas.
+        return $rule->codigo !== 'transicion_educativa'
+            || $anio < self::ANIO_SIN_TRANSICION_EDUCATIVA;
     }
 
     public static function calcularHorasRegla(DotacionFuncionRegla $rule, array $contexto): ?int

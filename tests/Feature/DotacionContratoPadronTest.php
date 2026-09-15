@@ -160,6 +160,32 @@ class DotacionContratoPadronTest extends TestCase
         $this->assertSame($before, $this->snapshot());
     }
 
+    public function test_dotacion_2027_conserva_situaciones_sin_heredar_asignaciones_de_2026(): void
+    {
+        $this->personal(101, ['anio' => 2027, 'mes' => 3]);
+        $this->declaracion();
+        DB::table('dotacion_docente_exclusiones')->insert([
+            'id' => 301, 'establecimiento_id' => 1, 'anio' => 2027,
+            'docente_rut' => '111111111', 'docente_rut_normalizado' => '111111111',
+            'motivo' => 'traslado', 'horas' => 10,
+        ]);
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'id' => 401, 'establecimiento_id' => 1, 'anio' => 2026,
+            'reemplazos_personal_id' => 101, 'declaracion_sostenedor_id' => 201,
+            'docente_rut' => '111111111', 'docente_rut_normalizado' => '111111111',
+            'docente_nombre' => 'Persona sintética', 'tipo_asignacion' => 'otra_funcion',
+            'asignatura_nombre' => 'Función 2026', 'horas_contrato' => 30,
+        ]);
+
+        $docente = DotacionEstablecimientoCalculator::docentes(Establecimiento::findOrFail(1), 2027)->sole();
+
+        $this->assertSame(38.0, $docente['horas_contrato_base']);
+        $this->assertSame(10.0, $docente['horas_excluidas']);
+        $this->assertSame(28.0, $docente['horas_contrato']);
+        $this->assertSame('traslado', $docente['exclusion_docente']['motivo']);
+        $this->assertCount(0, $docente['asignaciones']);
+    }
+
     public function test_docente_sin_declaracion_conserva_horas_del_padron(): void
     {
         $this->personal();

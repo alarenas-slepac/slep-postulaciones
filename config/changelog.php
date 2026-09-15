@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.9.15.465' => [
+        'date' => '2026-09-15',
+        'module' => 'Dotación Establecimiento',
+        'title' => 'Preparación anual de dotación docente 2027',
+        'files' => [
+            'app/Support/DotacionFuncionesCalculator.php',
+            'config/changelog.php',
+            'database/migrations/2026_09_15_100000_copy_dotacion_docente_exclusiones_to_2027.php',
+            'tests/Feature/DotacionContratoPadronTest.php',
+            'tests/Feature/DotacionDocenteExclusion2027MigrationTest.php',
+            'tests/Unit/DotacionFuncionesAnualesTest.php',
+        ],
+        'changes' => [
+            'Desde 2027 excluye Transición educativa de las horas normativas requeridas; la regla se conserva para consultar y reconstruir los cálculos de 2026 y años anteriores.',
+            'Copia las situaciones docentes de 2026 a 2027 para que sus horas no consideradas afecten la base contractual del nuevo año, sin sobrescribir ajustes ya registrados en 2027.',
+            'Mantiene las asignaciones de horas como registros anuales: no se copian desde 2026.',
+            'Mantiene para 2027 la base contractual del padrón vigente y sus antecedentes de bienios, fecha de antigüedad y tramo.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.8.28.464' => [
         'date' => '2026-08-28',
         'module' => 'Votaciones CCAF y Mutualidades',
