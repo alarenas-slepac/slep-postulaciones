@@ -91,7 +91,7 @@
             ] : []),
             ['label' => 'Horas contrato docente PIE', 'value' => $fmt($horasContratoDocentePie), 'hint' => ($resumen['establecimiento_especial'] ?? false)
                 ? 'No aplica por flag Especial. Los contratos de Educación Diferencial se contabilizan en Horas contrato aula.'
-                : 'Contratos completos de Educación Diferencial: '.$fmt($horasContratoEducadorasDiferenciales).' · Coordinación PIE de otros docentes: '.$fmt($horasContratoCoordinacionPie).'. Según título declarado, sin duplicar coordinación incluida en esos contratos.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
+                : 'Contrato PIE de Educación Diferencial: '.$fmt($horasContratoEducadorasDiferenciales).' · Coordinación PIE de otros docentes: '.$fmt($horasContratoCoordinacionPie).'. Las horas normativas de Educación Diferencial se contabilizan en Aula, excepto Coordinación PIE. El saldo permanece en PIE, sin duplicar coordinación.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
         ];
         $kpiFilas = [
             'generales' => ['items' => $kpisGenerales, 'columns' => 'row-cols-md-3'],

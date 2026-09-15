@@ -40,8 +40,9 @@ class DotacionProyeccionCalculator
         // Las horas no necesarias ya están descontadas en horas_contrato.
         $contratosVacantes = ['total' => $reservas['vacantes'], 'aula' => 0.0, 'parvularia' => 0.0, 'pie' => 0.0];
         foreach ($reservas['docentes'] as $reserva) {
-            $categoria = $reserva['categoria'];
-            $contratosVacantes[$categoria] = round($contratosVacantes[$categoria] + $reserva['horas_necesarias'], 2);
+            foreach ($reserva['contratos_por_categoria'] as $categoria => $horas) {
+                $contratosVacantes[$categoria] = round($contratosVacantes[$categoria] + $horas, 2);
+            }
         }
         $contratos = [];
         foreach ($contratosCubiertos as $categoria => $horas) {
@@ -137,28 +138,45 @@ class DotacionProyeccionCalculator
             }
 
             $horas = round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2);
-            $porIncorporar = $horas;
+            $contrato = self::contratos(collect([$docente]), collect($asignacionesPorRut->get($rut, $docente['asignaciones'] ?? [])), $especial);
+            $porCategoria = array_intersect_key($contrato, $adicionales);
+            $porIncorporarCategoria = $porCategoria;
+            $categorias = array_keys(array_filter($porCategoria, fn ($cantidad) => $cantidad > 0));
+            $categoriaPrincipal = $categorias[0] ?? 'aula';
+            $esDiferencial = DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_diferencial'];
             // La asignación identifica la necesidad, pero su cantidad no limita
             // las horas necesarias definidas en Situación docente.
             foreach ($necesidades as $index => $necesidad) {
-                $vinculada = collect($necesidad['asignaciones'] ?? [])->contains(fn ($row) =>
+                $vinculadas = collect($necesidad['asignaciones'] ?? [])->filter(fn ($row) =>
                     DotacionAsignacionCalculator::coverageEstamento($row) === 'docente' && self::rut($row) === $rut
                 );
-                if (! $vinculada) {
+                if ($vinculadas->isEmpty()) {
                     continue;
                 }
-                $existentes = min($porIncorporar, $saldos[$index]);
-                $porIncorporar = round($porIncorporar - $existentes, 2);
+                // Un contrato diferencial mixto conserva cada parte en su bloque:
+                // la necesidad normativa no absorbe también las horas PIE.
+                $categoria = $categoriaPrincipal;
+                if (count($categorias) > 1) {
+                    if ($esDiferencial) {
+                        $categoria = $vinculadas->contains(fn ($row) => DotacionAsignacionCalculator::esAsignacionNormativaAula($row)) ? 'aula' : 'pie';
+                    } else {
+                        $categoria = $vinculadas->contains(fn ($row) => DotacionAsignacionCalculator::esAsignacionCoordinacionPie($row))
+                            ? 'pie' : ($contrato['parvularia'] > 0 ? 'parvularia' : 'aula');
+                    }
+                }
+                $existentes = min($porIncorporarCategoria[$categoria], $saldos[$index]);
+                $porIncorporarCategoria[$categoria] = round($porIncorporarCategoria[$categoria] - $existentes, 2);
                 $saldos[$index] = round($saldos[$index] - $existentes, 2);
             }
 
-            $contrato = self::contratos(collect([$docente]), collect($docente['asignaciones'] ?? []), $especial);
-            $categoria = $contrato['pie'] > 0 ? 'pie' : ($contrato['parvularia'] > 0 ? 'parvularia' : 'aula');
-            $adicionales[$categoria] = round($adicionales[$categoria] + $porIncorporar, 2);
+            foreach ($porIncorporarCategoria as $categoria => $cantidad) {
+                $adicionales[$categoria] = round($adicionales[$categoria] + $cantidad, 2);
+            }
+            $porIncorporar = round(array_sum($porIncorporarCategoria), 2);
             $vacantes = round($vacantes + $horas, 2);
             $reservas[] = [
                 'rut' => $docente['rut'] ?? '', 'nombre' => $docente['nombre'] ?? 'Docente',
-                'categoria' => $categoria, 'horas_necesarias' => $horas,
+                'categoria' => $categoriaPrincipal, 'contratos_por_categoria' => $porCategoria, 'horas_necesarias' => $horas,
                 'ya_contempladas' => round($horas - $porIncorporar, 2), 'adicionales' => $porIncorporar,
                 'asignaciones_referencia' => self::detalleAsignaciones(
                     collect($asignacionesPorRut->get($rut, $docente['asignaciones'] ?? [])), $contextos, $rut

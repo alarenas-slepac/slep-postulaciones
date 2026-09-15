@@ -56,7 +56,14 @@
         <div class="table-responsive"><table class="table align-middle mb-0">
             <thead class="table-light"><tr><th scope="col">Docente que sale</th><th scope="col">Categoría</th><th scope="col" class="text-end">Vacantes conservadas</th><th scope="col" class="text-end">Ya incluidas en necesidades</th><th scope="col" class="text-end">Necesarias adicionales</th></tr></thead>
             <tbody>@foreach ($proyeccion['reservas'] as $reserva)
-                <tr><th scope="row" class="fw-normal">{{ $reserva['nombre'] }}</th><td>{{ $categoriasProyeccion[$reserva['categoria']] }}</td><td class="text-end text-success-emphasis fw-bold">{{ $fmtProyeccion($reserva['horas_necesarias']) }}</td><td class="text-end">{{ $fmtProyeccion($reserva['ya_contempladas']) }}</td><td class="text-end">{{ $fmtProyeccion($reserva['adicionales']) }}</td></tr>
+                <tr><th scope="row" class="fw-normal">{{ $reserva['nombre'] }}</th><td>
+                    @foreach ($reserva['contratos_por_categoria'] as $categoria => $horasCategoria)
+                        @if ($horasCategoria > 0)
+                            <div>{{ $categoriasProyeccion[$categoria] }}: {{ $fmtProyeccion($horasCategoria) }} h</div>
+                        @endif
+                    @endforeach
+                    @if ($reserva['horas_necesarias'] == 0){{ $categoriasProyeccion[$reserva['categoria']] }}@endif
+                </td><td class="text-end text-success-emphasis fw-bold">{{ $fmtProyeccion($reserva['horas_necesarias']) }}</td><td class="text-end">{{ $fmtProyeccion($reserva['ya_contempladas']) }}</td><td class="text-end">{{ $fmtProyeccion($reserva['adicionales']) }}</td></tr>
                 <tr><td colspan="5" class="pt-0">
                     @php $referencia = $reserva['asignaciones_referencia']; @endphp
                     <details class="border rounded-3 bg-light mb-2">

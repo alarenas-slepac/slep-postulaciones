@@ -318,7 +318,7 @@
             <th>Contrato aula</th>
             @if ($tieneEducacionParvularia || $horasContratoParvularia > 0)<th>Horas contrato parvularia</th>@endif
             <th>Coordinación PIE de otros docentes</th>
-            <th>Contratos completos de Educación Diferencial</th>
+            <th>Contrato PIE de Educación Diferencial</th>
             <th>Contrato docente PIE</th>
             <th>Total contrato docentes vigente</th>
         </tr>
@@ -534,7 +534,7 @@
                 @if ($resumen['establecimiento_especial'] ?? false)
                     No aplica por flag Especial. Los contratos de Educación Diferencial se contabilizan en Horas contrato aula.
                 @else
-                    Contratos completos de Educación Diferencial: {{ $fmt($horasContratoEducadorasDiferenciales) }} h + Coordinación PIE de otros docentes: {{ $fmt($horasContratoCoordinacionPie) }} h. Según título declarado, sin duplicar coordinación incluida en esos contratos.
+                    Contrato PIE de Educación Diferencial: {{ $fmt($horasContratoEducadorasDiferenciales) }} h + Coordinación PIE de otros docentes: {{ $fmt($horasContratoCoordinacionPie) }} h. Las horas normativas de Educación Diferencial se contabilizan en Aula, excepto Coordinación PIE. El saldo permanece en PIE, sin duplicar coordinación.
                 @endif
             </td>
         </tr>

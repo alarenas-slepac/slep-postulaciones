@@ -50,6 +50,7 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             $t->string('docente_nombre'); $t->string('tipo_asignacion');
             $t->string('subtipo_asignacion')->nullable(); $t->string('asignatura_nombre')->nullable();
             $t->string('estamento_cobertura')->default('docente');
+            $t->unsignedBigInteger('dotacion_funcion_id')->nullable();
             $t->decimal('horas_contrato', 8, 2); $t->string('estado')->default('activa');
         });
         (require database_path('migrations/2026_08_24_090000_create_dotacion_docente_exclusiones_table.php'))->up();
@@ -71,7 +72,7 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             'id' => 1, 'establecimiento_id' => 1, 'anio' => 2026,
             'docente_rut' => '11.111.111-1', 'docente_rut_normalizado' => '111111111',
             'docente_nombre' => 'Docente sintético', 'tipo_asignacion' => 'otra_funcion',
-            'asignatura_nombre' => 'Función sintética', 'horas_contrato' => 44,
+            'asignatura_nombre' => 'Función declarada sintética', 'horas_contrato' => 44, 'dotacion_funcion_id' => 1,
         ]);
     }
 
@@ -218,6 +219,25 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             ]);
             $this->assertSame([20.0, $aula, $parvularia, $pie], array_slice($row, 10, 4));
         }
+    }
+
+    public function test_diferencial_con_normativas_reparte_contrato_efectivo_del_padron(): void
+    {
+        DB::table('declaracion_sostenedores')->update(['nombre_titulo' => 'Pedagogía en Educación Diferencial']);
+        DB::table('dotacion_docente_asignaciones')->update([
+            'tipo_asignacion' => 'funcion_tecnico_pedagogica', 'asignatura_nombre' => 'Jefe UTP',
+            'dotacion_funcion_id' => null, 'horas_contrato' => 20,
+        ]);
+        $this->guardar(['horas_necesarias' => 34, 'horas' => 10]);
+        $docente = $this->docente();
+        $asignaciones = DotacionAsignacionCalculator::assignmentsFor(Establecimiento::findOrFail(1), 2026);
+        $this->assertSame(44.0, $docente['horas_contrato_base']);
+        $this->assertSame(34.0, $docente['horas_contrato']);
+        $this->assertSame(14.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente));
+        $this->assertSame(14.0, DotacionAsignacionCalculator::resumenContratoDocentePie($asignaciones, collect([$docente]))['total']);
+        $p = DotacionProyeccionCalculator::build(['docentes' => [$docente], 'asignacion' => ['asignaciones' => $asignaciones]], 2026, ['111111111' => false]);
+        $this->assertSame(['total' => 34.0, 'aula' => 20.0, 'parvularia' => 0.0, 'pie' => 14.0], $p['contratos_vacantes']);
+        $this->assertSame(34.0, $p['horas_vacantes_por_cubrir']);
     }
 
     public function test_formulario_disponible_con_todas_las_horas_asignadas_y_precarga_ambos_valores(): void
