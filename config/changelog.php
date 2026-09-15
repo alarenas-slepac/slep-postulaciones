@@ -4110,8 +4110,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.527',
+    'current_version' => '2026.9.14.528',
     'entries' => [
+        [
+            'version' => '2026.9.14.528',
+            'title' => 'Dotación: rótulo de horas vacantes en la proyección',
+            'summary' => 'Renombra el indicador como Hrs vacantes por cubrir seguido del año proyectado.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'La proyección 2027 muestra Hrs vacantes por cubrir 2027. Conserva el cálculo del indicador y adapta el año a la proyección consultada.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.527',
             'title' => 'Dotación: colores de la brecha proyectada',

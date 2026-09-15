@@ -34,7 +34,7 @@
 <section aria-labelledby="proyeccion-personas" class="mb-4">
     <h2 id="proyeccion-personas" class="h5 fw-bold">Disponibilidad docente</h2>
     <div class="row g-3">
-        @foreach ([['Docentes que continúan', $proyeccion['docentes_continuan'], 'person-check'], ['Docentes que no continúan', $proyeccion['docentes_no_continuan'], 'person-dash'], ['Horas de contrato proyectadas', $fmtProyeccion($proyeccion['contratos']['total']), 'briefcase'], ['Horas de contrato que dejan de aportar', $fmtProyeccion(max(0, $proyeccion['contratos_base']['total'] - $proyeccion['contratos']['total'])), 'calendar-minus']] as [$label, $value, $icon])
+        @foreach ([['Docentes que continúan', $proyeccion['docentes_continuan'], 'person-check'], ['Docentes que no continúan', $proyeccion['docentes_no_continuan'], 'person-dash'], ['Horas de contrato proyectadas', $fmtProyeccion($proyeccion['contratos']['total']), 'briefcase'], ['Hrs vacantes por cubrir '.$destinoProyeccion, $fmtProyeccion(max(0, $proyeccion['contratos_base']['total'] - $proyeccion['contratos']['total'])), 'calendar-minus']] as [$label, $value, $icon])
             <div class="col-sm-6 col-xl-3"><div class="border rounded-3 bg-white p-3 h-100"><div class="text-muted small"><i class="bi bi-{{ $icon }} me-1" aria-hidden="true"></i>{{ $label }}</div><div class="fs-2 fw-bold mt-1">{{ $value }}</div></div></div>
         @endforeach
     </div>
