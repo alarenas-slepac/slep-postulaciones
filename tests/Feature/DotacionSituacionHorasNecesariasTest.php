@@ -299,7 +299,7 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             $xpath = new \DOMXPath($dom);
             $this->assertSame((bool) $continua, $xpath->evaluate('boolean(//input[@type="checkbox" and @name="considerar_dotacion_siguiente"]/@checked)'));
             $this->assertSame('0', $xpath->evaluate('string(//input[@type="hidden" and @name="considerar_dotacion_siguiente"]/@value)'));
-            $this->assertStringContainsString('Contemplar a este docente y sus horas en dotación 2027', $html);
+            $this->assertStringContainsString('El docente continúa en dotación 2027', $html);
         }
         app(DotacionDocenteExclusionController::class)->destroy($this->request(), Establecimiento::findOrFail(1), DotacionDocenteExclusion::sole());
         $this->assertSame([], DotacionDocenteExclusion::continuidadPorRut(1, 2026));
@@ -309,6 +309,63 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
     private function instalarContinuidad(): void
     {
         (require database_path('migrations/2026_09_14_160000_add_continuidad_to_dotacion_docente_exclusiones.php'))->up();
+    }
+
+    public function test_conservacion_y_salida_se_guardan_independientes_y_con_alcance_anual(): void
+    {
+        $this->instalarContinuidad();
+        $this->guardar(['considerar_dotacion_siguiente' => 0]);
+        $antes = DotacionDocenteExclusion::sole()->getAttributes();
+        $migracion = require database_path('migrations/2026_09_14_170000_add_conservar_horas_to_dotacion_docente_exclusiones.php');
+        $migracion->up();
+        $migracion->up();
+        $this->assertEquals($antes, array_diff_key(DotacionDocenteExclusion::sole()->getAttributes(), ['conservar_horas_necesarias' => true]));
+        $this->assertTrue(DotacionDocenteExclusion::sole()->conservar_horas_necesarias);
+
+        foreach ([[0, 1], [0, 0], [1, 1], [1, 0]] as [$continua, $conserva]) {
+            $this->guardar(['considerar_dotacion_siguiente' => $continua, 'conservar_horas_necesarias' => $conserva]);
+            $this->assertSame((bool) $continua, DotacionDocenteExclusion::sole()->considerar_dotacion_siguiente);
+            $this->assertSame(['111111111' => (bool) $conserva], DotacionDocenteExclusion::conservacionHorasPorRut(1, 2026));
+            $this->assertSame([], DotacionDocenteExclusion::conservacionHorasPorRut(1, 2027));
+            $this->assertSame([], DotacionDocenteExclusion::conservacionHorasPorRut(2, 2026));
+            $this->assertSame(44.0, $this->docente()['horas_contrato_base']);
+            $this->assertSame(20.0, $this->docente()['horas_contrato']);
+            $this->assertSame(44.0, $this->docente()['horas_asignadas_total']);
+
+            $html = view('admin.dotacion-establecimiento.partials._docentes', [
+                'docentes' => collect([$this->docente()]), 'establecimiento' => Establecimiento::findOrFail(1),
+                'anio' => 2026, 'canManageDocenteExclusiones' => true, 'docenteExclusionesTableReady' => true,
+                'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS, 'errors' => new ViewErrorBag,
+                'continuidadDisponible' => true, 'continuidadPorRut' => DotacionDocenteExclusion::continuidadPorRut(1, 2026),
+                'conservacionHorasDisponible' => true, 'conservacionHorasPorRut' => DotacionDocenteExclusion::conservacionHorasPorRut(1, 2026),
+            ])->render();
+            $dom = new \DOMDocument;
+            @$dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+            $xpath = new \DOMXPath($dom);
+            $this->assertSame((bool) $continua, $xpath->evaluate('boolean(//input[@type="checkbox" and @name="considerar_dotacion_siguiente"]/@checked)'));
+            $this->assertSame((bool) $conserva, $xpath->evaluate('boolean(//input[@type="checkbox" and @name="conservar_horas_necesarias"]/@checked)'));
+            $this->assertSame('0', $xpath->evaluate('string(//input[@type="hidden" and @name="conservar_horas_necesarias"]/@value)'));
+            $this->assertStringContainsString('Contemplar horas necesarias en dotación 2027', $html);
+        }
+        $this->guardar(); // Una pantalla antigua no cambia ninguna de las dos decisiones.
+        $this->assertFalse(DotacionDocenteExclusion::sole()->conservar_horas_necesarias);
+        $this->assertTrue(DotacionDocenteExclusion::sole()->considerar_dotacion_siguiente);
+    }
+
+    public function test_rechaza_conservacion_sin_migracion_y_valores_no_booleanos(): void
+    {
+        $this->assertFalse(DotacionDocenteExclusion::conservacionHorasDisponible());
+        $this->assertSame([], DotacionDocenteExclusion::conservacionHorasPorRut(1, 2026));
+        try {
+            $this->guardar(['conservar_horas_necesarias' => 1]);
+            $this->fail('No puede guardar una decisión sin su columna.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('conservar_horas_necesarias', $exception->errors());
+            $this->assertDatabaseCount('dotacion_docente_exclusiones', 0);
+        }
+        (require database_path('migrations/2026_09_14_170000_add_conservar_horas_to_dotacion_docente_exclusiones.php'))->up();
+        $this->expectException(ValidationException::class);
+        $this->guardar(['conservar_horas_necesarias' => 'tal vez']);
     }
 
     private function guardar(array $data = []): \Illuminate\Http\RedirectResponse

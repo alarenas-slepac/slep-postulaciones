@@ -122,6 +122,8 @@
                         $horasNecesariasSeleccionadas = $formConErrores ? old('horas_necesarias') : ($docente['horas_contrato'] ?? $horasContratoBaseDocente);
                         $continuaDotacion = ($continuidadPorRut ?? [])[$docente['rut_normalizado'] ?? \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? '')] ?? true;
                         $continuidadSeleccionada = $formConErrores ? old('considerar_dotacion_siguiente', $continuaDotacion) : $continuaDotacion;
+                        $conservarHoras = ($conservacionHorasPorRut ?? [])[$docente['rut_normalizado'] ?? \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? '')] ?? true;
+                        $conservacionSeleccionada = $formConErrores ? old('conservar_horas_necesarias', $conservarHoras) : $conservarHoras;
                         $funcionesTecnicoPedagogicasDetalle = collect($docente['funciones_tecnico_pedagogicas_detalle'] ?? []);
                         $otrasFuncionesDetalle = collect($docente['otras_funciones_detalle'] ?? []);
                     @endphp
@@ -162,7 +164,7 @@
                                 <div class="small text-warning mt-1">{{ $exclusionDocente['motivo_label'] }} · {{ $fmt($exclusionDocente['horas']) }} h</div>
                             @endif
                             @if (!$continuaDotacion)
-                                <div class="badge text-bg-secondary mt-1">No continúa en {{ ($anio ?? $docente['anio']) + 1 }}</div>
+                                <div class="badge text-bg-danger mt-1">No continúa en {{ ($anio ?? $docente['anio']) + 1 }}</div>
                             @endif
                         </td>
                     </tr>
@@ -312,12 +314,25 @@
                                                             <input type="hidden" name="considerar_dotacion_siguiente" value="0">
                                                             <div class="form-check">
                                                                 <input class="form-check-input @if($formConErrores && $errors->has('considerar_dotacion_siguiente')) is-invalid @endif" type="checkbox" id="{{ $collapseId }}-continuidad" name="considerar_dotacion_siguiente" value="1" @checked($continuidadSeleccionada) aria-describedby="{{ $collapseId }}-continuidad-ayuda">
-                                                                <label class="form-check-label fw-semibold" for="{{ $collapseId }}-continuidad">Contemplar a este docente y sus horas en dotación {{ $anio + 1 }}</label>
+                                                                <label class="form-check-label fw-semibold" for="{{ $collapseId }}-continuidad">El docente continúa en dotación {{ $anio + 1 }}</label>
                                                                 @if ($formConErrores) @error('considerar_dotacion_siguiente')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                             </div>
-                                                            <div class="form-text" id="{{ $collapseId }}-continuidad-ayuda">Al desmarcar, su contrato y sus asignaciones dejan de cubrir la proyección {{ $anio + 1 }}. Las horas necesarias del plan de estudio y de las funciones normativas se mantienen. La dotación {{ $anio }} conserva sus registros.</div>
+                                                            <div class="form-text" id="{{ $collapseId }}-continuidad-ayuda">Desmarque si la persona no continúa: su contrato y sus asignaciones dejan de cubrir la proyección {{ $anio + 1 }}. Conservar sus horas necesarias no reincorpora al docente.</div>
                                                         @else
                                                             <div class="alert alert-warning py-2 mb-0">La continuidad para dotación {{ $anio + 1 }} estará disponible después de instalar la migración de continuidad docente.</div>
+                                                        @endif
+                                                    </div>
+                                                    <div class="col-12 mt-3">
+                                                        @if ($conservacionHorasDisponible ?? false)
+                                                            <input type="hidden" name="conservar_horas_necesarias" value="0">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input @if($formConErrores && $errors->has('conservar_horas_necesarias')) is-invalid @endif" type="checkbox" id="{{ $collapseId }}-conservar-horas" name="conservar_horas_necesarias" value="1" @checked($conservacionSeleccionada) aria-describedby="{{ $collapseId }}-conservar-horas-ayuda">
+                                                                <label class="form-check-label fw-semibold" for="{{ $collapseId }}-conservar-horas">Contemplar horas necesarias en dotación {{ $anio + 1 }}</label>
+                                                                @if ($formConErrores) @error('conservar_horas_necesarias')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
+                                                            </div>
+                                                            <div class="form-text" id="{{ $collapseId }}-conservar-horas-ayuda">Si el docente no continúa, conserva sus horas necesarias como vacantes por cubrir. Las horas ya incluidas en sus necesidades de plan o funciones se cuentan una sola vez. Al desmarcar, no se agrega una reserva por esta situación; los planes y funciones configurados conservan sus propias necesidades.</div>
+                                                        @else
+                                                            <div class="alert alert-warning py-2 mb-0">La conservación independiente de horas estará disponible después de instalar su migración.</div>
                                                         @endif
                                                     </div>
                                                     <div class="col-12 d-flex flex-wrap gap-2">

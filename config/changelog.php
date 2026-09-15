@@ -4110,8 +4110,44 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.14.528',
+    'current_version' => '2026.9.14.531',
     'entries' => [
+        [
+            'version' => '2026.9.14.531',
+            'title' => 'Dotación: contraste del estado No continúa',
+            'summary' => 'Mejora la legibilidad de las etiquetas de docentes que no continúan.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Usa fondo rojo oscuro y texto blanco para No continúa, tanto en la nómina docente como en la proyección del año siguiente.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
+        [
+            'version' => '2026.9.14.530',
+            'title' => 'Dotación: separar salida docente y conservación de horas necesarias',
+            'summary' => 'Permite conservar las horas necesarias de quien sale como vacantes del año siguiente sin reincorporar a la persona.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Separa las casillas El docente continúa y Contemplar horas necesarias, ambas con el año proyectado. Conservar horas no cambia la decisión de salida.',
+                'Muestra Hrs vacantes por cubrir en verde oscuro y suma solo las horas necesarias conservadas de docentes que no continúan. Usa el mismo verde legible para las brechas positivas.',
+                'Evita duplicar horas ya incluidas en necesidades de plan o funciones vinculadas. Incorpora las horas restantes como necesidad adicional de Aula, Parvularia o PIE y muestra el desglose.',
+                'Incluye migración aditiva para conservar horas por separado, sin modificar decisiones históricas de continuidad, y pruebas de persistencia, proyección y formularios.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
+        [
+            'version' => '2026.9.14.529',
+            'title' => 'Dotación: protección contractual por fuero maternal y horas gremiales',
+            'summary' => 'Protege el contrato original completo frente a propuestas de reducción, contabilizando solo las horas necesarias.',
+            'roles' => ['admin', 'coordinador_gdp', 'supervisor_plani', 'coordinador_uatp'],
+            'items' => [
+                'Excluye a docentes con Fuero maternal u Horas gremiales de las nóminas de contrato sin asignación revisable, funciones declaradas ajustables y sobredotación PIE revisable.',
+                'Conserva contratos contabilizados, coberturas reales y brechas estructurales. En PIE reserva primero el aporte de los contratos protegidos, sin superar las necesidades del establecimiento.',
+                'Muestra el contrato original protegido y las horas necesarias en una nómina informativa separada, tanto en pantalla como en Excel.',
+                'Aplica automáticamente a situaciones históricas y deja de proteger al cambiar o eliminar el motivo. Incluye pruebas de cálculos, categorías, visualización y exportación. No requiere migraciones.',
+            ],
+            'published_at' => '2026-09-14',
+        ],
         [
             'version' => '2026.9.14.528',
             'title' => 'Dotación: rótulo de horas vacantes en la proyección',

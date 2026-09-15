@@ -262,6 +262,22 @@ class DotacionSobredotacionEstablecimientosExport
             'DDEBF7'
         ) - 1;
 
+        $protegidos = collect($sobredotacion['protegidos'] ?? []);
+        if ($protegidos->isNotEmpty()) {
+            $lastRow = $this->writeTable(
+                $sheet,
+                $lastRow + 1,
+                'Contratos protegidos por situación docente (excluidos de reducción)',
+                ['RUT', 'Docente', 'Situación', 'Tipo contrato', 'Contrato original protegido', 'Horas necesarias contabilizadas'],
+                $protegidos->map(fn (array $item) => [
+                    $item['rut'], $item['nombre'], $item['motivo_proteccion'], $item['tipo_contrato'],
+                    $this->hours($item['contrato_original']), $this->hours($item['contrato_considerado']),
+                ])->all(),
+                [5, 6],
+                'E2F0D9'
+            ) - 1;
+        }
+
         $this->setColumnWidths($sheet);
         $sheet->freezePane('A6');
         $sheet->getStyle("A1:L{$lastRow}")->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
@@ -292,7 +308,7 @@ class DotacionSobredotacionEstablecimientosExport
         }
 
         $brecha = (float) ($aula['brecha_estructural'] ?? 0);
-        $pieSobredotacion = (float) ($pie['horas_sobredotacion_total'] ?? 0);
+        $pieSobredotacion = (float) ($pie['horas_sobredotacion_estructural'] ?? $pie['horas_sobredotacion_total'] ?? 0);
         $pieNecesarias = (float) ($pie['horas_necesarias_pendientes'] ?? 0);
         $estructuralEstado = $brecha < -0.01 ? 'Sobredotación estructural' : ($brecha > 0.01 ? 'Horas necesarias' : 'Cuadrada');
         $pieEstado = $pieSobredotacion > 0.01 ? 'Sobredotación PIE' : ($pieNecesarias > 0.01 ? 'Horas necesarias' : 'Cuadrada');
@@ -302,7 +318,7 @@ class DotacionSobredotacionEstablecimientosExport
         ];
         $aulaRows = [
             ['Contrato Aula individualizado', $this->hours($aula['horas_dotacion_total'] ?? 0), 'Asignaciones protegidas', $this->hours($aula['horas_asignadas_protegidas'] ?? 0)],
-            ['Declaradas docentes', $this->hours($aula['horas_declaradas_ajustables'] ?? 0), 'Declaradas requeridas', $this->hours($aula['horas_declaradas_requeridas'] ?? $aulaFormula['bloque_declarado'] ?? 0)],
+            ['Declaradas docentes', $this->hours($aula['horas_declaradas_asignadas'] ?? $aula['horas_declaradas_ajustables'] ?? 0), 'Declaradas requeridas', $this->hours($aula['horas_declaradas_requeridas'] ?? $aulaFormula['bloque_declarado'] ?? 0)],
             ['Declaradas pendientes', $this->hours($aula['horas_declaradas_pendientes'] ?? 0), 'Contrato sin asignación', $this->hours($aula['horas_sobredotacion_total'] ?? 0)],
             ['Sin asignación Titular', $this->hours($aula['horas_sobredotacion_planta'] ?? 0), 'Sin asignación Contrata', $this->hours($aula['horas_sobredotacion_contrata'] ?? 0)],
             ['Universo sujeto a revisión', $this->hours($aula['horas_universo_revision'] ?? $aula['horas_potencial_ajuste'] ?? 0), 'Diferencia entre indicadores', round((float) ($aula['horas_diferencia_indicadores'] ?? 0), 2)],

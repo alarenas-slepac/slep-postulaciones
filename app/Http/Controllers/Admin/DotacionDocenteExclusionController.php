@@ -28,6 +28,7 @@ class DotacionDocenteExclusionController extends Controller
             'horas_necesarias' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:999999.99'],
             'horas' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:999999.99'],
             'considerar_dotacion_siguiente' => ['sometimes', 'required', 'boolean'],
+            'conservar_horas_necesarias' => ['sometimes', 'required', 'boolean'],
         ]);
 
         if (array_key_exists('considerar_dotacion_siguiente', $data) && ! DotacionDocenteExclusion::continuidadDisponible()) {
@@ -37,6 +38,11 @@ class DotacionDocenteExclusionController extends Controller
         }
 
         $anio = (int) $data['anio'];
+        if (array_key_exists('conservar_horas_necesarias', $data) && ! DotacionDocenteExclusion::conservacionHorasDisponible()) {
+            throw ValidationException::withMessages([
+                'conservar_horas_necesarias' => 'Debe ejecutar la migración de conservación de horas necesarias antes de guardar esta decisión.',
+            ]);
+        }
         $rutNormalizado = DotacionEstablecimientoCalculator::normalizeRut((string) $data['docente_rut']);
         $docente = DotacionEstablecimientoCalculator::docentes($establecimiento, $anio)
             ->first(fn (array $item) => ($item['rut_normalizado'] ?? '') === $rutNormalizado);
@@ -76,6 +82,9 @@ class DotacionDocenteExclusionController extends Controller
         if (array_key_exists('considerar_dotacion_siguiente', $data)) {
             $exclusion->considerar_dotacion_siguiente = $request->boolean('considerar_dotacion_siguiente');
         }
+        if (array_key_exists('conservar_horas_necesarias', $data)) {
+            $exclusion->conservar_horas_necesarias = $request->boolean('conservar_horas_necesarias');
+        }
 
         // Conserva el campo histórico: "horas" son las no necesarias.
         // Las necesarias se obtienen como contrato vigente menos estas horas,
@@ -92,7 +101,7 @@ class DotacionDocenteExclusionController extends Controller
             $establecimiento,
             'anio' => $anio,
             'tab' => 'docentes',
-        ])->with('success', 'Situación docente guardada. Se actualizó la distribución contractual y, cuando corresponde, la continuidad en la proyección del año siguiente.');
+        ])->with('success', 'Situación docente guardada. Se actualizaron la distribución contractual y las decisiones de continuidad y conservación de horas para la proyección.');
     }
 
     public function destroy(

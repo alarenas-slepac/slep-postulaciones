@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\DotacionDocenteAsignacion;
+use App\Models\DotacionDocenteExclusion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -30,7 +31,7 @@ class DotacionSobredotacionCalculator
      * @param  iterable<int, array<string, mixed>>  $docentes
      * @param  array<string, mixed>  $resumen
      * @param  iterable<int, array<string, mixed>>  $necesidadesFunciones
-     * @return array{aula: array<string, mixed>, pie: array<string, mixed>}
+     * @return array{aula: array<string, mixed>, pie: array<string, mixed>, protegidos: Collection}
      */
     public static function build(iterable $docentes, array $resumen, iterable $necesidadesFunciones = []): array
     {
@@ -57,6 +58,7 @@ class DotacionSobredotacionCalculator
         $necesidadPie = self::numero($resumen, 'horas_contrato_pie_necesarias');
 
         return [
+            'protegidos' => $base->where('contrato_protegido', true)->values(),
             'aula' => self::analizarAula($base, $necesidadAula, $aulaObjetivo, [
                 'contrato_plan_pie' => (float) ($resumen['contrato_plan_general_mas_trabajo_colaborativo_pie']
                     ?? max(0.0, self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie')
@@ -77,6 +79,7 @@ class DotacionSobredotacionCalculator
     private static function prepararDocente(array $docente, Collection $clasificacionFunciones, bool $especial = false): array
     {
         $horasContrato = round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2);
+        $motivo = (string) data_get($docente, 'exclusion_docente.motivo', '');
         [$planta, $contrata] = self::contratoPorCalidad($docente, $horasContrato);
         $asignaciones = collect($docente['asignaciones'] ?? []);
         $contratoPie = array_key_exists('horas_contrato_pie', $docente)
@@ -117,6 +120,10 @@ class DotacionSobredotacionCalculator
             'funcion' => (string) ($docente['funcion'] ?? 'Sin función declarada'),
             'tipo_contrato' => (string) ($docente['tipo_contrato'] ?? 'Sin tipo contrato'),
             'es_titular' => self::esTitular($docente),
+            'contrato_protegido' => in_array($motivo, ['fuero_maternal', 'horas_gremiales'], true),
+            'motivo_proteccion' => DotacionDocenteExclusion::MOTIVOS[$motivo] ?? '',
+            'contrato_original' => round(max(0.0, (float) ($docente['horas_contrato_base'] ?? $horasContrato)), 2),
+            'contrato_considerado' => $horasContrato,
             'aula_planta' => round(max(0.0, $planta - $piePlanta), 2),
             'aula_contrata' => round(max(0.0, $contrata - $pieContrata), 2),
             'pie_planta' => round($piePlanta, 2),
@@ -172,6 +179,7 @@ class DotacionSobredotacionCalculator
                 'funcion' => $docente['funcion'],
                 'tipo_contrato' => $docente['tipo_contrato'],
                 'es_ajuste' => false,
+                'contrato_protegido' => $docente['contrato_protegido'],
                 'horas_contrato_categoria' => $contratoAula,
                 'horas_dotacion_total' => $contratoAula,
                 'horas_asignadas_protegidas' => $protegidas,
@@ -192,14 +200,14 @@ class DotacionSobredotacionCalculator
             ->values();
 
         $sobredotados = $analizados
-            ->filter(fn (array $item) => $item['horas_sobredotacion_total'] > 0.01)
+            ->filter(fn (array $item) => ! $item['contrato_protegido'] && $item['horas_sobredotacion_total'] > 0.01)
             ->sortBy([
                 ['horas_sobredotacion_total', 'desc'],
                 ['nombre', 'asc'],
             ])
             ->values();
         $ajustes = $analizados
-            ->filter(fn (array $item) => $item['horas_declaradas_ajustables'] > 0.01)
+            ->filter(fn (array $item) => ! $item['contrato_protegido'] && $item['horas_declaradas_ajustables'] > 0.01)
             ->sortBy([
                 ['horas_declaradas_ajustables', 'desc'],
                 ['nombre', 'asc'],
@@ -211,6 +219,8 @@ class DotacionSobredotacionCalculator
         $brechaEstructural = round($formula['contrato_plan_pie'] + $formula['bloque_normativo'] - $formula['contrato_aula'], 2);
         $sobredotacionReal = self::sumar($sobredotados, 'horas_sobredotacion_total');
         $declaradasAjustables = self::sumar($ajustes, 'horas_declaradas_ajustables');
+        // La protección impide proponer ajustes, pero no borra la cobertura real.
+        $declaradasAsignadas = self::sumar($analizados, 'horas_declaradas_ajustables');
         $asignadasTotal = self::sumar($analizados, 'horas_asignadas_total');
         $declaradasRequeridas = round(max(0.0, (float) ($formula['bloque_declarado'] ?? 0)), 2);
         $sobredotacionEstructural = max(0.0, round(-$brechaEstructural, 2));
@@ -231,9 +241,11 @@ class DotacionSobredotacionCalculator
                 'horas_necesarias_estructurales' => max(0.0, $brechaEstructural),
                 'horas_asignadas_protegidas' => self::sumar($analizados, 'horas_asignadas_protegidas'),
                 'horas_declaradas_ajustables' => $declaradasAjustables,
+                'horas_declaradas_asignadas' => $declaradasAsignadas,
+                'horas_declaradas_protegidas' => round($declaradasAsignadas - $declaradasAjustables, 2),
                 'horas_declaradas_requeridas' => $declaradasRequeridas,
-                'horas_declaradas_pendientes' => max(0.0, round($declaradasRequeridas - $declaradasAjustables, 2)),
-                'horas_declaradas_excedentes' => max(0.0, round($declaradasAjustables - $declaradasRequeridas, 2)),
+                'horas_declaradas_pendientes' => max(0.0, round($declaradasRequeridas - $declaradasAsignadas, 2)),
+                'horas_declaradas_excedentes' => max(0.0, round($declaradasAsignadas - $declaradasRequeridas, 2)),
                 'horas_declaradas_titulares' => self::sumar($ajustes, 'horas_declaradas_titulares'),
                 'horas_declaradas_contrata' => self::sumar($ajustes, 'horas_declaradas_contrata'),
                 'horas_declaradas_sin_cobertura' => self::sumar($ajustes, 'horas_declaradas_sin_cobertura'),
@@ -242,6 +254,7 @@ class DotacionSobredotacionCalculator
                 'horas_diferencia_indicadores' => round($sobredotacionReal - $sobredotacionEstructural, 2),
                 'horas_sobreasignadas' => self::sumar($analizados, 'horas_sobreasignadas'),
                 'horas_sobredotacion_total' => $sobredotacionReal,
+                'horas_sobredotacion_protegida' => self::sumar($analizados->where('contrato_protegido', true), 'horas_sobredotacion_total'),
                 'horas_sobredotacion_planta' => self::sumar($sobredotados, 'horas_sobredotacion_planta'),
                 'horas_sobredotacion_contrata' => self::sumar($sobredotados, 'horas_sobredotacion_contrata'),
                 'horas_universo_revision' => $universoRevision,
@@ -271,6 +284,7 @@ class DotacionSobredotacionCalculator
             'funcion' => $docente['funcion'],
             'tipo_contrato' => $docente['tipo_contrato'],
             'es_ajuste' => false,
+            'contrato_protegido' => $docente['contrato_protegido'],
         ], $horas, [
             'horas_dotacion_total' => round(
                 (float) $horas['horas_dotacion_planta'] + (float) $horas['horas_dotacion_contrata'],
@@ -291,6 +305,7 @@ class DotacionSobredotacionCalculator
                 'funcion' => 'Revisar asignación individual',
                 'tipo_contrato' => 'Sin clasificación individual',
                 'es_ajuste' => true,
+                'contrato_protegido' => false,
                 'horas_contrato_categoria' => $diferencia,
                 'horas_dotacion_planta' => 0.0,
                 'horas_dotacion_contrata' => $diferencia,
@@ -335,11 +350,15 @@ class DotacionSobredotacionCalculator
         $disponibles = self::sumar($items, 'horas_dotacion_total');
         $porCubrir = min($disponibles, max(0.0, round($horasNecesarias, 2)));
 
+        // Reserva primero el aporte necesario de los contratos protegidos.
+        // No genera cobertura ficticia: nunca distribuye más que la necesidad PIE.
         foreach ([
-            ['capacidad' => 'horas_dotacion_planta', 'cubierta' => 'horas_necesidad_cubierta_planta'],
-            ['capacidad' => 'horas_dotacion_contrata', 'cubierta' => 'horas_necesidad_cubierta_contrata'],
+            ['protegido' => true, 'capacidad' => 'horas_dotacion_planta', 'cubierta' => 'horas_necesidad_cubierta_planta'],
+            ['protegido' => true, 'capacidad' => 'horas_dotacion_contrata', 'cubierta' => 'horas_necesidad_cubierta_contrata'],
+            ['protegido' => false, 'capacidad' => 'horas_dotacion_planta', 'cubierta' => 'horas_necesidad_cubierta_planta'],
+            ['protegido' => false, 'capacidad' => 'horas_dotacion_contrata', 'cubierta' => 'horas_necesidad_cubierta_contrata'],
         ] as $calidad) {
-            $orden = $items->keys()->sort(function (int $a, int $b) use ($items) {
+            $orden = $items->where('contrato_protegido', $calidad['protegido'])->keys()->sort(function (int $a, int $b) use ($items) {
                 $asignadas = (float) $items[$b]['horas_asignadas_relevantes'] <=> (float) $items[$a]['horas_asignadas_relevantes'];
                 if ($asignadas !== 0) {
                     return $asignadas;
@@ -381,7 +400,7 @@ class DotacionSobredotacionCalculator
             return $item;
         });
         $sobredotados = $analizados
-            ->filter(fn (array $item) => $item['horas_sobredotacion_total'] > 0.01)
+            ->filter(fn (array $item) => ! $item['contrato_protegido'] && $item['horas_sobredotacion_total'] > 0.01)
             ->sortBy([
                 ['horas_sobredotacion_total', 'desc'],
                 ['nombre', 'asc'],
@@ -399,6 +418,8 @@ class DotacionSobredotacionCalculator
                 'horas_necesidad_cubierta' => self::sumar($analizados, 'horas_necesidad_cubierta'),
                 'horas_necesarias_pendientes' => max(0.0, round($horasNecesarias - $disponibles, 2)),
                 'horas_sobredotacion_total' => self::sumar($sobredotados, 'horas_sobredotacion_total'),
+                'horas_sobredotacion_estructural' => max(0.0, round($disponibles - $horasNecesarias, 2)),
+                'horas_sobredotacion_protegida' => self::sumar($analizados->where('contrato_protegido', true), 'horas_sobredotacion_total'),
                 'horas_sobredotacion_planta' => self::sumar($sobredotados, 'horas_sobredotacion_planta'),
                 'horas_sobredotacion_contrata' => self::sumar($sobredotados, 'horas_sobredotacion_contrata'),
                 'tiene_ajuste_no_asociado' => $analizados->contains(fn (array $item) => (bool) $item['es_ajuste']),
