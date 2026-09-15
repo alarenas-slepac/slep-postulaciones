@@ -820,7 +820,7 @@ class DotacionEstablecimientoCalculator
         }
 
         $query = app(PadronPeriodoService::class)
-            ->consultaAnual((int) $establecimiento->id, $anio)->sinReemplazoSuplencia();
+            ->consultaAnualParaDotacion((int) $establecimiento->id, $anio)->sinReemplazoSuplencia();
 
         if (self::schemaHasColumn('reemplazos_personal', 'vigente')) {
             $query->where('vigente', true);
@@ -1019,7 +1019,7 @@ class DotacionEstablecimientoCalculator
         }
 
         $query = app(PadronPeriodoService::class)
-            ->consultaAnual((int) $establecimiento->id, $anio)->sinReemplazoSuplencia();
+            ->consultaAnualParaDotacion((int) $establecimiento->id, $anio)->sinReemplazoSuplencia();
 
         if (self::schemaHasColumn('reemplazos_personal', 'vigente')) {
             $query->where('vigente', true);
