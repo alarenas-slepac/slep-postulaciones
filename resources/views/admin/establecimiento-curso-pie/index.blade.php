@@ -35,7 +35,9 @@
     @endif
 
     @if (session('pie_transfer_result'))
-        @php($transferResult = session('pie_transfer_result'))
+        @php
+            $transferResult = session('pie_transfer_result');
+        @endphp
         <div class="alert alert-info">
             <div class="fw-semibold mb-2">Traspaso de estudiantes PIE {{ $transferResult['anio_origen'] }} → {{ $transferResult['anio_destino'] }}</div>
             <div class="d-flex flex-wrap gap-2 mb-2">

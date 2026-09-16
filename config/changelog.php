@@ -12,11 +12,13 @@ return [
             'resources/views/admin/establecimiento-curso-pie/index.blade.php',
             'routes/web.php',
             'tests/Feature/PieCourseTransferServiceTest.php',
+            'tests/Feature/PieCourseTransferViewSyntaxTest.php',
         ],
         'changes' => [
             'Agrega un botón por establecimiento para traspasar estudiantes PIE desde 2026 hacia 2027.',
             'Conserva los valores por sección cuando la estructura coincide; consolida al reducir secciones y distribuye los totales al aumentar secciones, asignando los remanentes a las primeras letras.',
             'No sobrescribe registros PIE existentes en 2027 y omite niveles sin cursos destino o cuya asignación supere la matrícula.',
+            'Corrige la compilación del resumen de traspaso y agrega una prueba de sintaxis para la vista.',
         ],
         'roles' => ['Administrador', 'Coordinador UATP', 'Directivo Establecimiento'],
     ],
