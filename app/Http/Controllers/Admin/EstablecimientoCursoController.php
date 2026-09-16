@@ -20,6 +20,7 @@ class EstablecimientoCursoController extends Controller
         $establecimientoId = trim((string) $request->query('establecimiento_id', ''));
         $cursoId = trim((string) $request->query('curso_id', ''));
         $regimen = trim((string) $request->query('regimen_jec', ''));
+        $estadoPlan = trim((string) $request->query('estado_plan', ''));
         $q = trim((string) $request->query('q', ''));
 
         $items = DB::table('establecimiento_cursos as ec')
@@ -34,6 +35,8 @@ class EstablecimientoCursoController extends Controller
             ->when($establecimientoId !== '', fn ($query) => $query->where('ec.establecimiento_id', (int) $establecimientoId))
             ->when($cursoId !== '', fn ($query) => $query->where('ec.curso_id', (int) $cursoId))
             ->when($regimen !== '', fn ($query) => $query->where('ec.regimen_jec', $regimen))
+            ->when($estadoPlan === 'con_plan', fn ($query) => $query->whereNotNull('pe.id'))
+            ->when($estadoPlan === 'sin_plan', fn ($query) => $query->whereNull('pe.id'))
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($inner) use ($q) {
                     $inner->where('ec.nombre_seccion', 'like', "%{$q}%")
@@ -83,6 +86,7 @@ class EstablecimientoCursoController extends Controller
             'establecimientoId' => $establecimientoId,
             'cursoId' => $cursoId,
             'regimen' => $regimen,
+            'estadoPlan' => $estadoPlan,
             'q' => $q,
         ]);
     }

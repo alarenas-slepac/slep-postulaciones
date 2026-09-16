@@ -40,11 +40,11 @@
 
     <form method="GET" class="card card-body shadow-sm mb-3">
         <div class="row g-2 align-items-end">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">Buscar</label>
                 <input type="text" class="form-control" name="q" value="{{ $q }}" placeholder="RBD, establecimiento o curso">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label">Año</label>
                 <input type="number" class="form-control" name="anio" value="{{ $anio }}" placeholder="2026">
             </div>
@@ -79,6 +79,14 @@
                     <option value="Con JEC" @selected($regimen === 'Con JEC')>Con JEC</option>
                     <option value="Sin JEC" @selected($regimen === 'Sin JEC')>Sin JEC</option>
                     <option value="No aplica" @selected($regimen === 'No aplica')>No aplica</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Plan de estudio</label>
+                <select class="form-select" name="estado_plan">
+                    <option value="">Todos</option>
+                    <option value="con_plan" @selected($estadoPlan === 'con_plan')>Con plan</option>
+                    <option value="sin_plan" @selected($estadoPlan === 'sin_plan')>Sin plan</option>
                 </select>
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
