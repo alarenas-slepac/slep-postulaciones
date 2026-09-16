@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.16.471' => [
+        'date' => '2026-09-16',
+        'module' => 'Cursos por establecimiento',
+        'title' => 'Filtro por plan de estudio asociado',
+        'files' => [
+            'app/Http/Controllers/Admin/EstablecimientoCursoController.php',
+            'config/changelog.php',
+            'resources/views/admin/establecimiento-cursos/index.blade.php',
+            'tests/Feature/EstablecimientoCursoPlanFilterTest.php',
+        ],
+        'changes' => [
+            'Agrega un filtro para mostrar cursos con plan de estudio asociado o sin plan asociado.',
+            'El filtro considera la existencia real del plan y conserva los filtros de año, establecimiento, curso, régimen y búsqueda.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP'],
+    ],
     '2026.9.16.470' => [
         'date' => '2026-09-16',
         'module' => 'Estudiantes PIE por curso',
