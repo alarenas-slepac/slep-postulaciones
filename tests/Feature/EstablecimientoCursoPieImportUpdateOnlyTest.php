@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\Admin\EstablecimientoCursoPieController;
 use App\Models\EstablecimientoCurso;
+use App\Models\EstablecimientoCursoPie;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -15,6 +16,35 @@ use Tests\TestCase;
 
 class EstablecimientoCursoPieImportUpdateOnlyTest extends TestCase
 {
+    public function test_course_being_edited_is_rendered_as_a_selected_option_in_the_searchable_selector(): void
+    {
+        $this->createTables();
+
+        try {
+            $this->seedRecords();
+            $cursoSeleccionado = EstablecimientoCurso::query()
+                ->with(['establecimiento', 'curso', 'planEstudio'])
+                ->findOrFail(10);
+            $pie = EstablecimientoCursoPie::query()->findOrFail(100);
+
+            $html = view('admin.establecimiento-curso-pie._form', [
+                'pie' => $pie,
+                'cursoSeleccionado' => $cursoSeleccionado,
+                'cursosDisponibles' => collect(),
+                'estados' => EstablecimientoCursoPie::ESTADOS,
+                'activeRole' => 'admin',
+            ])->render();
+
+            $this->assertStringContainsString('id="establecimientoCursoSelect"', $html);
+            $this->assertStringContainsString('value="10" selected', $html);
+        } finally {
+            Schema::dropIfExists('establecimiento_curso_pie');
+            Schema::dropIfExists('establecimiento_cursos');
+            Schema::dropIfExists('cursos');
+            Schema::dropIfExists('establecimientos');
+        }
+    }
+
     public function test_available_courses_keeps_the_course_being_edited_when_it_falls_outside_the_limit(): void
     {
         $this->createTables();

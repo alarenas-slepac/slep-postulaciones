@@ -2,14 +2,21 @@
     $selectedCurso = old('establecimiento_curso_id', $pie->establecimiento_curso_id);
     $selectedEstado = old('estado', $pie->estado ?: 'borrador');
     $canChangeEstado = in_array($activeRole, ['admin', 'coordinador_uatp'], true);
+    $cursoSeleccionadoLabel = $cursoSeleccionado
+        ? trim(($cursoSeleccionado->establecimiento?->rbd ?: $cursoSeleccionado->rbd).' — '.($cursoSeleccionado->establecimiento?->nombre_establecimiento ?: 'Sin establecimiento').' · '.($cursoSeleccionado->nombre_seccion ?: trim(($cursoSeleccionado->curso?->nombre ?? '').' '.($cursoSeleccionado->letra ?? ''))).' · '.$cursoSeleccionado->anio.' · Matrícula '.$cursoSeleccionado->matricula)
+        : null;
 @endphp
 
 <div class="row g-3">
     <div class="col-lg-8">
         <label class="form-label">Curso/sección <span class="text-danger">*</span></label>
-        <select class="form-select" name="establecimiento_curso_id" required>
+        <select id="establecimientoCursoSelect" class="form-select pie-curso-selector" name="establecimiento_curso_id" data-placeholder="Buscar curso, sección, RBD o establecimiento..." required>
             <option value="">Seleccione curso/sección...</option>
+            @if ($cursoSeleccionado)
+                <option value="{{ $cursoSeleccionado->id }}" @selected((string) $selectedCurso === (string) $cursoSeleccionado->id)>{{ $cursoSeleccionadoLabel }}</option>
+            @endif
             @foreach ($cursosDisponibles as $cursoItem)
+                @continue($cursoSeleccionado && (string) $cursoItem->id === (string) $cursoSeleccionado->id)
                 @php
                     $label = trim(($cursoItem->establecimiento?->rbd ?: $cursoItem->rbd).' — '.($cursoItem->establecimiento?->nombre_establecimiento ?: 'Sin establecimiento').' · '.($cursoItem->nombre_seccion ?: trim(($cursoItem->curso?->nombre ?? '').' '.($cursoItem->letra ?? ''))).' · '.$cursoItem->anio.' · Matrícula '.$cursoItem->matricula);
                 @endphp
@@ -75,9 +82,40 @@
     </div>
 </div>
 
+@push('styles')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+    <style>
+        .pie-curso-selector + .select2-container { width: 100% !important; }
+        .pie-curso-selector + .select2-container .select2-selection--single {
+            min-height: calc(2.25rem + 2px);
+            border-color: var(--bs-border-color);
+            padding: .25rem .75rem;
+        }
+        .pie-curso-selector + .select2-container .select2-selection__rendered { line-height: 1.5rem; padding-left: 0; }
+        .pie-curso-selector + .select2-container .select2-selection__arrow { height: calc(2.25rem + 2px); }
+    </style>
+@endpush
+
 @push('scripts')
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const cursoSelect = window.jQuery ? window.jQuery('#establecimientoCursoSelect') : null;
+        if (cursoSelect?.length && window.jQuery.fn?.select2) {
+            cursoSelect.select2({
+                width: '100%',
+                placeholder: cursoSelect.data('placeholder'),
+                minimumResultsForSearch: 0,
+                language: {
+                    noResults: function () {
+                        return 'No se encontraron cursos o secciones.';
+                    },
+                },
+            });
+            cursoSelect.val(@json((string) $selectedCurso)).trigger('change');
+        }
+
         const neet = document.querySelector('[name="necesidades_transitorias"]');
         const neep = document.querySelector('[name="necesidades_permanentes"]');
         const total = document.getElementById('totalPiePreview');

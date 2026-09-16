@@ -8,10 +8,12 @@ return [
         'files' => [
             'app/Http/Controllers/Admin/EstablecimientoCursoPieController.php',
             'config/changelog.php',
+            'resources/views/admin/establecimiento-curso-pie/_form.blade.php',
             'tests/Feature/EstablecimientoCursoPieImportUpdateOnlyTest.php',
         ],
         'changes' => [
             'Incluye siempre en el selector el curso o sección vinculado al registro PIE durante la edición.',
+            'Agrega búsqueda por curso, sección, RBD y establecimiento, y fija explícitamente el curso actual al abrir la edición.',
             'Conserva el límite de cursos disponibles para el resto de las opciones y permite actualizar registros históricos cuyo curso ya no esté dentro de ese conjunto.',
         ],
         'roles' => ['Administrador', 'Coordinador UATP', 'Directivo Establecimiento'],
