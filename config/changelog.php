@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.16.470' => [
+        'date' => '2026-09-16',
+        'module' => 'Estudiantes PIE por curso',
+        'title' => 'Edición conserva el curso seleccionado',
+        'files' => [
+            'app/Http/Controllers/Admin/EstablecimientoCursoPieController.php',
+            'config/changelog.php',
+            'tests/Feature/EstablecimientoCursoPieImportUpdateOnlyTest.php',
+        ],
+        'changes' => [
+            'Incluye siempre en el selector el curso o sección vinculado al registro PIE durante la edición.',
+            'Conserva el límite de cursos disponibles para el resto de las opciones y permite actualizar registros históricos cuyo curso ya no esté dentro de ese conjunto.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Directivo Establecimiento'],
+    ],
     '2026.9.15.469' => [
         'date' => '2026-09-15',
         'module' => 'Dotación Establecimiento',

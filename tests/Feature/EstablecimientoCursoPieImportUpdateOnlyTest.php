@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Admin\EstablecimientoCursoPieController;
+use App\Models\EstablecimientoCurso;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -14,6 +15,52 @@ use Tests\TestCase;
 
 class EstablecimientoCursoPieImportUpdateOnlyTest extends TestCase
 {
+    public function test_available_courses_keeps_the_course_being_edited_when_it_falls_outside_the_limit(): void
+    {
+        $this->createTables();
+
+        try {
+            $this->seedRecords();
+            $now = now();
+            $availableCourses = [];
+
+            for ($id = 1000; $id < 1800; $id++) {
+                $availableCourses[] = [
+                    'id' => $id,
+                    'establecimiento_id' => 1,
+                    'rbd' => 5001,
+                    'curso_id' => 1,
+                    'anio' => 2027,
+                    'letra' => 'A',
+                    'nombre_seccion' => 'Curso '.$id,
+                    'matricula' => 30,
+                    'regimen_jec' => 'CON JEC',
+                    'activo' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            DB::table('establecimiento_cursos')->insert($availableCourses);
+
+            $request = Request::create('/admin/establecimiento-curso-pie');
+            $method = new \ReflectionMethod(EstablecimientoCursoPieController::class, 'cursosDisponibles');
+            $courses = $method->invoke(
+                app(EstablecimientoCursoPieController::class),
+                $request,
+                EstablecimientoCurso::query()->findOrFail(10)
+            );
+
+            $this->assertCount(801, $courses);
+            $this->assertTrue($courses->contains('id', 10));
+        } finally {
+            Schema::dropIfExists('establecimiento_curso_pie');
+            Schema::dropIfExists('establecimiento_cursos');
+            Schema::dropIfExists('cursos');
+            Schema::dropIfExists('establecimientos');
+        }
+    }
+
     public function test_import_updates_existing_pie_and_reports_rows_without_a_pie_record(): void
     {
         $this->createTables();
