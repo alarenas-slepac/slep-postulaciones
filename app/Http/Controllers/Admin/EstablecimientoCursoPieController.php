@@ -10,6 +10,7 @@ use App\Models\EstablecimientoCursoPie;
 use App\Models\AlumnoPrioritarioPorcentaje;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\PieHorasCalculator;
+use App\Services\Pie\PieCourseTransferService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -179,6 +180,27 @@ class EstablecimientoCursoPieController extends Controller
 
         return redirect()->route('admin.establecimiento-curso-pie.index', ['anio' => $data['anio']])
             ->with('status', 'Registro PIE guardado correctamente.');
+    }
+
+    public function transfer2026To2027(Request $request, PieCourseTransferService $transferService)
+    {
+        $activeRole = $this->authorizePieAccess($request, true);
+        $data = $request->validate([
+            'establecimiento_id' => ['required', 'integer', 'exists:establecimientos,id'],
+        ]);
+        $establecimientoId = (int) $data['establecimiento_id'];
+
+        if ($this->isEstablecimientoRole($activeRole)) {
+            abort_unless($establecimientoId === (int) ($request->user()->establecimiento_id ?? 0), 403);
+        }
+
+        $resultado = $transferService->transfer($establecimientoId, 2026, 2027, $request->user()?->id);
+        $resultado['detalle'] = array_slice($resultado['detalle'], 0, 100);
+
+        return redirect()->route('admin.establecimiento-curso-pie.index', [
+            'anio' => 2027,
+            'establecimiento_id' => $establecimientoId,
+        ])->with('pie_transfer_result', $resultado);
     }
 
     public function show(Request $request, EstablecimientoCursoPie $establecimiento_curso_pie)
