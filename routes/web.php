@@ -657,6 +657,9 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::post('establecimiento-curso-pie/import', [EstablecimientoCursoPieController::class, 'importStore'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
             ->name('establecimiento-curso-pie.import.store');
+        Route::post('establecimiento-curso-pie/transfer-2026-to-2027', [EstablecimientoCursoPieController::class, 'transfer2026To2027'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->name('establecimiento-curso-pie.transfer-2026-to-2027');
 
         Route::resource('establecimiento-curso-pie', EstablecimientoCursoPieController::class)
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
