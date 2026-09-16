@@ -10,6 +10,54 @@ use Illuminate\Support\Facades\DB;
 
 class PieCourseTransferService
 {
+    public function transferForEstablishments(iterable $establecimientoIds, int $anioOrigen, int $anioDestino, ?int $userId): array
+    {
+        $resultado = [
+            'anio_origen' => $anioOrigen,
+            'anio_destino' => $anioDestino,
+            'establecimientos_procesados' => 0,
+            'establecimientos_con_error' => 0,
+            'niveles_procesados' => 0,
+            'registros_creados' => 0,
+            'niveles_omitidos' => 0,
+            'detalle' => [],
+        ];
+
+        $ids = collect($establecimientoIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+
+        foreach ($ids as $establecimientoId) {
+            try {
+                $traspaso = $this->transfer($establecimientoId, $anioOrigen, $anioDestino, $userId);
+
+                $resultado['establecimientos_procesados']++;
+                $resultado['niveles_procesados'] += $traspaso['niveles_procesados'];
+                $resultado['registros_creados'] += $traspaso['registros_creados'];
+                $resultado['niveles_omitidos'] += $traspaso['niveles_omitidos'];
+
+                foreach ($traspaso['detalle'] as $detalle) {
+                    $resultado['detalle'][] = array_merge(['establecimiento_id' => $establecimientoId], $detalle);
+                }
+            } catch (\Throwable $exception) {
+                report($exception);
+
+                $resultado['establecimientos_con_error']++;
+                $resultado['detalle'][] = [
+                    'establecimiento_id' => $establecimientoId,
+                    'nivel' => '—',
+                    'estado' => 'error',
+                    'detalle' => 'No fue posible procesar este establecimiento.',
+                ];
+            }
+        }
+
+        return $resultado;
+    }
+
     public function transfer(int $establecimientoId, int $anioOrigen, int $anioDestino, ?int $userId): array
     {
         return DB::transaction(function () use ($establecimientoId, $anioOrigen, $anioDestino, $userId): array {

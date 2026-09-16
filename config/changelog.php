@@ -4,7 +4,7 @@ return [
     '2026.9.16.472' => [
         'date' => '2026-09-16',
         'module' => 'Estudiantes PIE por curso',
-        'title' => 'Traspaso PIE 2026 a 2027 por nivel',
+        'title' => 'Traspaso masivo PIE 2026 a 2027 por nivel',
         'files' => [
             'app/Http/Controllers/Admin/EstablecimientoCursoPieController.php',
             'app/Services/Pie/PieCourseTransferService.php',
@@ -15,9 +15,10 @@ return [
             'tests/Feature/PieCourseTransferViewSyntaxTest.php',
         ],
         'changes' => [
-            'Agrega un botón por establecimiento para traspasar estudiantes PIE desde 2026 hacia 2027.',
+            'El botón de traspaso procesa en una sola ejecución todos los establecimientos con registros PIE en 2026, sin requerir filtrar uno a uno.',
             'Conserva los valores por sección cuando la estructura coincide; consolida al reducir secciones y distribuye los totales al aumentar secciones, asignando los remanentes a las primeras letras.',
             'No sobrescribe registros PIE existentes en 2027 y omite niveles sin cursos destino o cuya asignación supere la matrícula.',
+            'Cada establecimiento se procesa de forma independiente: un error aislado se informa en el resumen y no impide continuar con los demás.',
             'Corrige la compilación del resumen de traspaso y agrega una prueba de sintaxis para la vista.',
         ],
         'roles' => ['Administrador', 'Coordinador UATP', 'Directivo Establecimiento'],

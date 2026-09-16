@@ -31,8 +31,7 @@ class PieCourseTransferServiceTest extends TestCase
     {
         $service = app(PieCourseTransferService::class);
 
-        $consolidado = $service->transfer(1, 2026, 2027, 99);
-        $distribuido = $service->transfer(2, 2026, 2027, 99);
+        $resultado = $service->transferForEstablishments([1, 2], 2026, 2027, 99);
 
         $this->assertDatabaseHas('establecimiento_curso_pie', [
             'establecimiento_curso_id' => 201,
@@ -56,8 +55,10 @@ class PieCourseTransferServiceTest extends TestCase
             'necesidades_permanentes' => 1,
             'total_pie' => 3,
         ]);
-        $this->assertSame(1, $consolidado['niveles_procesados']);
-        $this->assertSame(1, $distribuido['niveles_procesados']);
+        $this->assertSame(2, $resultado['establecimientos_procesados']);
+        $this->assertSame(0, $resultado['establecimientos_con_error']);
+        $this->assertSame(2, $resultado['niveles_procesados']);
+        $this->assertSame(3, $resultado['registros_creados']);
         $this->assertSame(3, DB::table('establecimiento_curso_pie')->where('anio', 2027)->count());
     }
 
