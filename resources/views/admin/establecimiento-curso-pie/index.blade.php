@@ -14,14 +14,16 @@
                 <a class="btn btn-outline-primary" href="{{ route('admin.establecimiento-curso-pie.import') }}">
                     <i class="bi bi-upload"></i> Carga masiva
                 </a>
-                @if ((int) $establecimientoId > 0)
-                    <form method="POST" action="{{ route('admin.establecimiento-curso-pie.transfer-2026-to-2027') }}" onsubmit="return confirm('¿Traspasar los estudiantes PIE de 2026 a 2027 para este establecimiento? Los registros PIE existentes en 2027 no se modificarán.');">
+                @if ($activeRole === 'funcionario_directivo_estab')
+                    <form method="POST" action="{{ route('admin.establecimiento-curso-pie.transfer-2026-to-2027') }}" onsubmit="return confirm('¿Traspasar los estudiantes PIE de 2026 a 2027 para su establecimiento? Los registros PIE existentes en 2027 no se modificarán.');">
                         @csrf
-                        <input type="hidden" name="establecimiento_id" value="{{ $establecimientoId }}">
                         <button class="btn btn-outline-warning" type="submit"><i class="bi bi-arrow-left-right"></i> Traspasar PIE 2026 a 2027</button>
                     </form>
                 @else
-                    <button class="btn btn-outline-warning" type="button" disabled title="Seleccione un establecimiento para habilitar el traspaso."><i class="bi bi-arrow-left-right"></i> Traspasar PIE 2026 a 2027</button>
+                    <form method="POST" action="{{ route('admin.establecimiento-curso-pie.transfer-2026-to-2027') }}" onsubmit="return confirm('¿Traspasar los estudiantes PIE de 2026 a 2027 para todos los establecimientos? Los registros PIE existentes en 2027 no se modificarán.');">
+                        @csrf
+                        <button class="btn btn-outline-warning" type="submit"><i class="bi bi-arrow-left-right"></i> Traspasar PIE 2026 a 2027 (todos)</button>
+                    </form>
                 @endif
                 <a class="btn btn-primary" href="{{ route('admin.establecimiento-curso-pie.create') }}">
                     <i class="bi bi-plus-circle"></i> Nuevo registro
@@ -41,19 +43,24 @@
         <div class="alert alert-info">
             <div class="fw-semibold mb-2">Traspaso de estudiantes PIE {{ $transferResult['anio_origen'] }} → {{ $transferResult['anio_destino'] }}</div>
             <div class="d-flex flex-wrap gap-2 mb-2">
+                <span class="badge text-bg-secondary">Establecimientos procesados: {{ $transferResult['establecimientos_procesados'] ?? 0 }}</span>
+                @if (($transferResult['establecimientos_con_error'] ?? 0) > 0)
+                    <span class="badge text-bg-danger">Establecimientos con error: {{ $transferResult['establecimientos_con_error'] }}</span>
+                @endif
                 <span class="badge text-bg-success">Niveles traspasados: {{ $transferResult['niveles_procesados'] ?? 0 }}</span>
                 <span class="badge text-bg-primary">Registros creados: {{ $transferResult['registros_creados'] ?? 0 }}</span>
                 <span class="badge text-bg-warning">Niveles omitidos: {{ $transferResult['niveles_omitidos'] ?? 0 }}</span>
             </div>
             @if (!empty($transferResult['detalle']))
                 <details class="small">
-                    <summary>Ver detalle por nivel</summary>
+                    <summary>Ver detalle por establecimiento y nivel</summary>
                     <div class="table-responsive mt-2">
                         <table class="table table-sm mb-0">
-                            <thead><tr><th>Nivel</th><th>Resultado</th><th>NEET</th><th>NEEP</th><th>Detalle</th></tr></thead>
+                            <thead><tr><th>ID establecimiento</th><th>Nivel</th><th>Resultado</th><th>NEET</th><th>NEEP</th><th>Detalle</th></tr></thead>
                             <tbody>
                                 @foreach ($transferResult['detalle'] as $detalle)
                                     <tr>
+                                        <td>{{ $detalle['establecimiento_id'] ?? '—' }}</td>
                                         <td>{{ $detalle['nivel'] ?? '—' }}</td>
                                         <td>{{ ucfirst($detalle['estado'] ?? '') }}</td>
                                         <td>{{ $detalle['neet'] ?? '—' }}</td>

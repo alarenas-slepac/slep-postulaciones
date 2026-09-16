@@ -185,22 +185,20 @@ class EstablecimientoCursoPieController extends Controller
     public function transfer2026To2027(Request $request, PieCourseTransferService $transferService)
     {
         $activeRole = $this->authorizePieAccess($request, true);
-        $data = $request->validate([
-            'establecimiento_id' => ['required', 'integer', 'exists:establecimientos,id'],
-        ]);
-        $establecimientoId = (int) $data['establecimiento_id'];
+        $establecimientoIds = $this->isEstablecimientoRole($activeRole)
+            ? [(int) ($request->user()->establecimiento_id ?? 0)]
+            : EstablecimientoCursoPie::query()
+                ->where('anio', 2026)
+                ->whereNotNull('establecimiento_id')
+                ->orderBy('establecimiento_id')
+                ->pluck('establecimiento_id')
+                ->all();
 
-        if ($this->isEstablecimientoRole($activeRole)) {
-            abort_unless($establecimientoId === (int) ($request->user()->establecimiento_id ?? 0), 403);
-        }
-
-        $resultado = $transferService->transfer($establecimientoId, 2026, 2027, $request->user()?->id);
+        $resultado = $transferService->transferForEstablishments($establecimientoIds, 2026, 2027, $request->user()?->id);
         $resultado['detalle'] = array_slice($resultado['detalle'], 0, 100);
 
-        return redirect()->route('admin.establecimiento-curso-pie.index', [
-            'anio' => 2027,
-            'establecimiento_id' => $establecimientoId,
-        ])->with('pie_transfer_result', $resultado);
+        return redirect()->route('admin.establecimiento-curso-pie.index', ['anio' => 2027])
+            ->with('pie_transfer_result', $resultado);
     }
 
     public function show(Request $request, EstablecimientoCursoPie $establecimiento_curso_pie)
