@@ -222,7 +222,7 @@ class EstablecimientoCursoPieController extends Controller
         return view('admin.establecimiento-curso-pie.edit', [
             'pie' => $establecimiento_curso_pie,
             'cursoSeleccionado' => $establecimiento_curso_pie->establecimientoCurso,
-            'cursosDisponibles' => $this->cursosDisponibles($request),
+            'cursosDisponibles' => $this->cursosDisponibles($request, $establecimiento_curso_pie->establecimientoCurso),
             'estados' => EstablecimientoCursoPie::ESTADOS,
             'activeRole' => $activeRole,
         ]);
@@ -514,7 +514,7 @@ class EstablecimientoCursoPieController extends Controller
         ], $calculo);
     }
 
-    private function cursosDisponibles(Request $request)
+    private function cursosDisponibles(Request $request, ?EstablecimientoCurso $cursoSeleccionado = null)
     {
         $query = EstablecimientoCurso::query()
             ->with(['establecimiento', 'curso', 'planEstudio'])
@@ -523,11 +523,21 @@ class EstablecimientoCursoPieController extends Controller
             ->whereNotNull('curso_id')
             ->orderByDesc('anio');
 
+        if ($cursoSeleccionado) {
+            $query->where('id', '!=', $cursoSeleccionado->id);
+        }
+
         if ($this->isEstablecimientoRole($this->activeRole($request))) {
             $query->where('establecimiento_id', (int) ($request->user()->establecimiento_id ?? 0));
         }
 
-        return $query->limit(800)->get()->sortBy([
+        $cursos = $query->limit(800)->get();
+
+        if ($cursoSeleccionado) {
+            $cursos->push($cursoSeleccionado);
+        }
+
+        return $cursos->sortBy([
             fn ($a, $b) => strcmp((string) ($a->establecimiento?->nombre_establecimiento ?? ''), (string) ($b->establecimiento?->nombre_establecimiento ?? '')),
             fn ($a, $b) => ($a->curso?->orden ?? 999) <=> ($b->curso?->orden ?? 999),
             fn ($a, $b) => strcmp((string) $a->letra, (string) $b->letra),
