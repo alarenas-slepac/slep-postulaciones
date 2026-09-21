@@ -15,12 +15,12 @@
                     <i class="bi bi-upload"></i> Carga masiva
                 </a>
                 @if ($activeRole === 'funcionario_directivo_estab')
-                    <form method="POST" action="{{ route('admin.establecimiento-curso-pie.transfer-2026-to-2027') }}" onsubmit="return confirm('¿Traspasar los estudiantes PIE de 2026 a 2027 para su establecimiento? Los registros PIE existentes en 2027 no se modificarán.');">
+                    <form method="POST" action="{{ route('admin.establecimiento-curso-pie.transfer-2026-to-2027') }}" onsubmit="return confirm('¿Traspasar los estudiantes PIE de 2026 a 2027 para su establecimiento? Los registros de 2027 se actualizarán solo si cambian NEET o NEEP; los iguales se omitirán.');">
                         @csrf
                         <button class="btn btn-outline-warning" type="submit"><i class="bi bi-arrow-left-right"></i> Traspasar PIE 2026 a 2027</button>
                     </form>
                 @else
-                    <form method="POST" action="{{ route('admin.establecimiento-curso-pie.transfer-2026-to-2027') }}" onsubmit="return confirm('¿Traspasar los estudiantes PIE de 2026 a 2027 para todos los establecimientos? Los registros PIE existentes en 2027 no se modificarán.');">
+                    <form method="POST" action="{{ route('admin.establecimiento-curso-pie.transfer-2026-to-2027') }}" onsubmit="return confirm('¿Traspasar los estudiantes PIE de 2026 a 2027 para todos los establecimientos? Los registros de 2027 se actualizarán solo si cambian NEET o NEEP; los iguales se omitirán.');">
                         @csrf
                         <button class="btn btn-outline-warning" type="submit"><i class="bi bi-arrow-left-right"></i> Traspasar PIE 2026 a 2027 (todos)</button>
                     </form>
@@ -49,6 +49,8 @@
                 @endif
                 <span class="badge text-bg-success">Niveles traspasados: {{ $transferResult['niveles_procesados'] ?? 0 }}</span>
                 <span class="badge text-bg-primary">Registros creados: {{ $transferResult['registros_creados'] ?? 0 }}</span>
+                <span class="badge text-bg-info">Registros actualizados: {{ $transferResult['registros_actualizados'] ?? 0 }}</span>
+                <span class="badge text-bg-light border">Registros sin cambios: {{ $transferResult['registros_omitidos_por_igualdad'] ?? 0 }}</span>
                 <span class="badge text-bg-warning">Niveles omitidos: {{ $transferResult['niveles_omitidos'] ?? 0 }}</span>
             </div>
             @if (!empty($transferResult['detalle']))
