@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.21.475' => [
+        'date' => '2026-09-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Asignación de docente para Director(a) ADP',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Feature/DirectorAdpNormativaAccessTest.php',
+            'tests/Unit/DotacionFuncionesAnualesTest.php',
+        ],
+        'changes' => [
+            'Permite reemplazar la plaza automática Docente Directivo por asumir por un docente real desde Dotación establecimiento.',
+            'La asignación exige que Director(a) ADP esté habilitado para el establecimiento y año, sea cubierta por docente y registre exactamente 44 horas de contrato.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.21.474' => [
         'date' => '2026-09-21',
         'module' => 'Dotación funciones y planes',

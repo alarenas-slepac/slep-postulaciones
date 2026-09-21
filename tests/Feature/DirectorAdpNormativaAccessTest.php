@@ -62,6 +62,16 @@ class DirectorAdpNormativaAccessTest extends TestCase
         );
     }
 
+    public function test_plaza_automatica_permite_asignar_un_docente_directivo(): void
+    {
+        $vista = file_get_contents(resource_path('views/admin/dotacion-establecimiento/partials/_asignacion.blade.php'));
+
+        $this->assertStringContainsString('Asignar docente directivo', $vista);
+        $this->assertStringContainsString('name="estamento_cobertura" value="docente"', $vista);
+        $this->assertStringContainsString('name="horas_contrato" value="44"', $vista);
+        $this->assertStringContainsString('name="dotacion_funcion_regla_id"', $vista);
+    }
+
     public function test_migracion_registra_la_regla_y_el_acceso_del_supervisor_de_forma_idempotente(): void
     {
         $this->createPrerequisites();

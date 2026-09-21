@@ -387,6 +387,27 @@
                                             <div class="fw-semibold">Asignación automática</div>
                                             <div>Docente Directivo por asumir · {{ $fmt($item['horas_contrato_asignadas'] ?? 0) }} hrs contrato.</div>
                                         </div>
+                                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 mt-2">
+                                            @csrf
+                                            <input type="hidden" name="anio" value="{{ $anio }}">
+                                            <input type="hidden" name="tipo_asignacion" value="funcion_directiva">
+                                            <input type="hidden" name="subtipo_asignacion" value="directiva">
+                                            <input type="hidden" name="necesidad_key" value="{{ $item['key'] }}">
+                                            <input type="hidden" name="asignatura_nombre" value="Director(a) ADP">
+                                            <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] }}">
+                                            <input type="hidden" name="estamento_cobertura" value="docente">
+                                            <input type="hidden" name="subvencion" value="General">
+                                            <input type="hidden" name="horas_contrato" value="44">
+                                            <label class="form-label small mb-0" for="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}">Docente directivo</label>
+                                            <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm" required>
+                                                <option value="">Seleccione docente...</option>
+                                                @foreach ($docenteOptions as $doc)
+                                                    <option value="{{ $doc['rut'] }}">{{ $doc['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                            <div class="small text-muted">Contrato fijo: 44 horas.</div>
+                                            <button class="btn btn-sm btn-primary rounded-pill" type="submit"><i class="bi bi-person-check"></i> Asignar docente directivo</button>
+                                        </form>
                                     @else
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2" data-dotacion-asignacion-form>
                                         @csrf
