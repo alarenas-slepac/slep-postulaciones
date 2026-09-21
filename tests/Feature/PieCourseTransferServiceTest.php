@@ -59,24 +59,52 @@ class PieCourseTransferServiceTest extends TestCase
         $this->assertSame(0, $resultado['establecimientos_con_error']);
         $this->assertSame(2, $resultado['niveles_procesados']);
         $this->assertSame(3, $resultado['registros_creados']);
+        $this->assertSame(0, $resultado['registros_actualizados']);
+        $this->assertSame(0, $resultado['registros_omitidos_por_igualdad']);
         $this->assertSame(3, DB::table('establecimiento_curso_pie')->where('anio', 2027)->count());
     }
 
-    public function test_transfer_does_not_overwrite_a_destination_level_that_already_has_pie(): void
+    public function test_transfer_overwrites_destination_records_when_neet_or_neep_changes(): void
     {
         DB::table('establecimiento_curso_pie')->insert($this->pie(9, 1, 201, 2027, 7, 1));
 
         $resultado = app(PieCourseTransferService::class)->transfer(1, 2026, 2027, 99);
 
-        $this->assertSame(0, $resultado['niveles_procesados']);
-        $this->assertSame(1, $resultado['niveles_omitidos']);
+        $this->assertSame(1, $resultado['niveles_procesados']);
+        $this->assertSame(0, $resultado['niveles_omitidos']);
+        $this->assertSame(0, $resultado['registros_creados']);
+        $this->assertSame(1, $resultado['registros_actualizados']);
+        $this->assertSame(0, $resultado['registros_omitidos_por_igualdad']);
         $this->assertDatabaseHas('establecimiento_curso_pie', [
             'establecimiento_curso_id' => 201,
             'anio' => 2027,
-            'necesidades_transitorias' => 7,
-            'necesidades_permanentes' => 1,
+            'necesidades_transitorias' => 8,
+            'necesidades_permanentes' => 4,
+            'total_pie' => 12,
+            'updated_by' => 99,
         ]);
         $this->assertSame(1, DB::table('establecimiento_curso_pie')->where('establecimiento_curso_id', 201)->where('anio', 2027)->count());
+    }
+
+    public function test_transfer_omits_destination_records_when_neet_and_neep_are_equal(): void
+    {
+        DB::table('establecimiento_curso_pie')->insert($this->pie(9, 1, 201, 2027, 8, 4));
+
+        $resultado = app(PieCourseTransferService::class)->transfer(1, 2026, 2027, 99);
+
+        $this->assertSame(0, $resultado['niveles_procesados']);
+        $this->assertSame(1, $resultado['niveles_omitidos']);
+        $this->assertSame(0, $resultado['registros_creados']);
+        $this->assertSame(0, $resultado['registros_actualizados']);
+        $this->assertSame(1, $resultado['registros_omitidos_por_igualdad']);
+        $this->assertDatabaseHas('establecimiento_curso_pie', [
+            'id' => 9,
+            'establecimiento_curso_id' => 201,
+            'anio' => 2027,
+            'necesidades_transitorias' => 8,
+            'necesidades_permanentes' => 4,
+            'updated_by' => null,
+        ]);
     }
 
     private function createTables(): void

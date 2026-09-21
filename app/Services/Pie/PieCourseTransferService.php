@@ -19,6 +19,8 @@ class PieCourseTransferService
             'establecimientos_con_error' => 0,
             'niveles_procesados' => 0,
             'registros_creados' => 0,
+            'registros_actualizados' => 0,
+            'registros_omitidos_por_igualdad' => 0,
             'niveles_omitidos' => 0,
             'detalle' => [],
         ];
@@ -37,6 +39,8 @@ class PieCourseTransferService
                 $resultado['establecimientos_procesados']++;
                 $resultado['niveles_procesados'] += $traspaso['niveles_procesados'];
                 $resultado['registros_creados'] += $traspaso['registros_creados'];
+                $resultado['registros_actualizados'] += $traspaso['registros_actualizados'];
+                $resultado['registros_omitidos_por_igualdad'] += $traspaso['registros_omitidos_por_igualdad'];
                 $resultado['niveles_omitidos'] += $traspaso['niveles_omitidos'];
 
                 foreach ($traspaso['detalle'] as $detalle) {
@@ -91,6 +95,8 @@ class PieCourseTransferService
                 'anio_destino' => $anioDestino,
                 'niveles_procesados' => 0,
                 'registros_creados' => 0,
+                'registros_actualizados' => 0,
+                'registros_omitidos_por_igualdad' => 0,
                 'niveles_omitidos' => 0,
                 'detalle' => [],
             ];
@@ -111,14 +117,6 @@ class PieCourseTransferService
                     continue;
                 }
 
-                if (EstablecimientoCursoPie::query()
-                    ->where('anio', $anioDestino)
-                    ->whereIn('establecimiento_curso_id', $destinos->pluck('id'))
-                    ->exists()) {
-                    $this->omit($resultado, $nivel, 'Ya existen registros PIE en '.$anioDestino.'; el nivel no fue sobrescrito.');
-                    continue;
-                }
-
                 [$asignaciones, $estrategia] = $this->asignaciones($registrosOrigen, $destinos, $neetTotal, $neepTotal);
 
                 if ($asignaciones->contains(fn (array $asignacion) => ($asignacion['neet'] + $asignacion['neep']) > (int) $asignacion['curso']->matricula)) {
@@ -126,12 +124,43 @@ class PieCourseTransferService
                     continue;
                 }
 
+                $existentesPorCurso = EstablecimientoCursoPie::query()
+                    ->where('anio', $anioDestino)
+                    ->whereIn('establecimiento_curso_id', $destinos->pluck('id'))
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('establecimiento_curso_id');
+                $creados = 0;
+                $actualizados = 0;
+                $omitidosPorIgualdad = 0;
+
                 foreach ($asignaciones as $asignacion) {
                     /** @var EstablecimientoCurso $cursoDestino */
                     $cursoDestino = $asignacion['curso'];
                     $neet = $asignacion['neet'];
                     $neep = $asignacion['neep'];
                     $calculo = PieHorasCalculator::calculate($cursoDestino, $neet, $neep);
+                    $mensajeTraspaso = "Traspaso automático {$anioOrigen}→{$anioDestino} por nivel ({$estrategia}).";
+                    /** @var EstablecimientoCursoPie|null $existente */
+                    $existente = $existentesPorCurso->get($cursoDestino->id);
+
+                    if ($existente) {
+                        if ((int) $existente->necesidades_transitorias === $neet
+                            && (int) $existente->necesidades_permanentes === $neep) {
+                            $omitidosPorIgualdad++;
+                            continue;
+                        }
+
+                        $existente->update(array_merge([
+                            'necesidades_transitorias' => $neet,
+                            'necesidades_permanentes' => $neep,
+                            'total_pie' => $neet + $neep,
+                            'observacion' => $this->observacionTraspaso($existente->observacion, $mensajeTraspaso),
+                            'updated_by' => $userId,
+                        ], $calculo));
+                        $actualizados++;
+                        continue;
+                    }
 
                     EstablecimientoCursoPie::create(array_merge([
                         'establecimiento_id' => $cursoDestino->establecimiento_id,
@@ -143,15 +172,23 @@ class PieCourseTransferService
                         'necesidades_transitorias' => $neet,
                         'necesidades_permanentes' => $neep,
                         'total_pie' => $neet + $neep,
-                        'observacion' => "Traspaso automático {$anioOrigen}→{$anioDestino} por nivel ({$estrategia}).",
+                        'observacion' => $mensajeTraspaso,
                         'estado' => 'borrador',
                         'created_by' => $userId,
                         'updated_by' => $userId,
                     ], $calculo));
+                    $creados++;
+                }
+
+                $resultado['registros_omitidos_por_igualdad'] += $omitidosPorIgualdad;
+                if ($creados + $actualizados === 0) {
+                    $this->omit($resultado, $nivel, 'Los valores NEET y NEEP de destino ya coinciden; no se realizaron cambios.');
+                    continue;
                 }
 
                 $resultado['niveles_procesados']++;
-                $resultado['registros_creados'] += $asignaciones->count();
+                $resultado['registros_creados'] += $creados;
+                $resultado['registros_actualizados'] += $actualizados;
                 $resultado['detalle'][] = [
                     'nivel' => $nivel,
                     'estado' => 'traspasado',
@@ -160,11 +197,23 @@ class PieCourseTransferService
                     'neep' => $neepTotal,
                     'secciones_origen' => $registrosOrigen->count(),
                     'secciones_destino' => $destinos->count(),
+                    'registros_creados' => $creados,
+                    'registros_actualizados' => $actualizados,
+                    'registros_omitidos_por_igualdad' => $omitidosPorIgualdad,
                 ];
             }
 
             return $resultado;
         });
+    }
+
+    private function observacionTraspaso(?string $observacionActual, string $mensajeTraspaso): string
+    {
+        $observacionActual = trim((string) $observacionActual);
+
+        return $observacionActual === ''
+            ? $mensajeTraspaso
+            : $observacionActual."\n".$mensajeTraspaso;
     }
 
     private function asignaciones(Collection $origenes, Collection $destinos, int $neetTotal, int $neepTotal): array

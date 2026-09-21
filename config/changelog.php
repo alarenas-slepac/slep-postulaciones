@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.21.480' => [
+        'date' => '2026-09-21',
+        'module' => 'Estudiantes PIE por curso',
+        'title' => 'Sobrescritura selectiva en traspaso PIE 2026 a 2027',
+        'files' => [
+            'app/Services/Pie/PieCourseTransferService.php',
+            'config/changelog.php',
+            'resources/views/admin/establecimiento-curso-pie/index.blade.php',
+            'tests/Feature/PieCourseTransferServiceTest.php',
+        ],
+        'changes' => [
+            'Actualiza los registros PIE existentes en 2027 sólo cuando cambian NEET o NEEP respecto del traspaso consolidado por nivel.',
+            'Omite registros con los mismos valores y presenta por separado los registros creados, actualizados y sin cambios.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Directivo Establecimiento'],
+    ],
     '2026.9.21.479' => [
         'date' => '2026-09-21',
         'module' => 'Dotacion establecimiento',
