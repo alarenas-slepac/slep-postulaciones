@@ -46,27 +46,20 @@
     @endif
 
     <div class="row g-3 mb-3">
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card shadow-sm border-0 h-100"><div class="card-body">
                 <div class="text-muted small">Matrícula total</div>
                 <div class="fs-3 fw-bold">{{ number_format((int) $contexto['matricula_total'], 0, ',', '.') }}</div>
             </div></div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card shadow-sm border-0 h-100"><div class="card-body">
                 <div class="text-muted small">Cursos con estudiantes NEE</div>
                 <div class="fs-3 fw-bold text-success">{{ number_format((int) $contexto['cursos_nee'], 0, ',', '.') }}</div>
                 <div class="small text-muted">Coordinación PIE = 2 hrs por curso.</div>
             </div></div>
         </div>
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0 h-100"><div class="card-body">
-                <div class="text-muted small">Matrícula NT1 + NT2</div>
-                <div class="fs-3 fw-bold text-warning">{{ number_format((int) $contexto['matricula_nt1_nt2'], 0, ',', '.') }}</div>
-                <div class="small text-muted">Transición educativa.</div>
-            </div></div>
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card shadow-sm border-0 h-100"><div class="card-body">
                 <div class="text-muted small">Total horas estimadas</div>
                 <div class="fs-3 fw-bold text-primary">{{ number_format((int) $resumen['horas_totales'], 0, ',', '.') }}</div>

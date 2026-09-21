@@ -123,18 +123,18 @@ class DotacionFuncionesAnualesTest extends TestCase
         ]);
     }
 
-    public function test_transicion_educativa_se_mantiene_en_2026_y_se_excluye_desde_2027(): void
+    public function test_transicion_educativa_se_excluye_de_todos_los_anios_y_calculos(): void
     {
         $establecimiento = Establecimiento::findOrFail(1);
 
         $funciones2026 = DotacionFuncionesCalculator::sugerencias($establecimiento, 2026);
         $funciones2027 = DotacionFuncionesCalculator::sugerencias($establecimiento, 2027);
 
-        $this->assertSame(
-            ['pise', 'transicion_educativa'],
-            $funciones2026->pluck('codigo')->all()
-        );
+        $this->assertSame(['pise'], $funciones2026->pluck('codigo')->all());
         $this->assertSame(['pise'], $funciones2027->pluck('codigo')->all());
+
+        $transicion = \App\Models\DotacionFuncionRegla::query()->where('codigo', 'transicion_educativa')->firstOrFail();
+        $this->assertNull(DotacionFuncionesCalculator::calcularHorasRegla($transicion, ['matricula_nt1_nt2' => 40]));
     }
 
     public function test_director_adp_solo_se_calcula_cuando_esta_habilitado_en_el_establecimiento_y_anio(): void

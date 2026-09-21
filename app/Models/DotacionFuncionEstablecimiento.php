@@ -56,7 +56,7 @@ class DotacionFuncionEstablecimiento extends Model
         'directiva' => 'Funciones directivas',
         'tecnico_pedagogica' => 'Funciones técnico-pedagógicas',
         'planes_programas' => 'Planes normativos y programas',
-        'otras_funciones_docentes' => 'Otras funciones docentes declaradas',
+        'otras_funciones_docentes' => 'Otras funciones declaradas y/o no normativas',
     ];
 
     public function establecimiento(): BelongsTo

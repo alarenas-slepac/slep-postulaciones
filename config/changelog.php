@@ -1,6 +1,32 @@
 <?php
 
 return [
+    '2026.9.21.476' => [
+        'date' => '2026-09-21',
+        'module' => 'Dotación funciones y planes',
+        'title' => 'Retiro de Transición educativa y reclasificación de funciones declaradas',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionFuncionesController.php',
+            'app/Models/DotacionFuncionEstablecimiento.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionFuncionesCalculator.php',
+            'config/changelog.php',
+            'database/migrations/2026_09_21_140000_retire_transicion_educativa_and_reclassify_declared_functions.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-funciones/index.blade.php',
+            'resources/views/admin/dotacion-funciones/show.blade.php',
+            'tests/Feature/DotacionFuncionesNoNormativasMigrationTest.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+            'tests/Unit/DotacionFuncionesAnualesTest.php',
+        ],
+        'changes' => [
+            'Retira Transición educativa de los cálculos normativos para todos los años, incluidos 2026 y 2027.',
+            'Reclasifica las funciones técnico-pedagógicas declaradas y sus asignaciones como otras funciones declaradas y/o no normativas.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.21.475' => [
         'date' => '2026-09-21',
         'module' => 'Dotación establecimiento',
