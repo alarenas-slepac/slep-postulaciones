@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 class DotacionContratoParvulariaTest extends TestCase
 {
-    public function test_separa_contratos_vigentes_por_titulo_sin_usar_horas_asignadas(): void
+    public function test_separa_contratos_vigentes_por_titulo_y_conserva_en_parvularia_las_horas_sin_asignacion_externa(): void
     {
         $docentes = [
             ['titulo' => 'Pedagogía en Educación de Párvulos', 'horas_contrato' => 44, 'horas_aula' => 32],
@@ -25,6 +25,45 @@ class DotacionContratoParvulariaTest extends TestCase
         $this->assertSame(683.0, $resultado['horas_contrato_docentes_aula_general']);
         $this->assertSame(32.0, $resultado['brecha_dotacion_parvularia']);
         $this->assertSame(771.0, $resultado['horas_contrato_docentes_aula_general'] + $resultado['horas_contrato_docentes_parvularia']);
+    }
+
+    public function test_excluye_de_parvularia_las_horas_asignadas_a_otros_niveles_y_funciones(): void
+    {
+        $resultado = DotacionEstablecimientoCalculator::contratoParvularia([
+            [
+                'titulo' => 'Pedagogía en Educación de Párvulos',
+                'horas_contrato' => 44,
+                'asignaciones' => [
+                    [
+                        'tipo_asignacion' => 'plan_estudio',
+                        'horas_contrato' => 20,
+                        'proporcion_aplicada' => 'NT Con JEC · base contractual 55 h',
+                    ],
+                    [
+                        'tipo_asignacion' => 'plan_estudio',
+                        'horas_contrato' => 12,
+                        'establecimientoCurso' => ['curso' => ['codigo' => '1B']],
+                    ],
+                    [
+                        'tipo_asignacion' => 'otra_funcion',
+                        'horas_contrato' => 4,
+                    ],
+                ],
+            ],
+            [
+                'titulo' => 'Pedagogía en Educación de Párvulos',
+                'horas_contrato' => 44,
+                'asignaciones' => [[
+                    'tipo_asignacion' => 'plan_estudio',
+                    'horas_contrato' => 44,
+                    'establecimientoCurso' => ['curso' => ['codigo' => '2B']],
+                ]],
+            ],
+        ], 88, 60);
+
+        $this->assertSame(28.0, $resultado['horas_contrato_docentes_parvularia']);
+        $this->assertSame(60.0, $resultado['horas_contrato_docentes_aula_general']);
+        $this->assertSame(32.0, $resultado['brecha_dotacion_parvularia']);
     }
 
     public function test_respeta_exclusiones_y_contratos_nulos(): void

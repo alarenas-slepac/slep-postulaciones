@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.21.478' => [
+        'date' => '2026-09-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Distribución de contrato de Educadoras de Párvulos por asignación',
+        'files' => [
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'tests/Feature/DotacionSituacionHorasNecesariasTest.php',
+            'tests/Unit/DotacionContratoParvulariaTest.php',
+        ],
+        'changes' => [
+            'Considera en Parvularia sólo las horas de Educadoras de Párvulos no asignadas fuera de NT1/NT2; las asignadas a otros niveles o funciones permanecen en el bloque correspondiente.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.21.477' => [
         'date' => '2026-09-21',
         'module' => 'Dotación establecimiento',

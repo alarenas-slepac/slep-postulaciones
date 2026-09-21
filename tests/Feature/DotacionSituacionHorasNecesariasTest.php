@@ -181,16 +181,16 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
     {
         return [
             'aula' => ['Profesor de Educación Básica', false, false, 20.0, 0.0, 0.0],
-            'parvularia' => ['Pedagogía en Educación de Párvulos', false, false, 0.0, 20.0, 0.0],
+            'parvularia' => ['Pedagogía en Educación de Párvulos', false, false, 20.0, 0.0, 0.0],
             'diferencial' => ['Educadora Diferencial', false, false, 0.0, 0.0, 20.0],
             'coordinación PIE' => ['Profesor de Educación Básica', true, false, 0.0, 0.0, 20.0],
-            'parvularia con coordinación histórica' => ['Pedagogía en Educación de Párvulos', true, false, 0.0, 20.0, 0.0],
+            'parvularia con coordinación histórica' => ['Pedagogía en Educación de Párvulos', true, false, 20.0, 0.0, 0.0],
             'diferencial en especial' => ['Educadora Diferencial', true, true, 20.0, 0.0, 0.0],
         ];
     }
 
     #[DataProvider('categorias')]
-    public function test_aporte_contractual_por_categoria_ignora_cantidad_asignada(
+    public function test_aporte_contractual_por_categoria_separa_las_horas_de_parvularia_asignadas_fuera_de_nt(
         string $titulo, bool $coordinacion, bool $especial, float $aula, float $parvularia, float $pie
     ): void {
         DB::table('declaracion_sostenedores')->update(['nombre_titulo' => $titulo]);
@@ -208,6 +208,10 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             $pieCalculado = (new ReflectionMethod(DotacionAsignacionCalculator::class, 'resumenContratoDocentePie'))
                 ->invoke(null, DotacionAsignacionCalculator::assignmentsFor(Establecimiento::findOrFail(1), 2026), $docentes, $especial);
             $separacion = DotacionEstablecimientoCalculator::contratoParvularia($docentes, 20 - $pieCalculado['total'], 0);
+            if ($titulo === 'Pedagogía en Educación de Párvulos') {
+                $parvularia = max(0.0, 20.0 - $horasAsignadas);
+                $aula = round(20.0 - $pie - $parvularia, 2);
+            }
             $this->assertSame($pie, $pieCalculado['total']);
             $this->assertSame($aula, $separacion['horas_contrato_docentes_aula_general']);
             $this->assertSame($parvularia, $separacion['horas_contrato_docentes_parvularia']);
