@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.9.21.477' => [
+        'date' => '2026-09-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Corrección de asignaciones duplicadas en otras funciones',
+        'files' => [
+            'app/Support/DotacionAsignacionCalculator.php',
+            'config/changelog.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+        ],
+        'changes' => [
+            'Evita que una asignación de una función declarada aparezca en otras funciones que comparten la misma regla base.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.21.476' => [
         'date' => '2026-09-21',
         'module' => 'Dotación funciones y planes',
