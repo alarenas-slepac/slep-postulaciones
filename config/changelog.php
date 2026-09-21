@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.9.21.474' => [
+        'date' => '2026-09-21',
+        'module' => 'Dotación funciones y planes',
+        'title' => 'Ajuste visual del interruptor Director(a) ADP',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/admin/dotacion-funciones/show.blade.php',
+            'tests/Feature/DirectorAdpNormativaAccessTest.php',
+        ],
+        'changes' => [
+            'Corrige el desbordamiento horizontal del interruptor Director(a) ADP, conservándolo dentro de su contenedor.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación'],
+    ],
     '2026.9.21.473' => [
         'date' => '2026-09-21',
         'module' => 'Dotación funciones y planes',

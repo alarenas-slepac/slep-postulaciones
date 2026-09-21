@@ -52,6 +52,16 @@ class DirectorAdpNormativaAccessTest extends TestCase
         $this->assertContains('Dotación funciones y planes', $quickLabels);
     }
 
+    public function test_interruptor_director_adp_se_mantiene_dentro_de_su_contenedor(): void
+    {
+        $vista = file_get_contents(resource_path('views/admin/dotacion-funciones/show.blade.php'));
+
+        $this->assertStringContainsString(
+            'form-check form-switch border rounded p-3 ps-5 mb-3',
+            $vista
+        );
+    }
+
     public function test_migracion_registra_la_regla_y_el_acceso_del_supervisor_de_forma_idempotente(): void
     {
         $this->createPrerequisites();
