@@ -142,7 +142,7 @@
                         <td class="text-end">{{ $fmt($totalAutomaticas) }}</td>
                         <td class="text-end">{{ $fmt($totalDeclaradas) }}</td>
                         <td class="text-end text-primary">{{ $fmt($totalBloquesDotacion) }}</td>
-                        <td class="small text-muted">Total de contrato considerado en funciones directivas, técnico-pedagógicas, planes, otras funciones y eventuales horas PIE declaradas. Coordinación PIE y Educadoras Diferenciales normativas se informan en un bloque independiente.</td>
+                        <td class="small text-muted">Total de contrato considerado en funciones directivas, técnico-pedagógicas normativas, planes, otras funciones declaradas y/o no normativas y eventuales horas PIE declaradas. Coordinación PIE y Educadoras Diferenciales normativas se informan en un bloque independiente.</td>
                     </tr>
                 </tfoot>
             </table>

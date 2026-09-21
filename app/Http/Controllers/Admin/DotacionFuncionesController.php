@@ -367,11 +367,7 @@ class DotacionFuncionesController extends Controller
 
     private function categoriaForType(string $type): string
     {
-        return match ($type) {
-            'coordinacion', 'orientador' => 'tecnico_pedagogica',
-            'otra' => 'otras_funciones_docentes',
-            default => 'otras_funciones_docentes',
-        };
+        return 'otras_funciones_docentes';
     }
 
     private function resumenEstablecimiento(Establecimiento $establecimiento, int $anio): array
@@ -415,7 +411,6 @@ class DotacionFuncionesController extends Controller
         return [
             'matricula_total' => $contexto['matricula_total'],
             'cursos_nee' => $contexto['cursos_nee'],
-            'matricula_nt1_nt2' => $contexto['matricula_nt1_nt2'],
             'director_adp' => $contexto['director_adp'],
             'horas_automaticas' => $sugerencias->sum('horas_sugeridas'),
             'horas_declaradas' => $manuales->sum(fn ($item) => $item->horasFinales()),
@@ -434,7 +429,7 @@ class DotacionFuncionesController extends Controller
             'tecnico_pedagogica' => 'Técnico-pedagógicas',
             'pie' => 'PIE',
             'planes_programas' => 'Planes',
-            'otras_funciones_docentes' => 'Otras funciones declaradas',
+            'otras_funciones_docentes' => 'Otras funciones declaradas y/o no normativas',
         ];
     }
 

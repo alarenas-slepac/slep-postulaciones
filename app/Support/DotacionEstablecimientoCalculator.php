@@ -1765,7 +1765,7 @@ class DotacionEstablecimientoCalculator
             'tecnico_pedagogica' => ['label' => 'Técnico-pedagógicas', 'icon' => 'bi-diagram-3', 'tone' => 'success', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
             'pie' => ['label' => 'PIE', 'icon' => 'bi-universal-access', 'tone' => 'info', 'automaticas' => 0, 'declaradas' => 0, 'educadoras_diferenciales' => 0, 'total' => 0, 'items' => []],
             'planes_programas' => ['label' => 'Planes', 'icon' => 'bi-journal-check', 'tone' => 'warning', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
-            'otras_funciones_docentes' => ['label' => 'Otras funciones declaradas', 'icon' => 'bi-plus-square-dotted', 'tone' => 'secondary', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
+            'otras_funciones_docentes' => ['label' => 'Otras funciones declaradas y/o no normativas', 'icon' => 'bi-plus-square-dotted', 'tone' => 'secondary', 'automaticas' => 0, 'declaradas' => 0, 'total' => 0, 'items' => []],
         ];
     }
 

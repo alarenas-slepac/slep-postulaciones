@@ -125,7 +125,7 @@ class DotacionDocenteDetalleHorasTest extends TestCase
     {
         $bloques = [
             'directiva' => ['automaticas' => 44, 'declaradas' => 0, 'total' => 44],
-            'tecnico_pedagogica' => ['automaticas' => 38, 'declaradas' => 14, 'total' => 52],
+            'tecnico_pedagogica' => ['automaticas' => 38, 'declaradas' => 0, 'total' => 38],
             'pie' => [
                 'automaticas' => 83,
                 'declaradas' => 5,
@@ -138,13 +138,13 @@ class DotacionDocenteDetalleHorasTest extends TestCase
                 ],
             ],
             'planes_programas' => ['automaticas' => 19, 'declaradas' => 0, 'total' => 19],
-            'otras_funciones_docentes' => ['automaticas' => 0, 'declaradas' => 7, 'total' => 7],
+            'otras_funciones_docentes' => ['automaticas' => 0, 'declaradas' => 21, 'total' => 21],
         ];
 
         $necesidadesFunciones = [
             ['subtipo_asignacion' => 'directiva', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 32],
             ['subtipo_asignacion' => 'tecnico_pedagogica', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 24],
-            ['subtipo_asignacion' => 'tecnico_pedagogica', 'dotacion_funcion_id' => 10, 'horas_contrato_asignadas' => 8],
+            ['subtipo_asignacion' => 'otras_funciones_docentes', 'dotacion_funcion_id' => 10, 'horas_contrato_asignadas' => 8],
             ['subtipo_asignacion' => 'planes_programas', 'dotacion_funcion_id' => null, 'horas_contrato_asignadas' => 12],
             ['subtipo_asignacion' => 'pie', 'dotacion_funcion_id' => 11, 'horas_contrato_asignadas' => 3],
             ['subtipo_asignacion' => 'otras_funciones_docentes', 'dotacion_funcion_id' => 12, 'horas_contrato_asignadas' => 4],
@@ -183,19 +183,19 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             'funciones_directivas_declaradas' => 0.0,
             'funciones_directivas_normativas_asignadas' => 32.0,
             'funciones_directivas_declaradas_asignadas' => 0.0,
-            'funciones_tecnico_pedagogicas' => 52.0,
+            'funciones_tecnico_pedagogicas' => 38.0,
             'funciones_tecnico_pedagogicas_normativas' => 38.0,
-            'funciones_tecnico_pedagogicas_declaradas' => 14.0,
+            'funciones_tecnico_pedagogicas_declaradas' => 0.0,
             'funciones_tecnico_pedagogicas_normativas_asignadas' => 24.0,
-            'funciones_tecnico_pedagogicas_declaradas_asignadas' => 8.0,
+            'funciones_tecnico_pedagogicas_declaradas_asignadas' => 0.0,
             'otras_funciones_pie' => 5.0,
             'otras_funciones_pie_asignadas' => 3.0,
             'planes_normativos' => 19.0,
             'planes_normativos_asignadas' => 12.0,
             'planes_declarados' => 0.0,
             'planes_declarados_asignadas' => 0.0,
-            'otras_funciones_declaradas' => 7.0,
-            'otras_funciones_declaradas_asignadas' => 4.0,
+            'otras_funciones_declaradas' => 21.0,
+            'otras_funciones_declaradas_asignadas' => 12.0,
             'total_normativas' => 101.0,
             'total_declaradas' => 26.0,
             'total_declaradas_asignadas' => 15.0,
@@ -244,12 +244,17 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             ],
             'tecnico_pedagogica' => [
                 'automaticas' => 38,
-                'declaradas' => 14,
-                'total' => 52,
+                'declaradas' => 0,
+                'total' => 38,
                 'items' => [
                     ['nombre' => 'UTP', 'horas' => 38, 'dotacion_funcion_id' => null],
-                    ['nombre' => 'Apoyo declarado', 'horas' => 14, 'dotacion_funcion_id' => 10],
                 ],
+            ],
+            'otras_funciones_docentes' => [
+                'automaticas' => 0,
+                'declaradas' => 14,
+                'total' => 14,
+                'items' => [['nombre' => 'Apoyo declarado', 'horas' => 14, 'dotacion_funcion_id' => 10]],
             ],
             'planes_programas' => [
                 'automaticas' => 19,
@@ -272,8 +277,8 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             $this->necesidadFuncion('tecnico_pedagogica', 'UTP', 38, null, [
                 $this->asignacion('funcion_tecnico_pedagogica', 'UTP', 50, 'asistente'),
             ]),
-            $this->necesidadFuncion('tecnico_pedagogica', 'Apoyo declarado', 14, 10, [
-                $this->asignacion('funcion_tecnico_pedagogica', 'Apoyo declarado', 8, 'asistente'),
+            $this->necesidadFuncion('otras_funciones_docentes', 'Apoyo declarado', 14, 10, [
+                $this->asignacion('otra_funcion', 'Apoyo declarado', 8, 'asistente'),
             ]),
             $this->necesidadFuncion('planes_programas', 'Plan normativo', 19, null, [
                 $this->asignacion('plan_normativo', 'Plan normativo', 7),
@@ -297,16 +302,17 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         $this->assertSame(12.0, $ajustados['directiva']['horas_asistentes_cobertura']);
         $this->assertSame(32.0, $ajustados['directiva']['items'][0]['horas']);
         $this->assertSame(0.0, $ajustados['tecnico_pedagogica']['automaticas']);
-        $this->assertSame(14.0, $ajustados['tecnico_pedagogica']['total']);
-        $this->assertSame(14, $ajustados['tecnico_pedagogica']['items'][1]['horas']);
-        $this->assertArrayNotHasKey('horas_asistentes_cobertura', $ajustados['tecnico_pedagogica']['items'][1]);
+        $this->assertSame(0.0, $ajustados['tecnico_pedagogica']['total']);
+        $this->assertSame(14, $ajustados['otras_funciones_docentes']['total']);
+        $this->assertSame(14, $ajustados['otras_funciones_docentes']['items'][0]['horas']);
+        $this->assertArrayNotHasKey('horas_asistentes_cobertura', $ajustados['otras_funciones_docentes']['items'][0]);
         $this->assertSame(14.0, $ajustados['planes_programas']['automaticas']);
         $this->assertSame(18, $ajustados['pie']['automaticas']);
         $this->assertSame(64.0, $desglose['total_normativas']);
         $this->assertSame(20.0, $desglose['funciones_directivas_normativas_asignadas']);
         $this->assertSame(0.0, $desglose['funciones_tecnico_pedagogicas_normativas_asignadas']);
         $this->assertSame(7.0, $desglose['planes_normativos_asignadas']);
-        $this->assertSame(8.0, $desglose['funciones_tecnico_pedagogicas_declaradas_asignadas']);
+        $this->assertSame(8.0, $desglose['otras_funciones_declaradas_asignadas']);
     }
 
     public function test_calcula_brecha_estructural_sin_funciones_declaradas_y_separa_pie(): void

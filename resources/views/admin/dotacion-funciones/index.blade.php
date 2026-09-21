@@ -4,7 +4,7 @@
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
         <div>
             <h1 class="h4 mb-1">Dotación funciones y planes</h1>
-            <div class="text-muted small">Consolidado de funciones directivas, técnico-pedagógicas, PIE, planes normativos y otras funciones docentes declaradas.</div>
+            <div class="text-muted small">Consolidado de funciones directivas, técnico-pedagógicas normativas, PIE, planes normativos y otras funciones declaradas y/o no normativas.</div>
         </div>
     </div>
 
@@ -40,7 +40,7 @@
 
     <div class="alert alert-info shadow-sm small mb-3">
         <div class="fw-semibold"><i class="bi bi-grid-3x3-gap"></i> Consolidado por establecimiento</div>
-        <div>Las horas se separan en <strong>Directivos</strong>, <strong>Técnico-pedagógicas</strong>, <strong>PIE</strong>, <strong>Planes</strong> y <strong>Otras funciones declaradas</strong>. Los establecimientos marcados como sala cuna no participan en este proceso.</div>
+        <div>Las horas se separan en <strong>Directivos</strong>, <strong>Técnico-pedagógicas normativas</strong>, <strong>PIE</strong>, <strong>Planes</strong> y <strong>Otras funciones declaradas y/o no normativas</strong>. Los establecimientos marcados como sala cuna no participan en este proceso.</div>
     </div>
 
     <div class="card shadow-sm">
@@ -53,12 +53,11 @@
                         <th>Comuna</th>
                         <th class="text-end">Matrícula</th>
                         <th class="text-end">Cursos NEE</th>
-                        <th class="text-end">NT1+NT2</th>
                         <th class="text-end">Directivos</th>
                         <th class="text-end">Téc. ped.</th>
                         <th class="text-end">PIE</th>
                         <th class="text-end">Planes</th>
-                        <th class="text-end">Otras</th>
+                        <th class="text-end">Otras decl./no norm.</th>
                         <th class="text-end">Total hrs</th>
                         <th class="text-end">Pendientes</th>
                         <th class="text-end">Acciones</th>
@@ -79,7 +78,6 @@
                             <td>{{ $establecimiento->comuna ?: '—' }}</td>
                             <td class="text-end">{{ number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end">{{ number_format((int) ($resumen['cursos_nee'] ?? 0), 0, ',', '.') }}</td>
-                            <td class="text-end">{{ number_format((int) ($resumen['matricula_nt1_nt2'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end fw-semibold text-primary">{{ number_format((int) ($consolidado['directiva']['total'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end fw-semibold text-success">{{ number_format((int) ($consolidado['tecnico_pedagogica']['total'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end fw-semibold text-info">{{ number_format((int) ($consolidado['pie']['total'] ?? 0), 0, ',', '.') }}</td>
@@ -101,7 +99,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="14" class="text-center text-muted py-4">No se encontraron establecimientos para los filtros aplicados.</td>
+                            <td colspan="13" class="text-center text-muted py-4">No se encontraron establecimientos para los filtros aplicados.</td>
                         </tr>
                     @endforelse
                 </tbody>

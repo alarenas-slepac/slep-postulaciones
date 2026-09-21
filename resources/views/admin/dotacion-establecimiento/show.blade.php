@@ -55,8 +55,7 @@
             ['label' => 'Planes normativos', 'assigned' => $desgloseContratoBloque['planes_normativos_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['planes_normativos'] ?? 0, 'tone' => 'warning', 'icon' => 'bi-journal-check'],
         ];
         $desgloseDeclaradoItems = [
-            ['label' => 'Téc.-pedagógicas declaradas', 'assigned' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0, 'tone' => 'success', 'icon' => 'bi-building-add'],
-            ['label' => 'Otras funciones declaradas', 'assigned' => $desgloseContratoBloque['otras_funciones_declaradas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['otras_funciones_declaradas'] ?? 0, 'tone' => 'secondary', 'icon' => 'bi-plus-square-dotted'],
+            ['label' => 'Otras funciones declaradas y/o no normativas', 'assigned' => $desgloseContratoBloque['otras_funciones_declaradas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['otras_funciones_declaradas'] ?? 0, 'tone' => 'secondary', 'icon' => 'bi-plus-square-dotted'],
         ];
         if ((float) ($desgloseContratoBloque['funciones_directivas_declaradas'] ?? 0) > 0) {
             $desgloseDeclaradoItems[] = ['label' => 'Funciones directivas declaradas', 'assigned' => $desgloseContratoBloque['funciones_directivas_declaradas_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['funciones_directivas_declaradas'], 'tone' => 'primary', 'icon' => 'bi-person-add'];
@@ -80,7 +79,7 @@
                 ['label' => 'Contrato plan + PIE', 'value' => $fmt($contratoPlanMasPieAsignadas).' / '.$fmt($contratoPlanMasPieRequerido), 'hint' => 'Contrato asignado / requerido.', 'tone' => 'info', 'icon' => 'bi-plus-square'],
             ]),
             ['label' => 'Funciones directivas / técnico pedagógicas y planes normativos', 'value' => $fmt($horasBloqueNormativas), 'hint' => 'Horas calculadas por normativa.', 'tone' => 'warning', 'icon' => 'bi-shield-check'],
-            ['label' => 'Otras funciones no normativas', 'value' => $fmt($horasBloqueDeclaradasAsignadas).' / '.$fmt($horasBloqueDeclaradas), 'hint' => 'Asignadas / declaradas por el establecimiento.', 'tone' => 'secondary', 'icon' => 'bi-building-add'],
+            ['label' => 'Otras funciones declaradas y/o no normativas', 'value' => $fmt($horasBloqueDeclaradasAsignadas).' / '.$fmt($horasBloqueDeclaradas), 'hint' => 'Asignadas / declaradas por el establecimiento.', 'tone' => 'secondary', 'icon' => 'bi-building-add'],
         ];
         $kpisContratos = [
             ['label' => 'Horas contrato PIE necesarias', 'value' => $fmt($horasContratoPieNecesariasAsignadas).' / '.$fmt($horasContratoPieNecesarias), 'hint' => 'Asignadas / necesarias para Coordinación PIE y Educadoras Diferenciales.', 'tone' => 'info', 'icon' => 'bi-universal-access'],

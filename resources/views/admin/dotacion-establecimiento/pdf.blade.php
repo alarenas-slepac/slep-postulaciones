@@ -368,10 +368,9 @@
     <thead>
         <tr>
             <th>Directivas<br><span class="small">Asig. / decl.</span></th>
-            <th>Téc.-pedagógicas<br><span class="small">Asig. / decl.</span></th>
             <th>Planes<br><span class="small">Asig. / decl.</span></th>
             <th>Otras funciones PIE<br><span class="small">Asig. / decl.</span></th>
-            <th>Otras funciones<br><span class="small">Asig. / decl.</span></th>
+            <th>Otras funciones declaradas y/o no normativas<br><span class="small">Asig. / decl.</span></th>
             <th>Total declaradas<br><span class="small">Asig. / decl.</span></th>
             <th>Total bloque</th>
         </tr>
@@ -379,7 +378,6 @@
     <tbody>
         <tr>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas_declaradas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['funciones_directivas_declaradas'] ?? 0) }}</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_declarados_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['planes_declarados'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['otras_funciones_pie_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['otras_funciones_pie'] ?? 0) }}</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['otras_funciones_declaradas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['otras_funciones_declaradas'] ?? 0) }}</td>
@@ -466,11 +464,6 @@
             <td>Horas normativas asignadas / requeridas.</td>
         </tr>
         <tr>
-            <td>Funciones técnico-pedagógicas declaradas</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_declaradas'] ?? 0) }}</td>
-            <td>Horas asignadas / declaradas por el establecimiento.</td>
-        </tr>
-        <tr>
             <td>Coordinador(a) PIE necesario</td>
             <td class="text-right">{{ $fmt($desgloseContratoPieNecesario['coordinacion_pie_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoPieNecesario['coordinacion_pie'] ?? 0) }}</td>
             <td>Horas asignadas / necesarias para coordinación normativa del Programa de Integración Escolar.</td>
@@ -501,14 +494,14 @@
             <td>Total de horas asignadas / declaradas por el establecimiento.</td>
         </tr>
         <tr>
-            <td>Otras funciones declaradas</td>
+            <td>Otras funciones declaradas y/o no normativas</td>
             <td class="text-right">{{ $fmt($desgloseContratoBloque['otras_funciones_declaradas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['otras_funciones_declaradas'] ?? 0) }}</td>
             <td>Horas asignadas / declaradas fuera de los bloques normativos.</td>
         </tr>
         <tr class="total-row">
             <td>Contrato bloque dotación</td>
             <td class="text-right">{{ $fmt($resumen['horas_dotacion_funciones'] ?? 0) }}</td>
-            <td>Suma de directivos, técnico-pedagógicas normativas y declaradas, planes, otras funciones y eventuales horas PIE declaradas; excluye las horas PIE automáticas normativas.</td>
+            <td>Suma de directivos, técnico-pedagógicas normativas, planes, otras funciones declaradas y/o no normativas y eventuales horas PIE declaradas; excluye las horas PIE automáticas normativas.</td>
         </tr>
         <tr class="total-row">
             <td>Horas que debiesen contratarse</td>
