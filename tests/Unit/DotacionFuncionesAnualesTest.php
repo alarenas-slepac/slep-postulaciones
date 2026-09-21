@@ -3,11 +3,13 @@
 namespace Tests\Unit;
 
 use App\Models\Establecimiento;
+use App\Http\Controllers\Admin\DotacionAsignacionController;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionFuncionesCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class DotacionFuncionesAnualesTest extends TestCase
@@ -236,5 +238,60 @@ class DotacionFuncionesAnualesTest extends TestCase
         $this->assertFalse($necesidad['asignacion_automatica']);
         $this->assertSame('Directivo asignado', $asignacion->docente_nombre);
         $this->assertSame(44.0, $resultado['resumen']['horas_asignadas']);
+    }
+
+    public function test_asignacion_de_director_adp_exige_docente_44_horas_y_habilitacion_anual(): void
+    {
+        $reglaId = DB::table('dotacion_funciones_reglas')->insertGetId([
+            'codigo' => 'director_adp',
+            'categoria' => 'directiva',
+            'nombre' => 'Director(a) ADP',
+            'tipo_regla' => 'director_adp',
+            'horas_fijas' => 44,
+            'declarable' => false,
+            'vigente' => true,
+        ]);
+        DB::table('dotacion_establecimiento_configuraciones')->insert([
+            'establecimiento_id' => 1,
+            'anio' => 2026,
+            'director_adp' => true,
+        ]);
+
+        $controller = app(DotacionAsignacionController::class);
+        $method = new \ReflectionMethod(DotacionAsignacionController::class, 'validateDirectorAdpAssignment');
+        $data = [
+            'tipo_asignacion' => 'funcion_directiva',
+            'estamento_cobertura' => 'docente',
+            'dotacion_funcion_regla_id' => $reglaId,
+            'horas_contrato' => 44,
+        ];
+
+        $this->assertNull($method->invoke($controller, Establecimiento::findOrFail(1), 2026, $data));
+
+        try {
+            $method->invoke($controller, Establecimiento::findOrFail(1), 2026, [...$data, 'horas_contrato' => 43]);
+            $this->fail('La asignación Director(a) ADP debe rechazar contratos distintos de 44 horas.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('horas_contrato', $exception->errors());
+        }
+
+        try {
+            $method->invoke($controller, Establecimiento::findOrFail(1), 2026, [...$data, 'estamento_cobertura' => 'asistente']);
+            $this->fail('La asignación Director(a) ADP debe rechazar coberturas que no sean docentes.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('estamento_cobertura', $exception->errors());
+        }
+
+        DB::table('dotacion_establecimiento_configuraciones')
+            ->where('establecimiento_id', 1)
+            ->where('anio', 2026)
+            ->update(['director_adp' => false]);
+
+        try {
+            $method->invoke($controller, Establecimiento::findOrFail(1), 2026, $data);
+            $this->fail('La asignación Director(a) ADP debe requerir que el cargo esté habilitado.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('dotacion_funcion_regla_id', $exception->errors());
+        }
     }
 }

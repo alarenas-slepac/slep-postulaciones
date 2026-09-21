@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DotacionCursoCombinado;
 use App\Models\DotacionDocenteAsignacion;
+use App\Models\DotacionEstablecimientoConfiguracion;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionFuncionRegla;
 use App\Models\Establecimiento;
@@ -49,6 +50,8 @@ class DotacionAsignacionController extends Controller
             'horas_contrato' => ['nullable', 'numeric', 'min:0'],
             'observacion' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        $this->validateDirectorAdpAssignment($establecimiento, (int) $data['anio'], $data);
 
         $persona = $this->findPersonal(
             $establecimiento,
@@ -102,6 +105,7 @@ class DotacionAsignacionController extends Controller
             'tipo_asignacion' => $asignacion->tipo_asignacion,
             'necesidad_key' => $asignacion->necesidad_key,
         ]);
+        $this->validateDirectorAdpAssignment($establecimiento, (int) $asignacion->anio, $context);
         $this->validatePlanHoursAvailable($establecimiento, $context, $asignacion);
 
         $request->merge([
@@ -451,6 +455,44 @@ class DotacionAsignacionController extends Controller
                     DotacionEstablecimientoCalculator::formatHoras($available),
                     DotacionEstablecimientoCalculator::formatHoras($requested)
                 ),
+            ]);
+        }
+    }
+
+    private function validateDirectorAdpAssignment(Establecimiento $establecimiento, int $anio, array $data): void
+    {
+        $reglaId = (int) ($data['dotacion_funcion_regla_id'] ?? 0);
+        $esDirectorAdp = $reglaId > 0 && DotacionFuncionRegla::query()
+            ->whereKey($reglaId)
+            ->where('codigo', 'director_adp')
+            ->exists();
+
+        if (! $esDirectorAdp) {
+            return;
+        }
+
+        if (($data['tipo_asignacion'] ?? null) !== 'funcion_directiva'
+            || ($data['estamento_cobertura'] ?? null) !== 'docente') {
+            throw ValidationException::withMessages([
+                'estamento_cobertura' => 'Director(a) ADP debe ser cubierto por un docente directivo.',
+            ]);
+        }
+
+        if (abs((float) ($data['horas_contrato'] ?? 0) - 44.0) > 0.01) {
+            throw ValidationException::withMessages([
+                'horas_contrato' => 'La asignación de Director(a) ADP debe registrar exactamente 44 horas de contrato.',
+            ]);
+        }
+
+        $habilitado = DotacionEstablecimientoConfiguracion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->where('director_adp', true)
+            ->exists();
+
+        if (! $habilitado) {
+            throw ValidationException::withMessages([
+                'dotacion_funcion_regla_id' => 'Director(a) ADP no está habilitado para este establecimiento y año.',
             ]);
         }
     }
