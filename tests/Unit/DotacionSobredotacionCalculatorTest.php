@@ -203,6 +203,43 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertSame('cubierta', $necesidad['estado']['key']);
     }
 
+    public function test_no_mezcla_asignaciones_de_funciones_declaradas_que_comparten_regla_base(): void
+    {
+        $asignaciones = collect([
+            new DotacionDocenteAsignacion([
+                'necesidad_key' => 'funcion:coordinacion-primer-ciclo',
+                'dotacion_funcion_id' => 101,
+                'dotacion_funcion_regla_id' => 7,
+                'horas_contrato' => 3,
+            ]),
+            new DotacionDocenteAsignacion([
+                'necesidad_key' => 'funcion:coordinacion-matematica',
+                'dotacion_funcion_id' => 102,
+                'dotacion_funcion_regla_id' => 7,
+                'horas_contrato' => 3,
+            ]),
+        ]);
+        $metodo = new ReflectionMethod(DotacionAsignacionCalculator::class, 'needRow');
+
+        $primerCiclo = $metodo->invoke(null, 'funcion:coordinacion-primer-ciclo', 'otra_funcion', 'otras_funciones_docentes', [
+            'horas_contrato' => 3,
+            'dotacion_funcion_id' => 101,
+            'dotacion_funcion_regla_id' => 7,
+        ], $asignaciones);
+        $matematica = $metodo->invoke(null, 'funcion:coordinacion-matematica', 'otra_funcion', 'otras_funciones_docentes', [
+            'horas_contrato' => 3,
+            'dotacion_funcion_id' => 102,
+            'dotacion_funcion_regla_id' => 7,
+        ], $asignaciones);
+
+        $this->assertSame(3.0, $primerCiclo['horas_contrato_asignadas']);
+        $this->assertCount(1, $primerCiclo['asignaciones']);
+        $this->assertSame(101, $primerCiclo['asignaciones']->sole()->dotacion_funcion_id);
+        $this->assertSame(3.0, $matematica['horas_contrato_asignadas']);
+        $this->assertCount(1, $matematica['asignaciones']);
+        $this->assertSame(102, $matematica['asignaciones']->sole()->dotacion_funcion_id);
+    }
+
     public function test_desglosa_horas_declaradas_entre_titulares_contrata_y_conceptos(): void
     {
         $docente = $this->docente('11111111-1', 'Docente mixto ajustable', 44, 30, 14, 26, 0, 0, true);

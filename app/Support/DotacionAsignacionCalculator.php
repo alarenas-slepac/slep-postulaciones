@@ -1344,14 +1344,19 @@ class DotacionAsignacionCalculator
         $dotacionFuncionId = (int) ($data['dotacion_funcion_id'] ?? 0);
         $dotacionFuncionReglaId = (int) ($data['dotacion_funcion_regla_id'] ?? 0);
         $assigned = $asignaciones->filter(function ($row) use ($key, $dotacionFuncionId, $dotacionFuncionReglaId) {
-            if ((string) ($row->necesidad_key ?? '') === $key) {
-                return true;
-            }
-
             // El identificador de la función declarada es estable aunque una
             // asignación histórica conserve una necesidad_key generada antes
-            // de reordenar o renombrar los bloques del establecimiento.
-            if ($dotacionFuncionId > 0 && (int) ($row->dotacion_funcion_id ?? 0) === $dotacionFuncionId) {
+            // de reordenar o renombrar los bloques del establecimiento. Cuando
+            // existe, no se debe usar la regla base: varias funciones declaradas
+            // pueden compartirla y mezclaría sus asignaciones.
+            if ($dotacionFuncionId > 0) {
+                $asignacionFuncionId = (int) ($row->dotacion_funcion_id ?? 0);
+
+                return $asignacionFuncionId === $dotacionFuncionId
+                    || ($asignacionFuncionId === 0 && (string) ($row->necesidad_key ?? '') === $key);
+            }
+
+            if ((string) ($row->necesidad_key ?? '') === $key) {
                 return true;
             }
 
