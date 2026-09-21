@@ -49,7 +49,7 @@
                         <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Excel resumen sobredotación
                     </a>
                 @endif
-                @if (Route::has('admin.dotacion-funciones.index') && $activeRole !== 'supervisor_plani')
+                @if (Route::has('admin.dotacion-funciones.index'))
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.index', ['anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Dotación funciones y planes
                     </a>

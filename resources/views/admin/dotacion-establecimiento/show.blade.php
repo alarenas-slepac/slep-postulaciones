@@ -143,7 +143,7 @@
                         <i class="bi bi-calendar2-range" aria-hidden="true"></i> Proyección {{ $anio + 1 }}
                     </a>
                 @endif
-                @if (Route::has('admin.dotacion-funciones.show') && $activeRole !== 'supervisor_plani')
+                @if (Route::has('admin.dotacion-funciones.show'))
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Funciones y planes
                     </a>
@@ -395,7 +395,7 @@
                     <i class="bi bi-intersect"></i> Cursos combinados
                 </a>
             </li>
-            @if (Route::has('admin.dotacion-funciones.show') && $activeRole !== 'supervisor_plani')
+            @if (Route::has('admin.dotacion-funciones.show'))
                 <li class="nav-item" role="presentation">
                     <a class="nav-link" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio]) }}">
                         <i class="bi bi-diagram-3"></i> Funciones y planes

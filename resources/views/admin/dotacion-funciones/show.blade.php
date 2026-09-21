@@ -87,9 +87,17 @@
                             <div class="fw-semibold">Inspector(a) General</div>
                             <div>Se considera cargo fijo con 44 horas, independiente de si Director(a) es ADP. Esta regla se calcula automáticamente en la dotación directiva.</div>
                         </div>
+                        @if ($canConfigureDirectorAdp)
+                            <input type="hidden" name="director_adp" value="0">
+                            <div class="form-check form-switch border rounded p-3 mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="director_adp" name="director_adp" value="1" @checked(old('director_adp', $config->director_adp))>
+                                <label class="form-check-label fw-semibold" for="director_adp">Director(a) ADP</label>
+                                <div class="form-text">Habilita 44 horas como función directiva normativa sólo para este establecimiento y año.</div>
+                            </div>
+                        @endif
                         <label class="form-label">Observación</label>
                         <textarea class="form-control" name="observacion" rows="3" @disabled(!$canEdit)>{{ old('observacion', $config->observacion) }}</textarea>
-                        @if ($canEdit)
+                        @if ($canEdit || $canConfigureDirectorAdp)
                             <div class="mt-3">
                                 <button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Guardar parámetros</button>
                             </div>
