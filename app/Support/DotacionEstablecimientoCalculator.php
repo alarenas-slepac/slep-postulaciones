@@ -293,20 +293,65 @@ class DotacionEstablecimientoCalculator
     /**
      * Separa el contrato vigente de las Educadoras de Párvulos. La colección
      * docentes ya consolida el último período y aplica exclusiones de dotación.
-     * El total aula histórico se conserva para las comparaciones globales.
+     * Las horas asignadas fuera de NT1/NT2 se mantienen en Aula general o en
+     * su función respectiva, sin incrementar la cobertura de Parvularia.
      */
     public static function contratoParvularia(iterable $docentes, float $contratoAulaTotal, float $necesidadParvularia): array
     {
         $horasParvularia = round((float) collect($docentes)
             ->filter(fn (array $docente) => ($docente['estamento_cobertura'] ?? 'docente') === 'docente'
                 && DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos'])
-            ->sum(fn (array $docente) => max(0.0, (float) ($docente['horas_contrato'] ?? 0))), 2);
+            ->sum(fn (array $docente) => self::horasContratoParvulariaDocente($docente)), 2);
 
         return [
             'horas_contrato_docentes_parvularia' => $horasParvularia,
             'horas_contrato_docentes_aula_general' => round(max(0.0, $contratoAulaTotal - $horasParvularia), 2),
             'brecha_dotacion_parvularia' => round($necesidadParvularia - $horasParvularia, 2),
         ];
+    }
+
+    private static function horasContratoParvulariaDocente(array $docente): float
+    {
+        $horasContrato = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
+        if ($horasContrato <= 0) {
+            return 0.0;
+        }
+
+        $horasPie = min(
+            $horasContrato,
+            max(0.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente))
+        );
+        $horasFueraParvularia = (float) collect($docente['asignaciones'] ?? [])
+            ->filter(fn ($asignacion) => DotacionAsignacionCalculator::coverageEstamento($asignacion) === 'docente'
+                && (data_get($asignacion, 'estado') ?? 'activa') === 'activa')
+            ->reject(fn ($asignacion) => self::esAsignacionPlanNt($asignacion))
+            ->sum(fn ($asignacion) => max(0.0, (float) data_get($asignacion, 'horas_contrato', 0)));
+
+        // La parte ya destinada a PIE se descuenta una sola vez del contrato.
+        // Si una coordinación PIE no integra el bloque PIE (por ejemplo, por
+        // una exclusión contractual), igualmente queda fuera de Parvularia.
+        $horasFueraParvularia = max(0.0, $horasFueraParvularia - $horasPie);
+
+        return round(max(0.0, $horasContrato - $horasPie - $horasFueraParvularia), 2);
+    }
+
+    private static function esAsignacionPlanNt(object|array $asignacion): bool
+    {
+        if (data_get($asignacion, 'tipo_asignacion') !== 'plan_estudio') {
+            return false;
+        }
+
+        $codigo = (string) data_get($asignacion, 'establecimientoCurso.curso.codigo', '');
+        $nombre = (string) data_get($asignacion, 'establecimientoCurso.curso.nombre', '');
+        $nivel = (string) data_get($asignacion, 'establecimientoCurso.curso.nivel_educativo', '');
+        if (in_array(self::nivelKey($codigo, $nombre, $nivel), ['NT1', 'NT2'], true)) {
+            return true;
+        }
+
+        $proporcion = self::normalizeText((string) data_get($asignacion, 'proporcion_aplicada', ''));
+
+        return str_starts_with($proporcion, 'NT ')
+            || str_contains($proporcion, 'PARVULARIA');
     }
 
     public static function cursosPorNivel(Establecimiento $establecimiento, int $anio): array

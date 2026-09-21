@@ -149,6 +149,10 @@ class DotacionAsignacionCalculator
         }
 
         return DotacionDocenteAsignacion::query()
+            ->when(
+                self::schemaHasTable('establecimiento_cursos') && self::schemaHasTable('cursos'),
+                fn ($query) => $query->with('establecimientoCurso.curso')
+            )
             ->where('establecimiento_id', $establecimiento->id)
             ->where('anio', $anio)
             ->where('estado', 'activa')
