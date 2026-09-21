@@ -281,8 +281,11 @@ class DotacionAsignacionCalculator
             // Reparte el contrato efectivo: las funciones normativas van a Aula.
             // Coordinación PIE y el saldo del contrato diferencial permanecen en PIE.
             $rut = DotacionEstablecimientoCalculator::normalizeRut(($docente['rut_normalizado'] ?? null) ?: ($docente['rut'] ?? ''));
-            $normativas = collect($docente['asignaciones'] ?? [])
-                ->filter(fn ($row) => self::esAsignacionNormativaAula($row))
+            // PIE only retains the contract balance not assigned to Aula or another function.
+            $horasFueraPie = collect($docente['asignaciones'] ?? [])
+                ->filter(fn ($row) => self::coverageEstamento($row) === 'docente'
+                    && (data_get($row, 'estado') ?? 'activa') === 'activa'
+                    && ! self::esAsignacionPie($row))
                 ->filter(function ($row) use ($rut): bool {
                     $rutAsignacion = DotacionEstablecimientoCalculator::normalizeRut(
                         data_get($row, 'docente_rut_normalizado') ?: data_get($row, 'docente_rut', '')
@@ -294,7 +297,7 @@ class DotacionAsignacionCalculator
                     : (is_object($row) ? 'obj:'.spl_object_id($row) : 'array:'.sha1(serialize($row))))
                 ->sum(fn ($row) => max(0.0, (float) data_get($row, 'horas_contrato', 0)));
 
-            return round(max(0.0, (float) ($docente['horas_contrato'] ?? 0) - $normativas), 2);
+            return round(max(0.0, (float) ($docente['horas_contrato'] ?? 0) - $horasFueraPie), 2);
         }
 
         $coordinaciones = collect($docente['asignaciones'] ?? [])
@@ -327,6 +330,14 @@ class DotacionAsignacionCalculator
             ], true)
             && (int) data_get($asignacion, 'dotacion_funcion_id', 0) === 0
             && ! self::esAsignacionCoordinacionPie($asignacion);
+    }
+
+    public static function esAsignacionPie(object|array $asignacion): bool
+    {
+        return in_array(data_get($asignacion, 'tipo_asignacion'), [
+            'pie_colaborativo',
+            'pie_educadora_diferencial',
+        ], true) || self::esAsignacionCoordinacionPie($asignacion);
     }
 
     public static function esAsignacionCoordinacionPie(object|array $asignacion): bool

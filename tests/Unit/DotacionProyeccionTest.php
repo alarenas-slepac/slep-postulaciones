@@ -98,6 +98,9 @@ class DotacionProyeccionTest extends TestCase
         $base = $this->base();
         $base['docentes'][0]['titulo'] = 'Pedagogía en Educación de Párvulos';
         $base['docentes'][1]['titulo'] = 'Educadora Diferencial';
+        $base['docentes'][0]['asignaciones'] = [];
+        $base['docentes'][1]['asignaciones'] = [];
+        $base['asignacion']['asignaciones'] = collect();
         $base['resumen']['contrato_educacion_parvularia_mas_trabajo_colaborativo_pie'] = 55;
         $base['resumen']['horas_contrato_pie_necesarias'] = 44;
         $proyeccion = DotacionProyeccionCalculator::build($base, 2026, ['111111111' => false]);

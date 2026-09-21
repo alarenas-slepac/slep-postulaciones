@@ -190,7 +190,7 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
     }
 
     #[DataProvider('categorias')]
-    public function test_aporte_contractual_por_categoria_separa_las_horas_de_parvularia_asignadas_fuera_de_nt(
+    public function test_aporte_contractual_por_categoria_separa_las_horas_asignadas_fuera_de_su_bloque(
         string $titulo, bool $coordinacion, bool $especial, float $aula, float $parvularia, float $pie
     ): void {
         DB::table('declaracion_sostenedores')->update(['nombre_titulo' => $titulo]);
@@ -211,6 +211,10 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             if ($titulo === 'Pedagogía en Educación de Párvulos') {
                 $parvularia = max(0.0, 20.0 - $horasAsignadas);
                 $aula = round(20.0 - $pie - $parvularia, 2);
+            }
+            if ($titulo === 'Educadora Diferencial' && ! $especial) {
+                $pie = max(0.0, 20.0 - $horasAsignadas);
+                $aula = round(20.0 - $pie, 2);
             }
             $this->assertSame($pie, $pieCalculado['total']);
             $this->assertSame($aula, $separacion['horas_contrato_docentes_aula_general']);
@@ -407,6 +411,9 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             ]);
         }
         $categoria = $pie > 0 ? 'pie' : ($parvularia > 0 ? 'parvularia' : 'aula');
+        if ($titulo === 'Educadora Diferencial' && ! $especial) {
+            $categoria = 'aula';
+        }
         $padron = DB::table('reemplazos_personal')->get()->toJson();
         $asignaciones = DB::table('dotacion_docente_asignaciones')->get()->toJson();
         foreach ([34.0, 0.0, 44.0, 19.37] as $necesarias) {
