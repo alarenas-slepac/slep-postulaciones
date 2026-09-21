@@ -729,13 +729,13 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->name('dotacion-establecimiento.show');
 
         Route::get('dotacion-funciones', [DotacionFuncionesController::class, 'index'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->name('dotacion-funciones.index');
         Route::get('dotacion-funciones/{establecimiento}', [DotacionFuncionesController::class, 'show'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->name('dotacion-funciones.show');
         Route::post('dotacion-funciones/{establecimiento}/config', [DotacionFuncionesController::class, 'updateConfig'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('dotacion-funciones.config');
         Route::post('dotacion-funciones/{establecimiento}/manual', [DotacionFuncionesController::class, 'storeManual'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')

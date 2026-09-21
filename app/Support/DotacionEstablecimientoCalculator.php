@@ -613,6 +613,7 @@ class DotacionEstablecimientoCalculator
             $bloques[$key]['automaticas'] += $horas;
             $bloques[$key]['total'] += $horas;
             $bloques[$key]['items'][] = [
+                'codigo' => $item['codigo'] ?? null,
                 'nombre' => $item['nombre_funcion'] ?? 'Función automática',
                 'origen' => 'Automática',
                 'horas' => $horas,

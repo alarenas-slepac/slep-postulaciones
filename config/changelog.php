@@ -1,6 +1,34 @@
 <?php
 
 return [
+    '2026.9.21.473' => [
+        'date' => '2026-09-21',
+        'module' => 'Dotación funciones y planes',
+        'title' => 'Director(a) ADP como función directiva normativa',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionFuncionesController.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionFuncionesCalculator.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'database/migrations/2026_09_21_120000_add_director_adp_normativa_rule.php',
+            'resources/views/admin/dotacion-establecimiento/index.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'resources/views/admin/dotacion-funciones/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/DirectorAdpNormativaAccessTest.php',
+            'tests/Unit/DotacionFuncionesAnualesTest.php',
+        ],
+        'changes' => [
+            'Agrega Director(a) ADP como función directiva normativa de 44 horas, configurable por establecimiento y año.',
+            'La habilitación está disponible exclusivamente para Administrador, Coordinador UATP y Supervisor de Planificación.',
+            'El cargo no se incorpora en establecimientos que no lo hayan habilitado y se mantiene la trazabilidad de la configuración anual.',
+            'Al habilitarse, incorpora una plaza automática de Docente Directivo por asumir, con contrato de 44 horas, sin crear un docente ficticio ni duplicar una asignación real.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación'],
+    ],
     '2026.9.16.472' => [
         'date' => '2026-09-16',
         'module' => 'Estudiantes PIE por curso',

@@ -363,6 +363,7 @@
                             @php
                                 $estado = $item['estado'] ?? ['class' => 'text-bg-secondary', 'label' => 'Pendiente'];
                                 $pendingContrato = $item['horas_contrato_pendientes'] ?? $item['horas_contrato_requeridas'] ?? 0;
+                                $asignacionAutomatica = (bool) ($item['asignacion_automatica'] ?? false);
                             @endphp
                             <tr>
                                 <td>
@@ -381,7 +382,13 @@
                                 <td class="text-end {{ ($pendingContrato ?? 0) > 0.01 ? 'text-warning' : 'text-success' }} fw-semibold">{{ $fmt($pendingContrato) }}</td>
                                 <td><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
                                 <td>
-                                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2" data-dotacion-asignacion-form>
+                                    @if ($asignacionAutomatica)
+                                        <div class="alert alert-primary small mb-0">
+                                            <div class="fw-semibold">Asignación automática</div>
+                                            <div>Docente Directivo por asumir · {{ $fmt($item['horas_contrato_asignadas'] ?? 0) }} hrs contrato.</div>
+                                        </div>
+                                    @else
+                                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2" data-dotacion-asignacion-form>
                                         @csrf
                                         <input type="hidden" name="anio" value="{{ $anio }}">
                                         <input type="hidden" name="tipo_asignacion" value="{{ $item['tipo_asignacion'] }}">
@@ -427,7 +434,8 @@
                                         </div>
                                         <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
                                         <button class="btn btn-sm btn-primary rounded-pill" type="submit"><i class="bi bi-plus-circle"></i> Asignar</button>
-                                    </form>
+                                        </form>
+                                    @endif
                                 </td>
                             </tr>
                             @if (count($item['asignaciones'] ?? []) > 0)
@@ -447,11 +455,15 @@
                                                             <td class="text-end fw-semibold">{{ $fmt($asig->horas_contrato) }}</td>
                                                             <td>{{ $asig->observacion }}</td>
                                                             <td class="text-end">
-                                                                <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" onsubmit="return confirm('¿Eliminar esta asignación?');">
-                                                                    @csrf
-                                                                    @method('DELETE')
-                                                                    <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash"></i></button>
-                                                                </form>
+                                                                @if (data_get($asig, 'asignacion_automatica', false))
+                                                                    <span class="badge rounded-pill text-bg-primary">Automática</span>
+                                                                @else
+                                                                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" onsubmit="return confirm('¿Eliminar esta asignación?');">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash"></i></button>
+                                                                    </form>
+                                                                @endif
                                                             </td>
                                                         </tr>
                                                     @endforeach

@@ -16,9 +16,10 @@ use Illuminate\Validation\Rule;
 
 class DotacionFuncionesController extends Controller
 {
-    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp'];
+    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
     private array $editableRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp'];
     private array $validatorRoles = ['admin', 'coordinador_uatp'];
+    private array $directorAdpRoles = ['admin', 'coordinador_uatp', 'supervisor_plani'];
 
     public function index(Request $request)
     {
@@ -114,19 +115,37 @@ class DotacionFuncionesController extends Controller
             'activeRole' => $activeRole,
             'canEdit' => in_array($activeRole, $this->editableRoles, true),
             'canValidate' => in_array($activeRole, $this->validatorRoles, true),
+            'canConfigureDirectorAdp' => in_array($activeRole, $this->directorAdpRoles, true),
             'bloquesConsolidados' => $this->bloquesConsolidados(),
         ]);
     }
 
     public function updateConfig(Request $request, Establecimiento $establecimiento)
     {
-        $this->authorizeDotacionAccess($request, true);
+        $activeRole = $this->authorizeDotacionAccess($request);
         $this->authorizeEstablecimientoScope($request, $establecimiento);
+        abort_unless(in_array($activeRole, [...$this->editableRoles, ...$this->directorAdpRoles], true), 403);
 
         $data = $request->validate([
             'anio' => ['required', 'integer', 'min:2020', 'max:2100'],
+            'director_adp' => ['nullable', 'boolean'],
             'observacion' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        $configExistente = DotacionEstablecimientoConfiguracion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', (int) $data['anio'])
+            ->first();
+
+        $directorAdp = (bool) ($configExistente?->director_adp ?? false);
+        if ($request->has('director_adp')) {
+            abort_unless(in_array($activeRole, $this->directorAdpRoles, true), 403);
+            $directorAdp = $request->boolean('director_adp');
+        }
+
+        $observacion = array_key_exists('observacion', $data)
+            ? (trim((string) $data['observacion']) ?: null)
+            : $configExistente?->observacion;
 
         DotacionEstablecimientoConfiguracion::updateOrCreate(
             [
@@ -134,8 +153,8 @@ class DotacionFuncionesController extends Controller
                 'anio' => (int) $data['anio'],
             ],
             [
-                'director_adp' => false,
-                'observacion' => trim((string) ($data['observacion'] ?? '')) ?: null,
+                'director_adp' => $directorAdp,
+                'observacion' => $observacion,
                 'created_by' => $request->user()?->id,
                 'updated_by' => $request->user()?->id,
             ]

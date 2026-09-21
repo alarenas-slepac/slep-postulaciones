@@ -51,7 +51,12 @@ class DotacionAsignacionCalculator
     public static function build(Establecimiento $establecimiento, int $anio, Collection $docentes, array $cursos, array $bloques, ?Collection $asistentes = null): array
     {
         $asistentes ??= collect();
-        $asignaciones = self::assignmentsFor($establecimiento, $anio);
+        $asignaciones = self::asignacionesConDirectorAdpPorAsumir(
+            $establecimiento,
+            $anio,
+            $bloques,
+            self::assignmentsFor($establecimiento, $anio)
+        );
         $necesidades = self::necesidades($establecimiento, $anio, $cursos, $bloques, $asignaciones);
         $asignacionesHuerfanas = self::asignacionesHuerfanas($asignaciones, $necesidades);
 
@@ -151,6 +156,53 @@ class DotacionAsignacionCalculator
             ->orderBy('asignatura_nombre')
             ->orderBy('docente_nombre')
             ->get();
+    }
+
+    private static function asignacionesConDirectorAdpPorAsumir(
+        Establecimiento $establecimiento,
+        int $anio,
+        array $bloques,
+        Collection $asignaciones
+    ): Collection {
+        $asignacionesAutomaticas = collect(data_get($bloques, 'directiva.items', []))
+            ->filter(fn (array $item): bool => ($item['codigo'] ?? null) === 'director_adp')
+            ->filter(fn (array $item): bool => (float) ($item['horas'] ?? 0) > 0)
+            ->filter(function (array $item) use ($asignaciones): bool {
+                $reglaId = (int) ($item['dotacion_funcion_regla_id'] ?? 0);
+
+                return $reglaId > 0 && ! $asignaciones->contains(
+                    fn ($asignacion): bool => (int) data_get($asignacion, 'dotacion_funcion_regla_id', 0) === $reglaId
+                );
+            })
+            ->map(function (array $item) use ($establecimiento, $anio): object {
+                $asignacion = new \stdClass;
+                $asignacion->id = null;
+                $asignacion->anio = $anio;
+                $asignacion->establecimiento_id = $establecimiento->id;
+                $asignacion->docente_rut = 'POR ASUMIR';
+                $asignacion->docente_rut_normalizado = 'DIRECTOR_ADP_POR_ASUMIR_'.$establecimiento->id;
+                $asignacion->docente_nombre = 'Docente Directivo por asumir';
+                $asignacion->estamento_cobertura = 'docente';
+                $asignacion->tipo_asignacion = 'funcion_directiva';
+                $asignacion->subtipo_asignacion = 'directiva';
+                $asignacion->subvencion = 'General';
+                $asignacion->necesidad_key = null;
+                $asignacion->asignatura_nombre = $item['nombre'] ?? 'Director(a) ADP';
+                $asignacion->dotacion_funcion_id = null;
+                $asignacion->dotacion_funcion_regla_id = $item['dotacion_funcion_regla_id'] ?? null;
+                $asignacion->horas_plan_pedagogicas = null;
+                $asignacion->horas_contrato = (float) $item['horas'];
+                $asignacion->horas_cronologicas_aula = null;
+                $asignacion->proporcion_aplicada = null;
+                $asignacion->fuente_calculo = 'Asignación automática de Director(a) ADP.';
+                $asignacion->observacion = 'Plaza automática mientras el cargo se encuentra por asumir.';
+                $asignacion->estado = 'activa';
+                $asignacion->asignacion_automatica = true;
+
+                return $asignacion;
+            });
+
+        return $asignaciones->concat($asignacionesAutomaticas)->values();
     }
 
     /**
@@ -1290,7 +1342,8 @@ class DotacionAsignacionCalculator
     private static function needRow(string $key, string $tipo, ?string $subtipo, array $data, Collection $asignaciones): array
     {
         $dotacionFuncionId = (int) ($data['dotacion_funcion_id'] ?? 0);
-        $assigned = $asignaciones->filter(function ($row) use ($key, $dotacionFuncionId) {
+        $dotacionFuncionReglaId = (int) ($data['dotacion_funcion_regla_id'] ?? 0);
+        $assigned = $asignaciones->filter(function ($row) use ($key, $dotacionFuncionId, $dotacionFuncionReglaId) {
             if ((string) ($row->necesidad_key ?? '') === $key) {
                 return true;
             }
@@ -1298,8 +1351,12 @@ class DotacionAsignacionCalculator
             // El identificador de la función declarada es estable aunque una
             // asignación histórica conserve una necesidad_key generada antes
             // de reordenar o renombrar los bloques del establecimiento.
-            return $dotacionFuncionId > 0
-                && (int) ($row->dotacion_funcion_id ?? 0) === $dotacionFuncionId;
+            if ($dotacionFuncionId > 0 && (int) ($row->dotacion_funcion_id ?? 0) === $dotacionFuncionId) {
+                return true;
+            }
+
+            return $dotacionFuncionReglaId > 0
+                && (int) ($row->dotacion_funcion_regla_id ?? 0) === $dotacionFuncionReglaId;
         });
         $horasContrato = (float) ($data['horas_contrato'] ?? 0);
         $horasPlan = isset($data['horas_plan']) ? (float) $data['horas_plan'] : null;
@@ -1333,6 +1390,9 @@ class DotacionAsignacionCalculator
             'horas_contrato_pendientes' => max(0.0, round($horasContrato - $assignedContrato, 2)),
             'estado' => self::estadoNecesidad($estadoRequeridas, $estadoAsignadas),
             'asignaciones' => $assigned->values(),
+            'asignacion_automatica' => $assigned->contains(
+                fn ($row): bool => (bool) data_get($row, 'asignacion_automatica', false)
+            ),
             'subvencion' => $data['subvencion'] ?? 'General',
             'fuente' => $data['fuente'] ?? null,
         ], $data);

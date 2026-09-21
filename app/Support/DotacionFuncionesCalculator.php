@@ -99,6 +99,9 @@ class DotacionFuncionesCalculator
     {
         return match ($rule->tipo_regla) {
             'fija' => (int) ($rule->horas_fijas ?? 0),
+            'director_adp' => (bool) ($contexto['director_adp'] ?? false)
+                ? (int) ($rule->horas_fijas ?? 0)
+                : null,
             'matricula', 'matricula_por_registro' => ((int) ($contexto['matricula_total'] ?? 0) > (int) ($rule->umbral_matricula ?? 300))
                 ? (int) ($rule->horas_sobre_umbral ?? 0)
                 : (int) ($rule->horas_bajo_umbral ?? 0),
@@ -113,6 +116,7 @@ class DotacionFuncionesCalculator
     public static function detalleRegla(DotacionFuncionRegla $rule, array $contexto, int $horas): string
     {
         return match ($rule->codigo) {
+            'director_adp' => 'Cargo directivo normativo habilitado para este establecimiento y año.',
             'inspector_general' => 'Inspector(a) General se considera cargo fijo con 44 horas, independiente de si Director(a) es ADP.',
             'coordinador_pie' => 'Cursos con estudiantes NEE: '.((int) ($contexto['cursos_nee'] ?? 0)).'. Regla: 2 horas por curso, sin tope máximo.',
             'coordinador_extraescolar', 'cra', 'coordinador_ciclo_tp_especialidad' => 'Matrícula total del establecimiento: '.number_format((int) ($contexto['matricula_total'] ?? 0), 0, ',', '.').'. Umbral: '.((int) ($rule->umbral_matricula ?? 300)).' estudiantes.',
