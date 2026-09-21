@@ -151,7 +151,7 @@ class DotacionProyeccionCalculator
                     return $categoriaPrincipal;
                 }
                 if ($esDiferencial) {
-                    return DotacionAsignacionCalculator::esAsignacionNormativaAula($row) ? 'aula' : 'pie';
+                    return DotacionAsignacionCalculator::esAsignacionPie($row) ? 'pie' : 'aula';
                 }
 
                 return DotacionAsignacionCalculator::esAsignacionCoordinacionPie($row)
@@ -173,7 +173,7 @@ class DotacionProyeccionCalculator
                 $categoria = $categoriaPrincipal;
                 if (count($categorias) > 1) {
                     if ($esDiferencial) {
-                        $categoria = $vinculadas->contains(fn ($row) => DotacionAsignacionCalculator::esAsignacionNormativaAula($row)) ? 'aula' : 'pie';
+                        $categoria = $vinculadas->contains(fn ($row) => DotacionAsignacionCalculator::esAsignacionPie($row)) ? 'pie' : 'aula';
                     } else {
                         $categoria = $vinculadas->contains(fn ($row) => DotacionAsignacionCalculator::esAsignacionCoordinacionPie($row))
                             ? 'pie' : ($contrato['parvularia'] > 0 ? 'parvularia' : 'aula');

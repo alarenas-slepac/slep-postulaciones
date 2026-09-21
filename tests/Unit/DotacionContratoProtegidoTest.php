@@ -59,17 +59,17 @@ class DotacionContratoProtegidoTest extends TestCase
         $otro['horas_contrata'] = 0;
         $protegido['titulo'] = $otro['titulo'] = 'Educadora Diferencial';
         $resultado = DotacionSobredotacionCalculator::build([$protegido, $otro], [
-            'horas_contrato_docente_pie' => 74, 'horas_contrato_pie_necesarias' => 25,
+            'horas_contrato_docente_pie' => 32, 'horas_contrato_pie_necesarias' => 25,
         ]);
         $pie = $resultado['pie'];
         $this->assertSame(['22222222-2'], $pie['items']->pluck('rut')->all());
-        $this->assertSame(74.0, $pie['resumen']['horas_dotacion_total']);
+        $this->assertSame(32.0, $pie['resumen']['horas_dotacion_total']);
         $this->assertSame(25.0, $pie['resumen']['horas_necesidad_cubierta']);
-        $this->assertSame(44.0, $pie['resumen']['horas_sobredotacion_total']);
-        $this->assertSame(44.0, $pie['resumen']['horas_sobredotacion_planta']);
+        $this->assertSame(7.0, $pie['resumen']['horas_sobredotacion_total']);
+        $this->assertSame(7.0, $pie['resumen']['horas_sobredotacion_planta']);
         $this->assertSame(0.0, $pie['resumen']['horas_sobredotacion_contrata']);
-        $this->assertSame(49.0, $pie['resumen']['horas_sobredotacion_estructural']);
-        $this->assertSame(5.0, $pie['resumen']['horas_sobredotacion_protegida']);
+        $this->assertSame(7.0, $pie['resumen']['horas_sobredotacion_estructural']);
+        $this->assertSame(0.0, $pie['resumen']['horas_sobredotacion_protegida']);
     }
 
     public function test_aplica_a_parvularia_y_escuela_especial_y_a_cero_o_todas_las_horas_necesarias(): void

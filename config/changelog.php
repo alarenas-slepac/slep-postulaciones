@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.9.21.479' => [
+        'date' => '2026-09-21',
+        'module' => 'Dotacion establecimiento',
+        'title' => 'Distribucion de contrato PIE de Educadoras Diferenciales por asignacion',
+        'files' => [
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionProyeccionCalculator.php',
+            'config/changelog.php',
+            'tests/Feature/DotacionSituacionHorasNecesariasTest.php',
+            'tests/Unit/DotacionAsignacionContratoPieTest.php',
+            'tests/Unit/DotacionContratoProtegidoTest.php',
+            'tests/Unit/DotacionProyeccionTest.php',
+        ],
+        'changes' => [
+            'Considera en PIE solo las horas de Educadoras Diferenciales no asignadas a plan de estudio ni a funciones externas a PIE; las horas asignadas permanecen en Aula o en la funcion correspondiente.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificacion', 'Directivo Establecimiento'],
+    ],
     '2026.9.21.478' => [
         'date' => '2026-09-21',
         'module' => 'Dotación establecimiento',

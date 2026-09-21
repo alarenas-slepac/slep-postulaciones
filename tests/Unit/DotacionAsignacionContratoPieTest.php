@@ -82,6 +82,33 @@ class DotacionAsignacionContratoPieTest extends TestCase
         $this->assertSame('11111111-1', $detalle['pie']['items']->sole()['rut']);
     }
 
+    public function test_diferencial_descuenta_del_pie_las_horas_asignadas_a_aula_o_funciones(): void
+    {
+        $plan = $this->asignacion('plan_estudio', 'asignatura', 'Matematica', 20);
+        $funcion = $this->asignacion('otra_funcion', 'declarada', 'Coordinacion comunal', 6);
+        $pie = $this->asignacion('pie_educadora_diferencial', 'bolsa_total', 'Educadoras diferenciales PIE', 18);
+        $coordinacionPie = $this->asignacion('funcion_tecnico_pedagogica', 'pie', 'Coordinacion PIE', 4);
+        $coordinacionPie->docente_rut_normalizado = '111111111';
+        $inactiva = $this->asignacion('funcion_directiva', 'directiva', 'Direccion historica', 10);
+        $inactiva->estado = 'inactiva';
+        foreach ([$plan, $funcion, $pie, $inactiva] as $asignacion) {
+            $asignacion->docente_rut_normalizado = '111111111';
+        }
+
+        $docente = [
+            'rut' => '11111111-1',
+            'titulo' => 'Educadora Diferencial',
+            'horas_contrato' => 44,
+            'asignaciones' => [$plan, $funcion, $pie, $coordinacionPie, $inactiva],
+        ];
+
+        $this->assertSame(18.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente));
+
+        $method = new ReflectionMethod(DotacionAsignacionCalculator::class, 'resumenContratoDocentePie');
+        $resumen = $method->invoke(null, collect([$plan, $funcion, $pie, $coordinacionPie, $inactiva]), collect([$docente]));
+        $this->assertSame(['coordinacion_pie' => 0.0, 'educadoras_diferenciales' => 18.0, 'total' => 18.0], $resumen);
+    }
+
     public function test_detalle_identifica_contrato_sin_asignaciones_y_no_lo_inventa_como_asignado(): void
     {
         $detalle = DotacionSobredotacionCalculator::build([
