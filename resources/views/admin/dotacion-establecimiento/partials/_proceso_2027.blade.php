@@ -48,13 +48,13 @@
                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}" class="border rounded-4 p-3 h-100">
                             @csrf
                             <input type="hidden" name="anio" value="2027">
-                            <div class="fw-semibold mb-2">Máximos autorizados para asignar</div>
+                            <div class="fw-semibold mb-2">Máximos autorizados para asignar por componente</div>
                             <div class="row g-2">
                                 @foreach (($proceso['bloques'] ?? []) as $key => $bloque)
                                     <div class="col-md-4">
-                                        <label class="form-label small fw-semibold">Bloque {{ substr($key, -1) }}</label>
+                                        <label class="form-label small fw-semibold">{{ $bloque['label'] }}</label>
                                         <input type="number" name="max_horas_{{ $key }}" min="0" step="0.25" class="form-control" value="{{ old('max_horas_'.$key, $bloque['maximo']) }}" required>
-                                        <div class="form-text">Req.: {{ $fmtProceso($bloque['requeridas']) }} h</div>
+                                        <div class="form-text">Horas necesarias: {{ $fmtProceso($bloque['requeridas']) }} h</div>
                                     </div>
                                 @endforeach
                             </div>
@@ -62,7 +62,7 @@
                         </form>
                     @else
                         <div class="border rounded-4 p-3 h-100 bg-light">
-                            <div class="fw-semibold">Máximos por bloque</div>
+                            <div class="fw-semibold">Máximos autorizados por componente</div>
                             <div class="small text-muted">La configuración de máximos corresponde a Administración, UATP o Supervisión de Planificación.</div>
                         </div>
                     @endif
@@ -75,7 +75,7 @@
                     <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
                         <div>
                             <div class="fw-semibold">Definición de funciones normativas</div>
-                            <div class="small text-muted">Seleccione las funciones que el establecimiento utilizará. Sólo esas horas se sumarán como necesidad obligatoria del bloque 1.</div>
+                            <div class="small text-muted">Seleccione las funciones que el establecimiento utilizará. Sólo esas horas se sumarán como necesidad obligatoria de Plan general, trabajo colaborativo PIE y funciones normativas.</div>
                         </div>
                         <span class="badge {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'text-bg-success' : 'text-bg-warning' }}">Bolsa potencial: {{ $fmtProceso(data_get($proceso, 'bloques.bloque_1.horas_normativas_potenciales', 0)) }} h</span>
                     </div>
@@ -105,7 +105,7 @@
 
             <div class="table-responsive mt-4">
                 <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light"><tr><th>Bloque</th><th class="text-end">Normativas potenciales</th><th class="text-end">Máximo</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Total asignado</th><th class="text-end">Obligatorio asignado</th><th class="text-end">Pendiente obligatorio</th><th class="text-end">Saldo</th></tr></thead>
+                    <thead class="table-light"><tr><th>Componente</th><th class="text-end">Normativas potenciales</th><th class="text-end">Máximo</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Total asignado</th><th class="text-end">Obligatorio asignado</th><th class="text-end">Pendiente obligatorio</th><th class="text-end">Saldo</th></tr></thead>
                     <tbody>
                         @foreach (($proceso['bloques'] ?? []) as $bloque)
                             <tr>
@@ -124,7 +124,7 @@
                 </table>
             </div>
             @if (!($proceso['funciones_no_normativas_habilitadas'] ?? false))
-                <div class="alert alert-secondary small mt-3 mb-0"><i class="bi bi-lock"></i> Las funciones no normativas aún están bloqueadas. Deben completarse las necesidades obligatorias y mantenerse saldo disponible en el bloque 1.</div>
+                <div class="alert alert-secondary small mt-3 mb-0"><i class="bi bi-lock"></i> Las funciones no normativas aún están bloqueadas. Deben completarse las necesidades obligatorias y mantenerse saldo disponible en Plan general, trabajo colaborativo PIE y funciones normativas.</div>
             @else
                 <div class="alert alert-success small mt-3 mb-0"><i class="bi bi-unlock"></i> Funciones no normativas habilitadas: {{ $fmtProceso($proceso['capacidad_no_normativas'] ?? 0) }} horas disponibles.</div>
             @endif
