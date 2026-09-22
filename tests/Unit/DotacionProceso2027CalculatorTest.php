@@ -97,6 +97,35 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertFalse($resumen['funciones_normativas']->first()['se_utilizara']);
     }
 
+    public function test_usa_el_contrato_ajustado_por_cursos_combinados_en_lugar_de_sumar_asignaturas_brutas(): void
+    {
+        $resumen = DotacionProceso2027Calculator::resumen(
+            new Establecimiento(['id' => 1]),
+            2027,
+            [
+                'resumen' => [
+                    'contrato_plan_general_mas_trabajo_colaborativo_pie' => 392,
+                    'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 72,
+                ],
+                'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+                'asignacion' => [
+                    'necesidades' => [
+                        'plan_estudio' => [[
+                            'key' => 'plan:combinado',
+                            'horas_contrato_requeridas' => 396,
+                        ]],
+                    ],
+                    'asignaciones' => [],
+                ],
+                'docentes' => [],
+                'cursos_combinados' => ['resumen' => ['grupos_activos' => 1]],
+            ]
+        );
+
+        $this->assertSame(392.0, $resumen['bloques']['bloque_1']['requeridas']);
+        $this->assertSame(72.0, $resumen['bloques']['bloque_2']['requeridas']);
+    }
+
     private function docente(
         string $nombre,
         float $planta,

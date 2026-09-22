@@ -1,6 +1,18 @@
 <?php
 
 return [
+    '2026.9.22.489' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Ajuste contractual de cursos combinados en proceso 2027',
+        'files' => [
+            'app/Support/DotacionProceso2027Calculator.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'El proceso guiado usa el contrato consolidado de cursos combinados para que las necesidades por componente coincidan con las tarjetas contractuales.',
+        ],
+    ],
     '2026.9.22.488' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',
