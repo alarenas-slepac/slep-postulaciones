@@ -1389,17 +1389,15 @@ class DotacionAsignacionCalculator
         $assignedPlan = (float) $assigned->sum(fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0));
         $esPlanEstudio = $tipo === 'plan_estudio' && $horasPlan !== null;
 
-        $necesidadNormativaCondicionada = self::esNecesidadNormativaCondicionadaPorDocente($subtipo, $data);
-        $docenteAsignado = $assigned->contains(
-            fn ($row): bool => self::esAsignacionDocenteReal($row)
-        );
+        $necesidadNormativaCondicionada = self::esNecesidadNormativaCondicionadaPorAsignacion($subtipo, $data);
+        $horasNormativasAsignadas = min($horasContrato, max(0.0, $assignedContrato));
         $plazaAutomaticaDirectorAdp = self::esDirectorAdp($data) && $assigned->contains(
             fn ($row): bool => (bool) data_get($row, 'asignacion_automatica', false)
                 && self::coverageEstamento($row) === 'docente'
         );
-        $necesidadActivada = $docenteAsignado || $plazaAutomaticaDirectorAdp;
-        $horasContratoRequeridasCalculo = $necesidadNormativaCondicionada && ! $necesidadActivada
-            ? 0.0
+        $necesidadActivada = $horasNormativasAsignadas > 0.01 || $plazaAutomaticaDirectorAdp;
+        $horasContratoRequeridasCalculo = $necesidadNormativaCondicionada
+            ? $horasNormativasAsignadas
             : $horasContrato;
         $estadoRequeridas = $esPlanEstudio ? $horasPlan : $horasContrato;
         $estadoAsignadas = $esPlanEstudio
@@ -1480,10 +1478,10 @@ class DotacionAsignacionCalculator
     }
 
     /**
-     * Las funciones directivas y los planes normativos se activan en el cálculo
-     * sólo al contar con una asignación activa de una persona docente. La plaza
-     * automática "por asumir" de Director(a) ADP es la excepción: representa
-     * una necesidad directiva vigente y activa las horas correspondientes.
+     * Las funciones directivas, técnico-pedagógicas y los planes normativos
+     * aportan al cálculo sólo sus horas activamente asignadas, sin exceder las
+     * horas disponibles. La plaza automática "por asumir" de Director(a) ADP
+     * mantiene sus 44 horas como una necesidad directiva vigente.
      */
     public static function horasContratoRequeridasParaCalculo(object|array $necesidad): float
     {
@@ -1501,10 +1499,10 @@ class DotacionAsignacionCalculator
             && ! self::esAsignacionPorAsumir($asignacion);
     }
 
-    private static function esNecesidadNormativaCondicionadaPorDocente(?string $subtipo, array $data): bool
+    private static function esNecesidadNormativaCondicionadaPorAsignacion(?string $subtipo, array $data): bool
     {
         return (int) ($data['dotacion_funcion_id'] ?? 0) <= 0
-            && in_array($subtipo, ['directiva', 'planes_programas'], true);
+            && in_array($subtipo, ['directiva', 'tecnico_pedagogica', 'planes_programas'], true);
     }
 
     private static function esDirectorAdp(array $data): bool

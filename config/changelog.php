@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.9.22.483' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Horas parciales asignadas en funciones normativas',
+        'files' => [
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+            'tests/Unit/DotacionFuncionesAnualesTest.php',
+        ],
+        'changes' => [
+            'Las funciones directivas, técnico-pedagógicas y los planes normativos suman sólo las horas efectivamente asignadas, con tope en las horas normativas disponibles.',
+            'El resumen y el PDF informan las horas asignadas respecto de las horas normativas disponibles.',
+            'Conserva la plaza automática de Director(a) ADP por asumir como necesidad vigente de 44 horas.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.22.482' => [
         'date' => '2026-09-22',
         'module' => 'Despliegue y plataforma',

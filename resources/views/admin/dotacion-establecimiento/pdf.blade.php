@@ -63,6 +63,7 @@
     $totalDeclaradas = collect($bloquesInformeDotacion)->sum(fn ($bloque) => (float) ($bloque['declaradas'] ?? 0));
     $desgloseContratoBloque = $resumen['horas_dotacion_desglose'] ?? [];
     $horasBloqueNormativas = (float) ($resumen['horas_dotacion_funciones_normativas'] ?? $desgloseContratoBloque['total_normativas'] ?? $totalAutomaticas);
+    $horasBloqueNormativasDisponibles = (float) ($resumen['horas_dotacion_funciones_normativas_disponibles'] ?? $desgloseContratoBloque['total_normativas_disponibles'] ?? $horasBloqueNormativas);
     $horasBloqueDeclaradas = (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? $desgloseContratoBloque['total_declaradas'] ?? $totalDeclaradas);
     $horasBloqueDeclaradasAsignadas = (float) ($desgloseContratoBloque['total_declaradas_asignadas'] ?? 0);
     $horasContratoPieNecesarias = (float) ($resumen['horas_contrato_pie_necesarias'] ?? 0);
@@ -345,21 +346,21 @@
             <th>Total normativas</th>
         </tr>
         <tr>
-            <th>Asignadas</th><th>Requeridas</th>
-            <th>Asignadas</th><th>Requeridas</th>
-            <th>Asignadas</th><th>Requeridas</th>
+            <th>Asignadas</th><th>Disponibles</th>
+            <th>Asignadas</th><th>Disponibles</th>
+            <th>Asignadas</th><th>Disponibles</th>
             <th></th>
         </tr>
     </thead>
     <tbody>
         <tr>
             <td class="text-right primary">{{ $fmt($desgloseContratoBloque['funciones_directivas_normativas_asignadas'] ?? 0) }}</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas_normativas'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas_normativas_disponibles'] ?? $desgloseContratoBloque['funciones_directivas_normativas'] ?? 0) }}</td>
             <td class="text-right primary">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas_asignadas'] ?? 0) }}</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas_disponibles'] ?? $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0) }}</td>
             <td class="text-right primary">{{ $fmt($desgloseContratoBloque['planes_normativos_asignadas'] ?? 0) }}</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_normativos'] ?? 0) }}</td>
-            <td class="text-right primary">{{ $fmt($horasBloqueNormativas) }}</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_normativos_disponibles'] ?? $desgloseContratoBloque['planes_normativos'] ?? 0) }}</td>
+            <td class="text-right primary">{{ $fmt($horasBloqueNormativas) }} / {{ $fmt($horasBloqueNormativasDisponibles) }}</td>
         </tr>
     </tbody>
 </table>
@@ -455,13 +456,13 @@
         </tr>
         <tr>
             <td>Funciones directivas</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas_normativas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['funciones_directivas_normativas'] ?? 0) }}</td>
-            <td>Horas normativas asignadas / requeridas.</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_directivas_normativas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['funciones_directivas_normativas_disponibles'] ?? $desgloseContratoBloque['funciones_directivas_normativas'] ?? 0) }}</td>
+            <td>Horas normativas asignadas / disponibles.</td>
         </tr>
         <tr>
             <td>Funciones técnico-pedagógicas normativas</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0) }}</td>
-            <td>Horas normativas asignadas / requeridas.</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas_disponibles'] ?? $desgloseContratoBloque['funciones_tecnico_pedagogicas_normativas'] ?? 0) }}</td>
+            <td>Horas normativas asignadas / disponibles.</td>
         </tr>
         <tr>
             <td>Coordinador(a) PIE necesario</td>
@@ -480,13 +481,13 @@
         </tr>
         <tr>
             <td>Planes normativos</td>
-            <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_normativos_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['planes_normativos'] ?? 0) }}</td>
-            <td>Horas normativas asignadas / requeridas.</td>
+            <td class="text-right">{{ $fmt($desgloseContratoBloque['planes_normativos_asignadas'] ?? 0) }} / {{ $fmt($desgloseContratoBloque['planes_normativos_disponibles'] ?? $desgloseContratoBloque['planes_normativos'] ?? 0) }}</td>
+            <td>Horas normativas asignadas / disponibles.</td>
         </tr>
         <tr>
             <td>Contrato bloque normativo</td>
-            <td class="text-right">{{ $fmt($horasBloqueNormativas) }}</td>
-            <td>Funciones directivas, técnico-pedagógicas y planes calculados por normativa.</td>
+            <td class="text-right">{{ $fmt($horasBloqueNormativas) }} / {{ $fmt($horasBloqueNormativasDisponibles) }}</td>
+            <td>Horas asignadas de las funciones directivas, técnico-pedagógicas y planes normativos disponibles.</td>
         </tr>
         <tr>
             <td>Contrato bloque declarado</td>
