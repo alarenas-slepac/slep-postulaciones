@@ -1,6 +1,18 @@
 <?php
 
 return [
+    '2026.9.22.486' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Corrección de migración del proceso 2027',
+        'files' => [
+            'database/migrations/2026_09_22_180000_create_dotacion_proceso_2027_configuraciones_table.php',
+            'tests/Feature/DotacionProceso2027MigrationTest.php',
+        ],
+        'changes' => [
+            'Usa nombres cortos para las claves foráneas de la configuración 2027 y completa relaciones faltantes si una ejecución anterior creó la tabla de forma parcial.',
+        ],
+    ],
     '2026.9.22.485' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',
