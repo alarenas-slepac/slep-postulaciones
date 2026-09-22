@@ -51,11 +51,15 @@ class DotacionProyeccionCalculator
 
         $coberturas = collect(data_get($base, 'asignacion.necesidades', []))
             ->map(fn ($items, $grupo) => collect($items)->map(function (array $item) use ($grupo, $continuaAsignacion): array {
-                $asignadas = collect($item['asignaciones'] ?? []);
+                $asignadas = collect($item['asignaciones'] ?? [])
+                    ->reject(fn ($row) => (bool) ($item['necesidad_condicionada_por_asignacion_docente'] ?? false)
+                        && ! DotacionAsignacionCalculator::esAsignacionDocenteReal($row));
                 $proyectadas = $asignadas->filter($continuaAsignacion);
                 $esPlan = $grupo === 'plan_estudio' && ($item['horas_plan_requeridas'] ?? null) !== null;
                 $campo = $esPlan ? 'horas_plan_pedagogicas' : 'horas_contrato';
-                $requeridas = (float) ($esPlan ? $item['horas_plan_requeridas'] : ($item['horas_contrato_requeridas'] ?? 0));
+                $requeridas = (float) ($esPlan
+                    ? $item['horas_plan_requeridas']
+                    : DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item));
                 $horasBase = round((float) $asignadas->sum(fn ($row) => (float) data_get($row, $campo, 0)), 2);
                 $horasProyectadas = round((float) $proyectadas->sum(fn ($row) => (float) data_get($row, $campo, 0)), 2);
 
@@ -112,7 +116,9 @@ class DotacionProyeccionCalculator
     private static function reservasNecesarias(array $base, array $noContinuan, array $conservarPorRut, bool $especial): array
     {
         $necesidades = collect(data_get($base, 'asignacion.necesidades', []))->flatMap(fn ($grupo) => collect($grupo)->values())->values();
-        $saldos = $necesidades->map(fn ($item) => max(0.0, (float) ($item['horas_contrato_requeridas'] ?? 0)))->all();
+        $saldos = $necesidades
+            ->map(fn ($item) => DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item))
+            ->all();
         $adicionales = ['aula' => 0.0, 'parvularia' => 0.0, 'pie' => 0.0];
         $reservas = [];
         $vacantes = 0.0;

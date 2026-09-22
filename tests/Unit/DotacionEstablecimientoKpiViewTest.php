@@ -14,7 +14,7 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
         $xpath = new \DOMXPath($dom);
         $expected = [
             'generales' => ['Matrícula', 'Cursos', 'Docentes'],
-            'necesidades' => ['Contrato Educación Parvularia + PIE', 'Contrato Plan General + PIE', 'Funciones directivas / técnico pedagógicas y planes normativos', 'Otras funciones no normativas'],
+            'necesidades' => ['Contrato Educación Parvularia + PIE', 'Contrato Plan General + PIE', 'Funciones directivas / técnico pedagógicas y planes normativos', 'Otras funciones declaradas y/o no normativas'],
             'contratos' => ['Horas contrato PIE necesarias', 'Horas contrato docentes', 'Horas contrato aula', 'Horas contrato parvularia', 'Horas contrato docente PIE'],
             'sobredotacion' => ['Sobredotación plan de estudio + funciones normativas', 'Sobredotación Parvularia', 'Sobredotación PIE'],
         ];
@@ -85,7 +85,7 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
         $this->assertStringContainsString("['label' => 'Contrato Plan General + PIE'", $source);
         $this->assertStringContainsString('...($tieneEducacionParvularia ? [', $source);
         $this->assertStringContainsString("['label' => 'Funciones directivas / técnico pedagógicas y planes normativos'", $source);
-        $this->assertStringContainsString("['label' => 'Otras funciones no normativas'", $source);
+        $this->assertStringContainsString("['label' => 'Otras funciones declaradas y/o no normativas'", $source);
         $this->assertStringNotContainsString("['label' => 'Horas plan'", $source);
         $this->assertStringNotContainsString("['label' => 'Contrato plan',", $source);
         $this->assertStringNotContainsString("['label' => 'Trabajo colab. PIE'", $source);

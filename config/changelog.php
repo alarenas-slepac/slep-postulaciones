@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.22.481' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Activación de necesidades directivas y de planes normativos por asignación docente',
+        'files' => [
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProyeccionCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Unit/DotacionEstablecimientoKpiViewTest.php',
+            'tests/Unit/DotacionFuncionesAnualesTest.php',
+        ],
+        'changes' => [
+            'Excluye del cálculo de necesidades, brechas, proyecciones y reportes las horas directivas y de planes normativos que aún no tengan una asignación activa de docente.',
+            'La plaza automática de Director(a) ADP por asumir es una excepción: activa sus 44 horas como necesidad directiva, brecha y proyección vigente.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.21.480' => [
         'date' => '2026-09-21',
         'module' => 'Estudiantes PIE por curso',
