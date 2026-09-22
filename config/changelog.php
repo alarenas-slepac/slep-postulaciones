@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.9.22.487' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Definición de funciones normativas 2027',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Http/Controllers/Admin/DotacionProceso2027Controller.php',
+            'app/Exports/DotacionEstablecimientoAvanceExport.php',
+            'app/Models/DotacionProceso2027Configuracion.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'database/migrations/2026_09_22_191000_add_funciones_normativas_to_dotacion_proceso_2027_configuraciones_table.php',
+            'resources/views/admin/dotacion-establecimiento/avance.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Feature/DotacionProceso2027MigrationTest.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'Muestra las horas potenciales de funciones normativas y exige definir cuáles utilizará el establecimiento antes de asignar horas.',
+            'Sólo incorpora al bloque 1 las horas normativas seleccionadas; la definición puede realizarla el establecimiento, Administración o UATP.',
+        ],
+    ],
     '2026.9.22.486' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',

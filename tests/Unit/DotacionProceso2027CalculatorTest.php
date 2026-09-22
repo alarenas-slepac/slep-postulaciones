@@ -66,6 +66,37 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame(0.0, $resumen['bloques']['bloque_1']['requeridas']);
     }
 
+    public function test_muestra_funcion_normativa_potencial_y_no_la_exige_hasta_definirla(): void
+    {
+        $resumen = DotacionProceso2027Calculator::resumen(
+            new Establecimiento(['id' => 1]),
+            2027,
+            [
+                'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+                'asignacion' => [
+                    'necesidades' => [
+                        'funciones' => [[
+                            'key' => 'funcion:utp',
+                            'titulo' => 'Jefatura UTP',
+                            'subtipo_asignacion' => 'tecnico_pedagogica',
+                            'horas_contrato_requeridas' => 8,
+                            'horas_contrato_asignadas' => 0,
+                            'necesidad_condicionada_por_asignacion_docente' => true,
+                        ]],
+                    ],
+                    'asignaciones' => [],
+                ],
+                'docentes' => [],
+                'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+            ]
+        );
+
+        $this->assertSame(8.0, $resumen['bloques']['bloque_1']['horas_normativas_potenciales']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['requeridas']);
+        $this->assertFalse($resumen['pasos']['normativas']['completo']);
+        $this->assertFalse($resumen['funciones_normativas']->first()['se_utilizara']);
+    }
+
     private function docente(
         string $nombre,
         float $planta,

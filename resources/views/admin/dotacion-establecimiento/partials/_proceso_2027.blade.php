@@ -17,7 +17,7 @@
         <div class="card-body">
             <div class="row g-3 mb-4">
                 @foreach (($proceso['pasos'] ?? []) as $paso)
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg col-md-4">
                         <div class="border rounded-4 p-3 h-100 {{ $paso['completo'] ? 'border-success bg-success-subtle' : 'border-warning bg-warning-subtle' }}">
                             <div class="small text-muted">{{ $loop->iteration }}. Etapa</div>
                             <div class="fw-semibold">{{ $paso['label'] }}</div>
@@ -69,13 +69,48 @@
                 </div>
             </div>
 
+            @php $funcionesNormativas = collect($proceso['funciones_normativas'] ?? []); @endphp
+            @if ($funcionesNormativas->isNotEmpty())
+                <div class="border rounded-4 p-3 mt-3 {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'border-success' : 'border-warning bg-warning-subtle' }}">
+                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
+                        <div>
+                            <div class="fw-semibold">Definición de funciones normativas</div>
+                            <div class="small text-muted">Seleccione las funciones que el establecimiento utilizará. Sólo esas horas se sumarán como necesidad obligatoria del bloque 1.</div>
+                        </div>
+                        <span class="badge {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'text-bg-success' : 'text-bg-warning' }}">Bolsa potencial: {{ $fmtProceso(data_get($proceso, 'bloques.bloque_1.horas_normativas_potenciales', 0)) }} h</span>
+                    </div>
+                    @if ($canManageProceso2027Normativas ?? false)
+                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}">
+                            @csrf
+                            <input type="hidden" name="anio" value="2027">
+                            <input type="hidden" name="funciones_normativas_configuradas" value="1">
+                            <div class="row g-2">
+                                @foreach ($funcionesNormativas as $funcion)
+                                    <div class="col-lg-6">
+                                        <label class="border rounded-3 bg-white px-3 py-2 d-flex gap-2 align-items-start h-100">
+                                            <input type="hidden" name="funciones_normativas[{{ $loop->index }}][key]" value="{{ $funcion['key'] }}">
+                                            <input class="form-check-input mt-1" type="checkbox" name="funciones_normativas[{{ $loop->index }}][usar]" value="1" @checked($funcion['se_utilizara'])>
+                                            <span><span class="fw-semibold d-block">{{ $funcion['titulo'] }}</span><span class="small text-muted">{{ $fmtProceso($funcion['horas']) }} horas{{ $funcion['asignacion_existente'] ? ' · Ya tiene asignación y se mantiene activa' : '' }}</span></span>
+                                        </label>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm rounded-pill mt-3" type="submit"><i class="bi bi-check2-circle"></i> Guardar definición</button>
+                        </form>
+                    @else
+                        <div class="small text-muted">La definición puede realizarla el funcionario directivo del establecimiento, Administración o Coordinación UATP.</div>
+                    @endif
+                </div>
+            @endif
+
             <div class="table-responsive mt-4">
                 <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light"><tr><th>Bloque</th><th class="text-end">Máximo</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Total asignado</th><th class="text-end">Obligatorio asignado</th><th class="text-end">Pendiente obligatorio</th><th class="text-end">Saldo</th></tr></thead>
+                    <thead class="table-light"><tr><th>Bloque</th><th class="text-end">Normativas potenciales</th><th class="text-end">Máximo</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Total asignado</th><th class="text-end">Obligatorio asignado</th><th class="text-end">Pendiente obligatorio</th><th class="text-end">Saldo</th></tr></thead>
                     <tbody>
                         @foreach (($proceso['bloques'] ?? []) as $bloque)
                             <tr>
                                 <td class="fw-semibold">{{ $bloque['label'] }}</td>
+                                <td class="text-end">{{ $bloque['horas_normativas_potenciales'] > 0 ? $fmtProceso($bloque['horas_normativas_potenciales']) : '—' }}</td>
                                 <td class="text-end">{{ $bloque['maximo'] === null ? 'Pendiente' : $fmtProceso($bloque['maximo']) }}</td>
                                 <td class="text-end text-success">{{ $fmtProceso($bloque['titulares_asignadas']) }}</td>
                                 <td class="text-end text-primary">{{ $fmtProceso($bloque['contrata_asignadas']) }}</td>

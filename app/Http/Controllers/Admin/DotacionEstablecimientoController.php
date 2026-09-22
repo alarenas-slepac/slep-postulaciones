@@ -358,6 +358,7 @@ class DotacionEstablecimientoController extends Controller
             'alertas' => $data['alertas'],
             'proceso2027' => $proceso2027,
             'canManageProceso2027Maximos' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true),
+            'canManageProceso2027Normativas' => in_array($activeRole, ['admin', 'funcionario_directivo_estab', 'coordinador_uatp'], true),
         ]);
     }
 
