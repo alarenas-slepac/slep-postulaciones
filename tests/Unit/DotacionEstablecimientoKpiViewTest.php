@@ -26,6 +26,8 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
         }
         $this->assertStringContainsString('row-cols-xl-4', $html);
         $this->assertStringContainsString('row-cols-xl-5', $html);
+        $this->assertStringContainsString('231 de 260 horas', $html);
+        $this->assertStringContainsString('Asignadas de las normativas disponibles.', $html);
         $values = $xpath->query('//*[@data-kpi-row="sobredotacion"]//div[contains(@class,"fs-2")]');
         $this->assertSame(['562', '88', '340'], array_map(fn ($node) => trim($node->textContent), iterator_to_array($values)));
         foreach ($values as $value) {
@@ -62,6 +64,7 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
                 'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 120,
                 'contrato_plan_general_mas_trabajo_colaborativo_pie' => 809,
                 'horas_dotacion_funciones_normativas' => 231,
+                'horas_dotacion_funciones_normativas_disponibles' => 260,
                 'horas_dotacion_funciones_declaradas' => 348,
                 'horas_dotacion_desglose' => ['total_declaradas_asignadas' => 346],
                 'horas_contrato_pie_necesarias' => 336,
@@ -85,6 +88,7 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
         $this->assertStringContainsString("['label' => 'Contrato Plan General + PIE'", $source);
         $this->assertStringContainsString('...($tieneEducacionParvularia ? [', $source);
         $this->assertStringContainsString("['label' => 'Funciones directivas / técnico pedagógicas y planes normativos'", $source);
+        $this->assertStringContainsString("'Asignadas de las normativas disponibles.'", $source);
         $this->assertStringContainsString("['label' => 'Otras funciones declaradas y/o no normativas'", $source);
         $this->assertStringNotContainsString("['label' => 'Horas plan'", $source);
         $this->assertStringNotContainsString("['label' => 'Contrato plan',", $source);
