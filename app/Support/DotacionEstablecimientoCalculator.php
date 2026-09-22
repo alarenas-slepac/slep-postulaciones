@@ -942,7 +942,8 @@ class DotacionEstablecimientoCalculator
             $exclusionDocente = $exclusionesPorRut[$rut] ?? null;
             $ajusteContrato = self::ajustarHorasContratoPorExclusion(
                 $horasContratoBase,
-                $exclusionDocente?->horas
+                $exclusionDocente?->horas,
+                $exclusionDocente?->motivo
             );
             $horasContrato = $ajusteContrato['horas_consideradas'];
             $horasBasicaDeclarada = (float) ($grupo['jornada_basica_total'] ?? 0);
@@ -1065,7 +1066,8 @@ class DotacionEstablecimientoCalculator
      */
     private static function ajustarHorasContratoPorExclusion(
         float|int|null $horasContratoBase,
-        float|int|string|null $horasExcluidas
+        float|int|string|null $horasExcluidas,
+        ?string $motivo = null
     ): array
     {
         if ($horasContratoBase === null) {
@@ -1077,6 +1079,13 @@ class DotacionEstablecimientoCalculator
         }
 
         $base = max(0.0, round((float) $horasContratoBase, 2));
+        if ($motivo === 'proceso_bir') {
+            return [
+                'horas_base' => $base,
+                'horas_excluidas' => 0.0,
+                'horas_consideradas' => $base,
+            ];
+        }
         $excluidas = min($base, max(0.0, round((float) ($horasExcluidas ?? 0), 2)));
 
         return [
@@ -1830,7 +1839,21 @@ class DotacionEstablecimientoCalculator
             return round((float) $necesidades
                 ->filter(fn ($item) => data_get($item, 'subtipo_asignacion') === $subtipo
                     && (int) data_get($item, 'dotacion_funcion_id', 0) <= 0)
-                ->sum(fn ($item) => DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item)), 2);
+                ->sum(function ($item): float {
+                    $horasCalculadas = data_get($item, 'horas_contrato_requeridas_calculo');
+                    if ($horasCalculadas !== null) {
+                        return DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item);
+                    }
+
+                    $horasAsignadas = max(0.0, (float) data_get($item, 'horas_contrato_asignadas', 0));
+                    $horasDisponibles = max(0.0, (float) data_get(
+                        $item,
+                        'horas_contrato_requeridas',
+                        $horasAsignadas
+                    ));
+
+                    return min($horasDisponibles, $horasAsignadas);
+                }), 2);
         };
         $horasNormativasDisponibles = static fn (string $bloqueKey): float => (float) data_get(
             $bloques,

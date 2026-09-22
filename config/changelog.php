@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.9.22.484' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Contrato completo para situación Proceso BIR',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionDocenteExclusionController.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'tests/Feature/DotacionSituacionHorasNecesariasTest.php',
+            'tests/Unit/DotacionDocenteDetalleHorasTest.php',
+        ],
+        'changes' => [
+            'Proceso BIR conserva automáticamente el total del contrato en el bloque de dotación que corresponda durante el año seleccionado.',
+            'La decisión de continuidad mantiene por separado la proyección de esas horas como vacante para el año siguiente.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Supervisor Planificación', 'Directivo Establecimiento'],
+    ],
     '2026.9.22.483' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',
