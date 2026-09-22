@@ -1,6 +1,18 @@
 <?php
 
 return [
+    '2026.9.22.488' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Etiquetas descriptivas de componentes 2027',
+        'files' => [
+            'app/Exports/DotacionEstablecimientoAvanceExport.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+        ],
+        'changes' => [
+            'Reemplaza las referencias genéricas a bloques por nombres descriptivos de cada componente en el proceso guiado y el exportable.',
+        ],
+    ],
     '2026.9.22.487' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',

@@ -215,9 +215,9 @@ class DotacionEstablecimientoAvanceExport
         $headers[] = 'Proceso 2027 - máximos';
         $headers[] = 'Proceso 2027 - asignación obligatoria';
         foreach ([
-            'bloque_1' => 'Bloque 1: plan general + normativas',
-            'bloque_2' => 'Bloque 2: parvularia',
-            'bloque_3' => 'Bloque 3: PIE especializado',
+            'bloque_1' => 'Plan general, trabajo colaborativo PIE y funciones normativas',
+            'bloque_2' => 'Educación Parvularia y trabajo colaborativo PIE NT1/NT2',
+            'bloque_3' => 'PIE especializado: coordinación PIE y educadoras diferenciales',
         ] as $key => $label) {
             $headers[] = $label.' - máximo';
             $headers[] = $label.' - titulares';
