@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.22.482' => [
+        'date' => '2026-09-22',
+        'module' => 'Despliegue y plataforma',
+        'title' => 'Página de mantenimiento SGA y despliegue protegido',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/errors/503.blade.php',
+            'scripts/production/actualizar_y_desplegar_produccion.sh',
+            'scripts/production/deploy_slep_postulaciones.sh',
+            'tests/Unit/MaintenancePageTest.php',
+        ],
+        'changes' => [
+            'Incorpora una página 503 de mantenimiento con la identidad visual de SGA.',
+            'Pre-renderiza la página durante el despliegue y protege el archivo maintenance.php de la sincronización rsync.',
+        ],
+        'roles' => ['Administrador técnico'],
+    ],
     '2026.9.22.481' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',
