@@ -97,6 +97,35 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertFalse($resumen['funciones_normativas']->first()['se_utilizara']);
     }
 
+    public function test_no_completa_los_planes_si_nt_y_libre_disposicion_siguen_pendientes(): void
+    {
+        $resumen = DotacionProceso2027Calculator::resumen(
+            new Establecimiento(['id' => 1]),
+            2027,
+            [
+                'cursos' => [
+                    'totales' => ['cursos' => 2, 'sin_horas_plan' => 0],
+                    'configuracion_planes' => [
+                        'completo' => false,
+                        'total' => 2,
+                        'configurados' => 0,
+                        'pendientes' => ['NT1 A', 'NT2 A'],
+                        'libre_disposicion_pendiente' => 2,
+                        'detalle' => '0 de 2 curso(s) listos; 2 pendiente(s). 2 pendiente(s) incluyen horas de libre disposición.',
+                    ],
+                ],
+                'asignacion' => ['necesidades' => [], 'asignaciones' => []],
+                'docentes' => [],
+                'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+            ]
+        );
+
+        $this->assertFalse($resumen['pasos']['planes']['completo']);
+        $this->assertFalse($resumen['asignacion_habilitada']);
+        $this->assertSame(2, $resumen['estado_planes']['libre_disposicion_pendiente']);
+        $this->assertStringContainsString('libre disposición', $resumen['pasos']['planes']['detalle']);
+    }
+
     public function test_usa_el_contrato_ajustado_por_cursos_combinados_en_lugar_de_sumar_asignaturas_brutas(): void
     {
         $resumen = DotacionProceso2027Calculator::resumen(

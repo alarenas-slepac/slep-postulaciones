@@ -21,6 +21,9 @@
                         <div class="border rounded-4 p-3 h-100 {{ $paso['completo'] ? 'border-success bg-success-subtle' : 'border-warning bg-warning-subtle' }}">
                             <div class="small text-muted">{{ $loop->iteration }}. Etapa</div>
                             <div class="fw-semibold">{{ $paso['label'] }}</div>
+                            @if (!empty($paso['detalle']))
+                                <div class="small text-muted mt-1">{{ $paso['detalle'] }}</div>
+                            @endif
                             <span class="badge rounded-pill {{ $paso['completo'] ? 'text-bg-success' : 'text-bg-warning' }} mt-2">{{ $paso['completo'] ? 'Completada' : 'Pendiente' }}</span>
                         </div>
                     </div>
