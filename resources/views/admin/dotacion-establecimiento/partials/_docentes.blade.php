@@ -45,7 +45,7 @@
             <div>
                 <div class="dotacion-eyebrow">Base docente contractual</div>
                 <h2 class="h5 fw-bold mb-1">Docentes vigentes del establecimiento</h2>
-                <div class="text-muted small">La nómina considera los registros vigentes del último mes. Las situaciones docentes distribuyen el contrato original entre horas necesarias y no necesarias; sólo las necesarias suman al bloque contractual correspondiente.</div>
+                <div class="text-muted small">La nómina considera los registros vigentes del último mes. Las situaciones docentes distribuyen el contrato original entre horas necesarias y no necesarias; sólo las necesarias suman al bloque contractual correspondiente. Proceso BIR conserva siempre el contrato completo durante el año seleccionado.</div>
             </div>
         </div>
     </div>
@@ -69,6 +69,39 @@
         </div>
     </div>
 </div>
+
+@once
+    <script>
+        (() => {
+            const syncProcesoBir = (select) => {
+                const form = select.closest('form');
+                const necesarias = form?.querySelector('[data-proceso-bir-necesarias]');
+                const noNecesarias = form?.querySelector('[data-proceso-bir-no-necesarias]');
+
+                if (!necesarias || !noNecesarias) {
+                    return;
+                }
+
+                const esProcesoBir = select.value === 'proceso_bir';
+                if (esProcesoBir) {
+                    necesarias.value = noNecesarias.max;
+                    noNecesarias.value = '0';
+                }
+
+                necesarias.readOnly = esProcesoBir;
+                noNecesarias.readOnly = esProcesoBir;
+            };
+
+            document.addEventListener('change', (event) => {
+                if (event.target.matches('[data-proceso-bir-select]')) {
+                    syncProcesoBir(event.target);
+                }
+            });
+
+            document.querySelectorAll('[data-proceso-bir-select]').forEach(syncProcesoBir);
+        })();
+    </script>
+@endonce
 
 <div class="card dotacion-section mb-4">
     <div class="dotacion-section-header d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -137,6 +170,7 @@
                         $motivoSeleccionado = $formConErrores ? old('motivo') : ($exclusionDocente['motivo'] ?? '');
                         $horasSeleccionadas = $formConErrores ? old('horas') : ($exclusionDocente['horas'] ?? 0);
                         $horasNecesariasSeleccionadas = $formConErrores ? old('horas_necesarias') : ($docente['horas_contrato'] ?? $horasContratoBaseDocente);
+                        $esProcesoBir = $motivoSeleccionado === 'proceso_bir';
                         $continuaDotacion = ($continuidadPorRut ?? [])[$docente['rut_normalizado'] ?? \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? '')] ?? true;
                         $continuidadSeleccionada = $formConErrores ? old('considerar_dotacion_siguiente', $continuaDotacion) : $continuaDotacion;
                         $conservarHoras = ($conservacionHorasPorRut ?? [])[$docente['rut_normalizado'] ?? \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? '')] ?? true;
@@ -178,7 +212,11 @@
                         <td>
                             <span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Sin estado' }}</span>
                             @if ($exclusionDocente)
-                                <div class="small text-warning mt-1">{{ $exclusionDocente['motivo_label'] }} · {{ $fmt($exclusionDocente['horas']) }} h</div>
+                                @if (($exclusionDocente['motivo'] ?? '') === 'proceso_bir')
+                                    <div class="small text-primary mt-1">Proceso BIR · contrato completo considerado este año</div>
+                                @else
+                                    <div class="small text-warning mt-1">{{ $exclusionDocente['motivo_label'] }} · {{ $fmt($exclusionDocente['horas']) }} h</div>
+                                @endif
                             @endif
                             @if (!$continuaDotacion)
                                 <div class="badge text-bg-danger mt-1">No continúa en {{ ($anio ?? $docente['anio']) + 1 }}</div>
@@ -194,7 +232,10 @@
                                             <div class="card-body">
                                                 <div class="fw-semibold mb-2">Datos contractuales</div>
                                                 <div class="small text-muted">Horas contrato originales</div><div class="fw-bold">{{ $fmt($horasContratoBaseDocente) }}</div>
-                                                @if ($exclusionDocente)
+                                                @if ($exclusionDocente && ($exclusionDocente['motivo'] ?? '') === 'proceso_bir')
+                                                    <div class="d-flex justify-content-between text-primary mt-2"><span>Contrato considerado</span><strong>{{ $fmt($docente['horas_contrato']) }}</strong></div>
+                                                    <div class="small text-muted mb-2">Proceso BIR conserva el contrato completo durante el año seleccionado.</div>
+                                                @elseif ($exclusionDocente)
                                                     <div class="d-flex justify-content-between text-warning mt-2"><span>Horas no necesarias</span><strong>{{ $fmt($exclusionDocente['horas']) }}</strong></div>
                                                     <div class="d-flex justify-content-between"><span>Horas necesarias / contrato considerado</span><strong class="text-success">{{ $fmt($docente['horas_contrato']) }}</strong></div>
                                                     <div class="small text-muted mb-2">{{ $exclusionDocente['motivo_label'] }}</div>
@@ -289,6 +330,7 @@
                                                 <div>
                                                     <div class="fw-semibold"><i class="bi bi-person-dash text-warning"></i> Situación docente</div>
                                                     <div class="small text-muted">Distribuya el contrato original entre horas necesarias y no necesarias. Las necesarias suman a Horas contrato aula, Educación Parvularia o Docente PIE según corresponda; las no necesarias quedan fuera de esos totales.</div>
+                                                    <div class="small text-primary">Proceso BIR considera automáticamente el contrato completo en la dotación del año seleccionado.</div>
                                                     <div class="small text-muted">Las horas asignadas no limitan ni se agregan a este aporte contractual. Las asignaciones registradas se conservan.</div>
                                                 </div>
                                                 @if ($exclusionDocente)
@@ -307,7 +349,7 @@
                                                     <input type="hidden" name="docente_rut" value="{{ $docente['rut'] }}">
                                                     <div class="col-lg-6">
                                                         <label for="{{ $collapseId }}-motivo" class="form-label small fw-semibold">Motivo</label>
-                                                        <select id="{{ $collapseId }}-motivo" name="motivo" class="form-select @if($formConErrores && $errors->has('motivo')) is-invalid @endif" required>
+                                                        <select id="{{ $collapseId }}-motivo" name="motivo" class="form-select @if($formConErrores && $errors->has('motivo')) is-invalid @endif" data-proceso-bir-select required>
                                                             <option value="">Seleccione una situación</option>
                                                             @foreach (($motivosExclusionDocente ?? []) as $motivoValue => $motivoLabel)
                                                                 <option value="{{ $motivoValue }}" @selected($motivoSeleccionado === $motivoValue)>{{ $motivoLabel }}</option>
@@ -317,12 +359,12 @@
                                                     </div>
                                                     <div class="col-lg-3">
                                                         <label for="{{ $collapseId }}-necesarias" class="form-label small fw-semibold">Horas necesarias</label>
-                                                        <input id="{{ $collapseId }}-necesarias" type="number" name="horas_necesarias" class="form-control @if($formConErrores && $errors->has('horas_necesarias')) is-invalid @endif" min="0" max="{{ $horasContratoBaseDocente }}" step="0.01" value="{{ $horasNecesariasSeleccionadas }}" aria-describedby="{{ $collapseId }}-suma" required>
+                                                        <input id="{{ $collapseId }}-necesarias" type="number" name="horas_necesarias" class="form-control @if($formConErrores && $errors->has('horas_necesarias')) is-invalid @endif" min="0" max="{{ $horasContratoBaseDocente }}" step="0.01" value="{{ $horasNecesariasSeleccionadas }}" aria-describedby="{{ $collapseId }}-suma" data-proceso-bir-necesarias @readonly($esProcesoBir) required>
                                                         @if ($formConErrores) @error('horas_necesarias')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                     </div>
                                                     <div class="col-lg-3">
                                                         <label for="{{ $collapseId }}-no-necesarias" class="form-label small fw-semibold">Horas no necesarias</label>
-                                                        <input id="{{ $collapseId }}-no-necesarias" type="number" name="horas" class="form-control @if($formConErrores && $errors->has('horas')) is-invalid @endif" min="0" max="{{ $horasContratoBaseDocente }}" step="0.01" value="{{ $horasSeleccionadas }}" aria-describedby="{{ $collapseId }}-suma" required>
+                                                        <input id="{{ $collapseId }}-no-necesarias" type="number" name="horas" class="form-control @if($formConErrores && $errors->has('horas')) is-invalid @endif" min="0" max="{{ $horasContratoBaseDocente }}" step="0.01" value="{{ $horasSeleccionadas }}" aria-describedby="{{ $collapseId }}-suma" data-proceso-bir-no-necesarias @readonly($esProcesoBir) required>
                                                         @if ($formConErrores) @error('horas')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                     </div>
                                                     <div class="col-12 small text-muted" id="{{ $collapseId }}-suma">Horas necesarias + horas no necesarias = {{ $fmt($horasContratoBaseDocente) }} h de contrato original. Cada valor puede ser cero, siempre que la suma coincida con el contrato.</div>

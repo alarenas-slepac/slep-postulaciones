@@ -287,6 +287,52 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
         $this->assertDatabaseCount('dotacion_docente_exclusiones', 1);
     }
 
+    public function test_proceso_bir_siempre_conserva_contrato_completo_y_lo_proyecta_como_vacante(): void
+    {
+        $this->instalarContinuidad();
+        (require database_path('migrations/2026_09_14_170000_add_conservar_horas_to_dotacion_docente_exclusiones.php'))->up();
+
+        $this->guardar([
+            'motivo' => 'proceso_bir',
+            'horas_necesarias' => 0,
+            'horas' => 44,
+            'considerar_dotacion_siguiente' => 0,
+            'conservar_horas_necesarias' => 1,
+        ]);
+
+        $docente = $this->docente();
+        $this->assertSame(44.0, $docente['horas_contrato']);
+        $this->assertSame(0.0, $docente['horas_excluidas']);
+        $this->assertSame(0.0, (float) DotacionDocenteExclusion::sole()->horas);
+
+        $html = view('admin.dotacion-establecimiento.partials._docentes', [
+            'docentes' => collect([$docente]),
+            'establecimiento' => Establecimiento::findOrFail(1),
+            'anio' => 2026,
+            'canManageDocenteExclusiones' => true,
+            'docenteExclusionesTableReady' => true,
+            'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS,
+            'errors' => new ViewErrorBag,
+            'continuidadDisponible' => true,
+            'continuidadPorRut' => DotacionDocenteExclusion::continuidadPorRut(1, 2026),
+            'conservacionHorasDisponible' => true,
+            'conservacionHorasPorRut' => DotacionDocenteExclusion::conservacionHorasPorRut(1, 2026),
+        ])->render();
+        $this->assertStringContainsString('Proceso BIR · contrato completo considerado este año', $html);
+        $this->assertStringContainsString('data-proceso-bir-select', $html);
+        $this->assertStringContainsString('data-proceso-bir-necesarias readonly', $html);
+        $this->assertStringContainsString('data-proceso-bir-no-necesarias readonly', $html);
+
+        $proyeccion = DotacionProyeccionCalculator::build([
+            'docentes' => collect([$docente]),
+            'resumen' => ['establecimiento_especial' => false],
+            'asignacion' => ['asignaciones' => DotacionAsignacionCalculator::assignmentsFor(Establecimiento::findOrFail(1), 2026)],
+        ], 2026, DotacionDocenteExclusion::continuidadPorRut(1, 2026), DotacionDocenteExclusion::conservacionHorasPorRut(1, 2026));
+
+        $this->assertSame(44.0, $proyeccion['contratos_vacantes']['aula']);
+        $this->assertSame(44.0, $proyeccion['horas_vacantes_por_cubrir']);
+    }
+
     public function test_migracion_conserva_situaciones_historicas_marcadas_y_es_idempotente(): void
     {
         $this->guardar();

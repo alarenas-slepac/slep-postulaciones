@@ -56,6 +56,13 @@ class DotacionDocenteExclusionController extends Controller
         $horasBase = (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0);
         $horasNecesarias = round((float) $data['horas_necesarias'], 2);
         $horasExcluidas = round((float) $data['horas'], 2);
+        if ($data['motivo'] === 'proceso_bir') {
+            // Durante el año seleccionado, Proceso BIR conserva la jornada
+            // contractual completa. La continuidad define por separado si
+            // ésta se representa como vacante en el año siguiente.
+            $horasNecesarias = $horasBase;
+            $horasExcluidas = 0.0;
+        }
         // Compara centésimas para exigir igualdad, sin tolerar una diferencia
         // de 0,01 h. Las asignaciones no limitan la distribución contractual.
         if ($horasBase <= 0.0

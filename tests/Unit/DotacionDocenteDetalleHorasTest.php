@@ -121,6 +121,15 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         $this->assertSame(30.0, $resultado['horas_consideradas']);
     }
 
+    public function test_proceso_bir_conserva_el_contrato_completo_en_el_anio_seleccionado(): void
+    {
+        $resultado = $this->invokePrivate('ajustarHorasContratoPorExclusion', [44, 44, 'proceso_bir']);
+
+        $this->assertSame(44.0, $resultado['horas_base']);
+        $this->assertSame(0.0, $resultado['horas_excluidas']);
+        $this->assertSame(44.0, $resultado['horas_consideradas']);
+    }
+
     public function test_extrae_horas_pie_normativas_del_contrato_bloque_sin_alterar_la_necesidad_total(): void
     {
         $bloques = [
@@ -180,23 +189,27 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         $this->assertSame([
             'funciones_directivas' => 44.0,
             'funciones_directivas_normativas' => 44.0,
+            'funciones_directivas_normativas_disponibles' => 44.0,
             'funciones_directivas_declaradas' => 0.0,
             'funciones_directivas_normativas_asignadas' => 32.0,
             'funciones_directivas_declaradas_asignadas' => 0.0,
             'funciones_tecnico_pedagogicas' => 38.0,
             'funciones_tecnico_pedagogicas_normativas' => 38.0,
+            'funciones_tecnico_pedagogicas_normativas_disponibles' => 38.0,
             'funciones_tecnico_pedagogicas_declaradas' => 0.0,
             'funciones_tecnico_pedagogicas_normativas_asignadas' => 24.0,
             'funciones_tecnico_pedagogicas_declaradas_asignadas' => 0.0,
             'otras_funciones_pie' => 5.0,
             'otras_funciones_pie_asignadas' => 3.0,
             'planes_normativos' => 19.0,
+            'planes_normativos_disponibles' => 19.0,
             'planes_normativos_asignadas' => 12.0,
             'planes_declarados' => 0.0,
             'planes_declarados_asignadas' => 0.0,
             'otras_funciones_declaradas' => 21.0,
             'otras_funciones_declaradas_asignadas' => 12.0,
             'total_normativas' => 101.0,
+            'total_normativas_disponibles' => 101.0,
             'total_declaradas' => 26.0,
             'total_declaradas_asignadas' => 15.0,
         ], $resultado);
@@ -233,7 +246,7 @@ class DotacionDocenteDetalleHorasTest extends TestCase
         ], $resultado);
     }
 
-    public function test_descuenta_asistentes_solo_de_funciones_normativas_y_con_tope_por_necesidad(): void
+    public function test_registra_cobertura_asistentes_sin_descontar_horas_normativas_asignadas(): void
     {
         $bloques = [
             'directiva' => [
@@ -289,7 +302,7 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             ]),
         ];
 
-        $ajustados = $this->invokePrivate('descontarCoberturaAsistentesFuncionesNormativas', [
+        $ajustados = $this->invokePrivate('registrarCoberturaAsistentesFuncionesNormativas', [
             $bloques,
             $necesidades,
         ]);
@@ -298,20 +311,22 @@ class DotacionDocenteDetalleHorasTest extends TestCase
             $necesidades,
         ]);
 
-        $this->assertSame(32.0, $ajustados['directiva']['automaticas']);
+        $this->assertSame(44, $ajustados['directiva']['automaticas']);
         $this->assertSame(12.0, $ajustados['directiva']['horas_asistentes_cobertura']);
-        $this->assertSame(32.0, $ajustados['directiva']['items'][0]['horas']);
-        $this->assertSame(0.0, $ajustados['tecnico_pedagogica']['automaticas']);
-        $this->assertSame(0.0, $ajustados['tecnico_pedagogica']['total']);
+        $this->assertSame(44, $ajustados['directiva']['items'][0]['horas']);
+        $this->assertSame(38, $ajustados['tecnico_pedagogica']['automaticas']);
+        $this->assertSame(38, $ajustados['tecnico_pedagogica']['total']);
+        $this->assertSame(38.0, $ajustados['tecnico_pedagogica']['horas_asistentes_cobertura']);
         $this->assertSame(14, $ajustados['otras_funciones_docentes']['total']);
         $this->assertSame(14, $ajustados['otras_funciones_docentes']['items'][0]['horas']);
         $this->assertArrayNotHasKey('horas_asistentes_cobertura', $ajustados['otras_funciones_docentes']['items'][0]);
-        $this->assertSame(14.0, $ajustados['planes_programas']['automaticas']);
+        $this->assertSame(19, $ajustados['planes_programas']['automaticas']);
+        $this->assertSame(5.0, $ajustados['planes_programas']['horas_asistentes_cobertura']);
         $this->assertSame(18, $ajustados['pie']['automaticas']);
-        $this->assertSame(64.0, $desglose['total_normativas']);
-        $this->assertSame(20.0, $desglose['funciones_directivas_normativas_asignadas']);
-        $this->assertSame(0.0, $desglose['funciones_tecnico_pedagogicas_normativas_asignadas']);
-        $this->assertSame(7.0, $desglose['planes_normativos_asignadas']);
+        $this->assertSame(101.0, $desglose['total_normativas']);
+        $this->assertSame(32.0, $desglose['funciones_directivas_normativas_asignadas']);
+        $this->assertSame(38.0, $desglose['funciones_tecnico_pedagogicas_normativas_asignadas']);
+        $this->assertSame(12.0, $desglose['planes_normativos_asignadas']);
         $this->assertSame(8.0, $desglose['otras_funciones_declaradas_asignadas']);
     }
 
