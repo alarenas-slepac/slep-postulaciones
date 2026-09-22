@@ -211,6 +211,7 @@ class DotacionEstablecimientoAvanceExport
         }
         $headers[] = 'Proceso 2027 - planes';
         $headers[] = 'Proceso 2027 - combinación';
+        $headers[] = 'Proceso 2027 - funciones normativas';
         $headers[] = 'Proceso 2027 - máximos';
         $headers[] = 'Proceso 2027 - asignación obligatoria';
         foreach ([
@@ -272,7 +273,7 @@ class DotacionEstablecimientoAvanceExport
             }
 
             $proceso2027 = data_get($avance, 'proceso_2027', []);
-            foreach (['planes', 'combinaciones', 'maximos', 'asignacion'] as $paso) {
+            foreach (['planes', 'combinaciones', 'normativas', 'maximos', 'asignacion'] as $paso) {
                 $values[] = data_get($proceso2027, 'pasos.'.$paso.'.completo', false) ? 'Completada' : 'Pendiente';
             }
             foreach (['bloque_1', 'bloque_2', 'bloque_3'] as $bloqueKey) {

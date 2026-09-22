@@ -157,7 +157,7 @@
                                     'label' => 'Avance consolidado',
                                     'porcentaje' => data_get($avance, 'porcentaje_general', 0),
                                     'detalle' => ($anio === 2027 && data_get($avance, 'proceso_2027.aplica', false))
-                                        ? 'Etapas 2027: planes, combinaciones, máximos y asignación obligatoria'
+                                        ? 'Etapas 2027: planes, combinaciones, funciones normativas, máximos y asignación obligatoria'
                                         : '50% planes + 50% asignación de horas aula',
                                 ])
                             </td>

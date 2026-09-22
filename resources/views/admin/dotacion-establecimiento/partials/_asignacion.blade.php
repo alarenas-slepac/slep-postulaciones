@@ -78,7 +78,7 @@
             <div class="alert alert-success rounded-4">{{ session('success') }}</div>
         @endif
         @if (($proceso2027Asignacion['aplica'] ?? false) && !$asignacion2027Habilitada)
-            <div class="alert alert-warning rounded-4"><i class="bi bi-lock"></i> La asignación 2027 está bloqueada hasta completar planes, declarar combinación de cursos y configurar máximos suficientes. Revise el proceso guiado superior.</div>
+            <div class="alert alert-warning rounded-4"><i class="bi bi-lock"></i> La asignación 2027 está bloqueada hasta completar planes, declarar combinación de cursos, definir las funciones normativas y configurar máximos suficientes. Revise el proceso guiado superior.</div>
         @endif
         <div class="alert alert-info rounded-4 small">
             <strong>Regla NT1/NT2:</strong> para <em>Pedagogía en Educación de Párvulos</em>, el contrato asignado se distribuye proporcionalmente: horas de plan asignadas / total del plan × base contractual. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición de otro docente con JEC mantiene 65/35 y se contabiliza en Plan General, una vez por grupo combinado.

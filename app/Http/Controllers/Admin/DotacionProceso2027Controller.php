@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DotacionProceso2027Configuracion;
 use App\Models\Establecimiento;
+use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,6 +15,8 @@ class DotacionProceso2027Controller extends Controller
     private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
 
     private array $maximosRoles = ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
+
+    private array $funcionesNormativasRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp'];
 
     public function update(Request $request, Establecimiento $establecimiento): RedirectResponse
     {
@@ -25,6 +28,10 @@ class DotacionProceso2027Controller extends Controller
             'max_horas_bloque_1' => ['nullable', 'numeric', 'min:0', 'max:9999'],
             'max_horas_bloque_2' => ['nullable', 'numeric', 'min:0', 'max:9999'],
             'max_horas_bloque_3' => ['nullable', 'numeric', 'min:0', 'max:9999'],
+            'funciones_normativas_configuradas' => ['nullable', 'boolean'],
+            'funciones_normativas' => ['nullable', 'array'],
+            'funciones_normativas.*.key' => ['nullable', 'string', 'max:500'],
+            'funciones_normativas.*.usar' => ['nullable', 'boolean'],
         ]);
 
         $config = DotacionProceso2027Configuracion::firstOrNew([
@@ -48,6 +55,21 @@ class DotacionProceso2027Controller extends Controller
             }
             $config->maximos_configurados_by = $request->user()?->id;
             $config->maximos_configurados_at = now();
+        }
+
+        if ($request->has('funciones_normativas_configuradas')) {
+            abort_unless(in_array($role, $this->funcionesNormativasRoles, true), 403);
+            $potenciales = collect(DotacionProceso2027Calculator::resumen($establecimiento, 2027)['funciones_normativas'] ?? [])
+                ->keyBy('key');
+            $seleccionadas = collect($data['funciones_normativas'] ?? [])
+                ->filter(fn ($funcion) => ! empty($funcion['key']) && $potenciales->has($funcion['key']))
+                ->mapWithKeys(fn ($funcion) => [(string) $funcion['key'] => (bool) ($funcion['usar'] ?? false)])
+                ->all();
+            $config->funciones_normativas = $potenciales
+                ->mapWithKeys(fn ($funcion, $key) => [$key => (bool) ($seleccionadas[$key] ?? false)])
+                ->all();
+            $config->funciones_normativas_configuradas_by = $request->user()?->id;
+            $config->funciones_normativas_configuradas_at = now();
         }
 
         $config->save();

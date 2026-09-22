@@ -41,6 +41,8 @@ class DotacionProceso2027Calculator
         $cursosNt = self::cursosNt($data);
         $needBlocks = [];
         $needKeysObligatorias = [];
+        $seleccionNormativas = (array) ($config?->funciones_normativas ?? []);
+        $funcionesNormativas = collect();
         $bloques = collect(self::BLOQUES)->mapWithKeys(fn ($label, $key) => [$key => [
             'key' => $key,
             'label' => $label,
@@ -49,6 +51,8 @@ class DotacionProceso2027Calculator
             'asignadas_obligatorias' => 0.0,
             'titulares_asignadas' => 0.0,
             'contrata_asignadas' => 0.0,
+            'horas_normativas_potenciales' => 0.0,
+            'horas_normativas_definidas' => 0.0,
             'maximo' => $config ? self::numero($config->{'max_horas_'.$key}) : null,
         ]])->all();
 
@@ -62,13 +66,37 @@ class DotacionProceso2027Calculator
                 if ($key !== '') {
                     $needBlocks[$key] = $bloque;
                 }
+                $esNormativaDefinible = self::esFuncionNormativaDefinible($groupKey, $item);
+                if ($esNormativaDefinible) {
+                    $horasPotenciales = max(0.0, (float) data_get($item, 'horas_contrato_requeridas', 0));
+                    $tieneAsignacion = (float) data_get($item, 'horas_contrato_asignadas', 0) > 0.01
+                        || (bool) data_get($item, 'asignacion_automatica', false);
+                    $definida = array_key_exists($key, $seleccionNormativas) || $tieneAsignacion;
+                    $seUtilizara = $tieneAsignacion || (bool) ($seleccionNormativas[$key] ?? false);
+                    $funcionesNormativas->push([
+                        'key' => $key,
+                        'titulo' => (string) data_get($item, 'titulo', 'Función normativa'),
+                        'subtipo' => (string) data_get($item, 'subtipo_asignacion', ''),
+                        'horas' => round($horasPotenciales, 2),
+                        'definida' => $definida,
+                        'se_utilizara' => $seUtilizara,
+                        'asignacion_existente' => $tieneAsignacion,
+                    ]);
+                    $bloques['bloque_1']['horas_normativas_potenciales'] += $horasPotenciales;
+                    if (! $seUtilizara) {
+                        continue;
+                    }
+                    $bloques['bloque_1']['horas_normativas_definidas'] += $horasPotenciales;
+                }
                 if (! self::esNecesidadObligatoria($groupKey, $item)) {
                     continue;
                 }
                 if ($key !== '') {
                     $needKeysObligatorias[$key] = true;
                 }
-                $bloques[$bloque]['requeridas'] += DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item);
+                $bloques[$bloque]['requeridas'] += $esNormativaDefinible
+                    ? max(0.0, (float) data_get($item, 'horas_contrato_requeridas', 0))
+                    : DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item);
             }
         }
 
@@ -107,6 +135,8 @@ class DotacionProceso2027Calculator
             $bloque['asignadas_obligatorias'] = round((float) $bloque['asignadas_obligatorias'], 2);
             $bloque['titulares_asignadas'] = round((float) $bloque['titulares_asignadas'], 2);
             $bloque['contrata_asignadas'] = round((float) $bloque['contrata_asignadas'], 2);
+            $bloque['horas_normativas_potenciales'] = round((float) $bloque['horas_normativas_potenciales'], 2);
+            $bloque['horas_normativas_definidas'] = round((float) $bloque['horas_normativas_definidas'], 2);
             $bloque['pendientes'] = max(0.0, round($bloque['requeridas'] - $bloque['asignadas_obligatorias'], 2));
             $bloque['saldo_maximo'] = $bloque['maximo'] === null ? null : round(max(0.0, $bloque['maximo'] - $bloque['asignadas']), 2);
             $bloque['maximo_insuficiente'] = $bloque['maximo'] !== null && $bloque['maximo'] + 0.01 < $bloque['requeridas'];
@@ -120,9 +150,10 @@ class DotacionProceso2027Calculator
             && ($config->decision_combinacion !== 'combinaciones_configuradas' || $gruposActivos > 0);
         $maximosConfigurados = $config
             && collect($bloques)->every(fn ($bloque) => $bloque['maximo'] !== null);
+        $funcionesNormativasDefinidas = $funcionesNormativas->every(fn ($funcion) => $funcion['definida']);
         $necesidadesCubiertas = collect($bloques)->every(fn ($bloque) => $bloque['pendientes'] <= 0.01);
         $topesSuficientes = collect($bloques)->every(fn ($bloque) => ! $bloque['maximo_insuficiente']);
-        $asignacionHabilitada = $planesCompletos && $combinacionDeclarada && $maximosConfigurados && $topesSuficientes;
+        $asignacionHabilitada = $planesCompletos && $combinacionDeclarada && $funcionesNormativasDefinidas && $maximosConfigurados && $topesSuficientes;
         $horasDisponiblesDocentes = round((float) $docentes->sum('horas_disponibles'), 2);
         $capacidadNoNormativas = min(
             max(0.0, (float) data_get($bloques, 'bloque_1.saldo_maximo', 0)),
@@ -134,10 +165,12 @@ class DotacionProceso2027Calculator
             'configuracion' => $config,
             'bloques' => $bloques,
             'need_blocks' => $needBlocks,
+            'funciones_normativas' => $funcionesNormativas->values(),
             'docentes' => $docentes->values(),
             'pasos' => [
                 'planes' => ['label' => 'Planes de estudio', 'completo' => $planesCompletos],
                 'combinaciones' => ['label' => 'Combinación de cursos', 'completo' => $combinacionDeclarada],
+                'normativas' => ['label' => 'Definición de funciones normativas', 'completo' => $funcionesNormativasDefinidas],
                 'maximos' => ['label' => 'Máximos por bloque', 'completo' => $maximosConfigurados && $topesSuficientes],
                 'asignacion' => ['label' => 'Asignación obligatoria', 'completo' => $necesidadesCubiertas],
             ],
@@ -226,6 +259,13 @@ class DotacionProceso2027Calculator
     private static function esNecesidadObligatoria(string $groupKey, mixed $item): bool
     {
         return $groupKey !== 'funciones' || (int) data_get($item, 'dotacion_funcion_id', 0) <= 0;
+    }
+
+    private static function esFuncionNormativaDefinible(string $groupKey, mixed $item): bool
+    {
+        return $groupKey === 'funciones'
+            && (bool) data_get($item, 'necesidad_condicionada_por_asignacion_docente', false)
+            && trim((string) data_get($item, 'key', '')) !== '';
     }
 
     public static function bloqueParaAsignacion(object|array $asignacion): ?string
