@@ -259,7 +259,11 @@
         </div>
     @endforeach
 
-    @if ($canEdit)
+    @if (($proceso2027['aplica'] ?? false) && !($proceso2027['funciones_no_normativas_habilitadas'] ?? false))
+        <div class="alert alert-secondary shadow-sm"><i class="bi bi-lock"></i> Para 2027 la creación de funciones declaradas/no normativas se habilitará cuando estén cubiertas las necesidades obligatorias. Revise Dotación establecimiento para conocer las horas pendientes y los máximos por bloque.</div>
+    @endif
+
+    @if ($canEdit && (!($proceso2027['aplica'] ?? false) || ($proceso2027['funciones_no_normativas_habilitadas'] ?? false)))
         <div class="row g-3 mb-4">
             <div class="col-lg-6">
                 <div class="card shadow-sm h-100">

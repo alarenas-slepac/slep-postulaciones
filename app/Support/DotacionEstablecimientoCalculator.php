@@ -1027,6 +1027,8 @@ class DotacionEstablecimientoCalculator
                 'estado_cuadratura' => $estadoCuadratura,
                 'financiamiento' => ($grupo['financiamientos'] ?? '') ?: ($row->financiamiento ?: 'Sin financiamiento'),
                 'tipo_contrato' => ($grupo['tipos_contrato'] ?? '') ?: ($row->tipocontrato ?: 'Sin tipo contrato'),
+                'tramo' => $row->tramo,
+                'fecha_antiguedad' => $row->fecha_antiguedad?->format('Y-m-d'),
                 'titularidad' => $titularidad,
                 'es_titular' => (bool) ($titularidad['es_titular'] ?? false),
                 'mes' => (int) ($grupo['mes'] ?? $row->mes ?? 0),

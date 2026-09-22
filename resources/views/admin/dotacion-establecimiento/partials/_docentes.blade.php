@@ -13,7 +13,8 @@
     $totalAsignadas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_asignadas_total'] ?? 0));
     $totalDiferencia = round($totalContrato - $totalAsignadas, 2);
     $mostrarEspecial = $totalContratoEspecial > 0.01;
-    $tableColspan = $mostrarEspecial ? 13 : 12;
+    $proceso2027Docentes = $proceso2027 ?? ['aplica' => false];
+    $tableColspan = ($mostrarEspecial ? 13 : 12) + (($proceso2027Docentes['aplica'] ?? false) ? 1 : 0);
     $countCuadra = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'cuadra')->count();
     $countPendiente = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'pendiente_asignacion')->count();
     $countFaltan = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'faltan_horas')->count();
@@ -67,6 +68,9 @@
             <span class="badge text-bg-danger">Sobrecarga: {{ $countSobrecarga }}</span>
             <span class="badge text-bg-warning">Sin info: {{ $countSinInfo }}</span>
         </div>
+        @if ($proceso2027Docentes['aplica'] ?? false)
+            <div class="alert alert-primary small mt-3 mb-0"><i class="bi bi-sort-numeric-down"></i> La nómina está ordenada por prelación 2027: fuero, titulares Expertos II/I/Avanzado por antigüedad, resto titular y contrata. Las horas disponibles se muestran en la ficha de cada docente.</div>
+        @endif
     </div>
 </div>
 
@@ -143,6 +147,7 @@
                     <th style="width: 44px;">#</th>
                     <th>RUT</th>
                     <th>Docente</th>
+                    @if ($proceso2027Docentes['aplica'] ?? false)<th>Prelación 2027</th>@endif
                     <th>Título / función</th>
                     <th class="text-end">Contrato considerado</th>
                     <th class="text-end">Aula asignada</th>
@@ -182,6 +187,9 @@
                         <td><button class="btn btn-sm btn-outline-primary rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $formConErrores ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down"></i></button></td>
                         <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
                         <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="text-muted small">{{ $docente['niveles_declarados'] }}</div></td>
+                        @if ($proceso2027Docentes['aplica'] ?? false)
+                            <td><span class="badge rounded-pill text-bg-primary">{{ $docente['prioridad_2027_label'] ?? 'Sin prioridad' }}</span><div class="small text-muted mt-1">{{ $docente['tramo'] ?: 'Sin tramo' }} · {{ $docente['fecha_antiguedad'] ?: 'Sin antigüedad' }}</div><div class="small text-success">Disp.: {{ $fmt($docente['horas_titulares_disponibles'] ?? 0) }} titular + {{ $fmt($docente['horas_contrata_disponibles'] ?? 0) }} contrata</div></td>
+                        @endif
                         <td><div class="fw-semibold">{{ $docente['funcion'] }}</div><div class="text-muted small">{{ $docente['titulo'] }}</div></td>
                         <td class="text-end">
                             <div class="fw-bold">{{ $fmt($docente['horas_contrato']) }}</div>

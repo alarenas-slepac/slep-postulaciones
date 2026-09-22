@@ -13,6 +13,7 @@ use App\Support\DotacionAsignaturaResumenCalculator;
 use App\Support\DotacionEstablecimientoAvanceCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionProyeccionCalculator;
+use App\Support\DotacionProceso2027Calculator;
 use App\Support\DotacionSobredotacionCalculator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -261,6 +262,11 @@ class DotacionEstablecimientoController extends Controller
         }
         $tab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'resumen';
         $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
+        $proceso2027 = DotacionProceso2027Calculator::resumen($establecimiento, $anio, $data);
+        if ($proceso2027['aplica'] ?? false) {
+            $data['docentes'] = $proceso2027['docentes'];
+            $data['asignacion']['docentes'] = $proceso2027['docentes'];
+        }
         $continuidadDisponible = DotacionDocenteExclusion::continuidadDisponible();
         $continuidadPorRut = DotacionDocenteExclusion::continuidadPorRut((int) $establecimiento->id, $anio);
         $conservacionHorasDisponible = DotacionDocenteExclusion::conservacionHorasDisponible();
@@ -350,6 +356,8 @@ class DotacionEstablecimientoController extends Controller
             'vacanciasPorNoContinuidad' => $vacanciasPorNoContinuidad,
             'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS,
             'alertas' => $data['alertas'],
+            'proceso2027' => $proceso2027,
+            'canManageProceso2027Maximos' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true),
         ]);
     }
 

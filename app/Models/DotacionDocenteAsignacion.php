@@ -37,6 +37,7 @@ class DotacionDocenteAsignacion extends Model
         'proporcion_aplicada',
         'fuente_calculo',
         'observacion',
+        'excepcion_prelacion',
         'estado',
         'created_by',
         'updated_by',

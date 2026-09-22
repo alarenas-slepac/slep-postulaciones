@@ -7,6 +7,8 @@
     $asignacionesHuerfanas = collect($asignacion['asignaciones_huerfanas'] ?? []);
     $subvenciones = $asignacion['subvenciones'] ?? collect();
     $docentesAsignacion = $asignacion['docentes'] ?? $docentes;
+    $proceso2027Asignacion = $proceso2027 ?? ['aplica' => false];
+    $asignacion2027Habilitada = !($proceso2027Asignacion['aplica'] ?? false) || ($proceso2027Asignacion['asignacion_habilitada'] ?? false);
     $asistentesAsignacion = collect($asignacion['asistentes'] ?? []);
     $subvencionesOptions = ['General', 'SEP', 'PIE', 'Libre disposición', 'Otra', 'Sin clasificar'];
     $buildPersonalOptions = function ($personal, string $estamento) use ($fmt) {
@@ -18,6 +20,11 @@
             $origenContrato = $detalleContrato !== '' ? ' · '.$detalleContrato : '';
             $titulo = trim((string) ($persona['titulo'] ?? ''));
             $detalleTitulo = $titulo !== '' ? ' · Título: '.$titulo : ' · Sin título declarado';
+            $prioridad = $estamento === 'docente' ? (int) ($persona['prioridad_2027'] ?? 99) : 99;
+            $prioridadLabel = $estamento === 'docente' ? trim((string) ($persona['prioridad_2027_label'] ?? '')) : '';
+            $titularDisponible = (float) ($persona['horas_titulares_disponibles'] ?? 0);
+            $contrataDisponible = (float) ($persona['horas_contrata_disponibles'] ?? max(0, $saldo));
+            $detallePrioridad = $prioridadLabel !== '' ? ' · '.$prioridadLabel : '';
 
             return [
                 'rut' => $persona['rut'],
@@ -25,16 +32,25 @@
                 'nombre' => $persona['nombre'],
                 'funcion' => $persona['funcion'] ?? 'Sin función',
                 'estamento' => $estamento,
-                'label' => $persona['nombre'].' · '.$persona['rut'].$detalleTitulo.' · '.$fmt($contrato).' contrato'.$origenContrato.' / '.$fmt($asignadas).' asignadas / '.($saldo >= 0 ? $fmt($saldo).' disponibles' : '+'.$fmt(abs($saldo)).' excedidas'),
+                'label' => $persona['nombre'].' · '.$persona['rut'].$detallePrioridad.$detalleTitulo.' · Disponible: '.$fmt($titularDisponible).' titular + '.$fmt($contrataDisponible).' contrata',
                 'titulo' => $titulo,
                 'es_parvularia' => \App\Support\DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos'],
                 'saldo' => $saldo,
+                'prioridad' => $prioridad,
+                'prioridad_label' => $prioridadLabel,
             ];
-        })->values();
+        })->filter(fn ($persona) => $estamento !== 'docente' || $persona['saldo'] > 0.01)->sortBy('prioridad')->values();
     };
     $docenteOptions = $buildPersonalOptions($docentesAsignacion, 'docente');
     $asistenteOptions = $buildPersonalOptions($asistentesAsignacion, 'asistente');
 @endphp
+
+@once
+    @push('styles')
+        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+        <style>.select2-container { width: 100% !important; }</style>
+    @endpush
+@endonce
 
 <div class="card dotacion-section mb-4">
     <div class="dotacion-section-header">
@@ -60,6 +76,9 @@
         @endif
         @if (session('success'))
             <div class="alert alert-success rounded-4">{{ session('success') }}</div>
+        @endif
+        @if (($proceso2027Asignacion['aplica'] ?? false) && !$asignacion2027Habilitada)
+            <div class="alert alert-warning rounded-4"><i class="bi bi-lock"></i> La asignación 2027 está bloqueada hasta completar planes, declarar combinación de cursos y configurar máximos suficientes. Revise el proceso guiado superior.</div>
         @endif
         <div class="alert alert-info rounded-4 small">
             <strong>Regla NT1/NT2:</strong> para <em>Pedagogía en Educación de Párvulos</em>, el contrato asignado se distribuye proporcionalmente: horas de plan asignadas / total del plan × base contractual. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición de otro docente con JEC mantiene 65/35 y se contabiliza en Plan General, una vez por grupo combinado.
@@ -259,12 +278,12 @@
                                                         <option value="docente">Cubierto por docente</option>
                                                         @unless ($soloParvularia)<option value="asistente">Cubierto por Asistente de la Educación</option>@endunless
                                                     </select>
-                                                    <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura" required>
+                                                    <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" required>
                                                         <option value="">Seleccione persona...</option>
                                                         <optgroup label="Docentes">
                                                             @foreach ($docenteOptions as $doc)
                                                                 @continue($soloParvularia && !$doc['es_parvularia'])
-                                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-titulo="{{ $doc['titulo'] }}">{{ $doc['label'] }}</option>
+                                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-titulo="{{ $doc['titulo'] }}" data-prioridad="{{ $doc['prioridad'] }}">{{ $doc['label'] }}</option>
                                                             @endforeach
                                                         </optgroup>
                                                         <optgroup label="Asistentes de la Educación">
@@ -290,8 +309,9 @@
                                                         </div>
                                                     </div>
                                                     <div class="form-text js-ayuda-aaee d-none">Para asistentes, ingrese las horas aula cubiertas y las horas de contrato AAEE. No se aplica conversión 65/35 ni 60/40.</div>
+                                                    <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación obligatoria si usa prioridad inferior">
                                                     <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
-                                                    <button class="btn btn-sm btn-primary rounded-pill" type="submit"><i class="bi bi-plus-circle"></i> Asignar</button>
+                                                    <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
                                                 </form>
                                             </td>
                                         </tr>
@@ -404,14 +424,15 @@
                                             <input type="hidden" name="subvencion" value="General">
                                             <input type="hidden" name="horas_contrato" value="44">
                                             <label class="form-label small mb-0" for="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}">Docente directivo</label>
-                                            <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm" required>
+                                            <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" required>
                                                 <option value="">Seleccione docente...</option>
                                                 @foreach ($docenteOptions as $doc)
-                                                    <option value="{{ $doc['rut'] }}">{{ $doc['label'] }}</option>
+                                                    <option value="{{ $doc['rut'] }}" data-prioridad="{{ $doc['prioridad'] }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </select>
                                             <div class="small text-muted">Contrato fijo: 44 horas.</div>
-                                            <button class="btn btn-sm btn-primary rounded-pill" type="submit"><i class="bi bi-person-check"></i> Asignar docente directivo</button>
+                                            <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si usa prioridad inferior">
+                                            <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
                                         </form>
                                     @else
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2" data-dotacion-asignacion-form>
@@ -433,11 +454,11 @@
                                             <option value="docente">Cubierto por docente</option>
                                             <option value="asistente">Cubierto por Asistente de la Educación</option>
                                         </select>
-                                        <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura" required>
+                                        <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" required>
                                             <option value="">Seleccione persona...</option>
                                             <optgroup label="Docentes">
                                                 @foreach ($docenteOptions as $doc)
-                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-titulo="{{ $doc['titulo'] }}">{{ $doc['label'] }}</option>
+                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-titulo="{{ $doc['titulo'] }}" data-prioridad="{{ $doc['prioridad'] }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </optgroup>
                                             <optgroup label="Asistentes de la Educación">
@@ -458,8 +479,9 @@
                                                 </select>
                                             </div>
                                         </div>
+                                        <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación obligatoria si usa prioridad inferior">
                                         <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
-                                        <button class="btn btn-sm btn-primary rounded-pill" type="submit"><i class="bi bi-plus-circle"></i> Asignar</button>
+                                        <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
                                         </form>
                                     @endif
                                 </td>
@@ -512,8 +534,16 @@
 
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+        window.jQuery('.js-dotacion-docente-select').select2({
+            width: '100%',
+            placeholder: 'Buscar por nombre o RUT...',
+            allowClear: true,
+        });
+    }
     document.querySelectorAll('[data-dotacion-asignacion-form]').forEach(function (form) {
         const estamento = form.querySelector('.js-estamento-cobertura');
         const personal = form.querySelector('.js-personal-cobertura');

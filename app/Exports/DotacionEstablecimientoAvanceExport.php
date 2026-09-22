@@ -209,6 +209,22 @@ class DotacionEstablecimientoAvanceExport
             $headers[] = $label.' - excedidas';
             $headers[] = $label.' - avance';
         }
+        $headers[] = 'Proceso 2027 - planes';
+        $headers[] = 'Proceso 2027 - combinación';
+        $headers[] = 'Proceso 2027 - máximos';
+        $headers[] = 'Proceso 2027 - asignación obligatoria';
+        foreach ([
+            'bloque_1' => 'Bloque 1: plan general + normativas',
+            'bloque_2' => 'Bloque 2: parvularia',
+            'bloque_3' => 'Bloque 3: PIE especializado',
+        ] as $key => $label) {
+            $headers[] = $label.' - máximo';
+            $headers[] = $label.' - titulares';
+            $headers[] = $label.' - contrata';
+            $headers[] = $label.' - total asignado';
+            $headers[] = $label.' - pendiente obligatorio';
+            $headers[] = $label.' - saldo máximo';
+        }
         $headers[] = 'Observaciones';
 
         $sheet->fromArray([$headers], null, 'A1');
@@ -253,6 +269,20 @@ class DotacionEstablecimientoAvanceExport
                 $values[] = $this->hoursValue((float) data_get($group, 'horas_pendientes', 0));
                 $values[] = $this->hoursValue((float) data_get($group, 'horas_excedidas', 0));
                 $values[] = $this->percentageValue((float) data_get($group, 'porcentaje', 0));
+            }
+
+            $proceso2027 = data_get($avance, 'proceso_2027', []);
+            foreach (['planes', 'combinaciones', 'maximos', 'asignacion'] as $paso) {
+                $values[] = data_get($proceso2027, 'pasos.'.$paso.'.completo', false) ? 'Completada' : 'Pendiente';
+            }
+            foreach (['bloque_1', 'bloque_2', 'bloque_3'] as $bloqueKey) {
+                $bloque = data_get($proceso2027, 'bloques.'.$bloqueKey, []);
+                $values[] = data_get($bloque, 'maximo') === null ? null : $this->hoursValue((float) data_get($bloque, 'maximo', 0));
+                $values[] = $this->hoursValue((float) data_get($bloque, 'titulares_asignadas', 0));
+                $values[] = $this->hoursValue((float) data_get($bloque, 'contrata_asignadas', 0));
+                $values[] = $this->hoursValue((float) data_get($bloque, 'asignadas', 0));
+                $values[] = $this->hoursValue((float) data_get($bloque, 'pendientes', 0));
+                $values[] = data_get($bloque, 'saldo_maximo') === null ? null : $this->hoursValue((float) data_get($bloque, 'saldo_maximo', 0));
             }
 
             $values[] = collect(data_get($avance, 'observaciones', []))->filter()->implode(' | ');
