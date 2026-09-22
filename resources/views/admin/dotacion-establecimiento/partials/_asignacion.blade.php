@@ -38,6 +38,8 @@
                 'saldo' => $saldo,
                 'prioridad' => $prioridad,
                 'prioridad_label' => $prioridadLabel,
+                'titular_disponible' => $titularDisponible,
+                'contrata_disponible' => $contrataDisponible,
             ];
         })->filter(fn ($persona) => $estamento !== 'docente' || $persona['saldo'] > 0.01)->sortBy('prioridad')->values();
     };
@@ -48,7 +50,63 @@
 @once
     @push('styles')
         <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
-        <style>.select2-container { width: 100% !important; }</style>
+        <style>
+            .select2-container { width: 100% !important; }
+            .dotacion-assignment-form {
+                padding: .75rem;
+                border: 1px solid #dce7f5;
+                border-radius: .85rem;
+                background: linear-gradient(135deg, #fbfdff 0%, #f4f8ff 100%);
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
+            }
+            .dotacion-selector-guide {
+                display: flex;
+                align-items: flex-start;
+                gap: .45rem;
+                padding: .5rem .625rem;
+                border-radius: .6rem;
+                background: #eaf2ff;
+                color: #174b91;
+                font-size: .75rem;
+                line-height: 1.35;
+            }
+            .dotacion-selector-guide .bi { margin-top: .05rem; }
+            .select2-container--default .select2-selection--single {
+                min-height: calc(1.5em + .5rem + 2px);
+                border-color: #b9cbe4;
+                border-radius: .55rem;
+                background: #fff;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+            }
+            .select2-container--default .select2-selection--single .select2-selection__rendered {
+                padding: .25rem 2rem .25rem .65rem;
+                line-height: 1.5;
+                color: #1e293b;
+            }
+            .select2-container--default .select2-selection--single .select2-selection__arrow {
+                height: 100%;
+                right: .45rem;
+            }
+            .select2-container--default.select2-container--focus .select2-selection--single,
+            .select2-container--default.select2-container--open .select2-selection--single {
+                border-color: #0d6efd;
+                box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .15);
+            }
+            .dotacion-personal-dropdown { z-index: 1080; }
+            .dotacion-personal-dropdown .select2-search--dropdown { padding: .6rem; background: #f7faff; border-bottom: 1px solid #dce7f5; }
+            .dotacion-personal-dropdown .select2-search__field { min-height: 2.1rem; border: 1px solid #9db7dc; border-radius: .5rem; padding: .35rem .55rem; }
+            .dotacion-personal-dropdown .select2-results__option { padding: .45rem .65rem; }
+            .dotacion-personal-dropdown .select2-results__option--highlighted.select2-results__option--selectable { background: #eaf2ff; color: #122e58; }
+            .dotacion-personal-option { display: grid; gap: .25rem; }
+            .dotacion-personal-option__name { font-weight: 700; color: #172554; }
+            .dotacion-personal-option__meta { display: flex; gap: .35rem; flex-wrap: wrap; color: #475569; font-size: .78rem; }
+            .dotacion-personal-option__priority { color: #0b4aa2; font-weight: 700; }
+            .dotacion-personal-option__availability { color: #0f766e; }
+            .dotacion-personal-selection { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            @media (max-width: 767.98px) {
+                .dotacion-assignment-form { padding: .65rem; }
+            }
+        </style>
     @endpush
 @endonce
 
@@ -259,7 +317,7 @@
                                             <td class="text-end {{ ($pendingPlan ?? 0) > 0.01 ? 'text-warning' : 'text-success' }} fw-semibold">{{ $fmt($pendingPlan) }}</td>
                                             <td><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
                                             <td>
-                                                <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2" data-dotacion-asignacion-form>
+                                                <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form" data-dotacion-asignacion-form>
                                                     @csrf
                                                     <input type="hidden" name="anio" value="{{ $anio }}">
                                                     <input type="hidden" name="tipo_asignacion" value="{{ $item['tipo_asignacion'] }}">
@@ -274,22 +332,25 @@
                                                     <input type="hidden" name="asignatura_nombre" value="{{ $item['asignatura_nombre'] ?? $item['titulo'] }}">
                                                     <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                                     <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
+                                                    @if ($proceso2027Asignacion['aplica'] ?? false)
+                                                        <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; la lista se presenta según la prelación 2027 y el saldo contractual disponible.</span></div>
+                                                    @endif
                                                     <select name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                                         <option value="docente">Cubierto por docente</option>
                                                         @unless ($soloParvularia)<option value="asistente">Cubierto por Asistente de la Educación</option>@endunless
                                                     </select>
-                                                    <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" required>
+                                                    <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
                                                         <option value="">Seleccione persona...</option>
                                                         <optgroup label="Docentes">
                                                             @foreach ($docenteOptions as $doc)
                                                                 @continue($soloParvularia && !$doc['es_parvularia'])
-                                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-titulo="{{ $doc['titulo'] }}" data-prioridad="{{ $doc['prioridad'] }}">{{ $doc['label'] }}</option>
+                                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                             @endforeach
                                                         </optgroup>
                                                         <optgroup label="Asistentes de la Educación">
                                                             @foreach ($asistenteOptions as $asistente)
                                                                 @continue($soloParvularia)
-                                                                <option value="{{ $asistente['rut'] }}" data-estamento="asistente">{{ $asistente['label'] }}</option>
+                                                                <option value="{{ $asistente['rut'] }}" data-estamento="asistente" data-nombre="{{ $asistente['nombre'] }}" data-rut="{{ $asistente['rut'] }}" data-funcion="{{ $asistente['funcion'] }}" data-titular-disponible="{{ $fmt($asistente['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($asistente['contrata_disponible']) }}">{{ $asistente['label'] }}</option>
                                                             @endforeach
                                                         </optgroup>
                                                     </select>
@@ -412,7 +473,7 @@
                                             <div>Docente Directivo por asumir · {{ $fmt($item['horas_contrato_asignadas'] ?? 0) }} hrs contrato.</div>
                                             <div class="mt-1">La plaza activa 44 horas como necesidad hasta asignar al docente directivo.</div>
                                         </div>
-                                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 mt-2">
+                                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 mt-2 dotacion-assignment-form">
                                             @csrf
                                             <input type="hidden" name="anio" value="{{ $anio }}">
                                             <input type="hidden" name="tipo_asignacion" value="funcion_directiva">
@@ -424,10 +485,11 @@
                                             <input type="hidden" name="subvencion" value="General">
                                             <input type="hidden" name="horas_contrato" value="44">
                                             <label class="form-label small mb-0" for="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}">Docente directivo</label>
-                                            <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" required>
+                                            <div class="dotacion-selector-guide"><i class="bi bi-search"></i><span>Busque por nombre o RUT. La lista muestra la prelación 2027 y las horas disponibles antes de confirmar la asignación.</span></div>
+                                            <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar docente por nombre o RUT..." required>
                                                 <option value="">Seleccione docente...</option>
                                                 @foreach ($docenteOptions as $doc)
-                                                    <option value="{{ $doc['rut'] }}" data-prioridad="{{ $doc['prioridad'] }}">{{ $doc['label'] }}</option>
+                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </select>
                                             <div class="small text-muted">Contrato fijo: 44 horas.</div>
@@ -435,7 +497,7 @@
                                             <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
                                         </form>
                                     @else
-                                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2" data-dotacion-asignacion-form>
+                                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form" data-dotacion-asignacion-form>
                                         @csrf
                                         <input type="hidden" name="anio" value="{{ $anio }}">
                                         <input type="hidden" name="tipo_asignacion" value="{{ $item['tipo_asignacion'] }}">
@@ -450,20 +512,23 @@
                                         <input type="hidden" name="asignatura_nombre" value="{{ $item['asignatura_nombre'] ?? $item['titulo'] }}">
                                         <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                         <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
+                                        @if ($proceso2027Asignacion['aplica'] ?? false)
+                                            <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; la lista se presenta según la prelación 2027 y el saldo contractual disponible.</span></div>
+                                        @endif
                                         <select name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                             <option value="docente">Cubierto por docente</option>
                                             <option value="asistente">Cubierto por Asistente de la Educación</option>
                                         </select>
-                                        <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" required>
+                                        <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
                                             <option value="">Seleccione persona...</option>
                                             <optgroup label="Docentes">
                                                 @foreach ($docenteOptions as $doc)
-                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-titulo="{{ $doc['titulo'] }}" data-prioridad="{{ $doc['prioridad'] }}">{{ $doc['label'] }}</option>
+                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </optgroup>
                                             <optgroup label="Asistentes de la Educación">
                                                 @foreach ($asistenteOptions as $asistente)
-                                                    <option value="{{ $asistente['rut'] }}" data-estamento="asistente">{{ $asistente['label'] }}</option>
+                                                <option value="{{ $asistente['rut'] }}" data-estamento="asistente" data-nombre="{{ $asistente['nombre'] }}" data-rut="{{ $asistente['rut'] }}" data-funcion="{{ $asistente['funcion'] }}" data-titular-disponible="{{ $fmt($asistente['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($asistente['contrata_disponible']) }}">{{ $asistente['label'] }}</option>
                                                 @endforeach
                                             </optgroup>
                                         </select>
@@ -534,14 +599,74 @@
 
 
 @push('scripts')
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
-        window.jQuery('.js-dotacion-docente-select').select2({
+        const $ = window.jQuery;
+        const optionData = function (item) {
+            const option = $(item.element);
+
+            return {
+                nombre: option.data('nombre') || item.text,
+                rut: option.data('rut') || '',
+                estamento: option.data('estamento') || '',
+                funcion: option.data('funcion') || '',
+                titulo: option.data('titulo') || '',
+                prioridad: option.data('prioridad-label') || '',
+                titular: option.data('titular-disponible'),
+                contrata: option.data('contrata-disponible'),
+            };
+        };
+        const templateResult = function (item) {
+            if (!item.id || !item.element) {
+                return item.text;
+            }
+
+            const data = optionData(item);
+            const result = $('<div>', { class: 'dotacion-personal-option' });
+            const name = $('<div>', { class: 'dotacion-personal-option__name' })
+                .text(data.nombre + (data.rut ? ' · ' + data.rut : ''));
+            const meta = $('<div>', { class: 'dotacion-personal-option__meta' });
+
+            if (data.prioridad) {
+                meta.append($('<span>', { class: 'dotacion-personal-option__priority' }).text(data.prioridad));
+            } else if (data.estamento === 'asistente') {
+                meta.append($('<span>').text('Asistente de la Educación'));
+            }
+            if (data.titulo) {
+                meta.append($('<span>').text(data.titulo));
+            } else if (data.funcion) {
+                meta.append($('<span>').text(data.funcion));
+            }
+            meta.append($('<span>', { class: 'dotacion-personal-option__availability' })
+                .text('Disponible: ' + (data.titular || '0') + ' titular + ' + (data.contrata || '0') + ' contrata'));
+
+            return result.append(name, meta);
+        };
+        const templateSelection = function (item) {
+            if (!item.id || !item.element) {
+                return item.text;
+            }
+
+            const data = optionData(item);
+            return $('<span>', { class: 'dotacion-personal-selection' })
+                .text(data.nombre + (data.rut ? ' · ' + data.rut : ''));
+        };
+
+        $('.js-dotacion-docente-select').select2({
             width: '100%',
             placeholder: 'Buscar por nombre o RUT...',
             allowClear: true,
+            minimumResultsForSearch: 0,
+            dropdownCssClass: 'dotacion-personal-dropdown',
+            language: {
+                noResults: function () { return 'No se encontraron personas con ese nombre o RUT.'; },
+                searching: function () { return 'Buscando personas…'; },
+            },
+            templateResult: templateResult,
+            templateSelection: templateSelection,
         });
     }
     document.querySelectorAll('[data-dotacion-asignacion-form]').forEach(function (form) {
@@ -568,6 +693,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const selectedOption = personal.options[personal.selectedIndex];
             if (selectedOption && selectedOption.dataset.estamento && selectedOption.dataset.estamento !== selectedEstamento) {
                 personal.value = '';
+            }
+
+            if (window.jQuery && window.jQuery(personal).hasClass('select2-hidden-accessible')) {
+                window.jQuery(personal).trigger('change.select2');
             }
 
             if (contratoAaee) {

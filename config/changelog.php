@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.9.22.490' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Buscador y prelación visible en asignación de horas',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Unit/DotacionAsignacionViewTest.php',
+        ],
+        'changes' => [
+            'Corrige la carga de dependencias del selector para habilitar la búsqueda por nombre o RUT en la asignación de horas.',
+            'Muestra en cada resultado la prelación 2027, título o función y saldo titular y a contrata disponible; también mejora la jerarquía visual de los formularios de asignación.',
+        ],
+    ],
     '2026.9.22.489' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',
