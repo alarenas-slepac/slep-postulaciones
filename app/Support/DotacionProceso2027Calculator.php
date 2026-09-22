@@ -43,6 +43,9 @@ class DotacionProceso2027Calculator
         $needKeysObligatorias = [];
         $seleccionNormativas = (array) ($config?->funciones_normativas ?? []);
         $funcionesNormativas = collect();
+        $resumenContractual = (array) data_get($data, 'resumen', []);
+        $usarResumenContractualPorComponente = array_key_exists('contrato_plan_general_mas_trabajo_colaborativo_pie', $resumenContractual)
+            && array_key_exists('contrato_educacion_parvularia_mas_trabajo_colaborativo_pie', $resumenContractual);
         $bloques = collect(self::BLOQUES)->mapWithKeys(fn ($label, $key) => [$key => [
             'key' => $key,
             'label' => $label,
@@ -94,10 +97,22 @@ class DotacionProceso2027Calculator
                 if ($key !== '') {
                     $needKeysObligatorias[$key] = true;
                 }
+                if ($usarResumenContractualPorComponente
+                    && in_array($groupKey, ['plan_estudio', 'pie_colaborativo'], true)) {
+                    continue;
+                }
                 $bloques[$bloque]['requeridas'] += $esNormativaDefinible
                     ? max(0.0, (float) data_get($item, 'horas_contrato_requeridas', 0))
                     : DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item);
             }
+        }
+
+        if ($usarResumenContractualPorComponente) {
+            // Esta base ya aplica la consolidación y el redondeo contractual de
+            // cursos combinados. Evita que el proceso guiado sume conversiones
+            // por asignatura que la tarjeta contractual ya redujo correctamente.
+            $bloques['bloque_1']['requeridas'] += max(0.0, (float) $resumenContractual['contrato_plan_general_mas_trabajo_colaborativo_pie']);
+            $bloques['bloque_2']['requeridas'] += max(0.0, (float) $resumenContractual['contrato_educacion_parvularia_mas_trabajo_colaborativo_pie']);
         }
 
         $docentes = self::docentesPriorizados(collect($data['docentes'] ?? []));
