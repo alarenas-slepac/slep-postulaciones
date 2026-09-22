@@ -172,6 +172,7 @@
     @endif
 
     @include('admin.dotacion-establecimiento.partials._proporcion_excepcion')
+    @include('admin.dotacion-establecimiento.partials._proceso_2027')
 
     {{-- Inicio de filas de indicadores --}}
     @foreach ($kpiFilas as $filaKey => $fila)

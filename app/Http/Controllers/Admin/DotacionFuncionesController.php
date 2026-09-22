@@ -9,10 +9,13 @@ use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionFuncionRegla;
 use App\Models\Establecimiento;
 use App\Support\DotacionFuncionesCalculator;
+use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class DotacionFuncionesController extends Controller
 {
@@ -100,6 +103,11 @@ class DotacionFuncionesController extends Controller
 
         $resumen = $this->resumenEstablecimiento($establecimiento, $anio);
         $rules = DotacionFuncionRegla::query()->where('vigente', true)->get()->keyBy('codigo');
+        $proceso2027 = DotacionProceso2027Calculator::resumen(
+            $establecimiento,
+            $anio,
+            DotacionEstablecimientoCalculator::build($establecimiento, $anio)
+        );
 
         return view('admin.dotacion-funciones.show', [
             'establecimiento' => $establecimiento,
@@ -117,6 +125,7 @@ class DotacionFuncionesController extends Controller
             'canValidate' => in_array($activeRole, $this->validatorRoles, true),
             'canConfigureDirectorAdp' => in_array($activeRole, $this->directorAdpRoles, true),
             'bloquesConsolidados' => $this->bloquesConsolidados(),
+            'proceso2027' => $proceso2027,
         ]);
     }
 
@@ -187,6 +196,7 @@ class DotacionFuncionesController extends Controller
         if ($data['tipo'] === 'orientador' || $data['tipo'] === 'otra') {
             $horasSugeridas = null;
         }
+        $this->assertPuedeRegistrarFuncionNoNormativa($establecimiento, (int) $data['anio'], (float) $data['horas_declaradas']);
 
         DotacionFuncionEstablecimiento::create([
             'establecimiento_id' => $establecimiento->id,
@@ -231,6 +241,13 @@ class DotacionFuncionesController extends Controller
             'observacion' => ['nullable', 'string', 'max:3000'],
             'estado' => ['nullable', Rule::in(array_keys(DotacionFuncionEstablecimiento::ESTADOS))],
         ]);
+
+        $this->assertPuedeRegistrarFuncionNoNormativa(
+            $establecimiento,
+            (int) $data['anio'],
+            (float) $data['horas_declaradas'],
+            $funcion
+        );
 
         $funcion->update([
             'nombre_funcion' => trim($data['nombre_funcion']),
@@ -285,6 +302,13 @@ class DotacionFuncionesController extends Controller
             'horas_aprobadas' => ['required', 'integer', 'min:0', 'max:200'],
             'observacion' => ['nullable', 'string', 'max:3000'],
         ]);
+
+        $this->assertPuedeRegistrarFuncionNoNormativa(
+            $establecimiento,
+            (int) $funcion->anio,
+            (float) $data['horas_aprobadas'],
+            $funcion
+        );
 
         $funcion->update([
             'horas_aprobadas' => (int) $data['horas_aprobadas'],
@@ -350,6 +374,37 @@ class DotacionFuncionesController extends Controller
 
         if ($this->isEstablecimientoRole($this->activeRole($request))) {
             abort_unless((int) $establecimiento->id === (int) ($request->user()->establecimiento_id ?? 0), 403);
+        }
+    }
+
+    private function assertPuedeRegistrarFuncionNoNormativa(
+        Establecimiento $establecimiento,
+        int $anio,
+        float $horas,
+        ?DotacionFuncionEstablecimiento $excepto = null
+    ): void {
+        if (! DotacionProceso2027Calculator::aplica($anio)) {
+            return;
+        }
+
+        $proceso = DotacionProceso2027Calculator::resumen($establecimiento, $anio);
+        if (! ($proceso['funciones_no_normativas_habilitadas'] ?? false)) {
+            throw ValidationException::withMessages([
+                'horas_declaradas' => 'Las funciones no normativas se habilitan sólo cuando estén cubiertas todas las necesidades obligatorias de dotación 2027.',
+            ]);
+        }
+
+        $reservadas = DotacionFuncionEstablecimiento::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->when($excepto, fn ($query) => $query->where('id', '<>', $excepto->id))
+            ->get()
+            ->sum(fn (DotacionFuncionEstablecimiento $funcion) => $funcion->horasFinales());
+        $capacidad = max(0.0, round((float) ($proceso['capacidad_no_normativas'] ?? 0) - $reservadas, 2));
+        if ($horas > $capacidad + 0.01) {
+            throw ValidationException::withMessages([
+                'horas_declaradas' => 'La función supera las '.$capacidad.' hora(s) disponibles en el bloque 1 para funciones no normativas.',
+            ]);
         }
     }
 

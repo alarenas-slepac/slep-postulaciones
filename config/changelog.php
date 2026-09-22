@@ -1,6 +1,38 @@
 <?php
 
 return [
+    '2026.9.22.485' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Proceso guiado de dotación docente 2027',
+        'files' => [
+            'app/Exports/DotacionEstablecimientoAvanceExport.php',
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Http/Controllers/Admin/DotacionFuncionesController.php',
+            'app/Http/Controllers/Admin/DotacionProceso2027Controller.php',
+            'app/Models/DotacionDocenteAsignacion.php',
+            'app/Models/DotacionProceso2027Configuracion.php',
+            'app/Support/DotacionEstablecimientoAvanceCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'database/migrations/2026_09_22_180000_create_dotacion_proceso_2027_configuraciones_table.php',
+            'resources/views/admin/dotacion-establecimiento/avance.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'resources/views/admin/dotacion-funciones/show.blade.php',
+            'routes/web.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'Incorpora etapas obligatorias para planes, combinación de cursos, máximos por bloque y asignación 2027.',
+            'Controla máximos y disponibilidad contractual por bloque, con prelación de fuero, titularidad, tramo y antigüedad; sus administradores, UATP, GDP y supervisión de planificación pueden configurarlos.',
+            'Bloquea las funciones no normativas hasta completar la cobertura obligatoria y limita su capacidad remanente.',
+            'Agrega selector con búsqueda y prioridad, vista docente ordenada e informe de avance con etapas 2027.',
+        ],
+    ],
     '2026.9.22.484' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',

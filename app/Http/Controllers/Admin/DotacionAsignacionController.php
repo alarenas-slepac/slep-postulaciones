@@ -15,6 +15,7 @@ use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionProfesionDocenteResolver;
+use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -48,6 +49,7 @@ class DotacionAsignacionController extends Controller
             'dotacion_funcion_regla_id' => ['nullable', 'integer', 'min:1'],
             'horas_plan_pedagogicas' => ['nullable', 'numeric', 'min:0'],
             'horas_contrato' => ['nullable', 'numeric', 'min:0'],
+            'excepcion_prelacion' => ['nullable', 'string', 'max:2000'],
             'observacion' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -70,6 +72,7 @@ class DotacionAsignacionController extends Controller
 
         $this->validatePlanHoursAvailable($establecimiento, $data);
         $payload = $this->buildPayload($request, $establecimiento, $persona, $data);
+        $this->validateProceso2027Assignment($establecimiento, $persona, $payload);
         DotacionDocenteAsignacion::create($payload);
 
         return back()->with('success', 'Asignación de horas guardada correctamente.');
@@ -85,6 +88,7 @@ class DotacionAsignacionController extends Controller
             'estamento_cobertura' => ['nullable', 'in:docente,asistente'],
             'horas_plan_pedagogicas' => ['nullable', 'numeric', 'min:0'],
             'horas_contrato' => ['nullable', 'numeric', 'min:0'],
+            'excepcion_prelacion' => ['nullable', 'string', 'max:2000'],
             'subvencion' => ['nullable', 'string', 'max:80'],
             'observacion' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -125,6 +129,7 @@ class DotacionAsignacionController extends Controller
             'estamento_cobertura' => $estamentoCobertura,
         ]);
         $payload = $this->buildPayload($request, $establecimiento, $persona, array_merge($asignacion->toArray(), $data));
+        $this->validateProceso2027Assignment($establecimiento, $persona, $payload, $asignacion);
         $payload['updated_by'] = $request->user()?->id;
         $asignacion->update($payload);
 
@@ -386,6 +391,7 @@ class DotacionAsignacionController extends Controller
             'proporcion_aplicada' => $proporcion,
             'fuente_calculo' => $fuente,
             'observacion' => $data['observacion'] ?? null,
+            'excepcion_prelacion' => trim((string) ($data['excepcion_prelacion'] ?? '')) ?: null,
             'estado' => 'activa',
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
@@ -455,6 +461,83 @@ class DotacionAsignacionController extends Controller
                     DotacionEstablecimientoCalculator::formatHoras($available),
                     DotacionEstablecimientoCalculator::formatHoras($requested)
                 ),
+            ]);
+        }
+    }
+
+    private function validateProceso2027Assignment(
+        Establecimiento $establecimiento,
+        array $persona,
+        array $payload,
+        ?DotacionDocenteAsignacion $current = null
+    ): void {
+        $anio = (int) ($payload['anio'] ?? 0);
+        if (! DotacionProceso2027Calculator::aplica($anio)
+            || ($payload['estamento_cobertura'] ?? 'docente') !== 'docente') {
+            return;
+        }
+
+        $proceso = DotacionProceso2027Calculator::resumen($establecimiento, $anio);
+        if (! ($proceso['asignacion_habilitada'] ?? false)) {
+            throw ValidationException::withMessages([
+                'anio' => 'Para asignar horas en 2027 debe completar planes de estudio, declarar la combinación de cursos y configurar máximos suficientes para los tres bloques.',
+            ]);
+        }
+
+        $bloque = data_get($proceso, 'need_blocks.'.($payload['necesidad_key'] ?? ''))
+            ?: DotacionProceso2027Calculator::bloqueParaAsignacion($payload);
+        if (! $bloque) {
+            return;
+        }
+
+        $horas = max(0.0, (float) ($payload['horas_contrato'] ?? 0));
+        $bloqueProceso = data_get($proceso, 'bloques.'.$bloque, []);
+        $asignadas = (float) ($bloqueProceso['asignadas'] ?? 0);
+        if ($current) {
+            $bloqueActual = data_get($proceso, 'need_blocks.'.($current->necesidad_key ?? ''))
+                ?: DotacionProceso2027Calculator::bloqueParaAsignacion($current);
+            if ($bloqueActual === $bloque) {
+                $asignadas = max(0.0, $asignadas - (float) $current->horas_contrato);
+            }
+        }
+        $maximo = $bloqueProceso['maximo'] ?? null;
+        if ($maximo !== null && $asignadas + $horas > (float) $maximo + 0.01) {
+            throw ValidationException::withMessages([
+                'horas_contrato' => 'La asignación supera el máximo autorizado del bloque '.$bloqueProceso['label'].'.',
+            ]);
+        }
+
+        $asignadasPersona = max(0.0, (float) ($persona['horas_asignadas_total'] ?? 0));
+        if ($current && DotacionEstablecimientoCalculator::normalizeRut((string) $current->docente_rut_normalizado)
+            === DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? ''))) {
+            $asignadasPersona = max(0.0, $asignadasPersona - (float) $current->horas_contrato);
+        }
+        $disponibles = max(0.0, (float) ($persona['horas_contrato'] ?? 0) - $asignadasPersona);
+        if ($horas > $disponibles + 0.01) {
+            throw ValidationException::withMessages([
+                'horas_contrato' => 'La persona seleccionada dispone de '.$disponibles.' hora(s) de contrato para asignar.',
+            ]);
+        }
+
+        $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? ''));
+        $seleccionado = collect($proceso['docentes'] ?? [])->first(
+            fn (array $docente) => ($docente['rut_normalizado'] ?? '') === $rut
+        );
+        $prioridad = (int) ($seleccionado['prioridad_2027'] ?? 6);
+        $hayPrioridadAnterior = collect($proceso['docentes'] ?? [])->contains(
+            fn (array $docente) => (int) ($docente['prioridad_2027'] ?? 6) < $prioridad
+                && (float) ($docente['horas_disponibles'] ?? 0) > 0.01
+        );
+        if ($hayPrioridadAnterior && blank($payload['excepcion_prelacion'] ?? null)) {
+            throw ValidationException::withMessages([
+                'excepcion_prelacion' => 'Existen docentes de prioridad superior con horas disponibles. Para continuar debe indicar una justificación de excepción.',
+            ]);
+        }
+
+        if ((int) ($payload['dotacion_funcion_id'] ?? 0) > 0
+            && ! ($proceso['funciones_no_normativas_habilitadas'] ?? false)) {
+            throw ValidationException::withMessages([
+                'dotacion_funcion_id' => 'Las funciones no normativas se habilitan sólo cuando todas las necesidades obligatorias estén cubiertas.',
             ]);
         }
     }

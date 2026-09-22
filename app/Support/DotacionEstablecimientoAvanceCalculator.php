@@ -40,7 +40,12 @@ class DotacionEstablecimientoAvanceCalculator
         $horasContratoPendientes = (float) data_get($data, 'asignacion.resumen.horas_pendientes', 0);
         $horasContratoExcedidas = (float) data_get($data, 'asignacion.resumen.horas_excedidas', 0);
 
+        $proceso2027 = DotacionProceso2027Calculator::resumen($establecimiento, $anio, $data);
         $porcentajeGeneral = round(($porcentajePlanes + $porcentajeAsignacion) / 2, 1);
+        if ($proceso2027['aplica'] ?? false) {
+            $porcentajeGeneral = round((float) collect($proceso2027['pasos'] ?? [])
+                ->avg(fn ($paso) => ($paso['completo'] ?? false) ? 100 : 0), 1);
+        }
         $observaciones = collect($data['alertas'] ?? []);
 
         if ($cursosSinPlan > 0) {
@@ -56,6 +61,14 @@ class DotacionEstablecimientoAvanceCalculator
         $docentesSobrecarga = (int) data_get($data, 'asignacion.resumen.docentes_sobrecarga', 0);
         if ($docentesSobrecarga > 0) {
             $observaciones->push($docentesSobrecarga.' docente(s) con sobrecarga de horas de contrato calculadas.');
+        }
+        if ($proceso2027['aplica'] ?? false) {
+            foreach (collect($proceso2027['pasos'] ?? [])->filter(fn ($paso) => ! ($paso['completo'] ?? false)) as $paso) {
+                $observaciones->push('Etapa 2027 pendiente: '.$paso['label'].'.');
+            }
+            foreach (collect($proceso2027['bloques'] ?? [])->filter(fn ($bloque) => $bloque['maximo_insuficiente'] ?? false) as $bloque) {
+                $observaciones->push('Máximo insuficiente para '.$bloque['label'].'.');
+            }
         }
 
         return [
@@ -90,6 +103,7 @@ class DotacionEstablecimientoAvanceCalculator
                 'docentes_disponibles' => (int) data_get($data, 'asignacion.resumen.docentes_disponibles', 0),
             ],
             'desglose' => self::desglose(data_get($data, 'asignacion.necesidades', [])),
+            'proceso_2027' => $proceso2027,
             'porcentaje_general' => $porcentajeGeneral,
             'estado' => self::estado($porcentajeGeneral, $observaciones->isNotEmpty()),
             'observaciones' => $observaciones->unique()->values(),

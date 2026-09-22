@@ -50,6 +50,7 @@ use App\Http\Controllers\Admin\DotacionFuncionesController;
 use App\Http\Controllers\Admin\DotacionCursoCombinadoController;
 use App\Http\Controllers\Admin\DotacionDocenteExclusionController;
 use App\Http\Controllers\Admin\DotacionEstablecimientoController;
+use App\Http\Controllers\Admin\DotacionProceso2027Controller;
 use App\Http\Controllers\Admin\DotacionProporcionExcepcionController;
 use App\Http\Controllers\Admin\DotacionAsignacionController;
 use App\Http\Controllers\Admin\EstablecimientoPlanEstudioController;
@@ -673,6 +674,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.pdf');
+        Route::post('dotacion-establecimiento/{establecimiento}/proceso-2027', [DotacionProceso2027Controller::class, 'update'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
+            ->whereNumber('establecimiento')
+            ->name('dotacion-establecimiento.proceso-2027.update');
         Route::post('dotacion-establecimiento/{establecimiento}/asignaciones', [DotacionAsignacionController::class, 'store'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
