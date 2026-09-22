@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.22.491' => [
+        'date' => '2026-09-22',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Validación de planes configurados en proceso 2027',
+        'files' => [
+            'app/Support/DotacionProceso2027Calculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Feature/DotacionProceso2027PlanConfigTest.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'La etapa Planes de estudio exige una configuración enviada por cada curso con matrícula, incluidos NT1 y NT2.',
+            'Los bloques flexibles deben completar sus horas; cuando corresponde, se valida expresamente la carga de libre disposición y se informa el avance en la etapa.',
+        ],
+    ],
     '2026.9.22.490' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',

@@ -5,7 +5,9 @@ namespace App\Support;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionProceso2027Configuracion;
 use App\Models\Establecimiento;
+use App\Models\EstablecimientoCurso;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -16,6 +18,8 @@ use Illuminate\Support\Str;
 class DotacionProceso2027Calculator
 {
     public const ANIO = 2027;
+
+    private const ESTADOS_PLAN_CONFIGURADO = ['enviado', 'aprobado', 'cerrado'];
 
     public const BLOQUES = [
         'bloque_1' => 'Plan general, trabajo colaborativo PIE y funciones normativas',
@@ -158,8 +162,8 @@ class DotacionProceso2027Calculator
         }
         unset($bloque);
 
-        $planesCompletos = (int) data_get($data, 'cursos.totales.cursos', 0) > 0
-            && (int) data_get($data, 'cursos.totales.sin_horas_plan', 0) === 0;
+        $estadoPlanes = self::estadoPlanesEstudio($establecimiento, $anio, $data);
+        $planesCompletos = $estadoPlanes['completo'];
         $gruposActivos = (int) data_get($data, 'cursos_combinados.resumen.grupos_activos', 0);
         $combinacionDeclarada = $config && in_array($config->decision_combinacion, array_keys(DotacionProceso2027Configuracion::COMBINACIONES), true)
             && ($config->decision_combinacion !== 'combinaciones_configuradas' || $gruposActivos > 0);
@@ -178,12 +182,17 @@ class DotacionProceso2027Calculator
         return [
             'aplica' => true,
             'configuracion' => $config,
+            'estado_planes' => $estadoPlanes,
             'bloques' => $bloques,
             'need_blocks' => $needBlocks,
             'funciones_normativas' => $funcionesNormativas->values(),
             'docentes' => $docentes->values(),
             'pasos' => [
-                'planes' => ['label' => 'Planes de estudio', 'completo' => $planesCompletos],
+                'planes' => [
+                    'label' => 'Planes de estudio',
+                    'completo' => $planesCompletos,
+                    'detalle' => $estadoPlanes['detalle'],
+                ],
                 'combinaciones' => ['label' => 'Combinación de cursos', 'completo' => $combinacionDeclarada],
                 'normativas' => ['label' => 'Definición de funciones normativas', 'completo' => $funcionesNormativasDefinidas],
                 'maximos' => ['label' => 'Máximos por bloque', 'completo' => $maximosConfigurados && $topesSuficientes],
@@ -237,6 +246,162 @@ class DotacionProceso2027Calculator
             ['fecha_antiguedad', 'asc'],
             ['nombre', 'asc'],
         ])->values();
+    }
+
+    /**
+     * El plan oficial asociado permite calcular horas, pero no acredita que el
+     * establecimiento haya completado su propia configuración. Para avanzar en
+     * 2027 se exige una configuración enviada por cada curso con matrícula y
+     * las horas completas en los bloques flexibles, especialmente Libre
+     * disposición.
+     *
+     * @return array{completo: bool, total: int, configurados: int, pendientes: array<int, string>, libre_disposicion_pendiente: int, detalle: string}
+     */
+    private static function estadoPlanesEstudio(Establecimiento $establecimiento, int $anio, array $data): array
+    {
+        $inyectado = (array) data_get($data, 'cursos.configuracion_planes', []);
+        if (array_key_exists('completo', $inyectado)) {
+            $total = (int) ($inyectado['total'] ?? data_get($data, 'cursos.totales.cursos', 0));
+            $configurados = (int) ($inyectado['configurados'] ?? 0);
+            $pendientes = array_values((array) ($inyectado['pendientes'] ?? []));
+            $librePendiente = (int) ($inyectado['libre_disposicion_pendiente'] ?? 0);
+
+            return [
+                'completo' => (bool) $inyectado['completo'],
+                'total' => $total,
+                'configurados' => $configurados,
+                'pendientes' => $pendientes,
+                'libre_disposicion_pendiente' => $librePendiente,
+                'detalle' => (string) ($inyectado['detalle'] ?? self::detallePlanes($configurados, $total, $pendientes, $librePendiente)),
+            ];
+        }
+
+        if (! Schema::hasTable('establecimiento_planes_estudio')
+            || ! Schema::hasTable('establecimiento_planes_estudio_asignaturas')
+            || ! Schema::hasTable('planes_estudio_bloques')) {
+            $total = (int) data_get($data, 'cursos.totales.cursos', 0);
+            $sinHoras = (int) data_get($data, 'cursos.totales.sin_horas_plan', 0);
+            $completo = $total > 0 && $sinHoras === 0;
+            $pendientes = $completo ? [] : ['Cursos sin horas de plan'];
+
+            return [
+                'completo' => $completo,
+                'total' => $total,
+                'configurados' => $completo ? $total : max(0, $total - $sinHoras),
+                'pendientes' => $pendientes,
+                'libre_disposicion_pendiente' => 0,
+                'detalle' => self::detallePlanes($completo ? $total : max(0, $total - $sinHoras), $total, $pendientes, 0),
+            ];
+        }
+
+        $cursos = EstablecimientoCurso::query()
+            ->with(['curso', 'planEstudio.bloques'])
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->where('activo', true)
+            ->where('matricula', '>', 0)
+            ->orderBy('curso_id')
+            ->orderBy('letra')
+            ->get();
+        $total = $cursos->count();
+        if ($total === 0) {
+            return [
+                'completo' => false,
+                'total' => 0,
+                'configurados' => 0,
+                'pendientes' => ['No hay cursos con matrícula'],
+                'libre_disposicion_pendiente' => 0,
+                'detalle' => 'No hay cursos con matrícula para configurar.',
+            ];
+        }
+
+        $configuraciones = DB::table('establecimiento_planes_estudio')
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->whereIn('establecimiento_curso_id', $cursos->pluck('id'))
+            ->get(['id', 'establecimiento_curso_id', 'estado'])
+            ->keyBy('establecimiento_curso_id');
+        $configuracionIds = $configuraciones->pluck('id')->filter()->values();
+        $horasPorBloque = [];
+
+        if ($configuracionIds->isNotEmpty()) {
+            foreach (DB::table('establecimiento_planes_estudio_asignaturas as detalle')
+                ->join('planes_estudio_bloques as bloque', 'bloque.id', '=', 'detalle.plan_estudio_bloque_id')
+                ->whereIn('detalle.establecimiento_plan_estudio_id', $configuracionIds)
+                ->groupBy('detalle.establecimiento_plan_estudio_id', 'bloque.tipo_bloque')
+                ->selectRaw('detalle.establecimiento_plan_estudio_id, bloque.tipo_bloque, SUM(detalle.horas_semanales) as horas')
+                ->get() as $detalle) {
+                $horasPorBloque[(int) $detalle->establecimiento_plan_estudio_id][(string) $detalle->tipo_bloque] = (float) $detalle->horas;
+            }
+        }
+
+        $configurados = 0;
+        $pendientes = [];
+        $librePendiente = 0;
+        foreach ($cursos as $curso) {
+            $label = trim((string) ($curso->nombre_seccion ?: (($curso->curso?->nombre ?? 'Curso').' '.($curso->letra ?? ''))));
+            $plan = $curso->planEstudio;
+            $configuracion = $configuraciones->get($curso->id);
+            if (! $plan || ! $configuracion || ! in_array((string) $configuracion->estado, self::ESTADOS_PLAN_CONFIGURADO, true)) {
+                $pendientes[] = $label;
+                continue;
+            }
+
+            $requeridosPorBloque = collect($plan->bloques ?? [])
+                ->filter(fn ($bloque) => (bool) $bloque->activo
+                    && ($bloque->permite_asignaturas_establecimiento || $bloque->permite_asignaturas_personalizadas)
+                    && (float) $bloque->horas_semanales > 0)
+                ->mapWithKeys(fn ($bloque) => [(string) $bloque->tipo_bloque => (float) $bloque->horas_semanales])
+                ->all();
+            $libreRequerida = max(0.0, (float) ($plan->horas_semanales_libre_disposicion ?? 0));
+            if ($libreRequerida > 0) {
+                $requeridosPorBloque['libre_disposicion'] = max(
+                    $libreRequerida,
+                    (float) ($requeridosPorBloque['libre_disposicion'] ?? 0)
+                );
+            }
+
+            $bloquesIncompletos = collect($requeridosPorBloque)
+                ->filter(fn (float $horasRequeridas, string $tipo) => (float) data_get($horasPorBloque, $configuracion->id.'.'.$tipo, 0) + 0.01 < $horasRequeridas)
+                ->keys()
+                ->all();
+            if ($bloquesIncompletos !== []) {
+                $pendientes[] = $label;
+                if (in_array('libre_disposicion', $bloquesIncompletos, true)) {
+                    $librePendiente++;
+                }
+                continue;
+            }
+
+            $configurados++;
+        }
+
+        return [
+            'completo' => $configurados === $total,
+            'total' => $total,
+            'configurados' => $configurados,
+            'pendientes' => $pendientes,
+            'libre_disposicion_pendiente' => $librePendiente,
+            'detalle' => self::detallePlanes($configurados, $total, $pendientes, $librePendiente),
+        ];
+    }
+
+    /** @param array<int, string> $pendientes */
+    private static function detallePlanes(int $configurados, int $total, array $pendientes, int $librePendiente): string
+    {
+        if ($total === 0) {
+            return 'No hay cursos con matrícula para configurar.';
+        }
+        if ($pendientes === []) {
+            return "{$configurados} de {$total} curso(s) con plan enviado y bloques flexibles completos.";
+        }
+
+        $detalle = "{$configurados} de {$total} curso(s) listos; ".count($pendientes).' pendiente(s).';
+        if ($librePendiente > 0) {
+            $detalle .= " {$librePendiente} pendiente(s) incluyen horas de libre disposición.";
+        }
+
+        return $detalle;
     }
 
     private static function configuracion(Establecimiento $establecimiento, int $anio): ?DotacionProceso2027Configuracion
