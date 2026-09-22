@@ -69,10 +69,12 @@ class DotacionAsignacionCalculator
         $totalRequeridasOtros = collect($necesidades)
             ->except('plan_estudio')
             ->sum(fn ($items) => collect($items)->sum(
-                fn ($item) => (float) ($item['horas_contrato_requeridas'] ?? 0)
+                fn ($item) => self::horasContratoRequeridasParaCalculo($item)
             ));
         $totalRequeridas = round($totalRequeridasPlan + (float) $totalRequeridasOtros, 2);
-        $totalAsignadas = $asignaciones->sum(fn ($item) => (float) $item->horas_contrato);
+        $totalAsignadas = $asignaciones
+            ->reject(fn ($item) => self::esAsignacionPorAsumir($item))
+            ->sum(fn ($item) => (float) $item->horas_contrato);
         $pendientes = max(0.0, round($totalRequeridas - $totalAsignadas, 2));
         $excedidas = max(0.0, round($totalAsignadas - $totalRequeridas, 2));
 
@@ -445,7 +447,9 @@ class DotacionAsignacionCalculator
 
     public static function subvencionResumen(Collection $items): Collection
     {
-        return $items->groupBy(fn ($item) => $item->subvencion ?: 'Sin clasificar')
+        return $items
+            ->reject(fn ($item) => self::esAsignacionPorAsumir($item))
+            ->groupBy(fn ($item) => $item->subvencion ?: 'Sin clasificar')
             ->map(fn ($rows, $subvencion) => [
                 'subvencion' => $subvencion,
                 'horas' => (float) $rows->sum(fn ($row) => (float) $row->horas_contrato),
@@ -958,6 +962,7 @@ class DotacionAsignacionCalculator
                 $subtipo = $keyBloque;
                 $needKey = self::key('funcion', [$keyBloque, $index, $nombre]);
                 $items->push(self::needRow($needKey, $tipo, $subtipo, [
+                    'codigo' => $item['codigo'] ?? null,
                     'titulo' => $nombre,
                     'curso_label' => $bloque['label'] ?? 'Bloque',
                     'horas_contrato' => $horas,
@@ -1383,8 +1388,23 @@ class DotacionAsignacionCalculator
         $assignedContrato = (float) $assigned->sum(fn ($row) => (float) $row->horas_contrato);
         $assignedPlan = (float) $assigned->sum(fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0));
         $esPlanEstudio = $tipo === 'plan_estudio' && $horasPlan !== null;
+
+        $necesidadNormativaCondicionada = self::esNecesidadNormativaCondicionadaPorDocente($subtipo, $data);
+        $docenteAsignado = $assigned->contains(
+            fn ($row): bool => self::esAsignacionDocenteReal($row)
+        );
+        $plazaAutomaticaDirectorAdp = self::esDirectorAdp($data) && $assigned->contains(
+            fn ($row): bool => (bool) data_get($row, 'asignacion_automatica', false)
+                && self::coverageEstamento($row) === 'docente'
+        );
+        $necesidadActivada = $docenteAsignado || $plazaAutomaticaDirectorAdp;
+        $horasContratoRequeridasCalculo = $necesidadNormativaCondicionada && ! $necesidadActivada
+            ? 0.0
+            : $horasContrato;
         $estadoRequeridas = $esPlanEstudio ? $horasPlan : $horasContrato;
-        $estadoAsignadas = $esPlanEstudio ? $assignedPlan : $assignedContrato;
+        $estadoAsignadas = $esPlanEstudio
+            ? $assignedPlan
+            : ($plazaAutomaticaDirectorAdp ? 0.0 : $assignedContrato);
 
         return array_merge([
             'key' => $key,
@@ -1403,16 +1423,20 @@ class DotacionAsignacionCalculator
             'bloque' => $data['bloque'] ?? null,
             'horas_plan_requeridas' => $horasPlan,
             'horas_contrato_requeridas' => $horasContrato,
+            'horas_contrato_requeridas_calculo' => $horasContratoRequeridasCalculo,
             'horas_aula_cronologicas' => $data['horas_aula_cronologicas'] ?? null,
             'horas_plan_asignadas' => $assignedPlan,
             'horas_contrato_asignadas' => $assignedContrato,
+            'horas_contrato_asignadas_calculo' => $estadoAsignadas,
             'horas_plan_pendientes' => $horasPlan !== null ? max(0.0, round($horasPlan - $assignedPlan, 2)) : null,
-            'horas_contrato_pendientes' => max(0.0, round($horasContrato - $assignedContrato, 2)),
+            'horas_contrato_pendientes' => max(0.0, round($horasContrato - $estadoAsignadas, 2)),
             'estado' => self::estadoNecesidad($estadoRequeridas, $estadoAsignadas),
             'asignaciones' => $assigned->values(),
             'asignacion_automatica' => $assigned->contains(
                 fn ($row): bool => (bool) data_get($row, 'asignacion_automatica', false)
             ),
+            'necesidad_condicionada_por_asignacion_docente' => $necesidadNormativaCondicionada,
+            'necesidad_activada_por_docente' => ! $necesidadNormativaCondicionada || $necesidadActivada,
             'subvencion' => $data['subvencion'] ?? 'General',
             'fuente' => $data['fuente'] ?? null,
         ], $data);
@@ -1453,6 +1477,71 @@ class DotacionAsignacionCalculator
             ->toString();
 
         return $value === 'asistente' ? 'asistente' : 'docente';
+    }
+
+    /**
+     * Las funciones directivas y los planes normativos se activan en el cálculo
+     * sólo al contar con una asignación activa de una persona docente. La plaza
+     * automática "por asumir" de Director(a) ADP es la excepción: representa
+     * una necesidad directiva vigente y activa las horas correspondientes.
+     */
+    public static function horasContratoRequeridasParaCalculo(object|array $necesidad): float
+    {
+        return max(0.0, (float) data_get(
+            $necesidad,
+            'horas_contrato_requeridas_calculo',
+            data_get($necesidad, 'horas_contrato_requeridas', 0)
+        ));
+    }
+
+    public static function esAsignacionDocenteReal(object|array $asignacion): bool
+    {
+        return self::coverageEstamento($asignacion) === 'docente'
+            && (string) data_get($asignacion, 'estado', 'activa') === 'activa'
+            && ! self::esAsignacionPorAsumir($asignacion);
+    }
+
+    private static function esNecesidadNormativaCondicionadaPorDocente(?string $subtipo, array $data): bool
+    {
+        return (int) ($data['dotacion_funcion_id'] ?? 0) <= 0
+            && in_array($subtipo, ['directiva', 'planes_programas'], true);
+    }
+
+    private static function esDirectorAdp(array $data): bool
+    {
+        $codigo = Str::of((string) ($data['codigo'] ?? ''))
+            ->ascii()
+            ->upper()
+            ->replace(['-', ' '], '_')
+            ->toString();
+        $nombre = Str::of((string) ($data['titulo'] ?? $data['asignatura_nombre'] ?? ''))
+            ->ascii()
+            ->upper()
+            ->replaceMatches('/[^A-Z0-9]+/', ' ')
+            ->squish()
+            ->toString();
+
+        return $codigo === 'DIRECTOR_ADP'
+            || (str_contains($nombre, 'DIRECTOR') && str_contains($nombre, 'ADP'));
+    }
+
+    private static function esAsignacionPorAsumir(object|array $asignacion): bool
+    {
+        if ((bool) data_get($asignacion, 'asignacion_automatica', false)) {
+            return true;
+        }
+
+        $identificador = Str::of((string) (
+            data_get($asignacion, 'docente_rut_normalizado')
+            ?: data_get($asignacion, 'docente_rut', '')
+        ))
+            ->ascii()
+            ->upper()
+            ->replace(['_', '-'], ' ')
+            ->squish()
+            ->toString();
+
+        return str_contains($identificador, 'POR ASUMIR');
     }
 
     public static function proportionGroup(?string $proporcion): string

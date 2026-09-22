@@ -363,12 +363,16 @@
                             @php
                                 $estado = $item['estado'] ?? ['class' => 'text-bg-secondary', 'label' => 'Pendiente'];
                                 $pendingContrato = $item['horas_contrato_pendientes'] ?? $item['horas_contrato_requeridas'] ?? 0;
+                                $asignadoContrato = $item['horas_contrato_asignadas_calculo'] ?? $item['horas_contrato_asignadas'] ?? 0;
                                 $asignacionAutomatica = (bool) ($item['asignacion_automatica'] ?? false);
                             @endphp
                             <tr>
                                 <td>
                                     <div class="fw-semibold">{{ $item['titulo'] ?? 'Necesidad' }}</div>
                                     <div class="small text-muted">{{ $item['fuente'] ?? '' }}</div>
+                                    @if (($item['necesidad_condicionada_por_asignacion_docente'] ?? false) && ! ($item['necesidad_activada_por_docente'] ?? false))
+                                        <div class="small text-warning-emphasis mt-1">No se contabiliza como necesidad hasta asignar un docente.</div>
+                                    @endif
                                 </td>
                                 <td>
                                     <div>{{ $item['curso_label'] ?? 'Establecimiento' }}</div>
@@ -378,7 +382,7 @@
                                 </td>
                                 <td class="text-end">{{ $item['horas_plan_requeridas'] !== null ? $fmt($item['horas_plan_requeridas']) : '—' }}</td>
                                 <td class="text-end fw-bold">{{ $fmt($item['horas_contrato_requeridas'] ?? 0) }}</td>
-                                <td class="text-end text-primary fw-semibold">{{ $fmt($item['horas_contrato_asignadas'] ?? 0) }}</td>
+                                <td class="text-end text-primary fw-semibold">{{ $fmt($asignadoContrato) }}</td>
                                 <td class="text-end {{ ($pendingContrato ?? 0) > 0.01 ? 'text-warning' : 'text-success' }} fw-semibold">{{ $fmt($pendingContrato) }}</td>
                                 <td><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
                                 <td>
@@ -386,6 +390,7 @@
                                         <div class="alert alert-primary small mb-0">
                                             <div class="fw-semibold">Asignación automática</div>
                                             <div>Docente Directivo por asumir · {{ $fmt($item['horas_contrato_asignadas'] ?? 0) }} hrs contrato.</div>
+                                            <div class="mt-1">La plaza activa 44 horas como necesidad hasta asignar al docente directivo.</div>
                                         </div>
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 mt-2">
                                             @csrf

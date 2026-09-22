@@ -192,8 +192,9 @@ class DotacionFuncionesAnualesTest extends TestCase
         $asignacion = $necesidad['asignaciones']->sole();
 
         $this->assertTrue($necesidad['asignacion_automatica']);
-        $this->assertSame('cubierta', $necesidad['estado']['key']);
+        $this->assertSame('pendiente', $necesidad['estado']['key']);
         $this->assertSame(44.0, $necesidad['horas_contrato_asignadas']);
+        $this->assertSame(0.0, $necesidad['horas_contrato_asignadas_calculo']);
         $this->assertTrue($asignacion->asignacion_automatica);
         $this->assertSame('Docente Directivo por asumir', $asignacion->docente_nombre);
         $this->assertSame(44.0, $asignacion->horas_contrato);
@@ -238,6 +239,131 @@ class DotacionFuncionesAnualesTest extends TestCase
         $this->assertFalse($necesidad['asignacion_automatica']);
         $this->assertSame('Directivo asignado', $asignacion->docente_nombre);
         $this->assertSame(44.0, $resultado['resumen']['horas_asignadas']);
+    }
+
+    public function test_directiva_y_plan_normativo_solo_son_necesarios_al_asignarlos_a_docente_real(): void
+    {
+        $schemaCache = new \ReflectionProperty(DotacionAsignacionCalculator::class, 'schemaTableCache');
+        $schemaCache->setValue([]);
+        $piseReglaId = (int) DB::table('dotacion_funciones_reglas')->where('codigo', 'pise')->value('id');
+        $bloques = [
+            'directiva' => [
+                'label' => 'Funciones directivas',
+                'items' => [[
+                    'codigo' => 'director_adp',
+                    'nombre' => 'Director(a) ADP',
+                    'horas' => 44,
+                    'dotacion_funcion_regla_id' => 73,
+                ]],
+            ],
+            'planes_programas' => [
+                'label' => 'Planes normativos',
+                'items' => [[
+                    'codigo' => 'pise',
+                    'nombre' => 'PISE',
+                    'horas' => 3,
+                    'dotacion_funcion_regla_id' => $piseReglaId,
+                ]],
+            ],
+        ];
+
+        $sinDocente = DotacionAsignacionCalculator::build(
+            Establecimiento::findOrFail(1),
+            2026,
+            collect(),
+            [],
+            $bloques
+        );
+        $necesidadesSinDocente = $sinDocente['necesidades']['funciones']->keyBy('titulo');
+
+        $this->assertSame(44.0, $sinDocente['resumen']['horas_requeridas']);
+        $this->assertTrue($necesidadesSinDocente['Director(a) ADP']['necesidad_activada_por_docente']);
+        $this->assertSame(44.0, $necesidadesSinDocente['Director(a) ADP']['horas_contrato_requeridas_calculo']);
+        $this->assertSame(0.0, $necesidadesSinDocente['PISE']['horas_contrato_requeridas_calculo']);
+
+        $bloquesContrato = [
+            'directiva' => ['automaticas' => 44, 'declaradas' => 0, 'total' => 44, 'items' => $bloques['directiva']['items']],
+            'planes_programas' => ['automaticas' => 3, 'declaradas' => 0, 'total' => 3, 'items' => $bloques['planes_programas']['items']],
+        ];
+        $ajustarBloques = new \ReflectionMethod(
+            \App\Support\DotacionEstablecimientoCalculator::class,
+            'considerarNormativasSoloConDocenteAsignado'
+        );
+        $bloquesSinDocente = $ajustarBloques->invoke(
+            null,
+            $bloquesContrato,
+            $sinDocente['necesidades']['funciones']
+        );
+        $this->assertSame(44.0, $bloquesSinDocente['directiva']['total']);
+        $this->assertSame(0.0, $bloquesSinDocente['planes_programas']['total']);
+
+        $proyeccionDirectorAdp = \App\Support\DotacionProyeccionCalculator::build([
+            'resumen' => ['horas_dotacion_funciones_normativas' => 44],
+            'docentes' => [],
+            'asignacion' => [
+                'asignaciones' => $sinDocente['asignaciones'],
+                'necesidades' => ['funciones' => $sinDocente['necesidades']['funciones']],
+            ],
+        ], 2026, []);
+        $coberturaDirectorAdp = $proyeccionDirectorAdp['coberturas']['funciones'][0];
+        $this->assertSame(44.0, $proyeccionDirectorAdp['necesarias']['funciones_normativas']);
+        $this->assertSame(44.0, $proyeccionDirectorAdp['brechas']['aula']);
+        $this->assertSame(44.0, $coberturaDirectorAdp['requeridas']);
+        $this->assertSame(0.0, $coberturaDirectorAdp['asignadas_base']);
+
+        DB::table('dotacion_docente_asignaciones')->insert([
+            [
+                'anio' => 2026,
+                'establecimiento_id' => 1,
+                'docente_rut' => '11.111.111-1',
+                'docente_rut_normalizado' => '111111111',
+                'docente_nombre' => 'Directivo asignado',
+                'estamento_cobertura' => 'docente',
+                'tipo_asignacion' => 'funcion_directiva',
+                'subtipo_asignacion' => 'directiva',
+                'subvencion' => 'General',
+                'asignatura_nombre' => 'Director(a) ADP',
+                'dotacion_funcion_regla_id' => 73,
+                'horas_contrato' => 44,
+                'estado' => 'activa',
+            ],
+            [
+                'anio' => 2026,
+                'establecimiento_id' => 1,
+                'docente_rut' => '22.222.222-2',
+                'docente_rut_normalizado' => '222222222',
+                'docente_nombre' => 'Docente PISE',
+                'estamento_cobertura' => 'docente',
+                'tipo_asignacion' => 'plan_normativo',
+                'subtipo_asignacion' => 'planes_programas',
+                'subvencion' => 'General',
+                'asignatura_nombre' => 'PISE',
+                'dotacion_funcion_regla_id' => $piseReglaId,
+                'horas_contrato' => 3,
+                'estado' => 'activa',
+            ],
+        ]);
+
+        $conDocente = DotacionAsignacionCalculator::build(
+            Establecimiento::findOrFail(1),
+            2026,
+            collect(),
+            [],
+            $bloques
+        );
+
+        $this->assertSame(47.0, $conDocente['resumen']['horas_requeridas']);
+        $this->assertSame(47.0, $conDocente['resumen']['horas_asignadas']);
+        $this->assertTrue($conDocente['necesidades']['funciones']->firstWhere('titulo', 'Director(a) ADP')['necesidad_activada_por_docente']);
+        $this->assertSame(3.0, $conDocente['necesidades']['funciones']->firstWhere('titulo', 'PISE')['horas_contrato_requeridas_calculo']);
+
+        $bloquesConDocente = $ajustarBloques->invoke(
+            null,
+            $bloquesContrato,
+            $conDocente['necesidades']['funciones']
+        );
+        $this->assertSame(44.0, $bloquesConDocente['directiva']['total']);
+        $this->assertSame(3.0, $bloquesConDocente['planes_programas']['total']);
     }
 
     public function test_asignacion_de_director_adp_exige_docente_44_horas_y_habilitacion_anual(): void

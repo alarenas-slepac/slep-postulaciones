@@ -146,6 +146,10 @@ class DotacionEstablecimientoCalculator
             data_get($asignacion, 'necesidades.pie_educadora_diferencial', [])
         );
         $bloquesContratoDotacion = self::bloquesSinContratoPieNecesario($bloques);
+        $bloquesContratoDotacion = self::considerarNormativasSoloConDocenteAsignado(
+            $bloquesContratoDotacion,
+            data_get($asignacion, 'necesidades.funciones', [])
+        );
         $bloquesContratoDotacion = self::descontarCoberturaAsistentesFuncionesNormativas(
             $bloquesContratoDotacion,
             data_get($asignacion, 'necesidades.funciones', [])
@@ -1868,8 +1872,77 @@ class DotacionEstablecimientoCalculator
         }
 
         return round((float) collect($asignaciones)
-            ->filter(fn ($asignacion) => DotacionAsignacionCalculator::coverageEstamento($asignacion) === $estamento)
+            ->filter(fn ($asignacion) => DotacionAsignacionCalculator::coverageEstamento($asignacion) === $estamento
+                && ($estamento !== 'docente' || DotacionAsignacionCalculator::esAsignacionDocenteReal($asignacion)))
             ->sum(fn ($asignacion) => (float) data_get($asignacion, 'horas_contrato', 0)), 2);
+    }
+
+    /**
+     * Las horas de directiva y planes normativos sólo forman parte de la
+     * necesidad contractual luego de asignar una persona docente real.
+     * Las funciones declaradas y las demás funciones normativas mantienen su
+     * tratamiento actual.
+     */
+    private static function considerarNormativasSoloConDocenteAsignado(
+        array $bloques,
+        iterable $necesidadesFunciones
+    ): array {
+        $necesidades = collect($necesidadesFunciones);
+
+        foreach (['directiva', 'planes_programas'] as $bloqueKey) {
+            if (! isset($bloques[$bloqueKey])) {
+                continue;
+            }
+
+            $horasPorNombre = $necesidades
+                ->filter(fn ($necesidad) => data_get($necesidad, 'subtipo_asignacion') === $bloqueKey
+                    && (int) data_get($necesidad, 'dotacion_funcion_id', 0) <= 0)
+                ->map(fn ($necesidad) => [
+                    'nombre' => self::normalizeText((string) (
+                        data_get($necesidad, 'asignatura_nombre')
+                        ?? data_get($necesidad, 'titulo')
+                        ?? ''
+                    )),
+                    'horas' => DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($necesidad),
+                ])
+                ->groupBy('nombre')
+                ->map(fn (Collection $items) => $items->pluck('horas')->values()->all())
+                ->all();
+
+            $automaticasConfiguradas = max(0.0, (float) ($bloques[$bloqueKey]['automaticas'] ?? 0));
+            $automaticasNecesarias = 0.0;
+            foreach ($bloques[$bloqueKey]['items'] as &$item) {
+                if ((int) ($item['dotacion_funcion_id'] ?? 0) > 0) {
+                    continue;
+                }
+
+                $nombre = self::normalizeText((string) ($item['nombre'] ?? ''));
+                $horasConfiguradas = max(0.0, (float) ($item['horas'] ?? 0));
+                $horasNecesarias = empty($horasPorNombre[$nombre])
+                    ? 0.0
+                    : max(0.0, (float) array_shift($horasPorNombre[$nombre]));
+
+                $item['horas_configuradas'] = $horasConfiguradas;
+                $item['horas'] = $horasNecesarias;
+                $item['pendiente_asignacion_docente'] = $horasNecesarias + 0.01 < $horasConfiguradas;
+                $automaticasNecesarias += $horasNecesarias;
+            }
+            unset($item);
+
+            $automaticasNecesarias = round($automaticasNecesarias, 2);
+            $bloques[$bloqueKey]['automaticas_configuradas'] = $automaticasConfiguradas;
+            $bloques[$bloqueKey]['horas_pendientes_asignacion_docente'] = max(
+                0.0,
+                round($automaticasConfiguradas - $automaticasNecesarias, 2)
+            );
+            $bloques[$bloqueKey]['automaticas'] = $automaticasNecesarias;
+            $bloques[$bloqueKey]['total'] = round(
+                $automaticasNecesarias + (float) ($bloques[$bloqueKey]['declaradas'] ?? 0),
+                2
+            );
+        }
+
+        return $bloques;
     }
 
     private static function descontarCoberturaAsistentesFuncionesNormativas(
@@ -1887,7 +1960,7 @@ class DotacionEstablecimientoCalculator
                 $bloquesPorSubtipo
             ) && (int) data_get($necesidad, 'dotacion_funcion_id', 0) <= 0)
             ->map(function ($necesidad): array {
-                $requeridas = max(0.0, (float) data_get($necesidad, 'horas_contrato_requeridas', 0));
+                $requeridas = DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($necesidad);
                 $asistentes = self::horasAsignadasNecesidadPorEstamento($necesidad, 'asistente');
 
                 return [
