@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.23.500' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Nómina de siete columnas para oficio de idoneidad psicológica',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'app/Services/IdoneidadPsicologica/IdoneidadPsicologicaNominaPdfRenderer.php',
+            'config/changelog.php',
+            'resources/views/pdf/idoneidad-psicologica-nomina.blade.php',
+        ],
+        'changes' => [
+            'Genera la nómina con las siete columnas administrativas: Nro., Nombre, RUT, Cargo, Establecimiento, Tipo de contrato y Comuna.',
+            'Dibuja directamente la grilla de nómina en el PDF para mantener el formato tabular sin agotar la memoria disponible en producción.',
+        ],
+    ],
     '2026.9.23.499' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',
