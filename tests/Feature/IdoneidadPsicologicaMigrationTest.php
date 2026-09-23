@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\IdoneidadPsicologicaFuncionario;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -58,11 +59,13 @@ class IdoneidadPsicologicaMigrationTest extends TestCase
             'rut' => '11.111.111-1',
             'rut_normalizado' => '11111111',
             'nombre' => 'Persona de prueba',
+            'comuna' => 'STA. JUANA',
             'estado' => 'solicitado',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
         $this->assertSame(1, DB::table('idoneidad_psicologica_funcionarios')->count());
+        $this->assertSame('Santa Juana', IdoneidadPsicologicaFuncionario::query()->sole()->comuna);
     }
 }

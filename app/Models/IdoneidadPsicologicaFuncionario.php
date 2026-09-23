@@ -51,6 +51,18 @@ class IdoneidadPsicologicaFuncionario extends Model
         return RutChile::format($value);
     }
 
+    public function getComunaAttribute(?string $value): ?string
+    {
+        $comuna = trim((string) $value);
+        $normalizada = mb_strtoupper($comuna);
+
+        return match ($normalizada) {
+            'SAN PEDRO', 'SAN PEDRO DE LA PAZ' => 'San Pedro de la Paz',
+            'STA. JUANA', 'STA JUANA', 'SANTA JUANA' => 'Santa Juana',
+            default => $comuna !== '' ? $comuna : null,
+        };
+    }
+
     public function solicitud(): BelongsTo
     {
         return $this->belongsTo(IdoneidadPsicologicaSolicitud::class, 'solicitud_id');

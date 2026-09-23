@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.9.23.493' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Oficio configurable de idoneidad psicológica',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'app/Models/IdoneidadPsicologicaFuncionario.php',
+            'config/changelog.php',
+            'resources/branding/idoneidad-psicologica/logo-oficio.png',
+            'resources/views/pdf/idoneidad-psicologica-nomina.blade.php',
+            'resources/views/tramites/idoneidad-psicologica/oficio.blade.php',
+            'resources/views/tramites/idoneidad-psicologica/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/IdoneidadPsicologicaMigrationTest.php',
+        ],
+        'changes' => [
+            'El oficio PDF incorpora el logo de la plantilla institucional, tipografía Century Gothic y el texto completo de solicitud de evaluación de idoneidad psicológica.',
+            'Antes de generar el documento se solicitan los nombres y cargos del Director Regional del Servicio de Salud Concepción y del Director Ejecutivo del SLEP, con vista previa en una pestaña independiente.',
+            'El oficio identifica a la persona de contacto con el nombre completo y correo de la cuenta que lo genera, y normaliza las comunas San Pedro de la Paz y Santa Juana.',
+        ],
+    ],
     '2026.9.23.492' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',
