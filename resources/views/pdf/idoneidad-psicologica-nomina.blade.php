@@ -3,26 +3,32 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page { margin: 14mm 13mm 17mm; }
-        body { font-family: DejaVu Sans, sans-serif; color: #111827; font-size: 9.3px; line-height: 1.35; }
-        .header { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-        .header td { padding: 3px 5px; vertical-align: top; }
-        .header__brand { width: 55%; font-size: 10px; font-weight: bold; line-height: 1.25; }
-        .header__subject { width: 45%; font-size: 8.5px; }
-        .header__label { font-weight: bold; }
-        .address { margin: 14px 0 13px 32px; line-height: 1.35; font-weight: bold; }
-        .body-copy { margin: 0 0 9px; text-align: justify; }
-        .period { background: #f3f4f6; border: 1px solid #d1d5db; padding: 7px 9px; margin: 10px 0 12px; font-size: 8.8px; }
-        .table-title { font-weight: bold; margin: 11px 0 5px; }
-        .nomina { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7.1px; }
+        @page { margin: 25mm 30mm 25mm; }
+        @font-face { font-family: "Century Gothic"; font-style: normal; font-weight: 400; src: url("{{ $fuenteRegularDataUri }}") format("truetype"); }
+        @font-face { font-family: "Century Gothic"; font-style: normal; font-weight: 700; src: url("{{ $fuenteBoldDataUri }}") format("truetype"); }
+        body { margin: 0; color: #000; font-family: "Century Gothic", sans-serif; font-size: 12pt; line-height: 1.14; }
+        .header { width: 100%; border-collapse: collapse; margin: 0 0 14pt; }
+        .header td { padding: 0; vertical-align: top; }
+        .logo { width: 124pt; height: auto; display: block; }
+        .reference { width: 48%; padding-top: 3pt !important; font-size: 11pt; line-height: 1.14; }
+        .reference p { margin: 0 0 9pt; }
+        .reference-label { font-weight: 700; }
+        .date { margin: 0 0 18pt; text-align: right; }
+        .address { margin: 0 0 18pt; line-height: 1.14; }
+        .address p { margin: 0; }
+        .address .spacer { height: 10pt; }
+        .body-copy { margin: 0 0 10pt; text-align: justify; }
+        .numbered { margin: 0 0 10pt; padding-left: 19pt; text-align: justify; text-indent: -19pt; }
+        .table-intro { margin-top: 12pt; }
+        .nomina { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 8pt 0 13pt; font-size: 7.2pt; line-height: 1.12; }
         .nomina thead { display: table-header-group; }
-        .nomina th { background: #e5e7eb; border: 1px solid #4b5563; color: #111827; padding: 4px 3px; text-align: center; font-weight: bold; vertical-align: middle; }
-        .nomina td { border: 1px solid #6b7280; padding: 3px; vertical-align: top; word-wrap: break-word; }
+        .nomina th { border: 0.6pt solid #000; padding: 3.5pt 2pt; text-align: center; font-weight: 700; vertical-align: middle; }
+        .nomina td { border: 0.6pt solid #000; padding: 3pt 2pt; vertical-align: top; overflow-wrap: break-word; }
         .nomina tr { page-break-inside: avoid; }
         .center { text-align: center; }
-        .signature { margin-top: 19px; text-align: center; font-weight: bold; line-height: 1.35; }
-        .distribution { margin-top: 16px; font-size: 8px; }
-        .footer { position: fixed; bottom: -10mm; left: 0; right: 0; color: #4b5563; font-size: 7px; }
+        .signature { margin-top: 28pt; text-align: center; line-height: 1.16; page-break-inside: avoid; }
+        .signature-name { font-weight: 700; text-transform: uppercase; }
+        .signature-role { font-size: 11pt; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -33,32 +39,41 @@
 
     <table class="header">
         <tr>
-            <td class="header__brand">SERVICIO LOCAL DE EDUCACIÓN PÚBLICA<br>DE ANDALIÉN COSTA</td>
-            <td class="header__subject"><span class="header__label">ANT.:</span> Art. 4 de la Ley N° 21.109.</td>
+            <td style="width:52%"><img class="logo" src="{{ $logoDataUri }}" alt="Servicio Local de Educación Pública Andalién Costa"></td>
+            <td class="reference">
+                <p><span class="reference-label">ANT.:</span> Art. 4 Ley N° 21.109.</p>
+                <p><span class="reference-label">MAT.:</span> Solicita evaluación de idoneidad sicológica de asistentes de la educación SLEP Andalién Costa.</p>
+            </td>
         </tr>
-        <tr>
-            <td></td>
-            <td class="header__subject"><span class="header__label">MAT.:</span> Solicita evaluación de idoneidad psicológica de asistentes de la educación del SLEP Andalién Costa.</td>
-        </tr>
-        <tr><td></td><td class="header__subject">{{ $fechaOficio }}</td></tr>
     </table>
 
+    <p class="date">{{ $fechaOficio }}</p>
+
     <div class="address">
-        A: SR.(A) DIRECTOR(A) REGIONAL<br>
-        SERVICIO DE SALUD CONCEPCIÓN<br><br>
-        DE: DIRECTOR(A) EJECUTIVO(A)<br>
-        SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE ANDALIÉN COSTA
+        <p><strong>A:</strong> Sr(a). {{ $datosOficio['director_regional_nombre'] }}</p>
+        <p>{{ $datosOficio['director_regional_cargo'] }}</p>
+        <p>SERVICIO DE SALUD CONCEPCIÓN</p>
+        <div class="spacer"></div>
+        <p><strong>DE:</strong> Sr(a). {{ $datosOficio['director_ejecutivo_nombre'] }}</p>
+        <p>{{ $datosOficio['director_ejecutivo_cargo'] }}</p>
+        <p>SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE ANDALIÉN COSTA</p>
     </div>
 
-    <p class="body-copy">Junto con saludar cordialmente, y en cumplimiento de las exigencias de idoneidad psicológica establecidas para quienes se desempeñan como asistentes de la educación, vengo en solicitar a usted la evaluación de las personas individualizadas en la nómina que se acompaña.</p>
-    <p class="body-copy"><strong>1.</strong> La Ley N° 21.040 creó el Sistema de Educación Pública y los Servicios Locales de Educación Pública, a los que corresponde administrar y gestionar los establecimientos educacionales de su dependencia.</p>
-    <p class="body-copy"><strong>2.</strong> El artículo 4 de la Ley N° 21.109 exige acreditar idoneidad psicológica para desempeñarse como asistente de la educación, mediante el informe que corresponda, con carácter previo a la celebración del respectivo contrato.</p>
-    <p class="body-copy"><strong>3.</strong> El Servicio Local no cuenta actualmente con un profesional de su dotación que pueda efectuar dichas evaluaciones, razón por la cual solicita la colaboración del Servicio de Salud competente.</p>
+    <p class="body-copy">Junto con saludar cordialmente, vengo en informar y solicitar a Ud. lo siguiente:</p>
 
-    <div class="period"><strong>Período de ingresos considerado en esta solicitud:</strong> {{ optional($solicitud->fecha_inicio)->format('d/m/Y') }} al {{ optional($solicitud->fecha_termino)->format('d/m/Y') }}. &nbsp; <strong>Solicitud:</strong> #{{ $solicitud->id }}.</div>
+    <p class="numbered"><strong>1.</strong> Con fecha 24 de noviembre de 2017, entró en vigor la Ley N° 21.040, que creó el nuevo sistema de educación pública, estableciendo las instituciones que lo componen y regulando su funcionamiento. Sistema que tiene como objetivo que el Estado provea, a través de los establecimientos educacionales de su propiedad y administración, que formen parte de los Servicios Locales de Educación Pública que son creados en la presente ley, una educación pública, gratuita y de calidad, laica, esto es, respetuosa de toda expresión religiosa, y pluralista, que promueva la inclusión social y cultural, la equidad, la tolerancia, el respeto a la diversidad y la libertad, considerando las particularidades locales y regionales, garantizando el ejercicio del derecho a la educación de conformidad a lo dispuesto en la Constitución Política de la República, en todo el territorio nacional.</p>
 
-    <p class="body-copy">Por lo anterior, se solicita efectuar las evaluaciones de idoneidad psicológica respecto de los siguientes asistentes de la educación:</p>
-    <div class="table-title">NÓMINA DE FUNCIONARIOS(AS)</div>
+    <p class="numbered"><strong>2.</strong> Como es de público conocimiento, este Servicio Local asumió como sostenedor de los establecimientos públicos de las comunas de Coronel, Lota, San Pedro de la Paz y Santa Juana, a contar del 1 de enero de 2025, de acuerdo con lo dispuesto en el Artículo Octavo Transitorio de la Ley N° 21.040.</p>
+
+    <p class="numbered"><strong>3.</strong> El Art. 21 de la Ley N° 21.040 establece que la “dirección y administración de cada Servicio Local estará a cargo de un funcionario denominado Director Ejecutivo, quien será el jefe superior del servicio”. El Art. 22 letra a) de la Ley N° 21.040 establece como atribución del Director Ejecutivo del Servicio Local de Educación Pública la de: a) Dirigir, organizar, administrar y gestionar el Servicio Local, velando por la mejora continua de la calidad de la educación pública en el territorio de su competencia”.</p>
+
+    <p class="numbered"><strong>4.</strong> El Art. 1° de la Ley N° 21.109 establece que: “La presente ley regula el estatuto funcionario de los asistentes de la educación que se desempeñen en establecimientos educacionales dependientes de los Servicios Locales de Educación Pública (en adelante “el servicio local” o “el servicio”).” Por su parte, el Artículo 3 señala que las relaciones laborales entre los servicios locales y los asistentes de la educación de su dependencia se regirán por las disposiciones de esta ley y, para estos efectos, serán considerados como funcionarios públicos.</p>
+
+    <p class="numbered"><strong>5.</strong> En la misma línea argumental, el artículo 4 de la Ley N° 21.109 señala: “Asimismo, para desempeñarse como asistentes de la educación deberá acreditarse idoneidad sicológica para desempeñar dicha función, sobre la base de un informe que deberá emitir el Servicio de Salud correspondiente o el mismo servicio local a través de un profesional competente de su propia dotación, y no podrán encontrarse inhabilitados para trabajar con menores de edad o desempeñarse en establecimientos educacionales, de acuerdo con la Ley N° 20.594. La idoneidad sicológica para desempeñarse como asistente de la educación deberá acreditarse en forma previa a la celebración del respectivo contrato”.</p>
+
+    <p class="numbered"><strong>6.</strong> Cabe indicar que, dentro de la dotación del SLEP de Andalién Costa, no se cuenta con un profesional para efectuar las evaluaciones a que se hace alusión en el art. 4 del párrafo anterior.</p>
+
+    <p class="numbered table-intro"><strong>7.</strong> Por lo anterior, para dar cumplimiento a los requisitos de contratación establecidos en la citada ley, para el caso de los asistentes de la educación, vengo en solicitar se efectúen por parte de la repartición pública que Ud. dirige las evaluaciones de idoneidad sicológica correspondientes respecto de los funcionarios que en el recuadro siguiente se individualizan:</p>
 
     <table class="nomina">
         <thead><tr>
@@ -73,10 +88,14 @@
         </tbody>
     </table>
 
-    <p class="body-copy" style="margin-top: 13px;">Para fines de coordinación, agradeceremos informar el resultado de las evaluaciones a través de los canales institucionales establecidos.</p>
-    <p class="body-copy">Sin otro particular, saluda atentamente,</p>
-    <div class="signature">DIRECTOR(A) EJECUTIVO(A)<br>SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE ANDALIÉN COSTA</div>
-    <div class="distribution"><strong>Distribución:</strong><br>– Destinatario<br>– Archivo</div>
-    <div class="footer">SGA SLEP Andalién Costa · Oficio generado el {{ $fechaEmision->format('d/m/Y H:i') }} desde el último padrón vigente utilizado al crear la solicitud.</div>
+    <p class="numbered"><strong>8.</strong> Teniendo en cuenta lo expuesto en los numerales anteriores, y a fin de plasmar el principio de coordinación entre los servicios públicos, dejo el contacto del funcionario(a) de la Subdirección de Gestión de Personas del Servicio Local de Educación Pública de Andalién Costa, Sr(a). {{ $datosOficio['contacto_nombre'] }}, mail {{ $datosOficio['contacto_email'] }}.</p>
+
+    <p class="body-copy">Esperando una buena recepción a la presente solicitud, saluda atentamente,</p>
+
+    <div class="signature">
+        <div class="signature-name">{{ $datosOficio['director_ejecutivo_nombre'] }}</div>
+        <div class="signature-role">{{ $datosOficio['director_ejecutivo_cargo'] }}</div>
+        <div class="signature-role">Servicio Local de Educación Pública de Andalién Costa</div>
+    </div>
 </body>
 </html>

@@ -11,6 +11,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -246,13 +247,96 @@ class IdoneidadPsicologicaController extends Controller
     public function nominaPdf(Request $request, IdoneidadPsicologicaSolicitud $solicitud)
     {
         $this->autorizar($request);
+
+        return redirect()->route('tramites.idoneidad-psicologica.oficio.configurar', $solicitud);
+    }
+
+    public function configurarOficio(Request $request, IdoneidadPsicologicaSolicitud $solicitud)
+    {
+        $this->autorizar($request);
+
+        $usuario = $request->user();
+        $datos = [
+            'director_regional_nombre' => '',
+            'director_regional_cargo' => 'Director(a) Regional Servicio de Salud Concepción',
+            'director_ejecutivo_nombre' => '',
+            'director_ejecutivo_cargo' => 'Director(a) Ejecutivo(a) Servicio Local de Educación Pública de Andalién Costa',
+            'contacto_nombre' => $this->nombreCompletoUsuario($usuario),
+            'contacto_email' => (string) $usuario->email,
+        ];
+
+        return view('tramites.idoneidad-psicologica.oficio', compact('solicitud', 'datos'));
+    }
+
+    public function previsualizarOficio(Request $request, IdoneidadPsicologicaSolicitud $solicitud)
+    {
+        $this->autorizar($request);
+
+        return $this->generarOficio($request, $solicitud, false);
+    }
+
+    public function descargarOficio(Request $request, IdoneidadPsicologicaSolicitud $solicitud)
+    {
+        $this->autorizar($request);
+
+        return $this->generarOficio($request, $solicitud, true);
+    }
+
+    private function generarOficio(Request $request, IdoneidadPsicologicaSolicitud $solicitud, bool $descargar)
+    {
+        $datos = $this->validarDatosOficio($request);
         $solicitud->load(['solicitante', 'funcionarios' => fn ($query) => $query
             ->orderBy('establecimiento_nombre')->orderBy('nombre')->orderBy('id')]);
 
-        return Pdf::loadView('pdf.idoneidad-psicologica-nomina', [
+        $pdf = Pdf::loadView('pdf.idoneidad-psicologica-nomina', [
             'solicitud' => $solicitud,
             'fechaEmision' => now(),
-        ])->setPaper('a4', 'portrait')->download("oficio_idoneidad_psicologica_{$solicitud->id}.pdf");
+            'datosOficio' => $datos,
+            'logoDataUri' => $this->dataUri(resource_path('branding/idoneidad-psicologica/logo-oficio.png')),
+            'fuenteRegularDataUri' => $this->dataUri(resource_path('fonts/certificados/century-gothic-regular.ttf'), 'font/ttf'),
+            'fuenteBoldDataUri' => $this->dataUri(resource_path('fonts/certificados/century-gothic-bold.ttf'), 'font/ttf'),
+        ])->setPaper('a4', 'portrait');
+
+        $nombreArchivo = "oficio_idoneidad_psicologica_{$solicitud->id}.pdf";
+
+        return $descargar ? $pdf->download($nombreArchivo) : $pdf->stream($nombreArchivo);
+    }
+
+    private function validarDatosOficio(Request $request): array
+    {
+        return $request->validate([
+            'director_regional_nombre' => ['required', 'string', 'max:180'],
+            'director_regional_cargo' => ['required', 'string', 'max:220'],
+            'director_ejecutivo_nombre' => ['required', 'string', 'max:180'],
+            'director_ejecutivo_cargo' => ['required', 'string', 'max:220'],
+            'contacto_nombre' => ['required', 'string', 'max:180'],
+            'contacto_email' => ['required', 'email', 'max:190'],
+        ], [], [
+            'director_regional_nombre' => 'nombre del Director Regional',
+            'director_regional_cargo' => 'cargo del Director Regional',
+            'director_ejecutivo_nombre' => 'nombre del Director Ejecutivo',
+            'director_ejecutivo_cargo' => 'cargo del Director Ejecutivo',
+            'contacto_nombre' => 'nombre del contacto de Gestión de Personas',
+            'contacto_email' => 'correo del contacto de Gestión de Personas',
+        ]);
+    }
+
+    private function nombreCompletoUsuario($usuario): string
+    {
+        return trim(implode(' ', array_filter([
+            $usuario?->nombres,
+            $usuario?->apellido_paterno,
+            $usuario?->apellido_materno,
+        ])));
+    }
+
+    private function dataUri(string $ruta, string $mime = 'image/png'): ?string
+    {
+        if (! File::exists($ruta)) {
+            return null;
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode(File::get($ruta));
     }
 
     private function validarFechas(Request $request): array

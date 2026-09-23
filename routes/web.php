@@ -1014,6 +1014,9 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::get('/', [IdoneidadPsicologicaController::class, 'index'])->name('index');
             Route::get('/crear', [IdoneidadPsicologicaController::class, 'create'])->name('create');
             Route::post('/', [IdoneidadPsicologicaController::class, 'store'])->name('store');
+            Route::get('/{solicitud}/oficio', [IdoneidadPsicologicaController::class, 'configurarOficio'])->name('oficio.configurar');
+            Route::post('/{solicitud}/oficio/previsualizar', [IdoneidadPsicologicaController::class, 'previsualizarOficio'])->name('oficio.previsualizar');
+            Route::post('/{solicitud}/oficio/descargar', [IdoneidadPsicologicaController::class, 'descargarOficio'])->name('oficio.descargar');
             Route::get('/{solicitud}/nomina.pdf', [IdoneidadPsicologicaController::class, 'nominaPdf'])->name('nomina-pdf');
             Route::get('/{solicitud}/plantilla-resultados', [IdoneidadPsicologicaController::class, 'plantillaResultados'])->name('plantilla-resultados');
             Route::post('/{solicitud}/importar-resultados', [IdoneidadPsicologicaController::class, 'importarResultados'])->name('importar-resultados');
