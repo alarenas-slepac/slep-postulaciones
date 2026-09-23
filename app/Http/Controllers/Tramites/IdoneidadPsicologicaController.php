@@ -257,7 +257,7 @@ class IdoneidadPsicologicaController extends Controller
 
         $usuario = $request->user();
         $datos = [
-            'director_regional_nombre' => '',
+            'director_regional_nombre' => 'VICTOR VALENZUELA ALVAREZ',
             'director_regional_cargo' => 'Director(a) Regional Servicio de Salud Concepción',
             'director_ejecutivo_nombre' => '',
             'director_ejecutivo_cargo' => 'Director(a) Ejecutivo(a) Servicio Local de Educación Pública de Andalién Costa',

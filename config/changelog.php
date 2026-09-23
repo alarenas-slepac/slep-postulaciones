@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.23.497' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Destinatarios destacados en oficio de idoneidad psicológica',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'config/changelog.php',
+            'resources/views/pdf/idoneidad-psicologica-nomina.blade.php',
+        ],
+        'changes' => [
+            'Prellena el destinatario del Servicio de Salud como VICTOR VALENZUELA ALVAREZ.',
+            'Destaca en mayúsculas y negrita los nombres del destinatario y del Director Ejecutivo.',
+            'Resalta el nombre, correo e iniciales de visación para facilitar la revisión administrativa del oficio.',
+        ],
+    ],
     '2026.9.23.496' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',

@@ -16,6 +16,7 @@
         .date { margin: 0 0 18pt; text-align: right; }
         .address { margin: 0 0 18pt; line-height: 1.14; }
         .address p { margin: 0; }
+        .address-name { font-weight: 700; text-transform: uppercase; }
         .address .spacer { height: 10pt; }
         .body-copy { margin: 0 0 10pt; text-align: justify; }
         .numbered { margin: 0 0 10pt; padding-left: 19pt; text-align: justify; text-indent: -19pt; }
@@ -30,7 +31,7 @@
         .signature { margin-top: 104pt; text-align: center; line-height: 1.16; page-break-inside: avoid; }
         .signature-name { font-weight: 700; text-transform: uppercase; }
         .signature-role { font-size: 11pt; text-transform: uppercase; }
-        .visadores { margin-top: 13pt; font-size: 8.5pt; line-height: 1.18; page-break-inside: avoid; }
+        .visadores { margin-top: 13pt; font-size: 8.5pt; font-weight: 700; line-height: 1.18; page-break-inside: avoid; }
         .distribution { margin-top: 13pt; font-size: 8.5pt; line-height: 1.3; page-break-inside: avoid; }
         .distribution-title { font-weight: 700; text-decoration: underline; }
     </style>
@@ -54,11 +55,11 @@
     <p class="date">{{ $fechaOficio }}</p>
 
     <div class="address">
-        <p><strong>A:</strong> Sr(a). {{ $datosOficio['director_regional_nombre'] }}</p>
+        <p><strong>A:</strong> <span class="address-name">{{ $datosOficio['director_regional_nombre'] }}</span></p>
         <p>{{ $datosOficio['director_regional_cargo'] }}</p>
         <p>SERVICIO DE SALUD CONCEPCIÓN</p>
         <div class="spacer"></div>
-        <p><strong>DE:</strong> Sr(a). {{ $datosOficio['director_ejecutivo_nombre'] }}</p>
+        <p><strong>DE:</strong> <span class="address-name">{{ $datosOficio['director_ejecutivo_nombre'] }}</span></p>
         <p>{{ $datosOficio['director_ejecutivo_cargo'] }}</p>
         <p>SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE ANDALIÉN COSTA</p>
     </div>
@@ -92,7 +93,7 @@
         </tbody>
     </table>
 
-    <p class="numbered"><strong>8.</strong> Teniendo en cuenta lo expuesto en los numerales anteriores, y a fin de plasmar el principio de coordinación entre los servicios públicos, dejo el contacto del funcionario(a) de la Subdirección de Gestión de Personas del Servicio Local de Educación Pública de Andalién Costa, Sr(a). {{ $datosOficio['contacto_nombre'] }}, mail {{ $datosOficio['contacto_email'] }}.</p>
+    <p class="numbered"><strong>8.</strong> Teniendo en cuenta lo expuesto en los numerales anteriores, y a fin de plasmar el principio de coordinación entre los servicios públicos, dejo el contacto del funcionario(a) de la Subdirección de Gestión de Personas del Servicio Local de Educación Pública de Andalién Costa, Sr(a). <strong>{{ $datosOficio['contacto_nombre'] }}</strong>, mail <strong>{{ $datosOficio['contacto_email'] }}</strong>.</p>
 
     <p class="body-copy">Esperando una buena recepción a la presente solicitud, saluda atentamente,</p>
 
