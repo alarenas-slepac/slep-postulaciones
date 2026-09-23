@@ -83,6 +83,7 @@
 
     <p class="numbered table-intro"><strong>7.</strong> Por lo anterior, para dar cumplimiento a los requisitos de contratación establecidos en la citada ley, para el caso de los asistentes de la educación, vengo en solicitar se efectúen por parte de la repartición pública que Ud. dirige las evaluaciones de idoneidad sicológica correspondientes respecto de los funcionarios que en el recuadro siguiente se individualizan:</p>
 
+    @unless($nominaCanvas ?? false)
     @if($solicitud->funcionarios->count() > 160)
         @foreach($solicitud->funcionarios->chunk(100) as $loteIndex => $funcionariosLote)
             <table class="nomina nomina--compact">
@@ -136,5 +137,6 @@
         <div>- Destinatario</div>
         <div>- Archivo</div>
     </div>
+    @endunless
 </body>
 </html>

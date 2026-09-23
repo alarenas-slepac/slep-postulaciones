@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Tramites;
 use App\Http\Controllers\Controller;
 use App\Models\IdoneidadPsicologicaFuncionario;
 use App\Models\IdoneidadPsicologicaSolicitud;
+use App\Services\IdoneidadPsicologica\IdoneidadPsicologicaNominaPdfRenderer;
 use App\Services\IdoneidadPsicologica\IdoneidadPsicologicaPadronService;
 use App\Support\RutChile;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -309,7 +310,14 @@ class IdoneidadPsicologicaController extends Controller
             'logoDataUri' => $this->dataUri(resource_path('branding/idoneidad-psicologica/logo-oficio.png')),
             'fuenteRegularDataUri' => $this->dataUri(resource_path('fonts/certificados/century-gothic-regular.ttf'), 'font/ttf'),
             'fuenteBoldDataUri' => $this->dataUri(resource_path('fonts/certificados/century-gothic-bold.ttf'), 'font/ttf'),
+            'nominaCanvas' => true,
         ])->setPaper([0, 0, 612, 964], 'portrait');
+        $pdf->render();
+        app(IdoneidadPsicologicaNominaPdfRenderer::class)->agregarNominaYFirma(
+            $pdf->getDomPDF(),
+            $solicitud->funcionarios,
+            $datos
+        );
 
         $nombreArchivo = "oficio_idoneidad_psicologica_{$solicitud->id}.pdf";
 
