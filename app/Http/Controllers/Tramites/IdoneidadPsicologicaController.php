@@ -93,16 +93,16 @@ class IdoneidadPsicologicaController extends Controller
         $fechas = $this->validarFechas($request);
         $data = $request->validate([
             'funcionarios' => ['required', 'array', 'min:1'],
-            'funcionarios.*' => ['integer', 'distinct'],
+            'funcionarios.*' => ['string', 'max:80', 'distinct'],
             'observacion' => ['nullable', 'string', 'max:2000'],
         ], ['funcionarios.min' => 'Selecciona al menos un funcionario para generar la solicitud.']);
 
         $elegibles = $padron->funcionariosElegibles(Carbon::parse($fechas['fecha_inicio']), Carbon::parse($fechas['fecha_termino']))
-            ->keyBy(fn ($funcionario) => (int) $funcionario->id);
-        $seleccionados = collect($data['funcionarios'])->map(fn ($id) => (int) $id)->unique()->map(fn (int $id) => $elegibles->get($id));
+            ->keyBy(fn ($funcionario) => (string) $funcionario->idoneidad_key);
+        $seleccionados = collect($data['funcionarios'])->map(fn ($key) => (string) $key)->unique()->map(fn (string $key) => $elegibles->get($key));
 
         if ($seleccionados->contains(fn ($funcionario) => $funcionario === null)) {
-            throw ValidationException::withMessages(['funcionarios' => 'Uno o más funcionarios ya no pertenecen al último padrón vigente o no cumplen las condiciones del proceso. Actualiza la búsqueda antes de enviar.']);
+            throw ValidationException::withMessages(['funcionarios' => 'Uno o más funcionarios ya no pertenecen a una fuente vigente o no cumplen las condiciones del proceso. Actualiza la búsqueda antes de enviar.']);
         }
 
         $solicitud = DB::transaction(function () use ($request, $fechas, $data, $seleccionados, $padron) {
@@ -261,7 +261,21 @@ class IdoneidadPsicologicaController extends Controller
             'director_regional_cargo' => 'Director(a) Regional Servicio de Salud Concepción',
             'director_ejecutivo_nombre' => '',
             'director_ejecutivo_cargo' => 'Director(a) Ejecutivo(a) Servicio Local de Educación Pública de Andalién Costa',
-            'contacto_nombre' => $this->nombreCompletoUsuario($usuario),
+            'firmante_nombres' => 'Ramón Ángel',
+            'firmante_apellidos' => 'Jara Zavala',
+            'visador_1_nombres' => 'Camilo Eduardo',
+            'visador_1_apellidos' => 'Manríquez Bocaz',
+            'visador_2_nombres' => 'Makarena Fabiola',
+            'visador_2_apellidos' => 'Paredes Aguilera',
+            'visador_3_nombres' => 'René Alfredo',
+            'visador_3_apellidos' => 'White Sánchez',
+            'visador_4_nombres' => 'Karla Ariely',
+            'visador_4_apellidos' => 'Muñoz Labarca',
+            'contacto_nombres' => (string) $usuario?->nombres,
+            'contacto_apellidos' => trim(implode(' ', array_filter([
+                $usuario?->apellido_paterno,
+                $usuario?->apellido_materno,
+            ]))),
             'contacto_email' => (string) $usuario->email,
         ];
 
@@ -304,30 +318,69 @@ class IdoneidadPsicologicaController extends Controller
 
     private function validarDatosOficio(Request $request): array
     {
-        return $request->validate([
+        $reglas = [
             'director_regional_nombre' => ['required', 'string', 'max:180'],
             'director_regional_cargo' => ['required', 'string', 'max:220'],
             'director_ejecutivo_nombre' => ['required', 'string', 'max:180'],
             'director_ejecutivo_cargo' => ['required', 'string', 'max:220'],
-            'contacto_nombre' => ['required', 'string', 'max:180'],
+            'firmante_nombres' => ['required', 'string', 'max:120'],
+            'firmante_apellidos' => ['required', 'string', 'max:120'],
+            'contacto_nombres' => ['required', 'string', 'max:120'],
+            'contacto_apellidos' => ['required', 'string', 'max:120'],
             'contacto_email' => ['required', 'email', 'max:190'],
-        ], [], [
+        ];
+
+        for ($numero = 1; $numero <= 4; $numero++) {
+            $reglas["visador_{$numero}_nombres"] = ['nullable', 'string', 'max:120', "required_with:visador_{$numero}_apellidos"];
+            $reglas["visador_{$numero}_apellidos"] = ['nullable', 'string', 'max:120', "required_with:visador_{$numero}_nombres"];
+        }
+
+        $datos = $request->validate($reglas, [], [
             'director_regional_nombre' => 'nombre del Director Regional',
             'director_regional_cargo' => 'cargo del Director Regional',
             'director_ejecutivo_nombre' => 'nombre del Director Ejecutivo',
             'director_ejecutivo_cargo' => 'cargo del Director Ejecutivo',
-            'contacto_nombre' => 'nombre del contacto de Gestión de Personas',
+            'firmante_nombres' => 'nombres del firmante',
+            'firmante_apellidos' => 'apellidos del firmante',
+            'contacto_nombres' => 'nombres del contacto de Gestión de Personas',
+            'contacto_apellidos' => 'apellidos del contacto de Gestión de Personas',
             'contacto_email' => 'correo del contacto de Gestión de Personas',
         ]);
+
+        $iniciales = [
+            $this->inicialesPorPartes($datos['firmante_nombres'], $datos['firmante_apellidos']),
+        ];
+        for ($numero = 1; $numero <= 4; $numero++) {
+            $nombres = trim((string) ($datos["visador_{$numero}_nombres"] ?? ''));
+            $apellidos = trim((string) ($datos["visador_{$numero}_apellidos"] ?? ''));
+            if ($nombres !== '' && $apellidos !== '') {
+                $iniciales[] = $this->inicialesPorPartes($nombres, $apellidos);
+            }
+        }
+
+        $datos['contacto_nombre'] = $this->nombreCompletoPartes($datos['contacto_nombres'], $datos['contacto_apellidos']);
+        $inicialesContacto = $this->inicialesPorPartes($datos['contacto_nombres'], $datos['contacto_apellidos']);
+        $iniciales[] = $inicialesContacto;
+        $iniciales[] = mb_strtolower($inicialesContacto);
+        $datos['iniciales_firmantes_visadores'] = implode('/', $iniciales);
+
+        return $datos;
     }
 
-    private function nombreCompletoUsuario($usuario): string
+    private function nombreCompletoPartes(string $nombres, string $apellidos): string
     {
-        return trim(implode(' ', array_filter([
-            $usuario?->nombres,
-            $usuario?->apellido_paterno,
-            $usuario?->apellido_materno,
-        ])));
+        return trim($nombres . ' ' . $apellidos);
+    }
+
+    private function inicialesPorPartes(string $nombres, string $apellidos): string
+    {
+        $primerNombre = preg_split('/\s+/u', trim($nombres), -1, PREG_SPLIT_NO_EMPTY)[0] ?? '';
+        $partes = array_merge([$primerNombre], preg_split('/\s+/u', trim($apellidos), -1, PREG_SPLIT_NO_EMPTY));
+
+        return mb_strtoupper(implode('', array_map(
+            static fn (string $parte): string => mb_substr($parte, 0, 1),
+            $partes
+        )));
     }
 
     private function dataUri(string $ruta, string $mime = 'image/png'): ?string

@@ -1,6 +1,39 @@
 <?php
 
 return [
+    '2026.9.23.496' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Visación y distribución en oficio de idoneidad psicológica',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'config/changelog.php',
+            'resources/views/pdf/idoneidad-psicologica-nomina.blade.php',
+            'resources/views/tramites/idoneidad-psicologica/oficio.blade.php',
+        ],
+        'changes' => [
+            'La configuración separa nombres y apellidos de firmante, visadores y contacto para calcular las iniciales del cierre del documento.',
+            'Los visadores opcionales sin información se omiten; el contacto de Gestión de Personas se incorpora como Visador 5 en mayúsculas y como confeccionista en minúsculas.',
+            'El oficio recupera la distribución Destinatario y Archivo después de la firma y de la línea de visación, con mayor espacio para la firma manuscrita.',
+        ],
+    ],
+    '2026.9.23.495' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Idoneidad psicológica desde solicitudes de reemplazo',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'app/Services/IdoneidadPsicologica/IdoneidadPsicologicaPadronService.php',
+            'config/changelog.php',
+            'resources/views/tramites/idoneidad-psicologica/create.blade.php',
+            'tests/Feature/IdoneidadPsicologicaPadronServiceTest.php',
+        ],
+        'changes' => [
+            'La búsqueda incorpora reemplazantes provenientes de solicitudes aceptadas, cerradas o cerrado que se cruzan con el período, aun cuando no figuren en el último padrón.',
+            'Sólo incorpora solicitudes cuyo titular corresponde a AAEE y conserva la solicitud de reemplazo y su área de desempeño como respaldo del cargo.',
+            'Unifica padrón y solicitudes bajo la regla histórica de exclusión por RUT normalizado más cargo; una persona sólo vuelve a quedar disponible si cambia dicho cargo.',
+        ],
+    ],
     '2026.9.23.494' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',

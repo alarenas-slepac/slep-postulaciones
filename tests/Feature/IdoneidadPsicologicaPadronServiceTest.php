@@ -39,6 +39,9 @@ class IdoneidadPsicologicaPadronServiceTest extends TestCase
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
             $table->string('rut')->nullable();
+            $table->string('nombres')->nullable();
+            $table->string('apellido_paterno')->nullable();
+            $table->string('apellido_materno')->nullable();
             $table->timestamp('deleted_at')->nullable();
         });
         Schema::create('areas_desempeno', function (Blueprint $table): void {
@@ -52,6 +55,8 @@ class IdoneidadPsicologicaPadronServiceTest extends TestCase
         });
         Schema::create('solicitudes_reemplazo', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('establecimiento_id')->nullable();
+            $table->unsignedBigInteger('reemplazo_personal_id')->nullable();
             $table->unsignedBigInteger('area_desempeno_id')->nullable();
             $table->unsignedBigInteger('postulant_profile_id')->nullable();
             $table->unsignedBigInteger('contrato_trabajo_postulant_profile_id')->nullable();
@@ -144,6 +149,48 @@ class IdoneidadPsicologicaPadronServiceTest extends TestCase
         ]);
 
         $this->assertSame(['AAEE reemplazo'], $service->funcionariosElegibles(Carbon::parse('2026-09-01'), Carbon::parse('2026-09-30'))->pluck('nombre')->all());
+    }
+
+    public function test_incluye_reemplazante_desde_solicitud_y_aplica_regla_rut_mas_cargo(): void
+    {
+        DB::table('areas_desempeno')->insert(['id' => 3, 'nombre' => 'Asistente de aula']);
+        DB::table('users')->insert([
+            'id' => 3,
+            'rut' => '12.345.678-5',
+            'nombres' => 'Reemplazante',
+            'apellido_paterno' => 'Solicitud',
+            'apellido_materno' => 'Prueba',
+        ]);
+        DB::table('postulant_profiles')->insert(['id' => 3, 'user_id' => 3, 'area_desempeno_id' => 3]);
+        DB::table('reemplazos_personal')->insert($this->fila(1, '9.999.999-9', 'Titular AAEE', '2026-09-01', 'Titular', 'AAEE', 'Auxiliar', 2026, 9) + ['id' => 99]);
+        DB::table('solicitudes_reemplazo')->insert([
+            'id' => 3,
+            'establecimiento_id' => 1,
+            'reemplazo_personal_id' => 99,
+            'area_desempeno_id' => 3,
+            'postulant_profile_id' => 3,
+            'rut_reemplazo_normalizado' => '12345678',
+            'numero_solicitud' => '00003-2026',
+            'estado' => 'aceptada',
+            'fecha_inicio' => '2026-09-05',
+            'fecha_inicio_trabajo' => '2026-09-06',
+            'fecha_termino' => '2026-09-30',
+        ]);
+
+        $service = app(IdoneidadPsicologicaPadronService::class);
+        $funcionario = $service->funcionariosElegibles(Carbon::parse('2026-09-01'), Carbon::parse('2026-09-30'))->sole();
+
+        $this->assertSame('Reemplazante Solicitud Prueba', $funcionario->nombre);
+        $this->assertSame('Asistente de aula', $funcionario->cargo_idoneidad);
+        $this->assertSame('solicitud:3', $funcionario->idoneidad_key);
+        $this->assertSame(3, $funcionario->solicitud_reemplazo_idoneidad);
+
+        DB::table('idoneidad_psicologica_funcionarios')->insert([
+            'rut_normalizado' => '12345678',
+            'cargo_clave' => 'ASISTENTE_DE_AULA',
+        ]);
+
+        $this->assertTrue($service->funcionariosElegibles(Carbon::parse('2026-09-01'), Carbon::parse('2026-09-30'))->isEmpty());
     }
 
     private function fila(int $establecimientoId, string $rut, string $nombre, string $fechaIngreso, string $contrato, string $estatuto, string $escalafon, int $anio, int $mes): array

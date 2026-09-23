@@ -16,13 +16,13 @@ use Illuminate\Support\Facades\Schema;
 class IdoneidadPsicologicaPadronService
 {
     /**
-     * Personas elegibles del último padrón vigente de cada establecimiento.
+     * Personas elegibles del último padrón vigente y de solicitudes de reemplazo.
      * Cada persona se evalúa una sola vez por cargo: si ese cargo ya fue
      * solicitado, aceptado o rechazado, no vuelve a quedar disponible.
      */
     public function funcionariosElegibles(CarbonInterface $fechaInicio, CarbonInterface $fechaTermino): Collection
     {
-        $funcionarios = app(PadronVigenciaService::class)->consultaActual()
+        $funcionariosPadron = app(PadronVigenciaService::class)->consultaActual()
             ->with('establecimiento:id,rbd,nombre_establecimiento,comuna')
             ->whereNotNull('fecha_ingreso')
             ->whereDate('fecha_ingreso', '>=', $fechaInicio->toDateString())
@@ -41,6 +41,9 @@ class IdoneidadPsicologicaPadronService
             ->unique(fn (ReemplazoPersonal $funcionario): string => $this->claveFuncionario($funcionario))
             ->values();
 
+        $funcionariosSolicitud = $this->funcionariosDesdeSolicitudes($fechaInicio, $fechaTermino);
+        $funcionarios = $funcionariosPadron->concat($funcionariosSolicitud)->values();
+
         if ($funcionarios->isEmpty()) {
             return $funcionarios;
         }
@@ -56,7 +59,14 @@ class IdoneidadPsicologicaPadronService
         return $funcionarios
             ->map(function (ReemplazoPersonal $funcionario) use ($perfilesPorRut, $solicitudesReemplazoPorRut, $cargosYaSolicitados): ?ReemplazoPersonal {
                 $rut = $this->rutNormalizado($funcionario->rut);
-                $cargo = $this->resolverCargo($funcionario, $perfilesPorRut->get($rut), $solicitudesReemplazoPorRut->get($rut));
+                $cargo = $funcionario->cargo_clave_idoneidad
+                    ? [
+                        'nombre' => $funcionario->cargo_idoneidad,
+                        'clave' => $funcionario->cargo_clave_idoneidad,
+                        'origen' => $funcionario->cargo_origen_idoneidad,
+                        'solicitud_reemplazo_id' => $funcionario->solicitud_reemplazo_idoneidad,
+                    ]
+                    : $this->resolverCargo($funcionario, $perfilesPorRut->get($rut), $solicitudesReemplazoPorRut->get($rut));
 
                 if ($cargo === null || $cargo['clave'] === '') {
                     return null;
@@ -69,12 +79,84 @@ class IdoneidadPsicologicaPadronService
                 $funcionario->setAttribute('cargo_clave_idoneidad', $cargo['clave']);
                 $funcionario->setAttribute('cargo_origen_idoneidad', $cargo['origen']);
                 $funcionario->setAttribute('solicitud_reemplazo_idoneidad', $cargo['solicitud_reemplazo_id']);
+                $funcionario->setAttribute('idoneidad_key', $funcionario->idoneidad_key ?: 'padron:' . $funcionario->id);
 
                 return $funcionario;
             })
             ->filter()
+            ->unique(fn (ReemplazoPersonal $funcionario): string => $this->claveFuncionario($funcionario))
             ->sortBy(fn (ReemplazoPersonal $funcionario): string => mb_strtoupper((string) ($funcionario->establecimiento?->nombre_establecimiento ?? '')) . '|' . mb_strtoupper((string) $funcionario->nombre))
             ->values();
+    }
+
+    private function funcionariosDesdeSolicitudes(CarbonInterface $fechaInicio, CarbonInterface $fechaTermino): Collection
+    {
+        if (! Schema::hasTable('solicitudes_reemplazo')
+            || ! Schema::hasTable('reemplazos_personal')
+            || ! Schema::hasTable('postulant_profiles')
+            || ! Schema::hasTable('users')
+            || ! Schema::hasTable('areas_desempeno')) {
+            return collect();
+        }
+
+        return SolicitudReemplazo::query()
+            ->with([
+                'establecimiento:id,rbd,nombre_establecimiento,comuna',
+                'funcionarioTitular:id,estatuto,escalafon',
+                'areaDesempeno:id,nombre',
+                'postulante.user:id,rut,nombres,apellido_paterno,apellido_materno',
+                'contratoPostulante.user:id,rut,nombres,apellido_paterno,apellido_materno',
+            ])
+            ->whereIn('estado', ['aceptada', 'cerrado', 'cerrada'])
+            ->whereRaw('DATE(COALESCE(fecha_inicio_trabajo, fecha_inicio)) <= ?', [$fechaTermino->toDateString()])
+            ->whereDate('fecha_termino', '>=', $fechaInicio->toDateString())
+            ->orderByRaw('COALESCE(fecha_inicio_trabajo, fecha_inicio) DESC')
+            ->orderByDesc('id')
+            ->get()
+            ->filter(fn (SolicitudReemplazo $solicitud): bool => $solicitud->funcionarioTitular !== null
+                && $this->esAaee($solicitud->funcionarioTitular))
+            ->map(fn (SolicitudReemplazo $solicitud): ?ReemplazoPersonal => $this->funcionarioDesdeSolicitud($solicitud))
+            ->filter()
+            ->values();
+    }
+
+    private function funcionarioDesdeSolicitud(SolicitudReemplazo $solicitud): ?ReemplazoPersonal
+    {
+        $perfil = $solicitud->contratoPostulante ?: $solicitud->postulante;
+        $usuario = $perfil?->user;
+        $rutOriginal = $usuario?->rut ?: $solicitud->rut_reemplazo_normalizado;
+        $rut = $this->rutNormalizado($rutOriginal);
+        $nombre = trim(implode(' ', array_filter([
+            $usuario?->nombres,
+            $usuario?->apellido_paterno,
+            $usuario?->apellido_materno,
+        ])));
+        $cargo = trim((string) $solicitud->areaDesempeno?->nombre);
+
+        if ($rut === '' || $nombre === '' || $cargo === '') {
+            return null;
+        }
+
+        $titular = $solicitud->funcionarioTitular;
+        $funcionario = new ReemplazoPersonal();
+        $funcionario->forceFill([
+            'establecimiento_id' => $solicitud->establecimiento_id,
+            'rut' => $this->formatoRut($rutOriginal),
+            'nombre' => $nombre,
+            'fecha_ingreso' => $solicitud->fecha_inicio_trabajo ?: $solicitud->fecha_inicio,
+            'fecha_termino' => $solicitud->fecha_termino,
+            'tipocontrato' => 'Reemplazo',
+            'estatuto' => $titular?->estatuto,
+            'escalafon' => $cargo,
+        ]);
+        $funcionario->setRelation('establecimiento', $solicitud->establecimiento);
+        $funcionario->setAttribute('idoneidad_key', 'solicitud:' . $solicitud->id);
+        $funcionario->setAttribute('cargo_idoneidad', $cargo);
+        $funcionario->setAttribute('cargo_clave_idoneidad', $this->claveCargo($cargo));
+        $funcionario->setAttribute('cargo_origen_idoneidad', 'Solicitud de reemplazo #' . $solicitud->numero_solicitud);
+        $funcionario->setAttribute('solicitud_reemplazo_idoneidad', $solicitud->id);
+
+        return $funcionario;
     }
 
     public function claveFuncionario(ReemplazoPersonal $funcionario): string
