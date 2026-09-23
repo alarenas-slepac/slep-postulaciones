@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Models\SolicitudReemplazo;
 use App\Support\Rut;
+use App\Support\TipoReemplazo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -420,7 +421,9 @@ class InformesController extends Controller
                     $postulante?->especialidad_tp,
                     $areaDesempenoNombre,
                 ])->filter()->unique()->implode(' / '));
-                $tipoReemplazo = (string) ($ultima->tipo_reemplazo ?: $ultima->tipo_reemplazo_otro ?: '');
+                $tipoReemplazo = $ultima->tipo_reemplazo
+                    ? TipoReemplazo::etiqueta($ultima->tipo_reemplazo)
+                    : (string) ($ultima->tipo_reemplazo_otro ?: '');
                 $rbdEstablecimiento = trim((string) ($establecimiento?->rbd ?? ''));
                 $ingresoServicio = (string) ($ingresoServicioPorPostulante->get($this->postulanteContinuidadId($ultima), '') ?: '');
                 $sistRem = $this->sistemaRemuneracionMatrizS($estamento, $establecimiento, $rbdEstablecimiento);
@@ -730,7 +733,9 @@ class InformesController extends Controller
                 $edad = $fechaNacimiento ? Carbon::parse($fechaNacimiento)->age : '';
                 $sexo = strtoupper(trim((string) ($postulante?->genero ?? '')));
                 $estamento = strtoupper(trim((string) ($postulante?->estamento ?? $postulante?->areaDesempeno?->estamento ?? '')));
-                $tipoReemplazo = (string) ($ultima->tipo_reemplazo ?: $ultima->tipo_reemplazo_otro ?: '');
+                $tipoReemplazo = $ultima->tipo_reemplazo
+                    ? TipoReemplazo::etiqueta($ultima->tipo_reemplazo)
+                    : (string) ($ultima->tipo_reemplazo_otro ?: '');
                 $rbdEstablecimiento = trim((string) ($establecimiento?->rbd ?? ''));
                 $ingresoServicio = (string) ($ingresoServicioPorPostulante->get($this->postulanteContinuidadId($ultima), '') ?: '');
                 $sistRem = $this->sistemaRemuneracionMatrizS($estamento, $establecimiento, $rbdEstablecimiento);
@@ -889,7 +894,7 @@ class InformesController extends Controller
                     'nombre_establecimiento' => (string) ($establecimiento?->nombre_establecimiento ?? ''),
                     'rut_funcionario_a_reemplazar' => $this->formatRutChile($funcionario?->rut),
                     'nombre_funcionario_a_reemplazar' => trim((string) ($funcionario?->nombre ?? '')),
-                    'tipo_reemplazo' => (string) ($solicitud->tipo_reemplazo ?? ''),
+                    'tipo_reemplazo' => TipoReemplazo::etiqueta($solicitud->tipo_reemplazo),
                     'fecha_inicio_trabajo' => optional($solicitud->fecha_inicio_trabajo)->format('d-m-Y') ?? '',
                     'fecha_termino' => optional($solicitud->fecha_termino)->format('d-m-Y') ?? '',
                     'horas_efectivamente_reemplazadas' => number_format((float) $solicitud->jornadas->sum(function ($j) {
@@ -1180,15 +1185,6 @@ class InformesController extends Controller
 
     protected function tiposReemplazoOptions(): array
     {
-        return [
-            'Licencia Médica (General)',
-            'Licencia Médica (Pre y/o Post Natal y/o Parental)',
-            'Permiso Postnatal Parental',
-            'Permiso sin goce de sueldo',
-            'Permiso Horas de Lactancia',
-            'Permiso especial para deportistas (Art 74, Ley 19.712)',
-            'Sumario Administrativo',
-            'Otras',
-        ];
+        return TipoReemplazo::opciones();
     }
 }

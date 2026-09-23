@@ -17,7 +17,7 @@
     @endif
     @php
         $isEdit = isset($solicitud);
-        $tipoVal = old('tipo_reemplazo', $isEdit ? $solicitud->tipo_reemplazo : '');
+        $tipoVal = \App\Support\TipoReemplazo::normalizar(old('tipo_reemplazo', $isEdit ? $solicitud->tipo_reemplazo : ''));
         $propVal = old('propone_reemplazo', $isEdit ? (string) (int) $solicitud->propone_reemplazo : '0');
         $contVal = old(
             'continuidad',
@@ -28,21 +28,8 @@
         $ftVal = old('fecha_termino', $isEdit ? \Carbon\Carbon::parse($solicitud->fecha_termino)->format('d/m/Y') : '');
 
         $v = fn($key, $default = '') => old($key, $isEdit ? data_get($solicitud, $key, $default) : $default);
-        $tiposReemplazoDeshabilitados = [
-            'Permiso Horas de Lactancia',
-            'Permiso especial para deportistas (Art 74, Ley 19.712)',
-            'Otras',
-        ];
-        $tiposReemplazoOpciones = [
-            'Licencia Médica (General)',
-            'Licencia Médica (Pre y/o Post Natal y/o Parental)',
-            'Permiso Postnatal Parental',
-            'Permiso sin goce de sueldo',
-            'Permiso Horas de Lactancia',
-            'Permiso especial para deportistas (Art 74, Ley 19.712)',
-            'Sumario Administrativo',
-            'Otras',
-        ];
+        $tiposReemplazoDeshabilitados = \App\Support\TipoReemplazo::opcionesDeshabilitadasParaNuevasSolicitudes();
+        $tiposReemplazoOpciones = \App\Support\TipoReemplazo::opciones();
     @endphp
 
     @if ($isEdit && $solicitud->estado === 'rechazada_uatp' && !empty($solicitud->motivo_rechazo))
