@@ -13,7 +13,7 @@ class OrdenTrabajoPdfService
      * Genera el PDF de Orden de Trabajo y lo guarda en storage/app (disco local).
      * Retorna el path guardado (ej: private/solicitudes-reemplazo/{id}/ORDEN_TRABAJO_XXXXX-AAAA.pdf).
      */
-    public function generateAndStore(SolicitudReemplazo $s): string
+    public function generateAndStore(SolicitudReemplazo $s, ?int $modificacionTerminoId = null): string
     {
         // Asegura traer los últimos valores (postulant_profile_id, fecha_inicio_trabajo, etc.)
         // por si el caller hizo update() por query y no refrescó la instancia.
@@ -47,7 +47,8 @@ class OrdenTrabajoPdfService
         ])->setPaper('letter', 'portrait');
 
         $dir = "private/solicitudes-reemplazo/{$s->id}";
-        $filename = "ORDEN_TRABAJO_{$safeNumero}.pdf";
+        $suffix = $modificacionTerminoId ? "_MODIFICACION_{$modificacionTerminoId}" : '';
+        $filename = "ORDEN_TRABAJO_{$safeNumero}{$suffix}.pdf";
         $path = "{$dir}/{$filename}";
 
         Storage::disk('local')->put($path, $pdf->output());

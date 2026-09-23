@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ResolucionDocenteDocxService
 {
-    public function generateAndStore(SolicitudReemplazo $solicitud): string
+    public function generateAndStore(SolicitudReemplazo $solicitud, ?int $modificacionTerminoId = null): string
     {
         $templatePath = $this->templatePath();
         $tmp = tempnam(sys_get_temp_dir(), 'res_') . '.docx';
@@ -35,7 +35,8 @@ class ResolucionDocenteDocxService
         }
         $zip->close();
         $dir = "resoluciones-docentes/solicitudes/{$solicitud->id}";
-        $path = "{$dir}/RESOLUCION_DOCENTE_{$solicitud->numero_solicitud}.docx";
+        $suffix = $modificacionTerminoId ? "_MODIFICACION_{$modificacionTerminoId}" : '';
+        $path = "{$dir}/RESOLUCION_DOCENTE_{$solicitud->numero_solicitud}{$suffix}.docx";
         Storage::disk('local')->put($path, file_get_contents($tmp)); @unlink($tmp);
         return $path;
     }

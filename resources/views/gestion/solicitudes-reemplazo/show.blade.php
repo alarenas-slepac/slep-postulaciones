@@ -1244,6 +1244,104 @@
             @endif
         </div>
     </div>
+    @if ($canReabrirTermino ?? false)
+        @php
+            $fechaMaximaModificacion = $s->fecha_termino?->copy()->subDay()->toDateString();
+            $esReposoMutualidad = \App\Support\TipoReemplazo::esReposoMutualidad($s->tipo_reemplazo);
+        @endphp
+        <div class="card mb-4 border-warning">
+            <div class="card-header fw-semibold text-warning-emphasis">Reapertura para modificar término</div>
+            <div class="card-body">
+                <div class="alert alert-warning small">
+                    Esta acción conserva la fecha y los documentos vigentes en el historial. La nueva fecha de término debe ser anterior a la actual.
+                    @if ($esReposoMutualidad)
+                        Para <strong>Reposo Mutualidad</strong>, utilice la causal de reducción de reposo cuando la mutualidad disminuya su duración.
+                    @endif
+                </div>
+                <form method="POST" enctype="multipart/form-data" action="{{ route('gestion.solicitudes-reemplazo.reabrir-modificar-termino', $s) }}">
+                    @csrf
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Causal <span class="text-danger">*</span></label>
+                            <select name="causal_modificacion_termino" class="form-select" required>
+                                @if ($esReposoMutualidad)
+                                    <option value="reduccion_reposo_mutualidad">Disminución de reposo médico por mutualidad</option>
+                                @endif
+                                <option value="renuncia_voluntaria">Renuncia voluntaria del trabajador</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Nueva fecha de término <span class="text-danger">*</span></label>
+                            <input type="date" name="fecha_termino_nueva" class="form-control" required
+                                min="{{ optional($s->fecha_inicio)->toDateString() }}" max="{{ $fechaMaximaModificacion }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Motivo de la modificación <span class="text-danger">*</span></label>
+                            <input type="text" name="motivo_modificacion_termino" class="form-control" maxlength="5000" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Carta de renuncia (PDF)</label>
+                            <input type="file" name="carta_renuncia_pdf" class="form-control" accept="application/pdf,.pdf">
+                            <div class="form-text">Obligatoria cuando la causal sea renuncia voluntaria.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Resolución de renuncia (PDF)</label>
+                            <input type="file" name="resolucion_renuncia_pdf" class="form-control" accept="application/pdf,.pdf">
+                            <div class="form-text">Obligatoria cuando la causal sea renuncia voluntaria.</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-warning mt-3" type="submit">Reabrir y registrar modificación</button>
+                </form>
+            </div>
+        </div>
+    @elseif ($modificacionTerminoActiva ?? false)
+        <div class="alert alert-warning mb-4">
+            <strong>Modificación de término en curso.</strong> Complete la regeneración de los documentos operativos indicados para cerrar esta reapertura.
+        </div>
+    @endif
+
+    @if (($modificacionesTermino ?? collect())->isNotEmpty())
+        <div class="card mb-4">
+            <div class="card-header fw-semibold">Historial de modificaciones de término</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Fecha</th><th>Causal y período</th><th>Motivo / responsable</th><th>Documentos conservados</th></tr></thead>
+                        <tbody>
+                            @foreach ($modificacionesTermino as $modificacion)
+                                <tr>
+                                    <td>{{ cl_datetime($modificacion->created_at, 'd/m/Y H:i') }}</td>
+                                    <td>
+                                        <div class="fw-semibold">{{ $modificacion->causal === 'renuncia_voluntaria' ? 'Renuncia voluntaria' : 'Disminución de reposo médico por mutualidad' }}</div>
+                                        <div class="small text-muted">{{ optional($modificacion->fecha_termino_anterior)->format('d/m/Y') }} → {{ optional($modificacion->fecha_termino_nueva)->format('d/m/Y') }}</div>
+                                    </td>
+                                    <td>
+                                        <div style="white-space: pre-line;">{{ $modificacion->motivo }}</div>
+                                        <div class="small text-muted mt-1">{{ $modificacion->reabiertaPor?->nombre_completo ?? $modificacion->reabiertaPor?->email ?? '—' }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach ([
+                                                'carta_renuncia_path' => ['carta_renuncia', 'Carta de renuncia'],
+                                                'resolucion_renuncia_path' => ['resolucion_renuncia', 'Resolución de renuncia'],
+                                                'orden_trabajo_anterior_path' => ['orden_trabajo_anterior', 'OT anterior'],
+                                                'resolucion_docente_docx_anterior_path' => ['resolucion_docente_docx_anterior', 'Resolución DOCX anterior'],
+                                                'resolucion_docente_firmada_anterior_path' => ['resolucion_docente_firmada_anterior', 'Resolución firmada anterior'],
+                                            ] as $campo => [$documento, $etiqueta])
+                                                @if ($modificacion->{$campo})
+                                                    <a class="btn btn-outline-secondary btn-sm" target="_blank" href="{{ route('gestion.solicitudes-reemplazo.modificacion-termino.documento', [$s, $modificacion, $documento]) }}">{{ $etiqueta }}</a>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
     @if ($titularEsDocente && in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true) && auth()->user()?->hasAnyRole(['admin','coordinador_gdp','coordinador_gdp_admin','funcionario_slep']))
         <div class="card mb-4 border-primary"><div class="card-header fw-semibold">Resolución docente</div><div class="card-body">
             <div class="small text-muted mb-3">
@@ -1255,6 +1353,9 @@
             </div>
             <div class="d-flex flex-wrap gap-2">
                 @if ($s->estado === 'aceptada')
+                    @if ($canRegenerarResolucionDocente ?? false)
+                        <div class="alert alert-warning small">La fecha de término fue modificada. Debe regenerarse la resolución docente; la versión anterior se conserva en el historial.</div>
+                    @endif
                     <form method="POST" action="{{ route('gestion.solicitudes-reemplazo.resolucion-docente.generar', $s) }}">
                         @csrf
                         <button class="btn btn-outline-primary btn-sm">{{ $s->resolucion_docente_docx_path ? 'Regenerar DOCX' : 'Generar DOCX' }}</button>
@@ -1313,6 +1414,18 @@
                                     href="{{ route('gestion.solicitudes-reemplazo.ot.download', $s) }}">
                                     Descargar Orden de Trabajo
                                 </a>
+                            </div>
+                        @endif
+
+                        @if ($canRegenerarOt ?? false)
+                            <div class="alert alert-warning mt-3 mb-0">
+                                <div class="fw-semibold">Debe regenerarse la Orden de Trabajo</div>
+                                <div class="small">La versión anterior quedó disponible en el historial de modificaciones.</div>
+                                <form method="POST" class="mt-2" action="{{ route('gestion.solicitudes-reemplazo.orden-trabajo.store', $s) }}">
+                                    @csrf
+                                    <input type="hidden" name="fecha_inicio_trabajo" value="{{ optional($s->fecha_inicio_trabajo)->toDateString() ?? optional($s->fecha_inicio)->toDateString() }}">
+                                    <button class="btn btn-warning btn-sm" type="submit">Regenerar Orden de Trabajo y notificar</button>
+                                </form>
                             </div>
                         @endif
 

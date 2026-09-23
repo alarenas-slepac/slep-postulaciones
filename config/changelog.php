@@ -1,6 +1,29 @@
 <?php
 
 return [
+    '2026.9.23.503' => [
+        'date' => '2026-09-23',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Reapertura trazable por modificación de término',
+        'files' => [
+            'app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php',
+            'app/Models/SolicitudReemplazo.php',
+            'app/Models/SolicitudReemplazoModificacionTermino.php',
+            'app/Services/OrdenTrabajoPdfService.php',
+            'app/Services/ResolucionDocenteDocxService.php',
+            'database/migrations/2026_09_23_130000_create_solicitud_reemplazo_modificaciones_termino_table.php',
+            'routes/web.php',
+            'resources/views/funcionario/solicitudes-reemplazo/create.blade.php',
+            'resources/views/gestion/solicitudes-reemplazo/show.blade.php',
+            'resources/views/pdf/orden-trabajo.blade.php',
+        ],
+        'changes' => [
+            'Permite reabrir solicitudes aceptadas o cerradas para disminuir Reposo Mutualidad o registrar renuncia voluntaria, con motivo y nueva fecha de término.',
+            'Exige carta y resolución de renuncia en PDF para renuncias voluntarias, conserva las versiones previas de OT y resolución docente, y registra usuario, fechas y causal.',
+            'Genera nuevas versiones de la Orden de Trabajo y la resolución docente sin sobrescribir los archivos anteriores.',
+            'Advierte en selector, correos y Orden de Trabajo que el Reposo Mutualidad puede modificar su duración.',
+        ],
+    ],
     '2026.9.23.502' => [
         'date' => '2026-09-23',
         'module' => 'Solicitudes de reemplazo',

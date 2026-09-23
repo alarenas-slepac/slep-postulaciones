@@ -39,4 +39,10 @@ class TipoReemplazoTest extends TestCase
             TipoReemplazo::etiqueta('Licencia Médica (Pre y/o Post Natal y/o Parental)')
         );
     }
+
+    public function test_it_identifies_reposo_mutualidad(): void
+    {
+        $this->assertTrue(TipoReemplazo::esReposoMutualidad(TipoReemplazo::REPOSO_MUTUALIDAD));
+        $this->assertFalse(TipoReemplazo::esReposoMutualidad('Permiso Postnatal Parental'));
+    }
 }

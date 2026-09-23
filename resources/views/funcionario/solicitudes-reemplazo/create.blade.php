@@ -258,6 +258,9 @@
                         <div id="permisoSinGoceAlert" class="alert alert-warning mt-2 mb-0 d-none">
                             El titular seleccionado no está autorizado para solicitar Permiso sin goce de sueldo.
                         </div>
+                        <div id="reposoMutualidadAlert" class="alert alert-info mt-2 mb-0 d-none">
+                            Las solicitudes por Reposo Mutualidad pueden requerir una disminución posterior de su duración. Si ocurre, GDP podrá reabrir la solicitud con trazabilidad y regenerar los documentos que correspondan.
+                        </div>
 
                     </div>
                     <div class="col-md-6 d-none" id="tipoOtroWrap">
@@ -817,6 +820,13 @@
                 if (alertEl) {
                     alertEl.classList.toggle('d-none', currentValue !== permisoSinGoceTipo || permisoSinGoceAutorizado);
                 }
+            }
+
+            function applyReposoMutualidadState() {
+                const alertEl = document.getElementById('reposoMutualidadAlert');
+                if (!alertEl || !tipoReemplazoEl) return;
+
+                alertEl.classList.toggle('d-none', tipoReemplazoEl.value !== @json(\App\Support\TipoReemplazo::REPOSO_MUTUALIDAD));
             }
 
             function setPostulanteSelected(id, text) {
@@ -1388,6 +1398,7 @@ $post.select2({
                 tipoReemplazoEl.addEventListener('change', () => {
                     applyTipoReemplazoState();
                     applyPermisoSinGoceState();
+                    applyReposoMutualidadState();
                 });
             }
 
@@ -1476,6 +1487,7 @@ $post.select2({
             applyProponeState(); // estado inicial
             applyTipoReemplazoState(); // estado inicial tipo
             applyPermisoSinGoceState();
+            applyReposoMutualidadState();
 
             if (isEdit && initial?.funcionario?.id) {
                 // asegurar opción del funcionario seleccionada en select2

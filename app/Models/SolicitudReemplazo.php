@@ -202,6 +202,11 @@ class SolicitudReemplazo extends Model
         return $this->hasMany(SolicitudReemplazoObservacion::class, 'solicitud_reemplazo_id')->latest();
     }
 
+    public function modificacionesTermino(): HasMany
+    {
+        return $this->hasMany(SolicitudReemplazoModificacionTermino::class, 'solicitud_reemplazo_id')->latest();
+    }
+
     public function establecimiento()
     {
         return $this->belongsTo(Establecimiento::class);

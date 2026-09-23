@@ -153,6 +153,13 @@
     $titRut    = $fmtRut($s->funcionarioTitular?->rut ?? '');
 
     $motivo = trim($tipo . ' ' . $titNombre . ' - RUT: ' . $titRut);
+    $modificacionTermino = \Illuminate\Support\Facades\Schema::hasTable('solicitudes_reemplazo_modificaciones_termino')
+        ? $s->modificacionesTermino()->latest('id')->first()
+        : null;
+    $esReposoMutualidad = \App\Support\TipoReemplazo::esReposoMutualidad($s->tipo_reemplazo);
+    if ($modificacionTermino?->causal === 'renuncia_voluntaria') {
+        $motivo .= ' | SE MODIFICA TÉRMINO DEL REEMPLAZO POR RENUNCIA VOLUNTARIA DEL TRABAJADOR.';
+    }
 
     // Financiamiento: {FIN} - TOTAL HORAS - HRS BÁSICA (>0) - HRS MEDIA (>0)
     $finParts = [];
@@ -215,6 +222,9 @@
 <div class="row"><span class="label">A CONTAR DE :</span> <span class="value">{{ $inicioTrab }}</span></div>
 <div class="row"><span class="label">FECHA DE TÉRMINO :</span> <span class="value">{{ $finTrab }}</span></div>
 <div class="row"><span class="label">MOTIVO U OBSERVACIÓN :</span> <span class="value">{{ $motivo }}</span></div>
+@if ($esReposoMutualidad)
+    <div class="row"><span class="label">AVISO :</span> <span class="value">Esta Orden de Trabajo podría sufrir cambios en su duración por disminución de reposo médico.</span></div>
+@endif
 <div class="row"><span class="label">FINANCIAMIENTO :</span> <span class="value">{{ $finTxt }}</span></div>
 
 @php

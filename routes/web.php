@@ -1561,6 +1561,13 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
             ->name('solicitudes-reemplazo.slep.cerrar-docente');
 
+        Route::post('/solicitudes-reemplazo/{solicitud}/reabrir-modificar-termino', [SolicitudReemplazoGestionController::class, 'reabrirParaModificarTermino'])
+            ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
+            ->name('solicitudes-reemplazo.reabrir-modificar-termino');
+        Route::get('/solicitudes-reemplazo/{solicitud}/modificaciones-termino/{modificacion}/documentos/{documento}', [SolicitudReemplazoGestionController::class, 'descargarDocumentoModificacionTermino'])
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani|funcionario_estab')
+            ->name('solicitudes-reemplazo.modificacion-termino.documento');
+
         Route::post('/solicitudes-reemplazo/{solicitud}/resolucion-docente/generar', [SolicitudReemplazoGestionController::class, 'slepGenerarResolucionDocente'])
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')->name('solicitudes-reemplazo.resolucion-docente.generar');
         Route::get('/solicitudes-reemplazo/{solicitud}/resolucion-docente/download', [SolicitudReemplazoGestionController::class, 'downloadResolucionDocente'])

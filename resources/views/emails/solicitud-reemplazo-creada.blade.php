@@ -26,5 +26,9 @@
 </p>
 
 <p>Esta solicitud se encuentra <strong>pendiente de aprobación por parte de UATP</strong>.</p>
+@if (\App\Support\TipoReemplazo::esReposoMutualidad($s->tipo_reemplazo))
+    <p><strong>Importante:</strong> si la mutualidad disminuye el reposo médico, la duración podrá modificarse mediante una reapertura trazable de la solicitud.</p>
+@endif
+
 <p>Se adjunta un resumen en PDF.</p>
 @endsection
