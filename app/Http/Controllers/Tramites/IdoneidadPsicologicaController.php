@@ -295,7 +295,7 @@ class IdoneidadPsicologicaController extends Controller
             'logoDataUri' => $this->dataUri(resource_path('branding/idoneidad-psicologica/logo-oficio.png')),
             'fuenteRegularDataUri' => $this->dataUri(resource_path('fonts/certificados/century-gothic-regular.ttf'), 'font/ttf'),
             'fuenteBoldDataUri' => $this->dataUri(resource_path('fonts/certificados/century-gothic-bold.ttf'), 'font/ttf'),
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper([0, 0, 612, 964], 'portrait');
 
         $nombreArchivo = "oficio_idoneidad_psicologica_{$solicitud->id}.pdf";
 

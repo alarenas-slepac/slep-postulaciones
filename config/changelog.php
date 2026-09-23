@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.23.494' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Formato y firma del oficio de idoneidad psicológica',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'config/changelog.php',
+            'resources/views/pdf/idoneidad-psicologica-nomina.blade.php',
+        ],
+        'changes' => [
+            'El oficio se genera en tamaño Oficio México (21,59 × 34,01 cm).',
+            'Reserva un espacio amplio y continuo para la firma manuscrita antes de la identificación del Director Ejecutivo.',
+            'Evita que el numeral 3 quede dividido con el cierre del numeral anterior durante la paginación del oficio.',
+        ],
+    ],
     '2026.9.23.493' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',
