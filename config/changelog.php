@@ -1,6 +1,19 @@
 <?php
 
 return [
+    '2026.9.23.501' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Valores predeterminados para autoridades del oficio de idoneidad',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Prellena Director Regional con VICTOR VALENZUELA ALVAREZ y el cargo Director Regional Servicio de Salud Concepción.',
+            'Prellena Director Ejecutivo con RAMÓN ÁNGEL JARA ZAVALA y el cargo Director Ejecutivo.',
+        ],
+    ],
     '2026.9.23.500' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',
