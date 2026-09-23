@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page { margin: 25mm 30mm 25mm; }
+        @page { size: 216mm 340mm; margin: 25mm 30mm 25mm; }
         @font-face { font-family: "Century Gothic"; font-style: normal; font-weight: 400; src: url("{{ $fuenteRegularDataUri }}") format("truetype"); }
         @font-face { font-family: "Century Gothic"; font-style: normal; font-weight: 700; src: url("{{ $fuenteBoldDataUri }}") format("truetype"); }
         body { margin: 0; color: #000; font-family: "Century Gothic", sans-serif; font-size: 12pt; line-height: 1.14; }
@@ -19,6 +19,7 @@
         .address .spacer { height: 10pt; }
         .body-copy { margin: 0 0 10pt; text-align: justify; }
         .numbered { margin: 0 0 10pt; padding-left: 19pt; text-align: justify; text-indent: -19pt; }
+        .numbered--new-page { page-break-before: always; }
         .table-intro { margin-top: 12pt; }
         .nomina { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 8pt 0 13pt; font-size: 7.2pt; line-height: 1.12; }
         .nomina thead { display: table-header-group; }
@@ -26,7 +27,7 @@
         .nomina td { border: 0.6pt solid #000; padding: 3pt 2pt; vertical-align: top; overflow-wrap: break-word; }
         .nomina tr { page-break-inside: avoid; }
         .center { text-align: center; }
-        .signature { margin-top: 28pt; text-align: center; line-height: 1.16; page-break-inside: avoid; }
+        .signature { margin-top: 76pt; text-align: center; line-height: 1.16; page-break-inside: avoid; }
         .signature-name { font-weight: 700; text-transform: uppercase; }
         .signature-role { font-size: 11pt; text-transform: uppercase; }
     </style>
@@ -65,7 +66,7 @@
 
     <p class="numbered"><strong>2.</strong> Como es de público conocimiento, este Servicio Local asumió como sostenedor de los establecimientos públicos de las comunas de Coronel, Lota, San Pedro de la Paz y Santa Juana, a contar del 1 de enero de 2025, de acuerdo con lo dispuesto en el Artículo Octavo Transitorio de la Ley N° 21.040.</p>
 
-    <p class="numbered"><strong>3.</strong> El Art. 21 de la Ley N° 21.040 establece que la “dirección y administración de cada Servicio Local estará a cargo de un funcionario denominado Director Ejecutivo, quien será el jefe superior del servicio”. El Art. 22 letra a) de la Ley N° 21.040 establece como atribución del Director Ejecutivo del Servicio Local de Educación Pública la de: a) Dirigir, organizar, administrar y gestionar el Servicio Local, velando por la mejora continua de la calidad de la educación pública en el territorio de su competencia”.</p>
+    <p class="numbered numbered--new-page"><strong>3.</strong> El Art. 21 de la Ley N° 21.040 establece que la “dirección y administración de cada Servicio Local estará a cargo de un funcionario denominado Director Ejecutivo, quien será el jefe superior del servicio”. El Art. 22 letra a) de la Ley N° 21.040 establece como atribución del Director Ejecutivo del Servicio Local de Educación Pública la de: a) Dirigir, organizar, administrar y gestionar el Servicio Local, velando por la mejora continua de la calidad de la educación pública en el territorio de su competencia”.</p>
 
     <p class="numbered"><strong>4.</strong> El Art. 1° de la Ley N° 21.109 establece que: “La presente ley regula el estatuto funcionario de los asistentes de la educación que se desempeñen en establecimientos educacionales dependientes de los Servicios Locales de Educación Pública (en adelante “el servicio local” o “el servicio”).” Por su parte, el Artículo 3 señala que las relaciones laborales entre los servicios locales y los asistentes de la educación de su dependencia se regirán por las disposiciones de esta ley y, para estos efectos, serán considerados como funcionarios públicos.</p>
 
