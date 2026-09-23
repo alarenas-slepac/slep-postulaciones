@@ -11,6 +11,7 @@ use App\Models\SolicitudReemplazo;
 use App\Models\SolicitudReemplazoDeudaPension;
 use App\Models\SolicitudReemplazoJornada;
 use App\Models\SolicitudReemplazoObservacion;
+use App\Models\SolicitudReemplazoModificacionTermino;
 use App\Models\PostulantProfile;
 use App\Models\User;
 use App\Models\Establecimiento;
@@ -32,6 +33,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\RestrictedRutService;
 use App\Services\SolicitudReemplazoAutorizacionDocenteService;
 use App\Services\ResolucionDocenteDocxService;
+use App\Support\TipoReemplazo;
 
 class SolicitudReemplazoGestionController extends Controller
 {
@@ -447,7 +449,7 @@ class SolicitudReemplazoGestionController extends Controller
             ? $user->hasAnyRole(['admin', 'supervisor_plani'])
             : false;
 
-        $solicitud->load([
+        $relacionesSolicitud = [
             'establecimiento',
             'funcionarioTitular',
             'postulante.user',
@@ -468,7 +470,11 @@ class SolicitudReemplazoGestionController extends Controller
             'autorizacionDocente.estadoActualizadoPor',
             'deudaPension.postulante.user',
             'derivadaA.roles',
-        ]);
+        ];
+        if (Schema::hasTable('solicitudes_reemplazo_modificaciones_termino')) {
+            $relacionesSolicitud[] = 'modificacionesTermino.reabiertaPor';
+        }
+        $solicitud->load($relacionesSolicitud);
 
         $isAdmin = method_exists($user, 'hasRole') ? $user->hasRole('admin') : false;
         $isGdp = method_exists($user, 'hasAnyRole')
@@ -480,7 +486,24 @@ class SolicitudReemplazoGestionController extends Controller
 
         $deudaPension = $solicitud->deudaPension;
         $deudaPensionBloqueaFlujo = $this->deudaPensionBloqueaFlujo($solicitud);
-        $canCrearOt = $solicitud->estado === 'derivada_slep'
+        $modificacionesTermino = Schema::hasTable('solicitudes_reemplazo_modificaciones_termino')
+            ? $solicitud->modificacionesTermino
+            : collect();
+        $modificacionTerminoActiva = $modificacionesTermino->first(
+            fn (SolicitudReemplazoModificacionTermino $modificacion) => $modificacion->finalizada_at === null
+        );
+        $canGestionarModificacionTermino = $this->puedeGestionarModificacionTermino($user, $solicitud);
+        $canReabrirTermino = $canGestionarModificacionTermino
+            && $modificacionTerminoActiva === null
+            && in_array((string) $solicitud->estado, ['aceptada', 'cerrado', 'cerrada'], true);
+        $canRegenerarOt = $canGestionarModificacionTermino
+            && $modificacionTerminoActiva?->orden_trabajo_requiere_regeneracion
+            && $modificacionTerminoActiva->orden_trabajo_regenerada_at === null;
+        $canRegenerarResolucionDocente = $canGestionarModificacionTermino
+            && $modificacionTerminoActiva?->resolucion_docente_requiere_regeneracion
+            && $modificacionTerminoActiva->resolucion_docente_regenerada_at === null;
+
+        $canCrearOt = ($solicitud->estado === 'derivada_slep' || $canRegenerarOt)
             && ! $deudaPensionBloqueaFlujo
             && (
                 $isAdmin
@@ -590,6 +613,7 @@ class SolicitudReemplazoGestionController extends Controller
             : collect();
 
         $canCerrarSolicitudDocente = $solicitud->estado === 'aceptada'
+            && $modificacionTerminoActiva === null
             && $titularEsDocente
             && !$this->hasContratoTrabajoAsociado($solicitud)
             && !empty($solicitud->resolucion_docente_firmada_pdf_path)
@@ -722,6 +746,11 @@ class SolicitudReemplazoGestionController extends Controller
             'responsablesGestion' => $responsablesGestion,
             'canGestionarContratoFirmado' => $canGestionarContratoFirmado,
             'canCerrarSolicitudDocente' => $canCerrarSolicitudDocente,
+            'canReabrirTermino' => $canReabrirTermino,
+            'canRegenerarOt' => $canRegenerarOt,
+            'canRegenerarResolucionDocente' => $canRegenerarResolucionDocente,
+            'modificacionTerminoActiva' => $modificacionTerminoActiva,
+            'modificacionesTermino' => $modificacionesTermino,
             'canRetornarDerivadaSlep' => $canRetornarDerivadaSlep,
             'tieneFiniquitoAsociado' => $tieneFiniquitoAsociado,
             'mostrarSolicitudesAnterioresRelacionadas' => $mostrarSolicitudesAnterioresRelacionadas,
@@ -842,6 +871,7 @@ class SolicitudReemplazoGestionController extends Controller
         $solicitud->loadMissing(['funcionarioTitular']);
 
         abort_unless($solicitud->estado === 'aceptada', 403);
+        abort_unless($this->modificacionTerminoActiva($solicitud) === null, 403);
         abort_unless($this->estamentoFromEstatuto($solicitud->funcionarioTitular?->estatuto) === 'docente', 403);
         abort_unless(!$this->hasContratoTrabajoAsociado($solicitud), 403);
         abort_unless($this->resolucionDocenteCompleta($solicitud), 403);
@@ -851,6 +881,7 @@ class SolicitudReemplazoGestionController extends Controller
             $s->loadMissing(['funcionarioTitular']);
 
             abort_unless($s->estado === 'aceptada', 403);
+            abort_unless($this->modificacionTerminoActiva($s) === null, 403);
             abort_unless($this->estamentoFromEstatuto($s->funcionarioTitular?->estatuto) === 'docente', 403);
             abort_unless(!$this->hasContratoTrabajoAsociado($s), 403);
             abort_unless($this->resolucionDocenteCompleta($s), 403);
@@ -867,13 +898,143 @@ class SolicitudReemplazoGestionController extends Controller
             ->with('status', 'Solicitud docente cerrada correctamente.');
     }
 
+    public function reabrirParaModificarTermino(Request $request, SolicitudReemplazo $solicitud)
+    {
+        $user = $request->user();
+        abort_unless($this->puedeGestionarModificacionTermino($user, $solicitud), 403);
+        abort_unless(in_array((string) $solicitud->estado, ['aceptada', 'cerrado', 'cerrada'], true), 403);
+        abort_unless($this->modificacionTerminoActiva($solicitud) === null, 403);
+
+        $data = $request->validate([
+            'causal_modificacion_termino' => ['required', Rule::in(['reduccion_reposo_mutualidad', 'renuncia_voluntaria'])],
+            'fecha_termino_nueva' => ['required', 'date'],
+            'motivo_modificacion_termino' => ['required', 'string', 'max:5000'],
+            'carta_renuncia_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'resolucion_renuncia_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+        ], [
+            'carta_renuncia_pdf.mimes' => 'La carta de renuncia debe estar en formato PDF.',
+            'resolucion_renuncia_pdf.mimes' => 'La resolución de renuncia debe estar en formato PDF.',
+        ]);
+
+        $causal = (string) $data['causal_modificacion_termino'];
+        if ($causal === 'reduccion_reposo_mutualidad' && !TipoReemplazo::esReposoMutualidad($solicitud->tipo_reemplazo)) {
+            return back()->withErrors(['causal_modificacion_termino' => 'La reducción de reposo sólo aplica a solicitudes de tipo Reposo Mutualidad.'])->withInput();
+        }
+
+        if ($causal === 'renuncia_voluntaria' && (!$request->hasFile('carta_renuncia_pdf') || !$request->hasFile('resolucion_renuncia_pdf'))) {
+            return back()->withErrors([
+                'carta_renuncia_pdf' => 'Debe adjuntar la carta de renuncia en PDF.',
+                'resolucion_renuncia_pdf' => 'Debe adjuntar la resolución de renuncia en PDF.',
+            ])->withInput();
+        }
+
+        $nuevaFechaTermino = Carbon::parse($data['fecha_termino_nueva'])->startOfDay();
+        $fechaTerminoActual = Carbon::parse($solicitud->fecha_termino)->startOfDay();
+        $fechaInicio = Carbon::parse($solicitud->fecha_inicio)->startOfDay();
+
+        if ($nuevaFechaTermino->lt($fechaInicio)) {
+            return back()->withErrors(['fecha_termino_nueva' => 'La nueva fecha de término no puede ser anterior al inicio del reemplazo.'])->withInput();
+        }
+
+        if (!$nuevaFechaTermino->lt($fechaTerminoActual)) {
+            return back()->withErrors(['fecha_termino_nueva' => 'La nueva fecha de término debe ser anterior a la fecha vigente.'])->withInput();
+        }
+
+        $cartaRenunciaPath = null;
+        $resolucionRenunciaPath = null;
+        $directorio = "reemplazos/solicitudes/{$solicitud->id}/modificaciones-termino";
+        if ($request->hasFile('carta_renuncia_pdf')) {
+            $cartaRenunciaPath = $request->file('carta_renuncia_pdf')->storeAs($directorio, 'CARTA_RENUNCIA_' . now()->format('Ymd_His') . '.pdf', 'local');
+        }
+        if ($request->hasFile('resolucion_renuncia_pdf')) {
+            $resolucionRenunciaPath = $request->file('resolucion_renuncia_pdf')->storeAs($directorio, 'RESOLUCION_RENUNCIA_' . now()->format('Ymd_His') . '.pdf', 'local');
+        }
+
+        DB::transaction(function () use ($solicitud, $user, $causal, $data, $nuevaFechaTermino, $cartaRenunciaPath, $resolucionRenunciaPath) {
+            $s = SolicitudReemplazo::query()->whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+            abort_unless(in_array((string) $s->estado, ['aceptada', 'cerrado', 'cerrada'], true), 403);
+            abort_unless($this->modificacionTerminoActiva($s) === null, 403);
+
+            $titularEsDocente = $this->estamentoFromEstatuto($s->funcionarioTitular?->estatuto) === 'docente';
+            $modificacion = SolicitudReemplazoModificacionTermino::create([
+                'solicitud_reemplazo_id' => $s->id,
+                'causal' => $causal,
+                'estado_origen' => $s->estado,
+                'fecha_termino_anterior' => $s->fecha_termino,
+                'fecha_termino_nueva' => $nuevaFechaTermino->toDateString(),
+                'motivo' => trim((string) $data['motivo_modificacion_termino']),
+                'carta_renuncia_path' => $cartaRenunciaPath,
+                'resolucion_renuncia_path' => $resolucionRenunciaPath,
+                'orden_trabajo_anterior_path' => $s->orden_trabajo_pdf_path,
+                'orden_trabajo_anterior_creada_at' => $s->orden_trabajo_creada_at,
+                'resolucion_docente_docx_anterior_path' => $s->resolucion_docente_docx_path,
+                'resolucion_docente_firmada_anterior_path' => $s->resolucion_docente_firmada_pdf_path,
+                'orden_trabajo_requiere_regeneracion' => !empty($s->orden_trabajo_pdf_path),
+                'resolucion_docente_requiere_regeneracion' => $titularEsDocente && (!empty($s->resolucion_docente_docx_path) || !empty($s->resolucion_docente_firmada_pdf_path)),
+                'reabierta_por_user_id' => $user->id,
+            ]);
+
+            $s->forceFill([
+                'fecha_termino' => $nuevaFechaTermino->toDateString(),
+                'estado' => 'aceptada',
+                'cerrado_por_user_id' => null,
+                'cerrado_at' => null,
+            ])->save();
+
+            SolicitudReemplazoObservacion::create([
+                'solicitud_reemplazo_id' => $s->id,
+                'etapa' => 'gdp',
+                'accion' => 'reapertura_modificacion_termino',
+                'estado_origen' => $modificacion->estado_origen,
+                'estado_destino' => 'aceptada',
+                'motivo' => $modificacion->motivo,
+                'observacion' => "Causal: {$causal}.\nFecha término anterior: {$modificacion->fecha_termino_anterior->format('d/m/Y')}.\nNueva fecha término: {$modificacion->fecha_termino_nueva->format('d/m/Y')}",
+                'user_id' => $user->id,
+            ]);
+
+            $this->finalizarModificacionTerminoSiCorresponde($modificacion);
+        });
+
+        return back()->with('status', 'Solicitud reabierta con trazabilidad. Actualiza los documentos operativos que el sistema indique.');
+    }
+
+    public function descargarDocumentoModificacionTermino(
+        SolicitudReemplazo $solicitud,
+        SolicitudReemplazoModificacionTermino $modificacion,
+        string $documento
+    ) {
+        abort_unless((int) $modificacion->solicitud_reemplazo_id === (int) $solicitud->id, 404);
+
+        $campos = [
+            'carta_renuncia' => ['campo' => 'carta_renuncia_path', 'nombre' => 'CARTA_RENUNCIA.pdf', 'inline' => true],
+            'resolucion_renuncia' => ['campo' => 'resolucion_renuncia_path', 'nombre' => 'RESOLUCION_RENUNCIA.pdf', 'inline' => true],
+            'orden_trabajo_anterior' => ['campo' => 'orden_trabajo_anterior_path', 'nombre' => 'ORDEN_TRABAJO_ANTERIOR.pdf', 'inline' => true],
+            'resolucion_docente_docx_anterior' => ['campo' => 'resolucion_docente_docx_anterior_path', 'nombre' => 'RESOLUCION_DOCENTE_ANTERIOR.docx', 'inline' => false],
+            'resolucion_docente_firmada_anterior' => ['campo' => 'resolucion_docente_firmada_anterior_path', 'nombre' => 'RESOLUCION_DOCENTE_FIRMADA_ANTERIOR.pdf', 'inline' => true],
+        ];
+        abort_unless(isset($campos[$documento]), 404);
+
+        $configuracion = $campos[$documento];
+        $path = (string) $modificacion->getAttribute($configuracion['campo']);
+        abort_if($path === '' || !Storage::disk('local')->exists($path), 404);
+
+        if ($configuracion['inline']) {
+            return response()->file(Storage::disk('local')->path($path), [
+                'Content-Disposition' => 'inline; filename="' . $configuracion['nombre'] . '"',
+            ]);
+        }
+
+        return Storage::disk('local')->download($path, $configuracion['nombre']);
+    }
+
     public function slepGenerarResolucionDocente(Request $request, SolicitudReemplazo $solicitud, ResolucionDocenteDocxService $service)
     {
         $this->authorizeResolucionDocente($request, $solicitud);
         abort_unless($solicitud->estado === 'aceptada', 403);
         $solicitud->loadMissing(['funcionarioTitular', 'postulante.user']);
         abort_unless($this->estamentoFromEstatuto($solicitud->funcionarioTitular?->estatuto) === 'docente', 403);
-        $path = $service->generateAndStore($solicitud);
+        $modificacionTermino = $this->modificacionTerminoActiva($solicitud);
+        $path = $service->generateAndStore($solicitud, $modificacionTermino?->id);
         $solicitud->forceFill([
             'resolucion_docente_docx_path' => $path,
             'resolucion_docente_generada_por_user_id' => $request->user()->id,
@@ -884,6 +1045,10 @@ class SolicitudReemplazoGestionController extends Controller
             'resolucion_docente_notificada_por_user_id' => null,
             'resolucion_docente_notificada_at' => null,
         ])->save();
+        if ($modificacionTermino && $modificacionTermino->resolucion_docente_requiere_regeneracion) {
+            $modificacionTermino->forceFill(['resolucion_docente_regenerada_at' => now()])->save();
+            $this->finalizarModificacionTerminoSiCorresponde($modificacionTermino);
+        }
         return back()->with('status', 'Resolución docente generada. Descárgala, revísala y luego carga el PDF firmado.');
     }
 
@@ -935,6 +1100,42 @@ class SolicitudReemplazoGestionController extends Controller
     private function resolucionDocenteCompleta(SolicitudReemplazo $s): bool
     {
         return !empty($s->resolucion_docente_firmada_pdf_path) && !empty($s->resolucion_docente_notificada_at) && Storage::disk('local')->exists($s->resolucion_docente_firmada_pdf_path);
+    }
+
+    private function puedeGestionarModificacionTermino($user, SolicitudReemplazo $solicitud): bool
+    {
+        if (!method_exists($user, 'hasAnyRole') || !$user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin', 'funcionario_slep'])) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['admin', 'coordinador_gdp', 'coordinador_gdp_admin'])) {
+            return true;
+        }
+
+        return (int) $solicitud->derivada_a_user_id === (int) $user->id;
+    }
+
+    private function modificacionTerminoActiva(SolicitudReemplazo $solicitud): ?SolicitudReemplazoModificacionTermino
+    {
+        if (!Schema::hasTable('solicitudes_reemplazo_modificaciones_termino')) {
+            return null;
+        }
+
+        return SolicitudReemplazoModificacionTermino::query()
+            ->where('solicitud_reemplazo_id', $solicitud->id)
+            ->whereNull('finalizada_at')
+            ->latest('id')
+            ->first();
+    }
+
+    private function finalizarModificacionTerminoSiCorresponde(SolicitudReemplazoModificacionTermino $modificacion): void
+    {
+        $ordenTrabajoLista = !$modificacion->orden_trabajo_requiere_regeneracion || $modificacion->orden_trabajo_regenerada_at !== null;
+        $resolucionLista = !$modificacion->resolucion_docente_requiere_regeneracion || $modificacion->resolucion_docente_regenerada_at !== null;
+
+        if ($ordenTrabajoLista && $resolucionLista && $modificacion->finalizada_at === null) {
+            $modificacion->forceFill(['finalizada_at' => now()])->save();
+        }
     }
 
 
@@ -1569,7 +1770,11 @@ class SolicitudReemplazoGestionController extends Controller
             : false;
 
         abort_unless($isAllowed, 403);
-        abort_unless($solicitud->estado === 'derivada_slep', 403);
+        $modificacionTermino = $this->modificacionTerminoActiva($solicitud);
+        $esRegeneracionTermino = $modificacionTermino !== null
+            && $modificacionTermino->orden_trabajo_requiere_regeneracion
+            && $modificacionTermino->orden_trabajo_regenerada_at === null;
+        abort_unless($solicitud->estado === 'derivada_slep' || ($solicitud->estado === 'aceptada' && $esRegeneracionTermino), 403);
 
         // Restricción de asignación solo para funcionario_slep (Admin/GDP no requieren estar asignados)
         if (!$isAdmin && !$isGdp) {
@@ -1596,7 +1801,7 @@ class SolicitudReemplazoGestionController extends Controller
             $rules['fecha_inicio_trabajo'][] = 'before_or_equal:' . $inicioMax;
         }
 
-        if (!$solicitud->propone_reemplazo) {
+        if (!$solicitud->propone_reemplazo && !$esRegeneracionTermino) {
             $rules['postulant_profile_id'] = ['required', 'integer', 'exists:postulant_profiles,id'];
         }
 
@@ -1607,7 +1812,7 @@ class SolicitudReemplazoGestionController extends Controller
 
         // Determinar postulante definitivo
         $postulantProfileId = (int) ($solicitud->postulant_profile_id ?? 0);
-        if (!$solicitud->propone_reemplazo) {
+        if (!$solicitud->propone_reemplazo && !$esRegeneracionTermino) {
             $postulantProfileId = (int) $data['postulant_profile_id'];
         }
         if ($postulantProfileId <= 0) {
@@ -1661,10 +1866,15 @@ class SolicitudReemplazoGestionController extends Controller
             ])->withInput();
         }
 
-        DB::transaction(function () use ($solicitud, $user, $postulantProfileId, $data) {
+        DB::transaction(function () use ($solicitud, $user, $postulantProfileId, $data, $esRegeneracionTermino) {
             $s = SolicitudReemplazo::whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+            $modificacionActiva = $this->modificacionTerminoActiva($s);
 
-            abort_unless($s->estado === 'derivada_slep', 403);
+            abort_unless(
+                $s->estado === 'derivada_slep'
+                || ($s->estado === 'aceptada' && $esRegeneracionTermino && $modificacionActiva?->orden_trabajo_requiere_regeneracion && $modificacionActiva->orden_trabajo_regenerada_at === null),
+                403
+            );
 
             if ($this->deudaPensionBloqueaFlujo($s)) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -1673,7 +1883,7 @@ class SolicitudReemplazoGestionController extends Controller
             }
 
             // Si no venía con propuesta, asignamos el postulante seleccionado
-            if (!$s->propone_reemplazo) {
+            if (!$s->propone_reemplazo && !$esRegeneracionTermino) {
                 $s->postulant_profile_id = $postulantProfileId;
             }
 
@@ -1686,12 +1896,19 @@ class SolicitudReemplazoGestionController extends Controller
             $s->save();
 
             $pdfService = app(\App\Services\OrdenTrabajoPdfService::class);
-            $path = $pdfService->generateAndStore($s);
+            $path = $pdfService->generateAndStore($s, $esRegeneracionTermino ? $modificacionActiva?->id : null);
 
             $s->orden_trabajo_pdf_path = $path;
-            $s->estado = 'aceptada';
+            if (!$esRegeneracionTermino) {
+                $s->estado = 'aceptada';
+            }
 
             $s->save();
+
+            if ($esRegeneracionTermino && $modificacionActiva) {
+                $modificacionActiva->forceFill(['orden_trabajo_regenerada_at' => now()])->save();
+                $this->finalizarModificacionTerminoSiCorresponde($modificacionActiva);
+            }
         });
 
         // Notificar al funcionario establecimiento

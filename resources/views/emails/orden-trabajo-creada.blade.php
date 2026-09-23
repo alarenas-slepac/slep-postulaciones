@@ -35,6 +35,10 @@
 
 <p>Se adjunta un resumen en PDF.</p>
 
+@if (\App\Support\TipoReemplazo::esReposoMutualidad($s->tipo_reemplazo))
+    <p><strong>Importante:</strong> por corresponder a Reposo Mutualidad, la duración de esta Orden de Trabajo podría modificarse si disminuye el reposo médico.</p>
+@endif
+
 @if (!empty($s->contrato_trabajo_docx_path))
     <p>
         También se adjunta el <strong>Contrato de Trabajo (Word)</strong>.

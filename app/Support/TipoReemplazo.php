@@ -66,6 +66,11 @@ final class TipoReemplazo
         return self::normalizar($tipo);
     }
 
+    public static function esReposoMutualidad(?string $tipo): bool
+    {
+        return self::normalizar($tipo) === self::REPOSO_MUTUALIDAD;
+    }
+
     /**
      * @return array<string, string>
      */

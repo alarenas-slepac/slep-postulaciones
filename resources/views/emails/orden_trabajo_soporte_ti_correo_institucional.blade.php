@@ -30,6 +30,10 @@
 
 <p>Se adjunta la <strong>Orden de Trabajo</strong> correspondiente como respaldo para la habilitación solicitada.</p>
 
+@if (\App\Support\TipoReemplazo::esReposoMutualidad($s->tipo_reemplazo))
+    <p><strong>Importante:</strong> esta Orden de Trabajo podría sufrir cambios en su duración por disminución de reposo médico.</p>
+@endif
+
 <p>Agradeceremos gestionar esta solicitud y mantener informado al establecimiento en copia para su seguimiento.</p>
 
 <p>Saludos cordiales.</p>

@@ -31,6 +31,10 @@
 
 <p>Se adjunta el PDF de la Orden de Trabajo.</p>
 
+@if (\App\Support\TipoReemplazo::esReposoMutualidad($s->tipo_reemplazo))
+    <p><strong>Importante:</strong> por corresponder a Reposo Mutualidad, la duración de esta Orden de Trabajo podría modificarse si disminuye el reposo médico.</p>
+@endif
+
 @if (!empty($s->horario_titular_pdf_path))
     <p>También se adjunta el <strong>Horario del titular</strong> para referencia del reemplazo asignado.</p>
 @endif
