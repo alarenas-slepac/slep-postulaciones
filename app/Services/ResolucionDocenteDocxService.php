@@ -29,11 +29,6 @@ class ResolucionDocenteDocxService
                     $new = strtr($plain, $values); if ($new === $plain || !$nodes->length) continue;
                     $nodes->item(0)->nodeValue = $new; for ($j = 1; $j < $nodes->length; $j++) $nodes->item($j)->nodeValue = '';
                 }
-                foreach ($xp->query('//w:t') as $node) {
-                    if (trim($node->textContent) === 'CARGO') {
-                        $node->nodeValue = str_replace('CARGO', 'SUBSECTOR', $node->textContent);
-                    }
-                }
                 $xml = $dom->saveXML();
             }
             $zip->addFromString($part, $xml);

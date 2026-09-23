@@ -1,18 +1,6 @@
 <?php
 
 return [
-    '2026.9.23.504' => [
-        'date' => '2026-09-23',
-        'module' => 'Solicitudes de reemplazo',
-        'title' => 'Etiqueta de subsector en resoluciones docentes',
-        'files' => [
-            'app/Services/ResolucionDocenteDocxService.php',
-            'config/changelog.php',
-        ],
-        'changes' => [
-            'Las resoluciones docentes nuevas y regeneradas muestran SUBSECTOR en lugar de CARGO, manteniendo el valor informado por el área de desempeño.',
-        ],
-    ],
     '2026.9.23.503' => [
         'date' => '2026-09-23',
         'module' => 'Solicitudes de reemplazo',
