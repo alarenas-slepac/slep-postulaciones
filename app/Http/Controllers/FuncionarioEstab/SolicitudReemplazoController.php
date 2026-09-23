@@ -27,6 +27,7 @@ use Illuminate\Validation\Rule;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\RestrictedRutService;
 use App\Support\ReemplazoSolicitudReglaMinima;
+use App\Support\TipoReemplazo;
 
 class SolicitudReemplazoController extends Controller
 {
@@ -144,6 +145,10 @@ class SolicitudReemplazoController extends Controller
     public function store(Request $request)
     {
         $establecimiento = $this->establecimientoDelUsuario();
+
+        $request->merge([
+            'tipo_reemplazo' => TipoReemplazo::normalizar($request->input('tipo_reemplazo')),
+        ]);
 
         $validTipos = $this->tiposReemplazoValidos();
         $tiposDeshabilitados = $this->tiposReemplazoDeshabilitados();
@@ -591,6 +596,10 @@ class SolicitudReemplazoController extends Controller
 
     public function update(Request $request, SolicitudReemplazo $solicitud)
     {
+        $request->merge([
+            'tipo_reemplazo' => TipoReemplazo::normalizar($request->input('tipo_reemplazo')),
+        ]);
+
         $establecimiento = $this->establecimientoDelUsuario();
 
         $this->assertEditableByEstablecimiento($solicitud, $establecimiento->id);
@@ -1683,25 +1692,12 @@ class SolicitudReemplazoController extends Controller
     }
     private function tiposReemplazoValidos(): array
     {
-        return [
-            'Licencia Médica (General)',
-            'Licencia Médica (Pre y/o Post Natal y/o Parental)',
-            'Permiso Postnatal Parental',
-            'Permiso sin goce de sueldo',
-            'Permiso Horas de Lactancia',
-            'Permiso especial para deportistas (Art 74, Ley 19.712)',
-            'Sumario Administrativo',
-            'Otras',
-        ];
+        return TipoReemplazo::opciones();
     }
 
     private function tiposReemplazoDeshabilitados(): array
     {
-        return [
-            'Permiso Horas de Lactancia',
-            'Permiso especial para deportistas (Art 74, Ley 19.712)',
-            'Otras',
-        ];
+        return TipoReemplazo::opcionesDeshabilitadasParaNuevasSolicitudes();
     }
 
     private function tipoPermisoSinGoce(): string

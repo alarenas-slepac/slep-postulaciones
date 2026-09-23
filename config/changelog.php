@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.23.502' => [
+        'date' => '2026-09-23',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Nuevas causales de licencia y reemplazo',
+        'files' => [
+            'app/Http/Controllers/FuncionarioEstab/SolicitudReemplazoController.php',
+            'app/Http/Controllers/Gestion/InformesController.php',
+            'app/Support/TipoReemplazo.php',
+            'database/migrations/2026_09_23_120000_rename_licencias_medicas_solicitudes_reemplazo.php',
+            'resources/views/funcionario/solicitudes-reemplazo/create.blade.php',
+        ],
+        'changes' => [
+            'Incorpora ocho causales numeradas de licencia, Reposo Mutualidad y mantiene las demás opciones en orden alfabético.',
+            'Renombra los registros históricos de licencia médica general y maternal para que formularios, informes, exportaciones y documentos usen las nuevas denominaciones.',
+            'Conserva las restricciones vigentes para Permiso Horas de Lactancia, permiso especial para deportistas y Otras.',
+        ],
+    ],
     '2026.9.23.501' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',
