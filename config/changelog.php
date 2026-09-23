@@ -1,6 +1,19 @@
 <?php
 
 return [
+    '2026.9.23.498' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Nóminas de idoneidad psicológica compatibles con límite de memoria',
+        'files' => [
+            'config/changelog.php',
+            'resources/views/pdf/idoneidad-psicologica-nomina.blade.php',
+        ],
+        'changes' => [
+            'Divide las nóminas extensas en tablas acotadas y usa una tabla compacta desde 161 personas, manteniendo encabezados y correlativo.',
+            'Evita el agotamiento de memoria de Dompdf al previsualizar o descargar solicitudes masivas con el límite de 128 MB de producción.',
+        ],
+    ],
     '2026.9.23.497' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',

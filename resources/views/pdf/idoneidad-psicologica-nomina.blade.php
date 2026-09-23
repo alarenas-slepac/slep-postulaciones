@@ -27,6 +27,8 @@
         .nomina th { border: 0.6pt solid #000; padding: 3.5pt 2pt; text-align: center; font-weight: 700; vertical-align: middle; }
         .nomina td { border: 0.6pt solid #000; padding: 3pt 2pt; vertical-align: top; overflow-wrap: break-word; }
         .nomina tr { page-break-inside: avoid; }
+        .nomina--compact { font-size: 6.8pt; line-height: 1.18; }
+        .nomina--compact th { text-align: left; }
         .center { text-align: center; }
         .signature { margin-top: 104pt; text-align: center; line-height: 1.16; page-break-inside: avoid; }
         .signature-name { font-weight: 700; text-transform: uppercase; }
@@ -80,18 +82,33 @@
 
     <p class="numbered table-intro"><strong>7.</strong> Por lo anterior, para dar cumplimiento a los requisitos de contratación establecidos en la citada ley, para el caso de los asistentes de la educación, vengo en solicitar se efectúen por parte de la repartición pública que Ud. dirige las evaluaciones de idoneidad sicológica correspondientes respecto de los funcionarios que en el recuadro siguiente se individualizan:</p>
 
-    <table class="nomina">
-        <thead><tr>
-            <th style="width:6.5%">Nro.</th><th style="width:20.8%">NOMBRE</th><th style="width:13%">RUT</th><th style="width:16.9%">CARGO</th><th style="width:18.2%">ESTABLECIMIENTO</th><th style="width:13%">TIPO DE CONTRATO</th><th style="width:11.6%">COMUNA</th>
-        </tr></thead>
-        <tbody>
-            @foreach($solicitud->funcionarios as $index => $funcionario)
-                <tr>
-                    <td class="center">{{ $index + 1 }}</td><td>{{ $funcionario->nombre }}</td><td class="center">{{ $funcionario->rut }}</td><td>{{ $funcionario->cargo_funcion ?: 'Sin cargo informado' }}</td><td>{{ $funcionario->establecimiento_nombre ?: 'Sin establecimiento informado' }}</td><td>{{ $funcionario->tipo_contrato ?: 'Sin contrato informado' }}</td><td>{{ $funcionario->comuna ?: 'Sin comuna informada' }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+    @if($solicitud->funcionarios->count() > 160)
+        @foreach($solicitud->funcionarios->chunk(100) as $loteIndex => $funcionariosLote)
+            <table class="nomina nomina--compact">
+                <thead><tr><th>Nro. | Nombre | RUT | Cargo | Establecimiento | Tipo de contrato | Comuna</th></tr></thead>
+                <tbody>
+                    @foreach($funcionariosLote as $rowIndex => $funcionario)
+                        <tr><td>{{ ($loteIndex * 100) + $rowIndex + 1 }} | {{ $funcionario->nombre }} | {{ $funcionario->rut }} | {{ $funcionario->cargo_funcion ?: 'Sin cargo informado' }} | {{ $funcionario->establecimiento_nombre ?: 'Sin establecimiento informado' }} | {{ $funcionario->tipo_contrato ?: 'Sin contrato informado' }} | {{ $funcionario->comuna ?: 'Sin comuna informada' }}</td></tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endforeach
+    @else
+        @foreach($solicitud->funcionarios->chunk(40) as $loteIndex => $funcionariosLote)
+            <table class="nomina">
+                <thead><tr>
+                    <th style="width:6.5%">Nro.</th><th style="width:20.8%">NOMBRE</th><th style="width:13%">RUT</th><th style="width:16.9%">CARGO</th><th style="width:18.2%">ESTABLECIMIENTO</th><th style="width:13%">TIPO DE CONTRATO</th><th style="width:11.6%">COMUNA</th>
+                </tr></thead>
+                <tbody>
+                    @foreach($funcionariosLote as $rowIndex => $funcionario)
+                        <tr>
+                            <td class="center">{{ ($loteIndex * 40) + $rowIndex + 1 }}</td><td>{{ $funcionario->nombre }}</td><td class="center">{{ $funcionario->rut }}</td><td>{{ $funcionario->cargo_funcion ?: 'Sin cargo informado' }}</td><td>{{ $funcionario->establecimiento_nombre ?: 'Sin establecimiento informado' }}</td><td>{{ $funcionario->tipo_contrato ?: 'Sin contrato informado' }}</td><td>{{ $funcionario->comuna ?: 'Sin comuna informada' }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endforeach
+    @endif
 
     <p class="numbered"><strong>8.</strong> Teniendo en cuenta lo expuesto en los numerales anteriores, y a fin de plasmar el principio de coordinación entre los servicios públicos, dejo el contacto del funcionario(a) de la Subdirección de Gestión de Personas del Servicio Local de Educación Pública de Andalién Costa, Sr(a). <strong>{{ $datosOficio['contacto_nombre'] }}</strong>, mail <strong>{{ $datosOficio['contacto_email'] }}</strong>.</p>
 
