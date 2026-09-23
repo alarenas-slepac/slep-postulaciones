@@ -27,9 +27,12 @@
         .nomina td { border: 0.6pt solid #000; padding: 3pt 2pt; vertical-align: top; overflow-wrap: break-word; }
         .nomina tr { page-break-inside: avoid; }
         .center { text-align: center; }
-        .signature { margin-top: 76pt; text-align: center; line-height: 1.16; page-break-inside: avoid; }
+        .signature { margin-top: 104pt; text-align: center; line-height: 1.16; page-break-inside: avoid; }
         .signature-name { font-weight: 700; text-transform: uppercase; }
         .signature-role { font-size: 11pt; text-transform: uppercase; }
+        .visadores { margin-top: 13pt; font-size: 8.5pt; line-height: 1.18; page-break-inside: avoid; }
+        .distribution { margin-top: 13pt; font-size: 8.5pt; line-height: 1.3; page-break-inside: avoid; }
+        .distribution-title { font-weight: 700; text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -97,6 +100,14 @@
         <div class="signature-name">{{ $datosOficio['director_ejecutivo_nombre'] }}</div>
         <div class="signature-role">{{ $datosOficio['director_ejecutivo_cargo'] }}</div>
         <div class="signature-role">Servicio Local de Educación Pública de Andalién Costa</div>
+    </div>
+
+    <div class="visadores">{{ $datosOficio['iniciales_firmantes_visadores'] }}</div>
+
+    <div class="distribution">
+        <div class="distribution-title">Distribución:</div>
+        <div>- Destinatario</div>
+        <div>- Archivo</div>
     </div>
 </body>
 </html>
