@@ -359,6 +359,7 @@ class IdoneidadPsicologicaController extends Controller
         }
 
         $datos['contacto_nombre'] = $this->nombreCompletoPartes($datos['contacto_nombres'], $datos['contacto_apellidos']);
+        $datos['director_ejecutivo_cargo_firma'] = $this->cargoSoloFirmante($datos['director_ejecutivo_cargo']);
         $inicialesContacto = $this->inicialesPorPartes($datos['contacto_nombres'], $datos['contacto_apellidos']);
         $iniciales[] = $inicialesContacto;
         $iniciales[] = mb_strtolower($inicialesContacto);
@@ -370,6 +371,15 @@ class IdoneidadPsicologicaController extends Controller
     private function nombreCompletoPartes(string $nombres, string $apellidos): string
     {
         return trim($nombres . ' ' . $apellidos);
+    }
+
+    private function cargoSoloFirmante(string $cargo): string
+    {
+        $marcaServicio = 'servicio local de educación pública';
+        $posicionServicio = mb_stripos($cargo, $marcaServicio);
+        $cargoSolo = trim($posicionServicio === false ? $cargo : mb_substr($cargo, 0, $posicionServicio));
+
+        return $cargoSolo !== '' ? $cargoSolo : trim($cargo);
     }
 
     private function inicialesPorPartes(string $nombres, string $apellidos): string

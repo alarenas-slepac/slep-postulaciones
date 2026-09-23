@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.23.499' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Tabla estructurada y firma ordenada en oficio de idoneidad',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'config/changelog.php',
+            'resources/views/pdf/idoneidad-psicologica-nomina.blade.php',
+            'resources/views/tramites/idoneidad-psicologica/oficio.blade.php',
+        ],
+        'changes' => [
+            'La nómina compacta vuelve a presentarse como tabla de tres columnas: número, datos del funcionario y antecedentes de vinculación.',
+            'La firma muestra sólo el cargo del Director Ejecutivo y deja el nombre del Servicio en la línea inferior, sin duplicarlo.',
+        ],
+    ],
     '2026.9.23.498' => [
         'date' => '2026-09-23',
         'module' => 'Trámites y operación',

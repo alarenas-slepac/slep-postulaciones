@@ -47,7 +47,7 @@
 
                 <div class="io-section mb-3">
                     <div class="io-section-title">Director Ejecutivo del Servicio Local</div>
-                    <div class="small text-muted mb-3">Firma el oficio.</div>
+                    <div class="small text-muted mb-3">Firma el oficio. Indica sólo el cargo: el nombre del Servicio se incorpora automáticamente debajo de la firma.</div>
                     <div class="row g-3">
                         <div class="col-md-6"><label class="io-label" for="director_ejecutivo_nombre">Nombre completo</label><input class="form-control @error('director_ejecutivo_nombre') is-invalid @enderror" id="director_ejecutivo_nombre" name="director_ejecutivo_nombre" maxlength="180" required value="{{ old('director_ejecutivo_nombre', $datos['director_ejecutivo_nombre']) }}">@error('director_ejecutivo_nombre')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                         <div class="col-md-6"><label class="io-label" for="director_ejecutivo_cargo">Cargo</label><input class="form-control @error('director_ejecutivo_cargo') is-invalid @enderror" id="director_ejecutivo_cargo" name="director_ejecutivo_cargo" maxlength="220" required value="{{ old('director_ejecutivo_cargo', $datos['director_ejecutivo_cargo']) }}">@error('director_ejecutivo_cargo')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>

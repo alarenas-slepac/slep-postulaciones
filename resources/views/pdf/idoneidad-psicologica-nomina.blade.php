@@ -28,7 +28,8 @@
         .nomina td { border: 0.6pt solid #000; padding: 3pt 2pt; vertical-align: top; overflow-wrap: break-word; }
         .nomina tr { page-break-inside: avoid; }
         .nomina--compact { font-size: 6.8pt; line-height: 1.18; }
-        .nomina--compact th { text-align: left; }
+        .nomina--compact th { text-align: center; }
+        .nomina--compact td { padding: 3.5pt 3pt; }
         .center { text-align: center; }
         .signature { margin-top: 104pt; text-align: center; line-height: 1.16; page-break-inside: avoid; }
         .signature-name { font-weight: 700; text-transform: uppercase; }
@@ -85,10 +86,18 @@
     @if($solicitud->funcionarios->count() > 160)
         @foreach($solicitud->funcionarios->chunk(100) as $loteIndex => $funcionariosLote)
             <table class="nomina nomina--compact">
-                <thead><tr><th>Nro. | Nombre | RUT | Cargo | Establecimiento | Tipo de contrato | Comuna</th></tr></thead>
+                <thead><tr>
+                    <th style="width:8%">Nro.</th>
+                    <th style="width:49%">Funcionario</th>
+                    <th style="width:43%">Vinculación</th>
+                </tr></thead>
                 <tbody>
                     @foreach($funcionariosLote as $rowIndex => $funcionario)
-                        <tr><td>{{ ($loteIndex * 100) + $rowIndex + 1 }} | {{ $funcionario->nombre }} | {{ $funcionario->rut }} | {{ $funcionario->cargo_funcion ?: 'Sin cargo informado' }} | {{ $funcionario->establecimiento_nombre ?: 'Sin establecimiento informado' }} | {{ $funcionario->tipo_contrato ?: 'Sin contrato informado' }} | {{ $funcionario->comuna ?: 'Sin comuna informada' }}</td></tr>
+                        <tr>
+                            <td class="center">{{ ($loteIndex * 100) + $rowIndex + 1 }}</td>
+                            <td>{{ $funcionario->nombre }}<br>RUT: {{ $funcionario->rut }}<br>Cargo: {{ $funcionario->cargo_funcion ?: 'Sin cargo informado' }}</td>
+                            <td>{{ $funcionario->establecimiento_nombre ?: 'Sin establecimiento informado' }}<br>{{ $funcionario->tipo_contrato ?: 'Sin contrato informado' }}<br>{{ $funcionario->comuna ?: 'Sin comuna informada' }}</td>
+                        </tr>
                     @endforeach
                 </tbody>
             </table>
@@ -116,7 +125,7 @@
 
     <div class="signature">
         <div class="signature-name">{{ $datosOficio['director_ejecutivo_nombre'] }}</div>
-        <div class="signature-role">{{ $datosOficio['director_ejecutivo_cargo'] }}</div>
+        <div class="signature-role">{{ $datosOficio['director_ejecutivo_cargo_firma'] }}</div>
         <div class="signature-role">Servicio Local de Educación Pública de Andalién Costa</div>
     </div>
 
