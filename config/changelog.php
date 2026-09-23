@@ -1,6 +1,38 @@
 <?php
 
 return [
+    '2026.9.23.492' => [
+        'date' => '2026-09-23',
+        'module' => 'Trámites y operación',
+        'title' => 'Solicitudes de idoneidad psicológica para AAEE',
+        'files' => [
+            'app/Http/Controllers/Tramites/IdoneidadPsicologicaController.php',
+            'app/Models/IdoneidadPsicologicaFuncionario.php',
+            'app/Models/IdoneidadPsicologicaSolicitud.php',
+            'app/Services/IdoneidadPsicologica/IdoneidadPsicologicaPadronService.php',
+            'app/Support/RutChile.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'database/migrations/2026_09_23_100000_create_idoneidad_psicologica_solicitudes_tables.php',
+            'database/migrations/2026_09_23_110000_add_cargo_snapshot_to_idoneidad_psicologica_funcionarios_table.php',
+            'resources/views/pdf/idoneidad-psicologica-nomina.blade.php',
+            'resources/views/tramites/idoneidad-psicologica/create.blade.php',
+            'resources/views/tramites/idoneidad-psicologica/index.blade.php',
+            'resources/views/tramites/idoneidad-psicologica/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/IdoneidadPsicologicaMigrationTest.php',
+            'tests/Feature/IdoneidadPsicologicaPadronServiceTest.php',
+        ],
+        'changes' => [
+            'Evita solicitudes repetidas para una misma persona y cargo, incluso con resultado rechazado; sólo vuelve a ser elegible si cambia el cargo determinado.',
+            'Determina el cargo desde el área de desempeño del perfil para personal no reemplazante y, para reemplazos o suplencias, desde la última solicitud aceptada o cerrada que cruza el período.',
+            'Estandariza la visualización y exportación de RUT al formato XX.XXX.XXX-X.',
+            'Genera un Oficio PDF con fecha de emisión y período dinámicos, incluyendo Nro., nombre, RUT, cargo, establecimiento, tipo de contrato y comuna.',
+            'Crea procesos de idoneidad psicológica para AAEE usando únicamente el último padrón vigente de cada establecimiento.',
+            'Filtra contratos a plazo fijo, reemplazo y suplencia por rango de fecha de ingreso; permite seleccionar la nómina, descargarla en PDF y conservar su fotografía histórica.',
+            'Registra estados solicitado, aceptado o rechazado por persona, tanto de forma individual como mediante una planilla Excel validada por RUT.',
+        ],
+    ],
     '2026.9.22.491' => [
         'date' => '2026-09-22',
         'module' => 'Dotación establecimiento',

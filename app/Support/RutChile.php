@@ -96,6 +96,18 @@ class RutChile
         return (string) $r;
     }
 
+    /** Formato de presentación estándar: XX.XXX.XXX-X. */
+    public static function format(?string $value): string
+    {
+        $normalizado = self::normalize($value);
+
+        if (! $normalizado) {
+            return trim((string) $value);
+        }
+
+        return number_format((int) $normalizado['rut_body'], 0, ',', '.') . '-' . $normalizado['rut_dv'];
+    }
+
     /**
      * Heurística: materno = última palabra, paterno = resto.
      */

@@ -95,6 +95,7 @@ use App\Http\Controllers\DeclaracionSostenedorController;
 use App\Http\Controllers\Tramites\CometidoFuncionarioController;
 use App\Http\Controllers\Tramites\CometidoFuncionarioRendicionController;
 use App\Http\Controllers\Tramites\CometidoFuncionarioInformeController;
+use App\Http\Controllers\Tramites\IdoneidadPsicologicaController;
 use App\Http\Controllers\Tramites\LicenciaMedicaController;
 use App\Http\Controllers\Tramites\LicenciaMedicaImportacionErrorController;
 use App\Http\Controllers\Tramites\LicenciaFeriadoController;
@@ -1001,6 +1002,23 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::post('/{agendamiento}/aprobar', [AgendamientoRecursoController::class, 'aprobar'])->name('aprobar');
             Route::post('/{agendamiento}/rechazar', [AgendamientoRecursoController::class, 'rechazar'])->name('rechazar');
             Route::post('/{agendamiento}/anular', [AgendamientoRecursoController::class, 'anular'])->name('anular');
+        });
+
+    // -----------------------------------
+    // Trámites: Idoneidad psicológica AAEE
+    // -----------------------------------
+    Route::prefix('tramites/idoneidad-psicologica')
+        ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
+        ->name('tramites.idoneidad-psicologica.')
+        ->group(function () {
+            Route::get('/', [IdoneidadPsicologicaController::class, 'index'])->name('index');
+            Route::get('/crear', [IdoneidadPsicologicaController::class, 'create'])->name('create');
+            Route::post('/', [IdoneidadPsicologicaController::class, 'store'])->name('store');
+            Route::get('/{solicitud}/nomina.pdf', [IdoneidadPsicologicaController::class, 'nominaPdf'])->name('nomina-pdf');
+            Route::get('/{solicitud}/plantilla-resultados', [IdoneidadPsicologicaController::class, 'plantillaResultados'])->name('plantilla-resultados');
+            Route::post('/{solicitud}/importar-resultados', [IdoneidadPsicologicaController::class, 'importarResultados'])->name('importar-resultados');
+            Route::patch('/{solicitud}/funcionarios/{funcionario}', [IdoneidadPsicologicaController::class, 'actualizarFuncionario'])->name('actualizar-funcionario');
+            Route::get('/{solicitud}', [IdoneidadPsicologicaController::class, 'show'])->name('show');
         });
 
     // -------------------------
