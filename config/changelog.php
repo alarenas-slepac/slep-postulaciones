@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.9.24.508' => [
+        'date' => '2026-09-24',
+        'module' => 'Autorizaciones docentes',
+        'title' => 'Bandeja de autorizaciones con Design System unificado',
+        'files' => [
+            'config/changelog.php',
+            'docs/DESIGN_SYSTEM.md',
+            'public/build/manifest.json',
+            'public/build/assets/app-gsxBnehD.css',
+            'resources/scss/app.scss',
+            'resources/scss/_autorizaciones-docentes.scss',
+            'resources/views/gestion/autorizaciones-docentes/index.blade.php',
+        ],
+        'changes' => [
+            'Adapta encabezado, indicadores, filtros, tabla, estados y edición por fila al diseño basado en Cometidos.',
+            'Separa el estado actual de los controles de actualización y mejora etiquetas, foco y adaptación móvil.',
+            'Documenta el patrón para tablas con edición de estado sin cambiar rutas ni permisos.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP'],
+    ],
     '2026.9.24.507' => [
         'date' => '2026-09-24',
         'module' => 'Certificados laborales',

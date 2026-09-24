@@ -81,6 +81,8 @@ Primario azul sólido; secundario blanco con borde gris; éxito verde; advertenc
 
 Colocar filtros en un panel propio. Usar cabecera gris muy clara, separadores tenues, alineación consistente y suficiente espacio en las celdas. Mostrar nombre o dato principal con mayor peso y metadatos debajo. Las acciones de fila se agrupan sin competir con el dato principal. En anchos reducidos, envolver la tabla en un contenedor con desplazamiento horizontal local o cambiar a tarjetas si la lectura lo requiere. Incluir estado vacío con mensaje y acción posible; mostrar contexto de paginación.
 
+Si una fila permite cambiar un estado, mostrar primero el **estado actual** con texto y color; ubicar después el formulario en un bloque propio. Cada control de la fila necesita una etiqueta visible y un `id` único. Dar espacio al botón de guardar y a los errores para que no se superpongan con la fila siguiente. Mantener el desplazamiento horizontal dentro de la tabla en pantallas pequeñas.
+
 ### Estados, mensajes y confirmaciones
 
 Usar chips redondeados con texto explícito para estados; reutilizar el significado cromático de la tabla de tokens. Los avisos informativos y de validación muestran icono, mensaje breve y, si hace falta, el siguiente paso. Confirmar acciones irreversibles con el patrón existente de la aplicación y explicar su efecto. Mostrar el estado real del proceso; no inferirlo solo de un color decorativo.
