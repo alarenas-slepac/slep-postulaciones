@@ -6,51 +6,44 @@
     $rutFormateado = number_format((int) mb_substr($rut, 0, -1), 0, ',', '.')
         . '-' . mb_substr($rut, -1);
 @endphp
-<div class="container py-5">
+<div class="cl-page py-5">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card shadow-sm border-0">
-                <div class="card-body p-4 p-lg-5">
+        <div class="col-xl-9">
+            <div class="card cl-panel">
+                <div class="card-body cl-verify-body">
                     <div class="text-center mb-4">
-                        <div class="display-6 text-{{ $certificado->estado === 'vigente' ? 'success' : 'danger' }}">
-                            <i class="bi bi-{{ $certificado->estado === 'vigente' ? 'patch-check-fill' : 'x-octagon-fill' }}"></i>
+                        <div class="cl-verify-icon {{ $certificado->estado === 'vigente' ? 'is-success' : ($certificado->estado === 'anulado' ? 'is-danger' : 'is-warning') }}" aria-hidden="true">
+                            <i class="bi bi-{{ $certificado->estado === 'vigente' ? 'patch-check-fill' : ($certificado->estado === 'anulado' ? 'x-octagon-fill' : 'exclamation-circle-fill') }}"></i>
                         </div>
-                        <h1 class="h3 mt-2">Verificación documental</h1>
-                        <p class="text-muted mb-0">
+                        <div class="cl-eyebrow mt-3">Certificados laborales</div>
+                        <h1 class="cl-hero-title">Verificación documental</h1>
+                        <p class="cl-hero-subtitle mx-auto">
                             Certificado de vigencia laboral · {{ $certificado->numero }}
                         </p>
                     </div>
 
                     @if ($certificado->estado === 'vigente')
-                        <div class="alert alert-success">
+                        <div class="alert alert-success cl-alert" role="status">
                             El documento consultado fue emitido por la plataforma y se encuentra vigente.
                         </div>
                     @elseif ($certificado->estado === 'anulado')
-                        <div class="alert alert-danger">
+                        <div class="alert alert-danger cl-alert" role="status">
                             El documento existe, pero fue anulado el
                             {{ $certificado->anulado_at?->format('d-m-Y H:i') }}.
                         </div>
                     @else
-                        <div class="alert alert-warning">
+                        <div class="alert alert-warning cl-alert" role="status">
                             El documento existe, pero no se encuentra vigente.
                         </div>
                     @endif
 
-                    <dl class="row mb-0">
-                        <dt class="col-sm-4">Funcionario</dt>
-                        <dd class="col-sm-8">{{ $certificado->nombre_snapshot }}</dd>
-                        <dt class="col-sm-4">RUT</dt>
-                        <dd class="col-sm-8">{{ $rutFormateado }}</dd>
-                        <dt class="col-sm-4">Fecha de antigüedad</dt>
-                        <dd class="col-sm-8">{{ $certificado->fecha_antiguedad?->format('d-m-Y') }}</dd>
-                        <dt class="col-sm-4">Fecha de emisión</dt>
-                        <dd class="col-sm-8">{{ $certificado->emitido_at?->format('d-m-Y H:i') }}</dd>
-                        <dt class="col-sm-4">Estado</dt>
-                        <dd class="col-sm-8 text-capitalize">{{ $certificado->estado }}</dd>
-                        <dt class="col-sm-4">Huella SHA-256</dt>
-                        <dd class="col-sm-8">
-                            <code class="text-break">{{ $certificado->documento_hash ?: 'No disponible' }}</code>
-                        </dd>
+                    <dl class="row g-2 mb-0">
+                        <div class="col-sm-6"><div class="cl-fact"><dt class="cl-fact-label">Funcionario</dt><dd class="cl-fact-value">{{ $certificado->nombre_snapshot }}</dd></div></div>
+                        <div class="col-sm-6"><div class="cl-fact"><dt class="cl-fact-label">RUT</dt><dd class="cl-fact-value">{{ $rutFormateado }}</dd></div></div>
+                        <div class="col-sm-6"><div class="cl-fact"><dt class="cl-fact-label">Fecha de antigüedad</dt><dd class="cl-fact-value">{{ $certificado->fecha_antiguedad?->format('d-m-Y') }}</dd></div></div>
+                        <div class="col-sm-6"><div class="cl-fact"><dt class="cl-fact-label">Fecha de emisión</dt><dd class="cl-fact-value">{{ $certificado->emitido_at?->format('d-m-Y H:i') }}</dd></div></div>
+                        <div class="col-12"><div class="cl-fact"><dt class="cl-fact-label">Estado</dt><dd class="cl-fact-value"><span class="cl-chip {{ $certificado->estado === 'vigente' ? 'is-success' : ($certificado->estado === 'anulado' ? 'is-danger' : 'is-warning') }}">{{ ucfirst($certificado->estado) }}</span></dd></div></div>
+                        <div class="col-12"><div class="cl-fact"><dt class="cl-fact-label">Huella SHA-256</dt><dd class="cl-fact-value cl-hash"><code>{{ $certificado->documento_hash ?: 'No disponible' }}</code></dd></div></div>
                     </dl>
                 </div>
             </div>
