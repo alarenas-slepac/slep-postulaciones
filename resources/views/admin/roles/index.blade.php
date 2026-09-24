@@ -1,21 +1,32 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="container">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <h1 class="h4 m-0">Roles</h1>
+    <div class="ur-page">
+        <div class="ur-hero">
+            <div class="ur-hero-main">
+                <span class="ur-hero-icon" aria-hidden="true"><i class="bi bi-person-gear"></i></span>
+                <div>
+                    <div class="ur-eyebrow">Administración · Accesos</div>
+                    <h1 class="ur-hero-title">Roles</h1>
+                    <p class="ur-hero-subtitle">Gestiona los roles y los módulos visibles para cada uno.</p>
+                </div>
+            </div>
+            <div class="ur-hero-actions">
+            <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary"><i class="bi bi-people" aria-hidden="true"></i> Usuarios</a>
             <a href="{{ route('admin.roles.create') }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Nuevo rol
+                <i class="bi bi-plus-circle" aria-hidden="true"></i> Nuevo rol
             </a>
+            </div>
         </div>
 
         @if (session('status'))
-            <div class="alert alert-success">{{ session('status') }}</div>
+            <div class="alert alert-success"><i class="bi bi-check-circle me-2" aria-hidden="true"></i>{{ session('status') }}</div>
         @endif
 
-        <div class="card">
+        <div class="card ur-panel">
+            <div class="card-header"><div class="ur-panel-kicker">Configuración</div><h2 class="ur-panel-title">Roles disponibles</h2></div>
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table table-hover align-middle ur-page-table">
                     <thead>
                         <tr>
                             <th>Rol</th>
@@ -25,7 +36,7 @@
                     <tbody>
                         @forelse($roles as $role)
                             <tr>
-                                <td class="fw-semibold">{{ $role->name }}</td>
+                                <td><span class="ur-table-primary">{{ $role->name }}</span></td>
                                 <td class="text-end">
                                     <a class="btn btn-sm btn-outline-secondary"
                                         href="{{ route('admin.roles.edit', $role) }}">
@@ -37,8 +48,8 @@
                                             action="{{ route('admin.roles.destroy', $role) }}"
                                             onsubmit="return confirm('¿Eliminar rol {{ $role->name }}?');">
                                             @csrf @method('DELETE')
-                                            <button class="btn btn-sm btn-outline-danger">
-                                                <i class="bi bi-trash"></i>
+                                            <button class="btn btn-sm ur-danger" type="submit" aria-label="Eliminar rol {{ $role->name }}">
+                                                <i class="bi bi-trash" aria-hidden="true"></i> Eliminar
                                             </button>
                                         </form>
                                     @endif
@@ -46,7 +57,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="2" class="text-center text-muted py-4">Sin roles.</td>
+                                <td colspan="2" class="ur-empty"><i class="bi bi-person-gear" aria-hidden="true"></i>Sin roles.</td>
                             </tr>
                         @endforelse
                     </tbody>

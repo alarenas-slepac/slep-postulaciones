@@ -29,6 +29,10 @@
 11. Los parches deben contener solamente archivos nuevos o modificados,
     conservando sus rutas relativas.
 12. Actualizar `config/changelog.php` cuando el cambio corresponda a un parche.
+13. Toda interfaz nueva o modificada debe seguir `docs/DESIGN_SYSTEM.md`, tomando
+    como referencia visual el módulo `resources/views/tramites/cometidos-funcionarios/`.
+    Si una pantalla existente se interviene, aplicar estas reglas a la zona
+    modificada y evitar nuevos estilos visuales divergentes.
 
 ## Validaciones antes de entregar
 

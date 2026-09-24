@@ -1,17 +1,21 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-        <div>
-            <h1 class="h3 mb-1">Correos por rol</h1>
-            <p class="text-muted mb-0">Envía una comunicación institucional a usuarios que tengan uno de los roles seleccionados y su correo verificado.</p>
+<div class="ur-page">
+    <div class="ur-hero">
+        <div class="ur-hero-main">
+            <span class="ur-hero-icon" aria-hidden="true"><i class="bi bi-envelope-at"></i></span>
+            <div>
+                <div class="ur-eyebrow">Administración · Usuarios y roles</div>
+                <h1 class="ur-hero-title">Correos por rol</h1>
+                <p class="ur-hero-subtitle">Envía una comunicación institucional a usuarios que tengan uno de los roles seleccionados y su correo verificado.</p>
+            </div>
         </div>
-        <a href="{{ route('admin.notification-logs.index') }}" class="btn btn-outline-secondary">Historial de notificaciones</a>
+        <div class="ur-hero-actions"><a href="{{ route('admin.notification-logs.index') }}" class="btn btn-outline-secondary"><i class="bi bi-clock-history" aria-hidden="true"></i> Historial de notificaciones</a></div>
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
+        <div class="alert alert-success"><i class="bi bi-check-circle me-2" aria-hidden="true"></i>{{ session('success') }}</div>
     @endif
 
     @if($errors->any())
@@ -24,15 +28,16 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('admin.bulk-role-mail.send') }}" class="card shadow-sm">
+    <form method="POST" action="{{ route('admin.bulk-role-mail.send') }}" class="card ur-panel">
         @csrf
-        <div class="card-body p-4">
-            <div class="mb-4">
-                <label class="form-label fw-semibold">Roles destinatarios</label>
+        <div class="card-header"><div class="ur-panel-kicker">Comunicación</div><h2 class="ur-panel-title">Preparar envío</h2></div>
+        <div class="card-body">
+            <fieldset class="mb-4">
+                <legend class="form-label">Roles destinatarios</legend>
                 <div class="row g-2">
                     @foreach($roles as $role)
                         <div class="col-md-6 col-xl-4">
-                            <label class="border rounded p-3 d-flex gap-3 align-items-start h-100 w-100">
+                            <label class="ur-option w-100">
                                 <input class="form-check-input mt-1" type="checkbox" name="roles[]" value="{{ $role['name'] }}" @checked(in_array($role['name'], old('roles', []), true))>
                                 <span>
                                     <span class="fw-semibold d-block">{{ $role['label'] }}</span>
@@ -42,7 +47,7 @@
                         </div>
                     @endforeach
                 </div>
-            </div>
+            </fieldset>
 
             <div class="mb-3">
                 <label for="subject" class="form-label fw-semibold">Asunto</label>
@@ -60,8 +65,8 @@
                 <label class="form-check-label" for="confirm">Confirmo que revisé los roles, el asunto y el contenido antes de programar el envío.</label>
             </div>
 
-            <button type="submit" class="btn btn-primary">Programar envío</button>
         </div>
+        <div class="ur-actionbar"><button type="submit" class="btn btn-primary"><i class="bi bi-send" aria-hidden="true"></i> Programar envío</button></div>
     </form>
 </div>
 @endsection

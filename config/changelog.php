@@ -1,6 +1,34 @@
 <?php
 
 return [
+    '2026.9.24.505' => [
+        'date' => '2026-09-24',
+        'module' => 'Administración',
+        'title' => 'Diseño unificado de usuarios y roles',
+        'files' => [
+            'config/changelog.php',
+            'public/build/manifest.json',
+            'public/build/assets/app-ZpYT2Xyq.css',
+            'resources/scss/app.scss',
+            'resources/scss/_admin-users-roles.scss',
+            'resources/views/admin/users/index.blade.php',
+            'resources/views/admin/users/show.blade.php',
+            'resources/views/admin/users/create.blade.php',
+            'resources/views/admin/users/edit.blade.php',
+            'resources/views/admin/users/_form.blade.php',
+            'resources/views/admin/roles/index.blade.php',
+            'resources/views/admin/roles/create.blade.php',
+            'resources/views/admin/roles/edit.blade.php',
+            'resources/views/admin/roles/_form.blade.php',
+            'resources/views/admin/bulk-role-mail/index.blade.php',
+        ],
+        'changes' => [
+            'Unifica encabezados, paneles, formularios, listados, indicadores y estados con el Design System basado en Cometidos funcionarios.',
+            'Mejora las etiquetas de campos, la lectura de acciones y la adaptación de usuarios, roles y correos por rol a pantallas pequeñas.',
+            'Conserva rutas, permisos y comportamiento de gestión existentes.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP'],
+    ],
     '2026.9.23.504' => [
         'date' => '2026-09-23',
         'module' => 'Solicitudes de reemplazo',

@@ -2,11 +2,12 @@
     $assignedIds = old('modules', $assigned ?? []);
 @endphp
 
-<div class="card mb-3">
+<div class="card ur-panel mb-4">
+    <div class="card-header"><div class="ur-panel-kicker">Identificación</div><h2 class="ur-panel-title">Datos del rol</h2></div>
     <div class="card-body">
-        <label class="form-label">Nombre del rol</label>
-        <input class="form-control @error('name') is-invalid @enderror" name="name"
-            value="{{ old('name', $role->name ?? '') }}" placeholder="ej: coordinador_gdp">
+        <label class="form-label" for="role-name">Nombre del rol <span class="text-danger">*</span></label>
+        <input id="role-name" class="form-control @error('name') is-invalid @enderror" name="name"
+            value="{{ old('name', $role->name ?? '') }}" placeholder="ej: coordinador_gdp" required>
         @error('name')
             <div class="invalid-feedback">{{ $message }}</div>
         @enderror
@@ -15,10 +16,10 @@
 </div>
 
 @if (isset($modules) && $modules->count())
-    <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between">
-            <strong>Módulos visibles</strong>
-            <div class="d-flex gap-2">
+    <div class="card ur-panel">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div><div class="ur-panel-kicker">Permisos de navegación</div><h2 class="ur-panel-title">Módulos visibles</h2></div>
+            <div class="ur-actions">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSelectAll">
                     Seleccionar todo
                 </button>
@@ -30,9 +31,9 @@
 
         <div class="card-body">
             @foreach ($modules as $section => $items)
-                <div class="mb-4">
+                <div class="ur-section mb-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <div class="text-uppercase text-muted small fw-semibold">{{ $section }}</div>
+                        <h3 class="ur-section-title mb-0">{{ $section }}</h3>
                         <button type="button" class="btn btn-sm btn-outline-secondary btnSectionToggle"
                             data-section="{{ \Illuminate\Support\Str::slug($section) }}">
                             Alternar sección
@@ -42,7 +43,7 @@
                     <div class="row g-2" data-section-wrap="{{ \Illuminate\Support\Str::slug($section) }}">
                         @foreach ($items as $m)
                             <div class="col-12 col-md-6">
-                                <div class="form-check">
+                                <div class="form-check ur-option">
                                     <input class="form-check-input module-check" type="checkbox" name="modules[]"
                                         value="{{ $m->id }}" id="mod_{{ $m->id }}"
                                         @checked(in_array($m->id, $assignedIds))>
