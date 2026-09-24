@@ -185,8 +185,8 @@
         <div class="card shadow-sm mb-3" id="bienios-card">
             <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
                 <span>Agregar nuevos documentos o reemplazos</span>
-                <a href="{{ route('tramites.template.download', 'reconocimiento_bienios') }}" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-download"></i> Descargar plantilla carta
+                <a href="{{ route('tramites.template.download', ['tipo' => 'reconocimiento_bienios', 'tramite' => $tramite->id]) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-download"></i> Descargar carta {{ $bieniosCartaEstamento }}
                 </a>
             </div>
             <div class="card-body">

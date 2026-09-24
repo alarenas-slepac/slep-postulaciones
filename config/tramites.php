@@ -22,6 +22,7 @@ return [
             'external_calculation' => true,
             'warning' => 'Adjunta documentos legibles, firmados y timbrados cuando corresponda. No debes ingresar fechas ni efectuar un cómputo en la plataforma; los períodos reconocibles serán determinados administrativamente durante la revisión.',
             'template_relative_path' => 'templates/CARTA BIENIOS.docx',
+            'template_relative_path_aaee' => 'templates/CARTA BIENIOS AAEE.docx',
             'documentos' => [
                 'carta_reconocimiento_director_ejecutivo' => [
                     'label' => 'Carta reconocimiento a director ejecutivo',
