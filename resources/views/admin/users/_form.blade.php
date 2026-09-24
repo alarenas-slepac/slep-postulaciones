@@ -13,14 +13,14 @@
 <div class="row g-3">
     @if ($isEdit)
         <div class="col-md-4">
-            <label class="form-label">RUT</label>
-            <input type="text" class="form-control" value="{{ $user->rut }}" disabled>
+            <label class="form-label" for="user-rut-readonly">RUT</label>
+            <input id="user-rut-readonly" type="text" class="form-control" value="{{ $user->rut }}" disabled>
             <div class="form-text">El RUT queda fijo una vez creado el usuario.</div>
         </div>
     @else
         <div class="col-md-4">
-            <label class="form-label">RUT <span class="text-danger">*</span></label>
-            <input type="text" name="rut" value="{{ old('rut') }}"
+            <label class="form-label" for="user-rut">RUT <span class="text-danger">*</span></label>
+            <input id="user-rut" type="text" name="rut" value="{{ old('rut') }}"
                 class="form-control @error('rut') is-invalid @enderror" placeholder="12.345.678-K" required
                 data-validate="rut" autocomplete="off">
             <div class="form-text">Usa el formato con guion y dígito verificador (ej.: 12.345.678-K).</div>
@@ -34,8 +34,8 @@
     @endif
 
     <div class="col-md-4">
-        <label class="form-label">Nombres <span class="text-danger">*</span></label>
-        <input type="text" name="nombres" value="{{ old('nombres', $user->nombres ?? '') }}"
+        <label class="form-label" for="user-nombres">Nombres <span class="text-danger">*</span></label>
+        <input id="user-nombres" type="text" name="nombres" value="{{ old('nombres', $user->nombres ?? '') }}"
             class="form-control @error('nombres') is-invalid @enderror" placeholder="Nombres del usuario" required
             autocomplete="off">
         <div class="form-text">Escribe los nombres tal como figuran en el documento.</div>
@@ -48,8 +48,8 @@
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Apellido paterno <span class="text-danger">*</span></label>
-        <input type="text" name="apellido_paterno"
+        <label class="form-label" for="user-apellido-paterno">Apellido paterno <span class="text-danger">*</span></label>
+        <input id="user-apellido-paterno" type="text" name="apellido_paterno"
             value="{{ old('apellido_paterno', $user->apellido_paterno ?? '') }}"
             class="form-control @error('apellido_paterno') is-invalid @enderror" placeholder="Apellido paterno"
             required autocomplete="off">
@@ -63,8 +63,8 @@
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Apellido materno <span class="text-danger">*</span></label>
-        <input type="text" name="apellido_materno"
+        <label class="form-label" for="user-apellido-materno">Apellido materno <span class="text-danger">*</span></label>
+        <input id="user-apellido-materno" type="text" name="apellido_materno"
             value="{{ old('apellido_materno', $user->apellido_materno ?? '') }}"
             class="form-control @error('apellido_materno') is-invalid @enderror" placeholder="Apellido materno"
             required autocomplete="off">
@@ -78,8 +78,8 @@
     </div>
 
     <div class="col-md-5">
-        <label class="form-label">Email <span class="text-danger">*</span></label>
-        <input type="email" name="email" value="{{ old('email', $user->email ?? '') }}"
+        <label class="form-label" for="user-email">Email <span class="text-danger">*</span></label>
+        <input id="user-email" type="email" name="email" value="{{ old('email', $user->email ?? '') }}"
             class="form-control @error('email') is-invalid @enderror" placeholder="usuario@ejemplo.cl" required
             autocomplete="off">
         <div class="form-text">Será usado para acceso y notificaciones.</div>
@@ -92,12 +92,12 @@
     </div>
 
     <div class="col-md-7">
-        <label class="form-label d-block">Roles <span class="text-danger">*</span></label>
-        <div class="border rounded-3 p-3 @if ($errors->has('roles') || $errors->has('roles.*')) border-danger @endif">
+        <div class="form-label">Roles <span class="text-danger">*</span></div>
+        <div class="ur-section @if ($errors->has('roles') || $errors->has('roles.*')) border-danger @endif" role="group" aria-label="Roles del usuario">
             <div class="row g-2">
                 @foreach ($roles as $value => $label)
                     <div class="col-md-6 col-xl-4">
-                        <div class="form-check">
+                        <div class="form-check ur-option">
                             <input class="form-check-input js-role-checkbox" type="checkbox" name="roles[]"
                                 value="{{ $value }}" id="role_{{ $value }}" @checked(in_array($value, $selectedRoles, true))>
                             <label class="form-check-label" for="role_{{ $value }}">{{ $label }}</label>
@@ -117,7 +117,7 @@
 
     @if ($isEdit)
         <div class="col-md-4 d-flex align-items-end">
-            <div class="form-check form-switch">
+            <div class="form-check form-switch ur-section w-100">
                 <input type="hidden" name="email_verified" value="0">
                 <input class="form-check-input" type="checkbox" role="switch" id="email_verified"
                     name="email_verified" value="1" @checked(old('email_verified', !empty($user?->email_verified_at) ? 1 : 0))>
@@ -128,8 +128,8 @@
     @endif
 
     <div class="col-md-9" id="establecimiento-wrapper" style="display:none;">
-        <label class="form-label">Establecimiento <span class="text-danger">*</span></label>
-        <select name="establecimiento_id" class="form-select @error('establecimiento_id') is-invalid @enderror">
+        <label class="form-label" for="user-establecimiento">Establecimiento <span class="text-danger">*</span></label>
+        <select id="user-establecimiento" name="establecimiento_id" class="form-select @error('establecimiento_id') is-invalid @enderror">
             <option value="">Seleccione un establecimiento...</option>
             @foreach ($establecimientos as $comuna => $items)
                 <optgroup label="{{ $comuna }}">

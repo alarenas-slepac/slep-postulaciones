@@ -1,35 +1,42 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h1 class="h4 mb-0">Crear usuario</h1>
-                <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary">Volver</a>
+<div class="ur-page">
+    <div class="ur-hero">
+        <div class="ur-hero-main">
+            <span class="ur-hero-icon" aria-hidden="true"><i class="bi bi-person-plus"></i></span>
+            <div>
+                <div class="ur-eyebrow">Administración · Usuarios</div>
+                <h1 class="ur-hero-title">Crear usuario</h1>
+                <p class="ur-hero-subtitle">Registra la cuenta y asigna sus roles y establecimiento cuando corresponda.</p>
             </div>
+        </div>
+        <div class="ur-hero-actions"><a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</a></div>
+    </div>
 
-            <div class="card">
+    <div class="row justify-content-center">
+        <div class="col-xl-10">
+            <div class="card ur-panel">
+                <div class="card-header"><div class="ur-panel-kicker">Datos de la cuenta</div><h2 class="ur-panel-title">Información y accesos</h2></div>
                 <div class="card-body">
                     <form method="POST" action="{{ route('admin.users.store') }}" class="js-validate" novalidate>
                         @csrf
 
                         @include('admin.users._form')
 
-                        <hr class="my-4">
-
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">Crear usuario</button>
-                            <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary">Cancelar</a>
-                        </div>
-
-                        <p class="text-muted mt-3 mb-0">
+                        <p class="ur-info-help mt-4 mb-0">
                             * Campos obligatorios. El usuario podrá definir su contraseña usando “Olvidé mi contraseña”.
                         </p>
+                        <div class="ur-actionbar mt-4">
+                            <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check2" aria-hidden="true"></i> Crear usuario</button>
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
+</div>
 @endsection
 
 @push('scripts')

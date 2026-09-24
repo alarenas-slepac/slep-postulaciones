@@ -1,69 +1,74 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h4 mb-0">Ficha de usuario</h1>
-            <div class="text-muted small">{{ $user->nombre_completo ?: $user->email }}</div>
+<div class="ur-page">
+    <div class="ur-hero">
+        <div class="ur-hero-main">
+            <span class="ur-hero-icon" aria-hidden="true"><i class="bi bi-person-vcard"></i></span>
+            <div>
+                <div class="ur-eyebrow">Administración · Usuarios</div>
+                <h1 class="ur-hero-title">Ficha de usuario</h1>
+                <p class="ur-hero-subtitle">{{ $user->nombre_completo ?: $user->email }}</p>
+            </div>
         </div>
-        <div class="d-flex gap-2">
+        <div class="ur-hero-actions">
+            <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</a>
             <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-primary">
-                <i class="bi bi-pencil-square"></i> Editar
+                <i class="bi bi-pencil-square" aria-hidden="true"></i> Editar usuario
             </a>
-            <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary">Volver</a>
         </div>
     </div>
 
     @if (session('status'))
-        <div class="alert alert-success">{{ session('status') }}</div>
+        <div class="alert alert-success"><i class="bi bi-check-circle me-2" aria-hidden="true"></i>{{ session('status') }}</div>
     @endif
 
-    <div class="row g-3">
+    <div class="row g-4">
         <div class="col-lg-8">
-            <div class="card h-100">
-                <div class="card-header"><strong>Información general</strong></div>
+            <div class="card ur-panel h-100">
+                <div class="card-header"><div class="ur-panel-kicker">Cuenta</div><h2 class="ur-panel-title">Información general</h2></div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <div class="text-muted small">RUT</div>
-                            <div class="fw-semibold">{{ $user->rut }}</div>
+                            <div class="ur-info-item"><div class="ur-info-label">RUT</div>
+                            <div class="ur-info-value">{{ $user->rut }}</div></div>
                         </div>
                         <div class="col-md-6">
-                            <div class="text-muted small">Email</div>
-                            <div class="fw-semibold">{{ $user->email }}</div>
+                            <div class="ur-info-item"><div class="ur-info-label">Email</div>
+                            <div class="ur-info-value">{{ $user->email }}</div></div>
                         </div>
                         <div class="col-md-6">
-                            <div class="text-muted small">Nombres</div>
-                            <div class="fw-semibold">{{ $user->nombres }}</div>
+                            <div class="ur-info-item"><div class="ur-info-label">Nombres</div>
+                            <div class="ur-info-value">{{ $user->nombres }}</div></div>
                         </div>
                         <div class="col-md-6">
-                            <div class="text-muted small">Apellidos</div>
-                            <div class="fw-semibold">{{ trim(($user->apellido_paterno ?? '') . ' ' . ($user->apellido_materno ?? '')) }}</div>
+                            <div class="ur-info-item"><div class="ur-info-label">Apellidos</div>
+                            <div class="ur-info-value">{{ trim(($user->apellido_paterno ?? '') . ' ' . ($user->apellido_materno ?? '')) }}</div></div>
                         </div>
                         <div class="col-md-6">
-                            <div class="text-muted small">Rol actual</div>
-                            <div>
+                            <div class="ur-info-item"><div class="ur-info-label">Roles asignados</div>
+                            <div class="ur-actions">
                                 @forelse ($user->getRoleNames() as $role)
-                                    <span class="badge bg-secondary">{{ $role }}</span>
+                                    <span class="ur-chip is-info">{{ $role }}</span>
                                 @empty
                                     <span class="text-muted">Sin rol asignado</span>
                                 @endforelse
-                            </div>
+                            </div></div>
                         </div>
                         <div class="col-md-6">
-                            <div class="text-muted small">Verificación</div>
+                            <div class="ur-info-item"><div class="ur-info-label">Verificación</div>
                             <div>
                                 @if ($user->email_verified_at)
-                                    <span class="badge text-bg-success">Verificado</span>
+                                    <span class="ur-chip is-success">Verificado</span>
                                     <div class="small text-muted mt-1">{{ cl_datetime($user->email_verified_at) }}</div>
                                 @else
-                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                    <span class="ur-chip is-warning">Pendiente</span>
                                 @endif
-                            </div>
+                            </div></div>
                         </div>
                         <div class="col-md-12">
-                            <div class="text-muted small">Establecimiento</div>
-                            <div class="fw-semibold">
+                            <div class="ur-info-item"><div class="ur-info-label">Establecimiento</div>
+                            <div class="ur-info-value">
                                 @if ($user->establecimiento)
                                     {{ $user->establecimiento->rbd }} — {{ $user->establecimiento->nombre_establecimiento }}
                                     @if ($user->establecimiento->comuna)
@@ -72,7 +77,7 @@
                                 @else
                                     <span class="text-muted">No aplica / sin asignación</span>
                                 @endif
-                            </div>
+                            </div></div>
                         </div>
                     </div>
                 </div>
@@ -80,26 +85,26 @@
         </div>
 
         <div class="col-lg-4">
-            <div class="card mb-3">
-                <div class="card-header"><strong>Auditoría</strong></div>
+            <div class="card ur-panel mb-3">
+                <div class="card-header"><div class="ur-panel-kicker">Seguimiento</div><h2 class="ur-panel-title">Auditoría</h2></div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <div class="text-muted small">Creado</div>
-                        <div class="fw-semibold">{{ cl_datetime($user->created_at) }}</div>
+                    <div class="ur-info-item mb-3">
+                        <div class="ur-info-label">Creado</div>
+                        <div class="ur-info-value">{{ cl_datetime($user->created_at) }}</div>
                     </div>
-                    <div class="mb-3">
-                        <div class="text-muted small">Actualizado</div>
-                        <div class="fw-semibold">{{ cl_datetime($user->updated_at) }}</div>
+                    <div class="ur-info-item mb-3">
+                        <div class="ur-info-label">Actualizado</div>
+                        <div class="ur-info-value">{{ cl_datetime($user->updated_at) }}</div>
                     </div>
-                    <div>
-                        <div class="text-muted small">Última actividad</div>
-                        <div class="fw-semibold">{{ cl_datetime($user->last_seen_at, 'd-m-Y H:i', 'Sin registro') }}</div>
+                    <div class="ur-info-item">
+                        <div class="ur-info-label">Última actividad</div>
+                        <div class="ur-info-value">{{ cl_datetime($user->last_seen_at, 'd-m-Y H:i', 'Sin registro') }}</div>
                     </div>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header"><strong>Acciones</strong></div>
+            <div class="card ur-panel">
+                <div class="card-header"><div class="ur-panel-kicker">Navegación</div><h2 class="ur-panel-title">Acciones</h2></div>
                 <div class="card-body d-grid gap-2">
                     <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-outline-primary">
                         <i class="bi bi-pencil-square"></i> Editar usuario
@@ -109,4 +114,5 @@
             </div>
         </div>
     </div>
+</div>
 @endsection
