@@ -1,31 +1,40 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
-        <div>
-            <h1 class="h3 mb-1">Importar historial de contratos</h1>
-            <p class="text-muted mb-0">
-                La carga queda pendiente hasta que finalice el procesamiento y sea activada.
-            </p>
+<div class="cl-page py-4">
+    <div class="cl-hero">
+        <div class="cl-hero-main">
+            <span class="cl-hero-icon" aria-hidden="true"><i class="bi bi-upload"></i></span>
+            <div>
+                <div class="cl-eyebrow">Certificados laborales · Bases históricas</div>
+                <h1 class="cl-hero-title">Importar historial de contratos</h1>
+                <p class="cl-hero-subtitle">
+                    La carga queda pendiente hasta que finalice el procesamiento y sea activada.
+                </p>
+            </div>
         </div>
-        <a href="{{ route('certificados.importaciones.index') }}" class="btn btn-outline-secondary">
-            Volver
-        </a>
+        <div class="cl-hero-actions">
+            <a href="{{ route('certificados.importaciones.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver
+            </a>
+        </div>
     </div>
 
     <div class="row g-4">
         <div class="col-lg-5">
-            <div class="card shadow-sm h-100">
+            <div class="card cl-panel h-100">
+                <div class="card-header">
+                    <div class="cl-panel-kicker">Formato</div>
+                    <h2 class="cl-panel-title">Columnas requeridas</h2>
+                </div>
                 <div class="card-body">
-                    <h2 class="h5">Columnas requeridas</h2>
-                    <ul class="small text-muted ps-3 mb-3">
+                    <ul class="cl-help-list mb-3">
                         <li>Rut y Nombre</li>
                         <li>Establecimiento y Comuna</li>
                         <li>Fec.Ing. y Fec.Finiq</li>
                         <li>Calidad Jurídica y Régimen Jurídico</li>
                     </ul>
-                    <p class="small text-muted mb-0">
+                    <p class="cl-section-help mb-0">
                         Fec.Finiq puede contener una fecha válida o el valor “Indefinido”.
                         Las filas inválidas se omiten y quedan registradas como observaciones.
                     </p>
@@ -33,7 +42,11 @@
             </div>
         </div>
         <div class="col-lg-7">
-            <div class="card shadow-sm">
+            <div class="card cl-panel">
+                <div class="card-header">
+                    <div class="cl-panel-kicker">Carga</div>
+                    <h2 class="cl-panel-title">Seleccionar archivo</h2>
+                </div>
                 <div class="card-body">
                     <form
                         method="POST"
@@ -41,28 +54,30 @@
                         enctype="multipart/form-data"
                     >
                         @csrf
-                        <label for="excel" class="form-label">Archivo Excel</label>
-                        <input
-                            id="excel"
-                            type="file"
-                            name="excel"
-                            accept=".xlsx,.xls"
-                            class="form-control @error('excel') is-invalid @enderror"
-                            required
-                        >
-                        @error('excel')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                        <div class="form-text">Tamaño máximo: 50 MB.</div>
+                        <div class="cl-section">
+                            <label for="excel" class="form-label">Archivo Excel <span class="text-danger">*</span></label>
+                            <input
+                                id="excel"
+                                type="file"
+                                name="excel"
+                                accept=".xlsx,.xls"
+                                class="form-control @error('excel') is-invalid @enderror"
+                                required
+                            >
+                            @error('excel')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Formatos .xlsx y .xls · Tamaño máximo: 50 MB.</div>
+                        </div>
 
-                        <div class="d-flex gap-2 mt-4">
-                            <button class="btn btn-primary">
-                                <i class="bi bi-upload"></i> Subir y procesar
-                            </button>
+                        <div class="cl-actionbar mt-4">
                             <a
                                 href="{{ route('certificados.importaciones.index') }}"
                                 class="btn btn-outline-secondary"
                             >Cancelar</a>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-upload" aria-hidden="true"></i> Subir y procesar
+                            </button>
                         </div>
                     </form>
                 </div>

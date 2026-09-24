@@ -1,6 +1,29 @@
 <?php
 
 return [
+    '2026.9.24.507' => [
+        'date' => '2026-09-24',
+        'module' => 'Certificados laborales',
+        'title' => 'Diseño unificado de certificados laborales',
+        'files' => [
+            'config/changelog.php',
+            'public/build/manifest.json',
+            'public/build/assets/app-D88HwLa8.css',
+            'resources/scss/app.scss',
+            'resources/scss/_certificados-laborales.scss',
+            'resources/views/certificados/index.blade.php',
+            'resources/views/certificados/verificar.blade.php',
+            'resources/views/certificados/importaciones/index.blade.php',
+            'resources/views/certificados/importaciones/create.blade.php',
+            'resources/views/certificados/importaciones/show.blade.php',
+        ],
+        'changes' => [
+            'Aplica el Design System basado en Cometidos a emisión, verificación y gestión de bases históricas.',
+            'Unifica encabezados, paneles, formularios, estados, tablas y acciones con adaptación móvil.',
+            'Conserva rutas, permisos, validación y datos históricos existentes.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP', 'Funcionario', 'Funcionario AC'],
+    ],
     '2026.9.24.506' => [
         'date' => '2026-09-24',
         'module' => 'Administración',
