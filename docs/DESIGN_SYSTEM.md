@@ -65,6 +65,14 @@ Usar tarjetas de superficie blanca, cabecera clara y cuerpo con espacio consiste
 
 Agrupar campos por tarea en secciones con título e icono. Asociar `label` e `id`; marcar los obligatorios con texto o asterisco visible y conservar validación del servidor. Usar `.form-control`, `.form-select`, `.form-check` y mensajes de ayuda/errores de Bootstrap como base; bordes suaves, radio cercano a `0.75rem` y foco azul visible. Mostrar los campos de solo lectura con fondo tenue. Colocar **Cancelar/Volver** como acción secundaria y **Guardar/Enviar** como acción principal al final. Deshabilitar una acción solo cuando exista una razón comprensible para el usuario.
 
+En una fila, alinear los bloques por su borde superior y dejar la ayuda y los errores **dentro** del bloque al que pertenecen. No aplicar `height: 100%` a un contenedor si sus etiquetas, ayudas o errores quedan fuera de él: el contenido puede invadir la fila siguiente. Las secciones condicionales deben ocupar su propia celda de la cuadrícula y mantener espacio al aparecer o desaparecer.
+
+### Selectores
+
+Usar el `select` nativo para listas cortas y fáciles de recorrer. Para catálogos largos, como establecimientos o roles disponibles en un filtro, ofrecer búsqueda con Select2 y el tema Bootstrap 5 ya usado en el proyecto. El selector visible debe respetar el alto mínimo de `2.65rem`, radio cercano a `0.75rem`, borde `#dbe4f0`, texto `#0f172a` y foco azul. El desplegable debe mostrar búsqueda, opciones con espacio suficiente y el mismo estilo de foco/selección.
+
+Conservar el `<select>` real, su `name`, `id`, grupos, opción vacía, valor seleccionado y validación del servidor. Asociar su `label` y mostrar el error junto al control visible. Si los recursos de Select2 no cargan, el selector nativo debe seguir siendo utilizable. Al cambiar una sección condicional o limpiar un valor por código, actualizar también el control enriquecido. Comprobar teclado, móvil y que el desplegable no quede recortado por una tarjeta o modal.
+
 ### Botones y enlaces de acción
 
 Primario azul sólido; secundario blanco con borde gris; éxito verde; advertencia ámbar; peligro rojo, preferentemente con fondo blanco salvo confirmación explícita. Botones con texto directo, icono opcional, peso fuerte y esquinas redondeadas. Los enlaces que actúan como botones deben seguir la misma apariencia. Mantener un área de interacción cómoda, especialmente en móvil, y estados hover, foco, carga y deshabilitado reconocibles.

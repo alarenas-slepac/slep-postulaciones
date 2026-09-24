@@ -91,12 +91,12 @@
         @endunless
     </div>
 
-    <div class="col-md-7">
-        <div class="form-label">Roles <span class="text-danger">*</span></div>
-        <div class="ur-section @if ($errors->has('roles') || $errors->has('roles.*')) border-danger @endif" role="group" aria-label="Roles del usuario">
+    <div class="col-12">
+        <fieldset class="ur-section ur-role-section @if ($errors->has('roles') || $errors->has('roles.*')) border-danger @endif">
+            <legend class="form-label">Roles <span class="text-danger">*</span></legend>
             <div class="row g-2">
                 @foreach ($roles as $value => $label)
-                    <div class="col-md-6 col-xl-4">
+                    <div class="col-sm-6 col-lg-4 col-xxl-3">
                         <div class="form-check ur-option">
                             <input class="form-check-input js-role-checkbox" type="checkbox" name="roles[]"
                                 value="{{ $value }}" id="role_{{ $value }}" @checked(in_array($value, $selectedRoles, true))>
@@ -105,8 +105,8 @@
                     </div>
                 @endforeach
             </div>
-        </div>
-        <div class="form-text">Puedes asignar uno o varios roles. Si el usuario mantiene el rol postulante, seguirá disponible en selectores de propuesta y reasignación.</div>
+            <p class="form-text mb-0 mt-3">Puedes asignar uno o varios roles. Si el usuario mantiene el rol postulante, seguirá disponible en selectores de propuesta y reasignación.</p>
+        </fieldset>
         @error('roles')
             <div class="invalid-feedback d-block">{{ $message }}</div>
         @enderror
@@ -116,38 +116,43 @@
     </div>
 
     @if ($isEdit)
-        <div class="col-md-4 d-flex align-items-end">
-            <div class="form-check form-switch ur-section w-100">
-                <input type="hidden" name="email_verified" value="0">
-                <input class="form-check-input" type="checkbox" role="switch" id="email_verified"
-                    name="email_verified" value="1" @checked(old('email_verified', !empty($user?->email_verified_at) ? 1 : 0))>
-                <label class="form-check-label" for="email_verified">Email verificado</label>
-                <div class="form-text">Controla si la cuenta aparece como verificada.</div>
+        <div class="col-12" id="verification-wrapper">
+            <div class="ur-section ur-account-section">
+                <div class="ur-section-title">Estado de la cuenta</div>
+                <div class="form-check form-switch">
+                    <input type="hidden" name="email_verified" value="0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="email_verified"
+                        name="email_verified" value="1" @checked(old('email_verified', !empty($user?->email_verified_at) ? 1 : 0))>
+                    <label class="form-check-label" for="email_verified">Email verificado</label>
+                </div>
+                <div class="form-text mt-2">Controla si la cuenta aparece como verificada.</div>
             </div>
         </div>
     @endif
 
-    <div class="col-md-9" id="establecimiento-wrapper" style="display:none;">
-        <label class="form-label" for="user-establecimiento">Establecimiento <span class="text-danger">*</span></label>
-        <select id="user-establecimiento" name="establecimiento_id" class="form-select @error('establecimiento_id') is-invalid @enderror">
-            <option value="">Seleccione un establecimiento...</option>
-            @foreach ($establecimientos as $comuna => $items)
-                <optgroup label="{{ $comuna }}">
-                    @foreach ($items as $e)
-                        <option value="{{ $e->id }}" @selected((string) $selectedEstablecimiento === (string) $e->id)>
-                            {{ $e->rbd }} — {{ $e->nombre_establecimiento }}
-                        </option>
-                    @endforeach
-                </optgroup>
-            @endforeach
-        </select>
-        <div class="form-text">Obligatorio cuando alguno de los roles seleccionados sea Funcionario, Funcionario establecimiento o Funcionario Directivo Establecimiento.</div>
+    <div class="col-12 {{ $isEdit ? 'col-lg-8' : '' }}" id="establecimiento-wrapper" hidden>
+        <div class="ur-section ur-account-section">
+            <label class="form-label" for="user-establecimiento">Establecimiento <span class="text-danger">*</span></label>
+            <select id="user-establecimiento" name="establecimiento_id" class="form-select js-ur-searchable-select @error('establecimiento_id') is-invalid @enderror" data-placeholder="Buscar establecimiento por RBD o nombre" aria-describedby="user-establecimiento-help user-establecimiento-error">
+                <option value="">Seleccione un establecimiento...</option>
+                @foreach ($establecimientos as $comuna => $items)
+                    <optgroup label="{{ $comuna }}">
+                        @foreach ($items as $e)
+                            <option value="{{ $e->id }}" @selected((string) $selectedEstablecimiento === (string) $e->id)>
+                                {{ $e->rbd }} — {{ $e->nombre_establecimiento }}
+                            </option>
+                        @endforeach
+                    </optgroup>
+                @endforeach
+            </select>
+            <div class="form-text" id="user-establecimiento-help">Obligatorio cuando alguno de los roles seleccionados sea Funcionario, Funcionario establecimiento o Funcionario Directivo Establecimiento.</div>
 
-        @error('establecimiento_id')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        @unless ($errors->has('establecimiento_id'))
-            <div class="invalid-feedback"></div>
-        @endunless
+            @error('establecimiento_id')
+                <div class="invalid-feedback d-block" id="user-establecimiento-error">{{ $message }}</div>
+            @enderror
+            @unless ($errors->has('establecimiento_id'))
+                <div class="invalid-feedback" id="user-establecimiento-error"></div>
+            @endunless
+        </div>
     </div>
 </div>

@@ -1,6 +1,29 @@
 <?php
 
 return [
+    '2026.9.24.506' => [
+        'date' => '2026-09-24',
+        'module' => 'Administración',
+        'title' => 'Alineación y selectores de usuarios',
+        'files' => [
+            'config/changelog.php',
+            'docs/DESIGN_SYSTEM.md',
+            'public/build/manifest.json',
+            'public/build/assets/app-DN4eKh_n.css',
+            'resources/scss/_admin-users-roles.scss',
+            'resources/views/admin/users/_form.blade.php',
+            'resources/views/admin/users/_select2_assets.blade.php',
+            'resources/views/admin/users/create.blade.php',
+            'resources/views/admin/users/edit.blade.php',
+            'resources/views/admin/users/index.blade.php',
+        ],
+        'changes' => [
+            'Corrige el espacio excesivo y la superposición de ayudas en el formulario de usuarios.',
+            'Agrega búsqueda a los selectores de establecimiento y filtros, con validación visible y alternativa nativa.',
+            'Documenta alineación, selección y accesibilidad en el Design System.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP'],
+    ],
     '2026.9.24.505' => [
         'date' => '2026-09-24',
         'module' => 'Administración',

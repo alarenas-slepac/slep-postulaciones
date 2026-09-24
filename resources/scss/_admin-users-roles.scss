@@ -74,12 +74,12 @@
     .ur-panel .card-footer { padding: 1rem 1.4rem; border-top: 1px solid #e5edf6; background: #fff; }
 
     .ur-summary-card, .ur-info-item, .ur-option, .ur-section {
-        height: 100%;
         padding: 1rem;
         border: 1px solid #e3eaf3;
         border-radius: .9rem;
         background: var(--ur-soft);
     }
+    .ur-summary-card, .ur-info-item, .ur-option { height: 100%; }
     .ur-summary-label, .ur-info-label {
         display: block;
         margin-bottom: .35rem;
@@ -93,13 +93,15 @@
     .ur-summary-help, .ur-info-help { margin: .35rem 0 0; color: var(--ur-muted); font-size: .84rem; }
     .ur-info-value { color: var(--ur-ink); font-weight: 700; overflow-wrap: anywhere; }
     .ur-section { background: #fff; }
+    .ur-role-section { min-width: 0; }
+    .ur-role-section legend { float: none; width: auto; margin: 0 0 .75rem; }
+    .ur-account-section { min-height: 100%; }
     .ur-section-title { margin-bottom: .75rem; color: var(--ur-ink); font-weight: 800; }
     .ur-option { display: flex; align-items: flex-start; gap: .65rem; cursor: pointer; background: #fff; }
     .ur-option:has(input:checked) { border-color: #b9d9ff; background: #f8fbff; box-shadow: 0 0 0 .14rem rgba(13, 110, 253, .06); }
     .ur-option input { flex: 0 0 auto; margin-top: .2rem; }
     .ur-option.form-check { padding-left: 1rem; }
     .ur-option.form-check .form-check-input { margin: 0; }
-    .ur-section.form-switch { padding-left: 3.5rem; }
     .ur-option-label { color: var(--ur-ink); font-weight: 700; }
 
     .ur-page-table { width: 100%; margin-bottom: 0; }
