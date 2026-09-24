@@ -119,7 +119,7 @@
             <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
                 <span>Trámite de reconocimiento de bienios</span>
                 <a href="{{ route('tramites.template.download', 'reconocimiento_bienios') }}" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-download"></i> Descargar plantilla carta
+                    <i class="bi bi-download"></i> Descargar carta{{ $bieniosCartaEstamento ? ' ' . $bieniosCartaEstamento : '' }}
                 </a>
             </div>
             <div class="card-body">

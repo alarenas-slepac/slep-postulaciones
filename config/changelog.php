@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.9.24.509' => [
+        'date' => '2026-09-24',
+        'module' => 'Reconocimiento de Bienios',
+        'title' => 'Cartas Word según estamento del solicitante',
+        'files' => [
+            'app/Http/Controllers/TramiteController.php',
+            'app/Support/TramiteBieniosCarta.php',
+            'config/changelog.php',
+            'config/tramites.php',
+            'resources/templates/CARTA BIENIOS AAEE.docx',
+            'resources/views/tramites/create.blade.php',
+            'resources/views/tramites/edit.blade.php',
+            'tests/Unit/TramiteBieniosCartaTest.php',
+        ],
+        'changes' => [
+            'Entrega la carta docente existente o la nueva carta AAEE según estatuto y escalafón del solicitante.',
+            'Al editar, conserva el estamento guardado en el trámite y muestra la carta correspondiente.',
+        ],
+        'roles' => ['Postulante', 'Funcionario'],
+    ],
     '2026.9.24.508' => [
         'date' => '2026-09-24',
         'module' => 'Autorizaciones docentes',

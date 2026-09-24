@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Support\NotificationAudit;
 use App\Support\StreamingXlsxWriter;
+use App\Support\TramiteBieniosCarta;
 
 class TramiteController extends Controller
 {
@@ -266,6 +267,10 @@ class TramiteController extends Controller
         return view('tramites.create', [
             'user' => $request->user(),
             'autofill' => $autofill,
+            'bieniosCartaEstamento' => ($autofill['ok'] ?? false) ? TramiteBieniosCarta::estamentoLabel(
+                (string) ($autofill['estatuto'] ?? ''),
+                (string) ($autofill['escalafon'] ?? '')
+            ) : null,
             'tipos' => $tipos,
             'tipoSeleccionado' => $tipoSeleccionado,
             'tramite' => null,
@@ -371,6 +376,10 @@ class TramiteController extends Controller
         return view('tramites.edit', [
             'user' => $request->user(),
             'autofill' => $autofillService->forUser($request->user()),
+            'bieniosCartaEstamento' => TramiteBieniosCarta::estamentoLabel(
+                (string) $tramite->estatuto_snapshot,
+                (string) $tramite->escalafon_snapshot
+            ),
             'tipos' => $tipos,
             'tipoSeleccionado' => $tramite->tipo,
             'tramite' => $tramite,
@@ -1568,11 +1577,30 @@ class TramiteController extends Controller
             ->with('status', 'Trámite anulado correctamente y notificación enviada al usuario.');
     }
 
-    public function downloadTemplate(Request $request, string $tipo)
+    public function downloadTemplate(Request $request, string $tipo, TramiteAutofillService $autofillService)
     {
         abort_unless($this->isApplicant($request->user()), 403);
 
-        $relativePath = (string) data_get(config('tramites.tipos'), $tipo . '.template_relative_path', '');
+        $configKey = 'template_relative_path';
+        if ($tipo === 'reconocimiento_bienios') {
+            if ($request->filled('tramite')) {
+                $tramite = Tramite::query()
+                    ->whereKey($request->integer('tramite'))
+                    ->where('user_id', $request->user()->id)
+                    ->where('tipo', $tipo)
+                    ->firstOrFail();
+                $estatuto = (string) $tramite->estatuto_snapshot;
+                $escalafon = (string) $tramite->escalafon_snapshot;
+            } else {
+                $autofill = $autofillService->forUser($request->user());
+                $estatuto = (string) ($autofill['estatuto'] ?? '');
+                $escalafon = (string) ($autofill['escalafon'] ?? '');
+            }
+
+            $configKey = TramiteBieniosCarta::configKey($estatuto, $escalafon);
+        }
+
+        $relativePath = (string) data_get(config('tramites.tipos'), $tipo . '.' . $configKey, '');
         abort_if($relativePath === '', 404);
 
         $fullPath = resource_path($relativePath);
