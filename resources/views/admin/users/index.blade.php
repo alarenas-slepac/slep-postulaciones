@@ -83,7 +83,7 @@
                 </div>
                 <div class="col-12 col-md-4 col-lg-2">
                     <label class="form-label" for="users-filter-role">Rol</label>
-                    <select id="users-filter-role" name="rol" class="form-select">
+                    <select id="users-filter-role" name="rol" class="form-select js-ur-searchable-select" data-placeholder="Todos los roles">
                         <option value="">Todos</option>
                         @foreach ($roles as $value => $label)
                             <option value="{{ $value }}" @selected($filters['rol'] === $value)>{{ $label }}</option>
@@ -100,7 +100,7 @@
                 </div>
                 <div class="col-12 col-md-8 col-lg-3">
                     <label class="form-label" for="users-filter-establishment">Establecimiento</label>
-                    <select id="users-filter-establishment" name="establecimiento_id" class="form-select">
+                    <select id="users-filter-establishment" name="establecimiento_id" class="form-select js-ur-searchable-select" data-placeholder="Todos los establecimientos">
                         <option value="">Todos</option>
                         @foreach ($establecimientos as $comuna => $items)
                             <optgroup label="{{ $comuna }}">
@@ -251,6 +251,8 @@
     </div>
 </div>
 @endsection
+
+@include('admin.users._select2_assets')
 
 @push('scripts')
     <script>

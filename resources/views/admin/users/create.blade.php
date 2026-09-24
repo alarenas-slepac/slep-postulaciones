@@ -39,26 +39,8 @@
 </div>
 @endsection
 
+@include('admin.users._select2_assets')
+
 @push('scripts')
     @include('partials.form-validation')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const roleChecks = Array.from(document.querySelectorAll('.js-role-checkbox'));
-            const wrapper = document.getElementById('establecimiento-wrapper');
-            const estabSelect = document.querySelector('select[name="establecimiento_id"]');
-
-            function toggleEstablecimiento() {
-                const selectedRoles = roleChecks.filter((el) => el.checked).map((el) => el.value);
-                const needsEstablecimiento = selectedRoles.includes('funcionario') || selectedRoles.includes('funcionario_estab') || selectedRoles.includes('funcionario_directivo_estab');
-                wrapper.style.display = needsEstablecimiento ? '' : 'none';
-
-                if (!needsEstablecimiento) {
-                    estabSelect.value = '';
-                }
-            }
-
-            roleChecks.forEach((check) => check.addEventListener('change', toggleEstablecimiento));
-            toggleEstablecimiento();
-        });
-    </script>
 @endpush
