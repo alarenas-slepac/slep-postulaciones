@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.25.514' => [
+        'date' => '2026-09-25',
+        'module' => 'Descuentos CGR',
+        'title' => 'Filtros independientes por etapa y meses del cronograma',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'config/changelog.php',
+            'resources/views/remuneraciones/descuentos-cgr/index.blade.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Conserva y limpia los filtros de cada pestaña de Descuentos CGR por separado.',
+            'Filtra por último mes calculado y por cualquier mes de descuento programado en el cronograma.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP', 'Funcionario DAF', 'Auditoria SLEP'],
+    ],
     '2026.9.25.513' => [
         'date' => '2026-09-25',
         'module' => 'Descuentos CGR',

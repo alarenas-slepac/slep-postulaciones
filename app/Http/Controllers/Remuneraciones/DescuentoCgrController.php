@@ -43,20 +43,51 @@ class DescuentoCgrController extends Controller
             return app(DescuentosCgrMensualExport::class)->download($periodo, $request->user());
         }
 
-        $buscar = trim((string) $request->get('buscar', ''));
-        $buscarRut = preg_match('/\d/', $buscar)
-            ? strtoupper((string) preg_replace('/[^0-9K]/i', '', $buscar))
-            : '';
-        $anio = (int) $request->integer('anio');
-        $origenes = ReemplazoPersonalRutService::opcionesOrigen() + ['sin_clasificar' => 'Sin clasificar'];
-        $origen = trim((string) $request->get('origen', ''));
         $estado = (string) $request->get('estado', 'ingresado');
         if (! in_array($estado, ['ingresado', 'descuentos_realizados', 'en_auditoria', 'cerrado'], true)) {
             $estado = 'ingresado';
         }
+
+        $claveFiltros = 'descuentos_cgr.filtros.'.$estado;
+        $camposFiltro = ['buscar', 'origen', 'anio', 'ultimo_mes', 'mes_descuento'];
+        if ($request->boolean('limpiar')) {
+            if ($request->hasSession()) {
+                $request->session()->forget($claveFiltros);
+            }
+            $filtros = [];
+        } elseif ($request->boolean('filtrar') || $request->hasAny($camposFiltro)) {
+            $filtros = $request->validate([
+                'buscar' => ['nullable', 'string', 'max:255'],
+                'origen' => ['nullable', 'string', 'max:40'],
+                'anio' => ['nullable', 'integer', 'min:1', 'max:9999'],
+                'ultimo_mes' => ['nullable', 'date_format:Y-m'],
+                'mes_descuento' => ['nullable', 'date_format:Y-m'],
+            ]);
+            if ($request->hasSession()) {
+                $request->session()->put($claveFiltros, $filtros);
+            }
+        } else {
+            $filtros = $request->hasSession() ? (array) $request->session()->get($claveFiltros, []) : [];
+        }
+
+        $buscar = trim((string) ($filtros['buscar'] ?? ''));
+        $buscarRut = preg_match('/\d/', $buscar)
+            ? strtoupper((string) preg_replace('/[^0-9K]/i', '', $buscar))
+            : '';
+        $anio = (int) ($filtros['anio'] ?? 0);
+        $origenes = ReemplazoPersonalRutService::opcionesOrigen() + ['sin_clasificar' => 'Sin clasificar'];
+        $origen = trim((string) ($filtros['origen'] ?? ''));
+        $ultimoMes = (string) ($filtros['ultimo_mes'] ?? '');
+        $mesDescuento = (string) ($filtros['mes_descuento'] ?? '');
         if (! array_key_exists($origen, $origenes)) {
             $origen = '';
         }
+        $indicePrimerMes = DB::connection()->getDriverName() === 'sqlite'
+            ? "(CAST(strftime('%Y', fecha_primer_descuento) AS INTEGER) * 12 + CAST(strftime('%m', fecha_primer_descuento) AS INTEGER))"
+            : '(YEAR(fecha_primer_descuento) * 12 + MONTH(fecha_primer_descuento))';
+        $mesIndice = static function (string $mes): int {
+            return (int) substr($mes, 0, 4) * 12 + (int) substr($mes, 5, 2);
+        };
 
         $descuentos = DescuentoCgr::query()
             ->where('estado', $estado)
@@ -75,6 +106,10 @@ class DescuentoCgrController extends Controller
             ->when($origen === 'sin_clasificar', fn ($query) => $query->whereNull('origen_funcionario'))
             ->when($origen !== '' && $origen !== 'sin_clasificar', fn ($query) => $query->where('origen_funcionario', $origen))
             ->when($anio > 0, fn ($query) => $query->whereYear('fecha_primer_descuento', $anio))
+            ->when($ultimoMes !== '', fn ($query) => $query->whereRaw("{$indicePrimerMes} + numero_cuotas - 1 = ?", [$mesIndice($ultimoMes)]))
+            ->when($mesDescuento !== '', fn ($query) => $query
+                ->whereRaw("{$indicePrimerMes} <= ?", [$mesIndice($mesDescuento)])
+                ->whereRaw("{$indicePrimerMes} + numero_cuotas - 1 >= ?", [$mesIndice($mesDescuento)]))
             ->orderByDesc('fecha_primer_descuento')
             ->latest('id')
             ->paginate(20)
@@ -93,7 +128,9 @@ class DescuentoCgrController extends Controller
 
         $conteos = DescuentoCgr::query()->selectRaw('estado, COUNT(*) as total')->groupBy('estado')->pluck('total', 'estado');
 
-        return view('remuneraciones.descuentos-cgr.index', compact('descuentos', 'buscar', 'anio', 'anios', 'origen', 'origenes', 'estado', 'conteos'));
+        $filtrosActivos = $buscar !== '' || $origen !== '' || $anio > 0 || $ultimoMes !== '' || $mesDescuento !== '';
+
+        return view('remuneraciones.descuentos-cgr.index', compact('descuentos', 'buscar', 'anio', 'anios', 'origen', 'origenes', 'estado', 'conteos', 'ultimoMes', 'mesDescuento', 'filtrosActivos'));
     }
 
     public function create(): View

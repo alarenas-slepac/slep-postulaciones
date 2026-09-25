@@ -352,6 +352,68 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertSame(['Registro Histórico'], $vistaSinClasificar->getData()['descuentos']->pluck('nombre')->all());
     }
 
+    public function test_listado_filtra_ultimo_mes_y_mes_de_cualquier_cuota_incluso_al_cruzar_de_anio(): void
+    {
+        $cruzaAnio = $this->crearDescuento([
+            'numero_resolucion' => 'CRUZA-2025',
+            'fecha_primer_descuento' => '2025-11-01',
+            'numero_cuotas' => 3,
+        ]);
+        $soloEnero = $this->crearDescuento([
+            'numero_resolucion' => 'ENERO-2026',
+            'fecha_primer_descuento' => '2026-01-01',
+            'numero_cuotas' => 1,
+        ]);
+        $posterior = $this->crearDescuento([
+            'numero_resolucion' => 'FEBRERO-2026',
+            'fecha_primer_descuento' => '2026-02-01',
+            'numero_cuotas' => 2,
+        ]);
+
+        $ultimoEnero = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', ['ultimo_mes' => '2026-01']));
+        $this->assertEqualsCanonicalizing([$cruzaAnio->id, $soloEnero->id], $ultimoEnero->getData()['descuentos']->pluck('id')->all());
+
+        $descuentoDiciembre = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', ['mes_descuento' => '2025-12']));
+        $this->assertSame([$cruzaAnio->id], $descuentoDiciembre->getData()['descuentos']->pluck('id')->all());
+
+        $ambos = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', [
+            'ultimo_mes' => '2026-01',
+            'mes_descuento' => '2026-01',
+        ]));
+        $this->assertEqualsCanonicalizing([$cruzaAnio->id, $soloEnero->id], $ambos->getData()['descuentos']->pluck('id')->all());
+        $this->assertNotContains($posterior->id, $ambos->getData()['descuentos']->pluck('id')->all());
+    }
+
+    public function test_filtros_de_cada_pestana_se_restauran_y_se_limpian_por_separado(): void
+    {
+        $ingresado = $this->crearDescuento(['nombre' => 'Persona Ingresada', 'numero_resolucion' => 'ING-2026']);
+        $finanzas = $this->crearDescuento(['nombre' => 'Persona Finanzas', 'numero_resolucion' => 'FIN-2026', 'estado' => 'descuentos_realizados']);
+        $sesion = app('session')->driver();
+        $listar = static function (array $parametros) use ($sesion) {
+            $solicitud = Request::create('/descuentos-cgr', 'GET', $parametros);
+            $solicitud->setLaravelSession($sesion);
+
+            return app(DescuentoCgrController::class)->index($solicitud)->getData();
+        };
+
+        $vistaIngresados = $listar(['estado' => 'ingresado', 'filtrar' => 1, 'buscar' => 'Ingresada', 'ultimo_mes' => '2026-02']);
+        $this->assertSame([$ingresado->id], $vistaIngresados['descuentos']->pluck('id')->all());
+
+        $vistaFinanzas = $listar(['estado' => 'descuentos_realizados', 'filtrar' => 1, 'buscar' => 'Finanzas']);
+        $this->assertSame([$finanzas->id], $vistaFinanzas['descuentos']->pluck('id')->all());
+        $this->assertSame('', $vistaFinanzas['ultimoMes']);
+
+        $restaurada = $listar(['estado' => 'ingresado']);
+        $this->assertSame('Ingresada', $restaurada['buscar']);
+        $this->assertSame('2026-02', $restaurada['ultimoMes']);
+        $this->assertSame([$ingresado->id], $restaurada['descuentos']->pluck('id')->all());
+
+        $limpia = $listar(['estado' => 'ingresado', 'limpiar' => 1]);
+        $this->assertSame('', $limpia['buscar']);
+        $this->assertSame('', $limpia['ultimoMes']);
+        $this->assertSame('Finanzas', $listar(['estado' => 'descuentos_realizados'])['buscar']);
+    }
+
     public function test_migracion_clasifica_registros_historicos_sin_inventar_origenes(): void
     {
         DB::table('funcionarios_ac_autorizados')->insert([
