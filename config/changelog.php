@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.9.25.518' => [
+        'date' => '2026-09-25',
+        'module' => 'Descuentos CGR',
+        'title' => 'Comprobante opcional de transferencia a otra institución',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrWorkflowController.php',
+            'app/Services/Remuneraciones/DescuentoCgrCertificadoService.php',
+            'app/Services/Remuneraciones/DescuentoCgrWorkflowService.php',
+            'config/changelog.php',
+            'resources/views/remuneraciones/descuentos-cgr/_workflow.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Permite a Finanzas cargar y corregir comprobantes PDF de transferencia a otra institución, con folio, fecha, monto y asociación a una o varias cuotas.',
+            'Mantiene la transferencia como respaldo opcional para el envío a Auditoría.',
+            'Incluye las transferencias cargadas y sus meses en el texto del certificado Word sin alterar la plantilla original.',
+            'Presenta en español los meses del certificado independientemente del locale del entorno.',
+        ],
+        'roles' => ['Administrador', 'Funcionario DAF', 'Auditoria SLEP'],
+    ],
     '2026.9.25.517' => [
         'date' => '2026-09-25',
         'module' => 'Dotación docente 2027',

@@ -50,16 +50,25 @@ class DescuentoCgrCertificadoService
                 $hoy = now();
                 $inicio = $descuento->fecha_primer_descuento;
                 $fin = $inicio->copy()->addMonthsNoOverflow($descuento->numero_cuotas - 1);
-                $periodoInicio = $inicio->translatedFormat('F Y');
-                $periodoFin = $fin->translatedFormat('F Y');
+                $periodoInicio = $inicio->copy()->locale('es')->translatedFormat('F Y');
+                $periodoFin = $fin->locale('es')->translatedFormat('F Y');
                 $documentos = 'liquidaciones verificadas por Auditoría, comprobantes de reintegro SIGFE y comprobantes de reintegro a TGR correspondientes a los períodos de '.$periodoInicio.' a '.$periodoFin;
+                $cuotasTransferencia = $descuento->archivos()->where('tipo', 'transferencia_institucion')
+                    ->pluck('numero_cuota')->unique()->sort()->values();
+                if ($cuotasTransferencia->isNotEmpty()) {
+                    $institucion = trim((string) $descuento->institucion_reintegro) ?: 'otra institución';
+                    $mesesTransferencia = $cuotasTransferencia->map(fn ($cuota) =>
+                        $inicio->copy()->addMonthsNoOverflow((int) $cuota - 1)->locale('es')->translatedFormat('F Y')
+                    )->implode(', ');
+                    $documentos .= ', y comprobantes de transferencia a '.$institucion.' correspondientes a '.$mesesTransferencia;
+                }
                 $monto = (int) $descuento->deuda_definitiva_pesos;
                 $palabras = (new NumberFormatter('es_CL', NumberFormatter::SPELLOUT))->format($monto);
                 $reemplazos = [
                     '{XX-XX-XXXX}' => $hoy->format('d-m-Y'),
                     '{N° DE REGISTRO}' => (string) $descuento->id,
                     '{DIA}' => $hoy->format('d'),
-                    '{MES}' => $hoy->translatedFormat('F'),
+                    '{MES}' => $hoy->locale('es')->translatedFormat('F'),
                     '{AÑO}' => $hoy->format('Y'),
                     '{Nombre completo}' => $descuento->nombre,
                     '{RUT}' => $descuento->rut,

@@ -45,6 +45,7 @@
                 @if ($puedeFinanzas)
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalSigfe">Cargar comprobante SIGFE</button>
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalTgr">Cargar comprobante TGR</button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalTransferenciaInstitucion"><i class="bi bi-upload me-1" aria-hidden="true"></i>Cargar transferencia a otra institución</button>
                 @endif
                 @if ($puedeAuditoria) <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalValidadas">Cargar liquidaciones validadas</button> @endif
             </div>
@@ -91,19 +92,20 @@
                                 <td class="text-center"><a href="{{ route('descuentos-cgr.cronograma.pdf', [$descuentoCgr, $fila['numero']]) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger text-nowrap"><i class="bi bi-file-earmark-pdf me-1"></i>Ver PDF</a></td>
                                 <td class="cgr-respaldos">
                                     @php $archivosCuota = $archivosPorCuota->get($fila['numero'], collect()); @endphp
-                                    @foreach (['liquidacion' => 'Liquidación', 'sigfe' => 'SIGFE', 'tgr' => 'TGR', 'liquidacion_validada' => 'Validada'] as $tipoArchivo => $etiquetaArchivo)
+                                    @foreach (['liquidacion' => 'Liquidación', 'sigfe' => 'SIGFE', 'tgr' => 'TGR', 'transferencia_institucion' => 'Transferencia a otra institución', 'liquidacion_validada' => 'Validada'] as $tipoArchivo => $etiquetaArchivo)
                                         @php $respaldo = $archivosCuota->get($tipoArchivo); @endphp
                                         <div class="mb-2"><span class="small fw-semibold">{{ $etiquetaArchivo }}:</span>
                                             @if ($respaldo)
                                                 <a href="{{ route('descuentos-cgr.archivos.show', [$descuentoCgr, $respaldo]) }}" target="_blank" rel="noopener" class="small">{{ $respaldo->nombre_original }}</a>
-                                                <div class="small text-muted">Última carga: {{ $respaldo->updated_at?->format('d-m-Y H:i') }} · {{ $respaldo->cargadoPor?->nombre_completo ?: 'Usuario' }}@if ($respaldo->folio) · Folio {{ $respaldo->folio }} · Reintegro {{ $respaldo->fecha_reintegro?->format('d-m-Y') }} · Monto comprobante {{ $pesos($respaldo->monto_reintegro_pesos) }} @endif</div>
-                                            @else <span class="small text-muted">Pendiente</span> @endif
+                                                <div class="small text-muted">Última carga: {{ $respaldo->updated_at?->format('d-m-Y H:i') }} · {{ $respaldo->cargadoPor?->nombre_completo ?: 'Usuario' }}@if ($respaldo->folio) · Folio {{ $respaldo->folio }} · {{ $tipoArchivo === 'transferencia_institucion' ? 'Transferencia' : 'Reintegro' }} {{ $respaldo->fecha_reintegro?->format('d-m-Y') }} · Monto comprobante {{ $pesos($respaldo->monto_reintegro_pesos) }} @endif</div>
+                                            @else <span class="small text-muted">{{ $tipoArchivo === 'transferencia_institucion' ? 'No cargado (opcional)' : 'Pendiente' }}</span> @endif
                                         </div>
                                     @endforeach
                                     @if ($puedeRegistrar) <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-bs-toggle="modal" data-bs-target="#modalLiquidaciones" data-cuota="{{ $fila['numero'] }}">{{ $archivosCuota->has('liquidacion') ? 'Corregir' : 'Cargar' }} liquidación</button> @endif
                                     @if ($puedeFinanzas)
                                         <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-bs-toggle="modal" data-bs-target="#modalSigfe" data-cuota="{{ $fila['numero'] }}">{{ $archivosCuota->has('sigfe') ? 'Corregir' : 'Cargar' }} SIGFE</button>
                                         <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-bs-toggle="modal" data-bs-target="#modalTgr" data-cuota="{{ $fila['numero'] }}">{{ $archivosCuota->has('tgr') ? 'Corregir' : 'Cargar' }} TGR</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-bs-toggle="modal" data-bs-target="#modalTransferenciaInstitucion" data-cuota="{{ $fila['numero'] }}">{{ $archivosCuota->has('transferencia_institucion') ? 'Corregir' : 'Cargar' }} transferencia</button>
                                     @endif
                                     @if ($puedeAuditoria) <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-bs-toggle="modal" data-bs-target="#modalValidadas" data-cuota="{{ $fila['numero'] }}">{{ $archivosCuota->has('liquidacion_validada') ? 'Corregir' : 'Cargar' }} validada</button> @endif
                                 </td>
