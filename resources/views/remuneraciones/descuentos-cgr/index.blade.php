@@ -37,6 +37,39 @@
             @endforeach
         </nav>
 
+        @php
+            $tarjetas = [
+                ['icono' => 'bi-files', 'etiqueta' => 'Registros de la etapa', 'valor' => number_format($indicadores['registros'], 0, ',', '.'), 'ayuda' => 'Total de registros según los filtros de esta pestaña.'],
+                ['icono' => 'bi-cash-stack', 'etiqueta' => 'Deuda definitiva original', 'valor' => '$'.number_format($indicadores['deuda_pesos'], 0, ',', '.'), 'ayuda' => 'Suma nominal de la deuda registrada en estos expedientes.'],
+            ];
+            if ($estado === 'ingresado') {
+                $tarjetas[] = ['icono' => 'bi-file-earmark-pdf', 'etiqueta' => 'Liquidaciones cargadas', 'valor' => number_format($indicadores['documentos'], 0, ',', '.').' / '.number_format($indicadores['cuotas'], 0, ',', '.'), 'ayuda' => 'Cuotas con liquidación respecto de las cuotas programadas.'];
+                $tarjetas[] = ['icono' => 'bi-send', 'etiqueta' => 'Listos para Finanzas', 'valor' => number_format($indicadores['listos'], 0, ',', '.'), 'ayuda' => 'Registros con liquidación en todas sus cuotas.'];
+            } elseif ($estado === 'descuentos_realizados') {
+                $tarjetas[] = ['icono' => 'bi-receipt', 'etiqueta' => 'Comprobantes asociados', 'valor' => number_format($indicadores['documentos'], 0, ',', '.').' / '.number_format($indicadores['cuotas'] * 2, 0, ',', '.'), 'ayuda' => 'Una asociación SIGFE y una TGR por cuota.'];
+                $tarjetas[] = ['icono' => 'bi-send', 'etiqueta' => 'Listos para Auditoría', 'valor' => number_format($indicadores['listos'], 0, ',', '.'), 'ayuda' => 'Registros con ambos comprobantes en todas sus cuotas.'];
+            } elseif ($estado === 'en_auditoria') {
+                $tarjetas[] = ['icono' => 'bi-file-earmark-check', 'etiqueta' => 'Liquidaciones validadas', 'valor' => number_format($indicadores['documentos'], 0, ',', '.').' / '.number_format($indicadores['cuotas'], 0, ',', '.'), 'ayuda' => 'Cuotas con liquidación validada.'];
+                $tarjetas[] = ['icono' => 'bi-patch-check', 'etiqueta' => 'Certificados firmados', 'valor' => number_format($indicadores['firmados'], 0, ',', '.'), 'ayuda' => 'Registros con certificado PDF firmado cargado.'];
+            } else {
+                $tarjetas[] = ['icono' => 'bi-calendar-check', 'etiqueta' => 'Cuotas finalizadas', 'valor' => number_format($indicadores['cuotas'], 0, ',', '.'), 'ayuda' => 'Cuotas programadas en los registros cerrados.'];
+                $tarjetas[] = ['icono' => 'bi-check-circle', 'etiqueta' => 'Cerrados este mes', 'valor' => number_format($indicadores['cierres_mes'], 0, ',', '.'), 'ayuda' => 'Cierres registrados durante '.now()->format('m-Y').'.'];
+            }
+        @endphp
+        <section class="row g-3 mb-4" aria-label="Indicadores de {{ $pestanas[$estado] }}">
+            @foreach ($tarjetas as $tarjeta)
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card cgr-kpi h-100">
+                        <div class="card-body">
+                            <div class="cgr-kpi__label"><i class="bi {{ $tarjeta['icono'] }} me-1" aria-hidden="true"></i>{{ $tarjeta['etiqueta'] }}</div>
+                            <div class="cgr-kpi__value text-break">{{ $tarjeta['valor'] }}</div>
+                            <p class="small text-muted mb-0">{{ $tarjeta['ayuda'] }}</p>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </section>
+
         <div class="card mb-4">
             <div class="card-header"><i class="bi bi-funnel me-2 text-primary" aria-hidden="true"></i>Filtros de {{ $pestanas[$estado] }}</div>
             <div class="card-body">
