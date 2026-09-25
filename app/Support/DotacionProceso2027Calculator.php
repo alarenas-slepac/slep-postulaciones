@@ -89,11 +89,11 @@ class DotacionProceso2027Calculator
                         'se_utilizara' => $seUtilizara,
                         'asignacion_existente' => $tieneAsignacion,
                     ]);
-                    $bloques['bloque_1']['horas_normativas_potenciales'] += $horasPotenciales;
+                    $bloques[$bloque]['horas_normativas_potenciales'] += $horasPotenciales;
                     if (! $seUtilizara) {
                         continue;
                     }
-                    $bloques['bloque_1']['horas_normativas_definidas'] += $horasPotenciales;
+                    $bloques[$bloque]['horas_normativas_definidas'] += $horasPotenciales;
                 }
                 if (! self::esNecesidadObligatoria($groupKey, $item)) {
                     continue;
@@ -124,18 +124,23 @@ class DotacionProceso2027Calculator
         $asignaciones = collect(data_get($data, 'asignacion.asignaciones', []))
             ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row));
         foreach ($asignaciones as $asignacion) {
-            $bloque = $needBlocks[(string) data_get($asignacion, 'necesidad_key', '')]
+            $rut = DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($asignacion, 'docente_rut_normalizado') ?: data_get($asignacion, 'docente_rut', '')));
+            $docente = $docentesPorRut->get($rut);
+            $keyNecesidad = (string) data_get($asignacion, 'necesidad_key', '');
+            $bloqueNecesidad = $needBlocks[$keyNecesidad] ?? null;
+            $bloque = ($docente ? self::bloqueFuncionPorDocente($asignacion, $docente) : null)
+                ?? $bloqueNecesidad
                 ?? self::bloqueParaAsignacion($asignacion);
             if (! $bloque || ! isset($bloques[$bloque])) {
                 continue;
             }
             $horas = max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
             $bloques[$bloque]['asignadas'] += $horas;
-            if (isset($needKeysObligatorias[(string) data_get($asignacion, 'necesidad_key', '')])) {
-                $bloques[$bloque]['asignadas_obligatorias'] += $horas;
+            if (isset($needKeysObligatorias[$keyNecesidad])) {
+                // La cobertura de la necesidad conserva su bloque de origen;
+                // las horas de contrato respetan el estamento del docente.
+                $bloques[$bloqueNecesidad ?? $bloque]['asignadas_obligatorias'] += $horas;
             }
-            $rut = DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($asignacion, 'docente_rut_normalizado') ?: data_get($asignacion, 'docente_rut', '')));
-            $docente = $docentesPorRut->get($rut);
             if ($docente) {
                 $titularDisponible = max(0.0, (float) $docente['horas_planta'] - (float) $docente['horas_asignadas_previas']);
                 $titular = min($horas, $titularDisponible);
@@ -175,7 +180,7 @@ class DotacionProceso2027Calculator
         $asignacionHabilitada = $planesCompletos && $combinacionDeclarada && $funcionesNormativasDefinidas && $maximosConfigurados && $topesSuficientes;
         $horasDisponiblesDocentes = round((float) $docentes->sum('horas_disponibles'), 2);
         $capacidadNoNormativas = min(
-            max(0.0, (float) data_get($bloques, 'bloque_1.saldo_maximo', 0)),
+            (float) collect($bloques)->sum(fn (array $bloque) => max(0.0, (float) ($bloque['saldo_maximo'] ?? 0))),
             $horasDisponiblesDocentes
         );
 
@@ -438,7 +443,9 @@ class DotacionProceso2027Calculator
 
     private static function esNecesidadObligatoria(string $groupKey, mixed $item): bool
     {
-        return $groupKey !== 'funciones' || (int) data_get($item, 'dotacion_funcion_id', 0) <= 0;
+        return $groupKey !== 'funciones'
+            || ((int) data_get($item, 'dotacion_funcion_id', 0) <= 0
+                && (string) data_get($item, 'tipo_asignacion', '') !== 'otra_funcion');
     }
 
     private static function esFuncionNormativaDefinible(string $groupKey, mixed $item): bool
@@ -457,6 +464,29 @@ class DotacionProceso2027Calculator
             'funcion_directiva', 'plan_normativo', 'otra_funcion' => 'bloque_1',
             default => null,
         };
+    }
+
+    /** Imputa funciones al bloque contractual del docente, sin alterar la necesidad que cubren. */
+    public static function bloqueFuncionPorDocente(object|array $asignacion, array $docente): ?string
+    {
+        if (! in_array((string) data_get($asignacion, 'tipo_asignacion'), [
+            'funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion',
+        ], true)) {
+            return null;
+        }
+
+        $perfil = DotacionProfesionDocenteResolver::perfilTitulo($docente);
+        $esDiferencial = (bool) $perfil['es_educacion_diferencial'];
+        $esParvularia = (bool) $perfil['es_educacion_parvulos'];
+        if (! $esDiferencial && ! $esParvularia) {
+            return null;
+        }
+
+        if (DotacionAsignacionCalculator::esAsignacionNormativaAula($asignacion, $esDiferencial)) {
+            return 'bloque_1';
+        }
+
+        return $esDiferencial ? 'bloque_3' : 'bloque_2';
     }
 
     private static function esNt(mixed $curso): bool

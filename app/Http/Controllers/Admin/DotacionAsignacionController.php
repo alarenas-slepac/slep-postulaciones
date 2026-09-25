@@ -484,7 +484,8 @@ class DotacionAsignacionController extends Controller
             ]);
         }
 
-        $bloque = data_get($proceso, 'need_blocks.'.($payload['necesidad_key'] ?? ''))
+        $bloque = DotacionProceso2027Calculator::bloqueFuncionPorDocente($payload, $persona)
+            ?: data_get($proceso, 'need_blocks.'.($payload['necesidad_key'] ?? ''))
             ?: DotacionProceso2027Calculator::bloqueParaAsignacion($payload);
         if (! $bloque) {
             return;
@@ -494,7 +495,12 @@ class DotacionAsignacionController extends Controller
         $bloqueProceso = data_get($proceso, 'bloques.'.$bloque, []);
         $asignadas = (float) ($bloqueProceso['asignadas'] ?? 0);
         if ($current) {
-            $bloqueActual = data_get($proceso, 'need_blocks.'.($current->necesidad_key ?? ''))
+            $rutActual = DotacionEstablecimientoCalculator::normalizeRut((string) ($current->docente_rut_normalizado ?: $current->docente_rut));
+            $personaActual = collect($proceso['docentes'] ?? [])->first(fn (array $docente) =>
+                DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) === $rutActual
+            );
+            $bloqueActual = ($personaActual ? DotacionProceso2027Calculator::bloqueFuncionPorDocente($current, $personaActual) : null)
+                ?: data_get($proceso, 'need_blocks.'.($current->necesidad_key ?? ''))
                 ?: DotacionProceso2027Calculator::bloqueParaAsignacion($current);
             if ($bloqueActual === $bloque) {
                 $asignadas = max(0.0, $asignadas - (float) $current->horas_contrato);

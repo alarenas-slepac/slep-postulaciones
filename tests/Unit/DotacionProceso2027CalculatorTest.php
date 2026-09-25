@@ -66,6 +66,82 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame(0.0, $resumen['bloques']['bloque_1']['requeridas']);
     }
 
+    public function test_funciones_no_normativas_permanecen_en_parvularia_y_pie(): void
+    {
+        $parvularia = [
+            'rut_normalizado' => '111111111', 'nombre' => 'Docente de Párvulos',
+            'titulo' => 'Pedagogía en Educación de Párvulos',
+            'horas_contrato' => 44, 'horas_planta' => 44, 'horas_contrata' => 0,
+            'horas_asignadas_total' => 0,
+        ];
+        $diferencial = [
+            'rut_normalizado' => '222222222', 'nombre' => 'Docente Diferencial',
+            'titulo' => 'Educadora Diferencial',
+            'horas_contrato' => 44, 'horas_planta' => 44, 'horas_contrata' => 0,
+            'horas_asignadas_total' => 0,
+        ];
+        $asignaciones = [
+            ['docente_rut_normalizado' => '111111111', 'tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 4],
+            ['docente_rut_normalizado' => '111111111', 'tipo_asignacion' => 'otra_funcion', 'dotacion_funcion_id' => 1, 'horas_contrato' => 6],
+            ['docente_rut_normalizado' => '111111111', 'tipo_asignacion' => 'funcion_tecnico_pedagogica', 'subtipo_asignacion' => 'pie', 'horas_contrato' => 2],
+            ['docente_rut_normalizado' => '222222222', 'tipo_asignacion' => 'plan_normativo', 'horas_contrato' => 4],
+            ['docente_rut_normalizado' => '222222222', 'tipo_asignacion' => 'otra_funcion', 'dotacion_funcion_id' => 2, 'horas_contrato' => 6],
+            ['docente_rut_normalizado' => '222222222', 'tipo_asignacion' => 'funcion_tecnico_pedagogica', 'subtipo_asignacion' => 'pie', 'horas_contrato' => 2],
+        ];
+
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+            'asignacion' => ['necesidades' => [], 'asignaciones' => $asignaciones],
+            'docentes' => [$parvularia, $diferencial],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $this->assertSame(10.0, $resumen['bloques']['bloque_1']['asignadas']);
+        $this->assertSame(6.0, $resumen['bloques']['bloque_2']['asignadas']);
+        $this->assertSame(8.0, $resumen['bloques']['bloque_3']['asignadas']);
+        $this->assertSame('bloque_1', DotacionProceso2027Calculator::bloqueFuncionPorDocente($asignaciones[2], $parvularia));
+        $this->assertSame('bloque_3', DotacionProceso2027Calculator::bloqueFuncionPorDocente($asignaciones[5], $diferencial));
+    }
+
+    public function test_coordinacion_pie_cubre_la_necesidad_sin_duplicar_el_bloque_contractual(): void
+    {
+        $necesidad = [
+            'key' => 'funcion:coordinacion_pie',
+            'tipo_asignacion' => 'funcion_tecnico_pedagogica',
+            'subtipo_asignacion' => 'pie',
+            'horas_contrato_requeridas' => 4,
+            'horas_contrato_asignadas' => 4,
+            'necesidad_condicionada_por_asignacion_docente' => true,
+        ];
+        $asignacion = [
+            'necesidad_key' => $necesidad['key'],
+            'docente_rut_normalizado' => '111111111',
+            'tipo_asignacion' => 'funcion_tecnico_pedagogica',
+            'subtipo_asignacion' => 'pie',
+            'horas_contrato' => 4,
+        ];
+        $docente = [
+            'rut_normalizado' => '111111111', 'titulo' => 'Pedagogía en Educación de Párvulos',
+            'horas_contrato' => 44, 'horas_planta' => 44, 'horas_contrata' => 0,
+            'horas_asignadas_total' => 0,
+        ];
+
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+            'asignacion' => ['necesidades' => ['funciones' => [$necesidad]], 'asignaciones' => [$asignacion]],
+            'docentes' => [$docente],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $this->assertSame(4.0, $resumen['bloques']['bloque_1']['asignadas']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_3']['asignadas']);
+        $this->assertSame(4.0, $resumen['bloques']['bloque_3']['requeridas']);
+        $this->assertSame(4.0, $resumen['bloques']['bloque_3']['asignadas_obligatorias']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_3']['pendientes']);
+        $this->assertSame(4.0, $resumen['bloques']['bloque_3']['horas_normativas_potenciales']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['horas_normativas_potenciales']);
+    }
+
     public function test_muestra_funcion_normativa_potencial_y_no_la_exige_hasta_definirla(): void
     {
         $resumen = DotacionProceso2027Calculator::resumen(

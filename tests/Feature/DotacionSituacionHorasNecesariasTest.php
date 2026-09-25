@@ -181,10 +181,10 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
     {
         return [
             'aula' => ['Profesor de Educación Básica', false, false, 20.0, 0.0, 0.0],
-            'parvularia' => ['Pedagogía en Educación de Párvulos', false, false, 20.0, 0.0, 0.0],
+            'parvularia' => ['Pedagogía en Educación de Párvulos', false, false, 0.0, 20.0, 0.0],
             'diferencial' => ['Educadora Diferencial', false, false, 0.0, 0.0, 20.0],
             'coordinación PIE' => ['Profesor de Educación Básica', true, false, 0.0, 0.0, 20.0],
-            'parvularia con coordinación histórica' => ['Pedagogía en Educación de Párvulos', true, false, 20.0, 0.0, 0.0],
+            'parvularia con coordinación histórica' => ['Pedagogía en Educación de Párvulos', true, false, 0.0, 20.0, 0.0],
             'diferencial en especial' => ['Educadora Diferencial', true, true, 20.0, 0.0, 0.0],
         ];
     }
@@ -208,14 +208,6 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             $pieCalculado = (new ReflectionMethod(DotacionAsignacionCalculator::class, 'resumenContratoDocentePie'))
                 ->invoke(null, DotacionAsignacionCalculator::assignmentsFor(Establecimiento::findOrFail(1), 2026), $docentes, $especial);
             $separacion = DotacionEstablecimientoCalculator::contratoParvularia($docentes, 20 - $pieCalculado['total'], 0);
-            if ($titulo === 'Pedagogía en Educación de Párvulos') {
-                $parvularia = max(0.0, 20.0 - $horasAsignadas);
-                $aula = round(20.0 - $pie - $parvularia, 2);
-            }
-            if ($titulo === 'Educadora Diferencial' && ! $especial) {
-                $pie = max(0.0, 20.0 - $horasAsignadas);
-                $aula = round(20.0 - $pie, 2);
-            }
             $this->assertSame($pie, $pieCalculado['total']);
             $this->assertSame($aula, $separacion['horas_contrato_docentes_aula_general']);
             $this->assertSame($parvularia, $separacion['horas_contrato_docentes_parvularia']);
@@ -457,9 +449,6 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
             ]);
         }
         $categoria = $pie > 0 ? 'pie' : ($parvularia > 0 ? 'parvularia' : 'aula');
-        if ($titulo === 'Educadora Diferencial' && ! $especial) {
-            $categoria = 'aula';
-        }
         $padron = DB::table('reemplazos_personal')->get()->toJson();
         $asignaciones = DB::table('dotacion_docente_asignaciones')->get()->toJson();
         foreach ([34.0, 0.0, 44.0, 19.37] as $necesarias) {

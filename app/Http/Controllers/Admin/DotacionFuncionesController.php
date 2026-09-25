@@ -403,7 +403,7 @@ class DotacionFuncionesController extends Controller
         $capacidad = max(0.0, round((float) ($proceso['capacidad_no_normativas'] ?? 0) - $reservadas, 2));
         if ($horas > $capacidad + 0.01) {
             throw ValidationException::withMessages([
-                'horas_declaradas' => 'La función supera las '.$capacidad.' hora(s) disponibles en el bloque 1 para funciones no normativas.',
+                'horas_declaradas' => 'La función supera las '.$capacidad.' hora(s) disponibles en los bloques de dotación para funciones no normativas.',
             ]);
         }
     }

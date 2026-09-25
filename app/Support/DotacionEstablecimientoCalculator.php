@@ -301,8 +301,8 @@ class DotacionEstablecimientoCalculator
     /**
      * Separa el contrato vigente de las Educadoras de Párvulos. La colección
      * docentes ya consolida el último período y aplica exclusiones de dotación.
-     * Las horas asignadas fuera de NT1/NT2 se mantienen en Aula general o en
-     * su función respectiva, sin incrementar la cobertura de Parvularia.
+     * Sólo las horas de plan general y funciones normativas principales salen
+     * del contrato de Parvularia; las funciones no normativas permanecen allí.
      */
     public static function contratoParvularia(iterable $docentes, float $contratoAulaTotal, float $necesidadParvularia): array
     {
@@ -325,27 +325,21 @@ class DotacionEstablecimientoCalculator
             return 0.0;
         }
 
-        $horasPie = min(
-            $horasContrato,
-            max(0.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente))
-        );
         $horasFueraParvularia = (float) collect($docente['asignaciones'] ?? [])
             ->filter(fn ($asignacion) => DotacionAsignacionCalculator::coverageEstamento($asignacion) === 'docente'
                 && (data_get($asignacion, 'estado') ?? 'activa') === 'activa')
-            ->reject(fn ($asignacion) => self::esAsignacionPlanNt($asignacion))
+            ->filter(fn ($asignacion) => (
+                in_array(data_get($asignacion, 'tipo_asignacion'), ['plan_estudio', 'pie_colaborativo'], true)
+                    && ! self::esAsignacionPlanNt($asignacion)
+            ) || DotacionAsignacionCalculator::esAsignacionNormativaAula($asignacion))
             ->sum(fn ($asignacion) => max(0.0, (float) data_get($asignacion, 'horas_contrato', 0)));
 
-        // La parte ya destinada a PIE se descuenta una sola vez del contrato.
-        // Si una coordinación PIE no integra el bloque PIE (por ejemplo, por
-        // una exclusión contractual), igualmente queda fuera de Parvularia.
-        $horasFueraParvularia = max(0.0, $horasFueraParvularia - $horasPie);
-
-        return round(max(0.0, $horasContrato - $horasPie - $horasFueraParvularia), 2);
+        return round(max(0.0, $horasContrato - $horasFueraParvularia), 2);
     }
 
     private static function esAsignacionPlanNt(object|array $asignacion): bool
     {
-        if (data_get($asignacion, 'tipo_asignacion') !== 'plan_estudio') {
+        if (! in_array(data_get($asignacion, 'tipo_asignacion'), ['plan_estudio', 'pie_colaborativo'], true)) {
             return false;
         }
 
