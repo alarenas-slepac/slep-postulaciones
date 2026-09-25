@@ -126,6 +126,13 @@ class DotacionFuncionesController extends Controller
             'canConfigureDirectorAdp' => in_array($activeRole, $this->directorAdpRoles, true),
             'bloquesConsolidados' => $this->bloquesConsolidados(),
             'proceso2027' => $proceso2027,
+            'accionesContexto' => $this->accionesContexto($request),
+            'volverUrl' => $request->boolean('desde_dotacion')
+                ? route('admin.dotacion-establecimiento.show', [
+                    $establecimiento, 'anio' => $anio,
+                    'tab' => $this->tabOrigen($request),
+                ])
+                : route('admin.dotacion-funciones.index', ['anio' => $anio]),
         ]);
     }
 
@@ -169,7 +176,7 @@ class DotacionFuncionesController extends Controller
             ]
         );
 
-        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => (int) $data['anio']])
+        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => (int) $data['anio'], ...$this->accionesContexto($request)])
             ->with('status', 'Parámetros de dotación actualizados correctamente.');
     }
 
@@ -220,7 +227,7 @@ class DotacionFuncionesController extends Controller
             'validated_at' => in_array($activeRole, $this->validatorRoles, true) ? now() : null,
         ]);
 
-        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => (int) $data['anio']])
+        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => (int) $data['anio'], ...$this->accionesContexto($request)])
             ->with('status', 'Función declarada correctamente.');
     }
 
@@ -261,7 +268,7 @@ class DotacionFuncionesController extends Controller
             'updated_by' => $request->user()?->id,
         ]);
 
-        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => (int) $data['anio']])
+        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => (int) $data['anio'], ...$this->accionesContexto($request)])
             ->with('status', 'Función actualizada correctamente.');
     }
 
@@ -287,7 +294,7 @@ class DotacionFuncionesController extends Controller
             $mensaje .= ' Se conservaron '.$asignacionesVinculadas.' asignación(es) activa(s) para revisión manual en el bloque Horas fantasmas de Dotación Establecimiento.';
         }
 
-        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio])
+        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio, ...$this->accionesContexto($request)])
             ->with('status', $mensaje);
     }
 
@@ -319,7 +326,7 @@ class DotacionFuncionesController extends Controller
             'updated_by' => $request->user()?->id,
         ]);
 
-        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $funcion->anio])
+        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $funcion->anio, ...$this->accionesContexto($request)])
             ->with('status', 'Función validada correctamente.');
     }
 
@@ -340,8 +347,23 @@ class DotacionFuncionesController extends Controller
             'updated_by' => $request->user()?->id,
         ]);
 
-        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $funcion->anio])
+        return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $funcion->anio, ...$this->accionesContexto($request)])
             ->with('status', 'Función observada correctamente.');
+    }
+
+    private function accionesContexto(Request $request): array
+    {
+        return $request->boolean('desde_dotacion')
+            ? ['desde_dotacion' => 1, 'tab_origen' => $this->tabOrigen($request)]
+            : [];
+    }
+
+    private function tabOrigen(Request $request): string
+    {
+        $tab = (string) $request->input('tab_origen', 'resumen');
+
+        return in_array($tab, ['resumen', 'docentes', 'sobredotacion', 'asignacion', 'asignaturas', 'cursos-combinados'], true)
+            ? $tab : 'resumen';
     }
 
     private function authorizeDotacionAccess(Request $request, bool $requiresEdit = false): string

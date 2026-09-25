@@ -144,7 +144,7 @@
                     </a>
                 @endif
                 @if (Route::has('admin.dotacion-funciones.show'))
-                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio]) }}">
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio, 'desde_dotacion' => 1, 'tab_origen' => $tab ?? 'resumen']) }}" data-dotacion-contexto-salida>
                         <i class="bi bi-diagram-3"></i> Funciones y planes
                     </a>
                 @endif
@@ -398,7 +398,7 @@
             </li>
             @if (Route::has('admin.dotacion-funciones.show'))
                 <li class="nav-item" role="presentation">
-                    <a class="nav-link" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio]) }}">
+                    <a class="nav-link" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio, 'desde_dotacion' => 1, 'tab_origen' => $tab ?? 'resumen']) }}" data-dotacion-contexto-salida>
                         <i class="bi bi-diagram-3"></i> Funciones y planes
                     </a>
                 </li>
@@ -419,4 +419,5 @@
     @else
         @include('admin.dotacion-establecimiento.partials._resumen')
     @endif
+    @include('admin.dotacion-establecimiento.partials._restore_context')
 @endsection

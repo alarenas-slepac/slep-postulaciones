@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.25.511' => [
+        'date' => '2026-09-25',
+        'module' => 'Dotación docente',
+        'title' => 'Conservación del contexto al guardar y volver desde Funciones y planes',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionFuncionesController.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_restore_context.blade.php',
+            'resources/views/admin/dotacion-funciones/show.blade.php',
+            'tests/Feature/DotacionProyeccionAccessTest.php',
+            'tests/Unit/DotacionFuncionesNavigationTest.php',
+        ],
+        'changes' => [
+            'Restablece el desplazamiento y los cursos o bloques desplegados después de guardar en las vistas de dotación.',
+            'Conserva la pestaña de Dotación docente al entrar en Funciones y planes y utilizar Volver, incluso tras guardar.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Funcionario directivo de establecimiento'],
+    ],
     '2026.9.25.510' => [
         'date' => '2026-09-25',
         'module' => 'Dotación docente',
