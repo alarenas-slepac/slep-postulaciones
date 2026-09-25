@@ -42,6 +42,57 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame(4, $docentes->last()['prioridad_2027']);
     }
 
+    public function test_ordena_el_resto_titular_por_antiguedad_y_exige_justificacion_al_omitirla(): void
+    {
+        $sinFecha = $this->docente('Sin fecha', 20, 0, 0, null, 'Inicial', '2020-01-01');
+        $sinFecha['fecha_antiguedad'] = null;
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('Titular reciente', 20, 0, 0, null, 'Temprano', '2018-01-01'),
+            $sinFecha,
+            $this->docente('Titular antiguo', 20, 0, 0, null, 'Inicial', '2005-01-01'),
+            $this->docente('Titular intermedio', 20, 0, 0, null, 'Acceso', '2010-01-01'),
+        ]));
+
+        $this->assertSame([
+            'Titular antiguo', 'Titular intermedio', 'Titular reciente', 'Sin fecha',
+        ], $docentes->pluck('nombre')->all());
+        $this->assertSame([3, 3, 3, 3], $docentes->pluck('prioridad_2027')->all());
+        $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
+            $docentes, $docentes->firstWhere('nombre', 'Titular reciente')
+        ));
+        $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
+            $docentes, $docentes->firstWhere('nombre', 'Sin fecha')
+        ));
+        $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
+            $docentes, $docentes->firstWhere('nombre', 'Titular antiguo')
+        ));
+
+        $sinSaldoAntiguo = $docentes->map(function (array $docente): array {
+            if (in_array($docente['nombre'], ['Titular antiguo', 'Titular intermedio'], true)) {
+                $docente['horas_disponibles'] = 0.0;
+            }
+            return $docente;
+        });
+        $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
+            $sinSaldoAntiguo, $sinSaldoAntiguo->firstWhere('nombre', 'Titular reciente')
+        ));
+    }
+
+    public function test_aplica_antiguedad_dentro_del_grupo_avanzado_y_experto_sin_priorizar_tramo(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('Experto antiguo', 20, 0, 0, null, 'Experto I', '2000-01-01'),
+            $this->docente('Avanzado reciente', 20, 0, 0, null, 'Avanzado', '2010-01-01'),
+        ]));
+
+        $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
+            $docentes, $docentes->firstWhere('nombre', 'Avanzado reciente')
+        ));
+        $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
+            $docentes, $docentes->firstWhere('nombre', 'Experto antiguo')
+        ));
+    }
+
     public function test_trabajo_colaborativo_nt_se_contabiliza_en_bloque_parvularia(): void
     {
         $resumen = DotacionProceso2027Calculator::resumen(

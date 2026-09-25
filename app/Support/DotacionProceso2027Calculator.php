@@ -243,11 +243,35 @@ class DotacionProceso2027Calculator
             $docente['horas_contrata_disponibles'] = max(0.0, round($contrata - max(0.0, $asignadas - $planta), 2));
 
             return $docente;
-        })->sortBy([
-            ['prioridad_2027', 'asc'],
-            ['fecha_antiguedad', 'asc'],
-            ['nombre', 'asc'],
-        ])->values();
+        })->sort(fn (array $a, array $b) => ($a['prioridad_2027'] <=> $b['prioridad_2027'])
+            ?: (self::fechaOrden($a) <=> self::fechaOrden($b))
+            ?: strcmp((string) ($a['nombre'] ?? ''), (string) ($b['nombre'] ?? '')))->values();
+    }
+
+    /** @param Collection<int, array<string, mixed>> $docentes */
+    public static function hayPrelacionAnteriorDisponible(Collection $docentes, array $seleccionado): bool
+    {
+        $prioridad = (int) ($seleccionado['prioridad_2027'] ?? 6);
+        $rut = (string) ($seleccionado['rut_normalizado'] ?? '');
+
+        return $docentes->contains(function (array $docente) use ($prioridad, $rut, $seleccionado): bool {
+            if ((string) ($docente['rut_normalizado'] ?? '') === $rut
+                || (float) ($docente['horas_disponibles'] ?? 0) <= 0.01) {
+                return false;
+            }
+
+            $prioridadDocente = (int) ($docente['prioridad_2027'] ?? 6);
+
+            return $prioridadDocente < $prioridad
+                || ($prioridadDocente === $prioridad
+                    && in_array($prioridad, [2, 3], true)
+                    && self::fechaOrden($docente) < self::fechaOrden($seleccionado));
+        });
+    }
+
+    private static function fechaOrden(array $docente): string
+    {
+        return trim((string) ($docente['fecha_antiguedad'] ?? '')) ?: '9999-12-31';
     }
 
     /**

@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.25.517' => [
+        'date' => '2026-09-25',
+        'module' => 'Dotación docente 2027',
+        'title' => 'Antigüedad dentro de cada grupo de titulares',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'Ordena por antigüedad a los demás titulares dentro de su grupo, dejando las fechas no informadas al final.',
+            'Conserva el orden de prelación en el selector de asignación y muestra la fecha de antigüedad.',
+            'Solicita justificación al asignar horas antes que a otro titular más antiguo del mismo grupo con horas disponibles.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.9.25.516' => [
         'date' => '2026-09-25',
         'module' => 'Dotación docente 2027',

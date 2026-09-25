@@ -22,9 +22,13 @@
             $detalleTitulo = $titulo !== '' ? ' · Título: '.$titulo : ' · Sin título declarado';
             $prioridad = $estamento === 'docente' ? (int) ($persona['prioridad_2027'] ?? 99) : 99;
             $prioridadLabel = $estamento === 'docente' ? trim((string) ($persona['prioridad_2027_label'] ?? '')) : '';
+            $antiguedad = $prioridadLabel !== '' ? (string) ($persona['fecha_antiguedad'] ?? '') : '';
             $titularDisponible = (float) ($persona['horas_titulares_disponibles'] ?? 0);
             $contrataDisponible = (float) ($persona['horas_contrata_disponibles'] ?? max(0, $saldo));
             $detallePrioridad = $prioridadLabel !== '' ? ' · '.$prioridadLabel : '';
+            $detalleAntiguedad = $prioridadLabel !== ''
+                ? ($antiguedad !== '' ? ' · Antigüedad: '.$antiguedad : ' · Sin antigüedad')
+                : '';
 
             return [
                 'rut' => $persona['rut'],
@@ -32,16 +36,17 @@
                 'nombre' => $persona['nombre'],
                 'funcion' => $persona['funcion'] ?? 'Sin función',
                 'estamento' => $estamento,
-                'label' => $persona['nombre'].' · '.$persona['rut'].$detallePrioridad.$detalleTitulo.' · Disponible: '.$fmt($titularDisponible).' titular + '.$fmt($contrataDisponible).' contrata',
+                'label' => $persona['nombre'].' · '.$persona['rut'].$detallePrioridad.$detalleAntiguedad.$detalleTitulo.' · Disponible: '.$fmt($titularDisponible).' titular + '.$fmt($contrataDisponible).' contrata',
                 'titulo' => $titulo,
                 'es_parvularia' => \App\Support\DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos'],
                 'saldo' => $saldo,
                 'prioridad' => $prioridad,
                 'prioridad_label' => $prioridadLabel,
+                'antiguedad' => $antiguedad,
                 'titular_disponible' => $titularDisponible,
                 'contrata_disponible' => $contrataDisponible,
             ];
-        })->filter(fn ($persona) => $estamento !== 'docente' || $persona['saldo'] > 0.01)->sortBy('prioridad')->values();
+        })->filter(fn ($persona) => $estamento !== 'docente' || $persona['saldo'] > 0.01)->values();
     };
     $docenteOptions = $buildPersonalOptions($docentesAsignacion, 'docente');
     $asistenteOptions = $buildPersonalOptions($asistentesAsignacion, 'asistente');
@@ -333,7 +338,7 @@
                                                     <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                                     <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
                                                     @if ($proceso2027Asignacion['aplica'] ?? false)
-                                                        <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; la lista se presenta según la prelación 2027 y el saldo contractual disponible.</span></div>
+                                                        <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; cada grupo titular se ordena por antigüedad y muestra el saldo contractual disponible.</span></div>
                                                     @endif
                                                     <select name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                                         <option value="docente">Cubierto por docente</option>
@@ -344,7 +349,7 @@
                                                         <optgroup label="Docentes">
                                                             @foreach ($docenteOptions as $doc)
                                                                 @continue($soloParvularia && !$doc['es_parvularia'])
-                                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
+                                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                             @endforeach
                                                         </optgroup>
                                                         <optgroup label="Asistentes de la Educación">
@@ -370,7 +375,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="form-text js-ayuda-aaee d-none">Para asistentes, ingrese las horas aula cubiertas y las horas de contrato AAEE. No se aplica conversión 65/35 ni 60/40.</div>
-                                                    <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación obligatoria si usa prioridad inferior">
+                                                    <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si omite prelación o antigüedad">
                                                     <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
                                                     <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
                                                 </form>
@@ -489,11 +494,11 @@
                                             <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar docente por nombre o RUT..." required>
                                                 <option value="">Seleccione docente...</option>
                                                 @foreach ($docenteOptions as $doc)
-                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
+                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </select>
                                             <div class="small text-muted">Contrato fijo: 44 horas.</div>
-                                            <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si usa prioridad inferior">
+                                            <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si omite prelación o antigüedad">
                                             <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
                                         </form>
                                     @else
@@ -513,7 +518,7 @@
                                         <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                         <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
                                         @if ($proceso2027Asignacion['aplica'] ?? false)
-                                            <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; la lista se presenta según la prelación 2027 y el saldo contractual disponible.</span></div>
+                                            <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; cada grupo titular se ordena por antigüedad y muestra el saldo contractual disponible.</span></div>
                                         @endif
                                         <select name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                             <option value="docente">Cubierto por docente</option>
@@ -523,7 +528,7 @@
                                             <option value="">Seleccione persona...</option>
                                             <optgroup label="Docentes">
                                                 @foreach ($docenteOptions as $doc)
-                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
+                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </optgroup>
                                             <optgroup label="Asistentes de la Educación">
@@ -544,7 +549,7 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación obligatoria si usa prioridad inferior">
+                                        <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si omite prelación o antigüedad">
                                         <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
                                         <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
                                         </form>
@@ -615,6 +620,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 funcion: option.data('funcion') || '',
                 titulo: option.data('titulo') || '',
                 prioridad: option.data('prioridad-label') || '',
+                antiguedad: option.data('antiguedad') || '',
                 titular: option.data('titular-disponible'),
                 contrata: option.data('contrata-disponible'),
             };
@@ -632,6 +638,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (data.prioridad) {
                 meta.append($('<span>', { class: 'dotacion-personal-option__priority' }).text(data.prioridad));
+                meta.append($('<span>').text(data.antiguedad ? 'Antigüedad: ' + data.antiguedad : 'Sin antigüedad'));
             } else if (data.estamento === 'asistente') {
                 meta.append($('<span>').text('Asistente de la Educación'));
             }
