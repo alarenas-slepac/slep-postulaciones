@@ -82,7 +82,37 @@ class DotacionAsignacionContratoPieTest extends TestCase
         $this->assertSame('11111111-1', $detalle['pie']['items']->sole()['rut']);
     }
 
-    public function test_diferencial_descuenta_del_pie_las_horas_asignadas_a_aula_o_funciones(): void
+    public function test_coordinacion_pie_de_parvularia_va_al_bloque_principal(): void
+    {
+        $coordinacion = $this->asignacion('funcion_tecnico_pedagogica', 'pie', 'Coordinación PIE', 4);
+        $coordinacion->docente_rut_normalizado = '111111111';
+        $docente = [
+            'rut' => '11.111.111-1',
+            'titulo' => 'Pedagogía en Educación de Párvulos',
+            'horas_contrato' => 44,
+            'asignaciones' => [$coordinacion],
+        ];
+
+        $this->assertSame(0.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente));
+        $this->assertSame(0.0, DotacionAsignacionCalculator::resumenContratoDocentePie(
+            collect([$coordinacion]), collect([$docente])
+        )['total']);
+        $this->assertSame(40.0, \App\Support\DotacionEstablecimientoCalculator::contratoParvularia(
+            [$docente], 44, 40
+        )['horas_contrato_docentes_parvularia']);
+
+        $detalle = DotacionSobredotacionCalculator::build([$docente], [
+            'horas_contrato_docentes' => 44,
+            'horas_contrato_docentes_aula' => 44,
+            'horas_contrato_docente_pie' => 0,
+            'horas_dotacion_funciones_normativas' => 4,
+            'horas_contrato_pie_necesarias' => 0,
+        ]);
+        $this->assertSame(0.0, $detalle['pie']['resumen']['horas_dotacion_total']);
+        $this->assertSame(0.0, $detalle['pie']['resumen']['horas_asignadas_registradas']);
+    }
+
+    public function test_diferencial_descuenta_plan_general_y_conserva_otra_funcion_en_pie(): void
     {
         $plan = $this->asignacion('plan_estudio', 'asignatura', 'Matematica', 20);
         $funcion = $this->asignacion('otra_funcion', 'declarada', 'Coordinacion comunal', 6);
@@ -102,11 +132,11 @@ class DotacionAsignacionContratoPieTest extends TestCase
             'asignaciones' => [$plan, $funcion, $pie, $coordinacionPie, $inactiva],
         ];
 
-        $this->assertSame(18.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente));
+        $this->assertSame(24.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente));
 
         $method = new ReflectionMethod(DotacionAsignacionCalculator::class, 'resumenContratoDocentePie');
         $resumen = $method->invoke(null, collect([$plan, $funcion, $pie, $coordinacionPie, $inactiva]), collect([$docente]));
-        $this->assertSame(['coordinacion_pie' => 0.0, 'educadoras_diferenciales' => 18.0, 'total' => 18.0], $resumen);
+        $this->assertSame(['coordinacion_pie' => 0.0, 'educadoras_diferenciales' => 24.0, 'total' => 24.0], $resumen);
     }
 
     public function test_detalle_identifica_contrato_sin_asignaciones_y_no_lo_inventa_como_asignado(): void

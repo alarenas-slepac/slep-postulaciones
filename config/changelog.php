@@ -1,6 +1,31 @@
 <?php
 
 return [
+    '2026.9.25.510' => [
+        'date' => '2026-09-25',
+        'module' => 'Dotación docente',
+        'title' => 'Imputación de funciones según bloque contractual de Parvularia y PIE',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Http/Controllers/Admin/DotacionFuncionesController.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Feature/DotacionSituacionHorasNecesariasTest.php',
+            'tests/Unit/DotacionAsignacionContratoPieTest.php',
+            'tests/Unit/DotacionContratoParvulariaTest.php',
+            'tests/Unit/DotacionDiferencialNormativaTest.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'Lleva al bloque principal las horas de funciones directivas, técnico-pedagógicas y planes normativos asignadas a docentes de Párvulos o diferenciales.',
+            'Mantiene las funciones no normativas en Parvularia o PIE y conserva Coordinación PIE en el contrato de Educación Diferencial.',
+            'Aplica el mismo reparto a los topes del proceso 2027 sin duplicar la cobertura de necesidades.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Funcionario directivo de establecimiento'],
+    ],
     '2026.9.24.509' => [
         'date' => '2026-09-24',
         'module' => 'Reconocimiento de Bienios',

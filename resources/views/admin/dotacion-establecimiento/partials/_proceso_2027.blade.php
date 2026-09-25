@@ -78,9 +78,9 @@
                     <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
                         <div>
                             <div class="fw-semibold">Definición de funciones normativas</div>
-                            <div class="small text-muted">Seleccione las funciones que el establecimiento utilizará. Sólo esas horas se sumarán como necesidad obligatoria de Plan general, trabajo colaborativo PIE y funciones normativas.</div>
+                            <div class="small text-muted">Seleccione las funciones que el establecimiento utilizará. Sólo esas horas se sumarán como necesidad obligatoria en el componente correspondiente.</div>
                         </div>
-                        <span class="badge {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'text-bg-success' : 'text-bg-warning' }}">Bolsa potencial: {{ $fmtProceso(data_get($proceso, 'bloques.bloque_1.horas_normativas_potenciales', 0)) }} h</span>
+                        <span class="badge {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'text-bg-success' : 'text-bg-warning' }}">Bolsa potencial: {{ $fmtProceso(collect($proceso['bloques'] ?? [])->sum('horas_normativas_potenciales')) }} h</span>
                     </div>
                     @if ($canManageProceso2027Normativas ?? false)
                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}">
@@ -127,7 +127,7 @@
                 </table>
             </div>
             @if (!($proceso['funciones_no_normativas_habilitadas'] ?? false))
-                <div class="alert alert-secondary small mt-3 mb-0"><i class="bi bi-lock"></i> Las funciones no normativas aún están bloqueadas. Deben completarse las necesidades obligatorias y mantenerse saldo disponible en Plan general, trabajo colaborativo PIE y funciones normativas.</div>
+                <div class="alert alert-secondary small mt-3 mb-0"><i class="bi bi-lock"></i> Las funciones no normativas aún están bloqueadas. Deben completarse las necesidades obligatorias y mantenerse saldo disponible en el bloque contractual que corresponda a cada docente.</div>
             @else
                 <div class="alert alert-success small mt-3 mb-0"><i class="bi bi-unlock"></i> Funciones no normativas habilitadas: {{ $fmtProceso($proceso['capacidad_no_normativas'] ?? 0) }} horas disponibles.</div>
             @endif

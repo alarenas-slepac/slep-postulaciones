@@ -47,15 +47,15 @@ class DotacionDiferencialNormativaTest extends TestCase
             $this->asignacion(10, ['tipo_asignacion' => 'pie_educadora_diferencial']),
         ];
         $docente = $this->docente($asignaciones);
-        $this->assertSame(24.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente));
+        $this->assertSame(14.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente));
         // El resumen también funciona cuando solo recibe asignaciones a nivel establecimiento.
         unset($docente['asignaciones']);
-        $this->assertSame(24.0, DotacionAsignacionCalculator::resumenContratoDocentePie(collect($asignaciones), collect([$docente]))['total']);
+        $this->assertSame(14.0, DotacionAsignacionCalculator::resumenContratoDocentePie(collect($asignaciones), collect([$docente]))['total']);
     }
 
     public function test_reparto_respeta_contrato_efectivo_decimales_y_funciones_normativas(): void
     {
-        foreach (['funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion'] as $tipo) {
+        foreach (['funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo'] as $tipo) {
             foreach ([[44, 44, 0], [34, 20, 14], [34, 44, 0], [34, 60, 0], [0, 20, 0], [34, 19.37, 14.63]] as [$contrato, $normativas, $pie]) {
                 $docente = $this->docente([$this->asignacion($normativas, ['tipo_asignacion' => $tipo])], $contrato);
                 $docente['exclusion_docente'] = ['motivo' => 'fuero_maternal', 'horas' => 44 - $contrato];
@@ -64,6 +64,28 @@ class DotacionDiferencialNormativaTest extends TestCase
                 $this->assertSame(44.0, $docente['horas_contrato_base']);
             }
         }
+
+        $otraFuncion = $this->docente([$this->asignacion(10, ['tipo_asignacion' => 'otra_funcion'])]);
+        $this->assertSame(44.0, DotacionAsignacionCalculator::contratoPiePorDocente($otraFuncion));
+    }
+
+    public function test_diferencial_conserva_en_pie_coordinacion_y_funciones_no_normativas(): void
+    {
+        $asignaciones = [
+            $this->asignacion(6, ['tipo_asignacion' => 'funcion_directiva']),
+            $this->asignacion(4, ['asignatura_nombre' => 'Convivencia Escolar']),
+            $this->asignacion(4, ['tipo_asignacion' => 'plan_normativo']),
+            $this->asignacion(6, ['tipo_asignacion' => 'otra_funcion']),
+            $this->asignacion(4, ['dotacion_funcion_id' => 9]),
+            $this->asignacion(4, ['subtipo_asignacion' => 'pie', 'asignatura_nombre' => 'Coordinación PIE']),
+            $this->asignacion(16, ['tipo_asignacion' => 'pie_educadora_diferencial']),
+        ];
+        $docente = $this->docente($asignaciones);
+
+        $this->assertSame(30.0, DotacionAsignacionCalculator::contratoPiePorDocente($docente));
+        $this->assertSame(30.0, DotacionAsignacionCalculator::resumenContratoDocentePie(
+            collect($asignaciones), collect([$docente])
+        )['total']);
     }
 
     public function test_proyeccion_conserva_reparto_vacantes_y_no_duplica_necesidades(): void
