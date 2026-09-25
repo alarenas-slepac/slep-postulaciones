@@ -20,6 +20,7 @@ Referencias en el código:
 3. Mantener una misma jerarquía: contexto breve, título principal, descripción útil, acciones; después filtros o resumen y finalmente contenido. Una acción principal visible por bloque de decisión.
 4. El color comunica función o estado. Ningún estado depende solo del color: acompañarlo de texto y, cuando ayude, icono.
 5. El diseño debe responder a escritorio, tableta y móvil, sin ocultar información esencial ni crear desplazamiento horizontal de toda la página.
+6. Al intervenir una pantalla o módulo, revisar todos sus elementos y componentes visibles. Cualquier componente existente que no siga estas reglas debe incorporarse al alcance del cambio y ajustarse antes de entregar: encabezados, filtros, formularios, selectores, tablas, estados, mensajes, acciones, vistas vacías y adaptación móvil. Aplicar el mismo criterio a documentos y vistas públicas, respetando las limitaciones de cada medio.
 
 ## Tokens visuales
 
@@ -103,7 +104,7 @@ Mostrar los datos en bloques de etiqueta/valor sobre superficie suave, con texto
 
 1. Antes de editar una vista, revisar el archivo completo, su layout, estilos compilados, rutas, controladores, usos y pruebas relacionadas, conforme a `AGENTS.md`.
 2. Identificar el patrón equivalente en Cometidos y reutilizar el componente compartido existente cuando lo haya. Si el patrón se repite, extraerlo a CSS/SCSS o Blade reutilizable en vez de duplicar estilos incrustados.
-3. Aplicar los tokens y estados de esta guía a la zona intervenida; preservar permisos, datos históricos, nombres de campos y comportamiento.
+3. Aplicar los tokens y estados de esta guía a la pantalla o módulo intervenido. Ajustar también los componentes preexistentes que diverjan del Design System y preservar permisos, datos históricos, nombres de campos y comportamiento.
 4. Revisar escritorio y móvil, navegación por teclado, validación y estados vacío/carga/error. Ejecutar las validaciones indicadas en `AGENTS.md`; si se modifica CSS o JavaScript compilado, ejecutar `npm run build`.
 
 La documentación establece la dirección visual del sistema. La adaptación efectiva de cada módulo requiere cambios de interfaz específicos y su revisión funcional.

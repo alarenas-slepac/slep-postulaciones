@@ -6,33 +6,33 @@
     <style>
         @page { margin: 30px 36px 40px; }
         * { box-sizing: border-box; }
-        body { margin: 0; color: #202938; font-family: DejaVu Sans, sans-serif; font-size: 10px; line-height: 1.45; }
-        .header { border-bottom: 2px solid #184a78; margin-bottom: 18px; padding-bottom: 10px; width: 100%; }
+        body { margin: 0; color: #0f172a; font-family: DejaVu Sans, sans-serif; font-size: 10px; line-height: 1.45; }
+        .header { border-bottom: 2px solid #0b3d91; margin-bottom: 18px; padding-bottom: 10px; width: 100%; }
         .header td { vertical-align: middle; }
         .logo { height: auto; width: 80px; }
         .header-title { text-align: right; }
-        h1 { color: #184a78; font-size: 19px; margin: 0 0 4px; }
-        h2 { color: #184a78; font-size: 11px; margin: 0 0 8px; text-transform: uppercase; }
-        .muted { color: #667085; }
-        .section { border: 1px solid #d8dee8; border-radius: 4px; margin-bottom: 12px; padding: 10px; }
+        h1 { color: #0b3d91; font-size: 19px; margin: 0 0 4px; }
+        h2 { color: #0b3d91; font-size: 11px; margin: 0 0 8px; text-transform: uppercase; }
+        .muted { color: #64748b; }
+        .section { border: 1px solid #dbe4f0; border-radius: 4px; margin-bottom: 12px; padding: 10px; }
         .summary { border-collapse: collapse; width: 100%; }
-        .summary td { border-right: 1px solid #e3e7ed; padding: 3px 10px; vertical-align: top; width: 33.333%; }
+        .summary td { border-right: 1px solid #dbe4f0; padding: 3px 10px; vertical-align: top; width: 33.333%; }
         .summary td:first-child { padding-left: 0; }
         .summary td:last-child { border-right: 0; padding-right: 0; }
-        .label { color: #667085; display: block; font-size: 8px; margin-bottom: 2px; text-transform: uppercase; }
-        .value { color: #101828; font-size: 12px; font-weight: bold; }
+        .label { color: #64748b; display: block; font-size: 8px; margin-bottom: 2px; text-transform: uppercase; }
+        .value { color: #0f172a; font-size: 12px; font-weight: bold; }
         .amount-table { border-collapse: collapse; width: 100%; }
-        .amount-table th, .amount-table td { border: 1px solid #cfd6df; padding: 7px 8px; }
-        .amount-table th { background: #eaf0f6; color: #173d63; text-align: left; width: 46%; }
+        .amount-table th, .amount-table td { border: 1px solid #dbe4f0; padding: 7px 8px; }
+        .amount-table th { background: #f8fafc; color: #334155; text-align: left; width: 46%; }
         .amount-table td { text-align: right; }
-        .total th, .total td { background: #184a78; color: #fff; font-size: 13px; }
-        .warning { background: #fff5d6; border: 1px solid #e8c75f; color: #6f4d00; margin-bottom: 12px; padding: 8px 10px; }
-        .formula { background: #f7f9fc; color: #475467; font-size: 9px; margin-top: 7px; padding: 6px 8px; text-align: center; }
+        .total th, .total td { background: #0b3d91; color: #fff; font-size: 13px; }
+        .warning { background: #fff8e1; border: 1px solid #f5d58b; color: #8a4b00; margin-bottom: 12px; padding: 8px 10px; }
+        .formula { background: #f8fafc; color: #475569; font-size: 9px; margin-top: 7px; padding: 6px 8px; text-align: center; }
         .verification { border-collapse: collapse; width: 100%; }
         .verification td { vertical-align: middle; }
         .qr { height: 98px; width: 98px; }
-        .hash { color: #344054; font-family: DejaVu Sans Mono, monospace; font-size: 7px; word-break: break-all; }
-        .footer { bottom: -27px; color: #667085; font-size: 7px; left: 0; position: fixed; right: 0; text-align: center; }
+        .hash { color: #334155; font-family: DejaVu Sans Mono, monospace; font-size: 7px; word-break: break-all; }
+        .footer { bottom: -27px; color: #64748b; font-size: 7px; left: 0; position: fixed; right: 0; text-align: center; }
     </style>
 </head>
 <body>
