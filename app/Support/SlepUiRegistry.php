@@ -25,6 +25,7 @@ class SlepUiRegistry
             'funcionario_estab' => 'Funcionario Establecimiento',
             'funcionario_directivo_estab' => 'Directivo de Establecimiento',
             'funcionario_daf' => 'Funcionario DAF',
+            'auditoria_slep' => 'Auditoria SLEP',
             'funcionario_daf_compra' => 'Funcionario DAF Compra',
             'director_ejecutivo' => 'Director Ejecutivo',
             'funcionario_juridica' => 'Funcionario Jurídica',
@@ -49,6 +50,7 @@ class SlepUiRegistry
             'supervisor_plani', 'coordinador_plani' => 'warning',
             'coordinador_gdp', 'funcionario_slep', 'digitador_licencias', 'analista_licencias', 'analista_smc', 'administrador_licencias' => 'purple',
             'funcionario_daf', 'funcionario_daf_compra' => 'teal',
+            'auditoria_slep' => 'primary',
             'director_ejecutivo' => 'primary',
             'funcionario_juridica' => 'danger',
             default => 'muted',
@@ -141,7 +143,7 @@ class SlepUiRegistry
             'Remuneraciones' => [
                 self::entry('Liquidaciones', 'liquidaciones.cargas.index', 'bi-receipt-cutoff', ['admin', 'funcionario_slep'], 'liquidaciones'),
                 self::entry('Endeudamiento', 'endeudamiento.cargas.index', 'bi-calculator', ['admin', 'funcionario_slep'], 'endeudamiento'),
-                self::entry('Descuentos CGR', 'descuentos-cgr.index', 'bi-bank', ['admin', 'funcionario_slep']),
+                self::entry('Descuentos CGR', 'descuentos-cgr.index', 'bi-bank', ['admin', 'funcionario_slep', 'funcionario_daf', 'auditoria_slep']),
                 self::entry('Valores UTM', 'descuentos-cgr.utm.index', 'bi-currency-exchange', ['admin', 'funcionario_slep']),
             ],
             'Gestión y control' => [
@@ -189,7 +191,7 @@ class SlepUiRegistry
             self::entry('Viáticos y reembolsos', 'admin.viaticos-reembolsos.index', 'bi-cash-coin', ['admin', 'supervisor_plani', 'coordinador_plani'], 'admin.viaticos-reembolsos'),
             self::entry('Funcionarios viático por anexo', 'admin.funcionarios-viatico-anexo.index', 'bi-person-check', ['admin', 'supervisor_plani', 'coordinador_plani'], 'admin.funcionarios-viatico-anexo'),
             self::entry('Valores hora AAEE', 'admin.aaee-valores-hora.index', 'bi-currency-dollar', ['admin']),
-            self::entry('Descuentos CGR', 'descuentos-cgr.index', 'bi-bank', ['admin', 'funcionario_slep']),
+            self::entry('Descuentos CGR', 'descuentos-cgr.index', 'bi-bank', ['admin', 'funcionario_slep', 'funcionario_daf', 'auditoria_slep']),
             self::entry('Mis Cargas Familiares', 'tramites.cargas-familiares.index', 'bi-people', ['postulante', 'funcionario', 'funcionario_ac']),
             self::entry('Mis Finiquitos', 'postulant.finiquitos.index', 'bi-file-earmark-pdf', ['postulante', 'funcionario'], 'postulant.reemplazos'),
             self::entry('Mi deuda de pensión', 'postulant.deudas-pension-alimentos.index', 'bi-file-earmark-lock', ['postulante', 'funcionario'], 'postulant.reemplazos'),

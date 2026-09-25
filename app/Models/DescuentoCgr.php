@@ -15,6 +15,9 @@ class DescuentoCgr extends Model
         'rut',
         'nombre',
         'origen_funcionario',
+        'estado',
+        'institucion_reintegro',
+        'estamento_funcionario',
         'numero_resolucion',
         'numero_resolucion_clave',
         'fecha_resolucion',
@@ -34,6 +37,15 @@ class DescuentoCgr extends Model
         'documento_emitido_en',
         'creado_por_id',
         'actualizado_por_id',
+        'enviado_finanzas_en',
+        'enviado_auditoria_en',
+        'cerrado_en',
+        'certificado_generado_en',
+        'certificado_generado_por_id',
+        'certificado_firmado_path',
+        'certificado_firmado_nombre',
+        'certificado_firmado_en',
+        'certificado_firmado_por_id',
     ];
 
     protected function casts(): array
@@ -49,6 +61,11 @@ class DescuentoCgr extends Model
             'tasa_interes_mensual' => 'decimal:4',
             'resolucion_pdf_tamano' => 'integer',
             'documento_emitido_en' => 'datetime',
+            'enviado_finanzas_en' => 'datetime',
+            'enviado_auditoria_en' => 'datetime',
+            'cerrado_en' => 'datetime',
+            'certificado_generado_en' => 'datetime',
+            'certificado_firmado_en' => 'datetime',
         ];
     }
 
@@ -82,5 +99,25 @@ class DescuentoCgr extends Model
     public function documentosMensuales(): HasMany
     {
         return $this->hasMany(DescuentoCgrDocumentoMensual::class, 'descuento_cgr_id');
+    }
+
+    public function archivos(): HasMany
+    {
+        return $this->hasMany(DescuentoCgrArchivo::class, 'descuento_cgr_id');
+    }
+
+    public function estadoActual(): string
+    {
+        return $this->estado ?: 'ingresado';
+    }
+
+    public function etiquetaEstado(): string
+    {
+        return match ($this->estadoActual()) {
+            'descuentos_realizados' => 'Descuentos realizados',
+            'en_auditoria' => 'En proceso de Auditoría',
+            'cerrado' => 'Cerrado',
+            default => 'Ingresado',
+        };
     }
 }

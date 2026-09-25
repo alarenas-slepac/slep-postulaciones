@@ -2,6 +2,7 @@
 
 @section('content')
     @include('remuneraciones.descuentos-cgr._styles')
+    @php $puedeRegistrar = auth()->user()?->hasAnyRole(['admin', 'funcionario_slep']) ?? false; @endphp
     <div class="cgr-page">
         <div class="cgr-page-header d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
             <div>
@@ -10,8 +11,11 @@
                 <p class="mb-0">Resoluciones de Contraloría y cronogramas de descuento.</p>
             </div>
             <div class="cgr-page-actions d-flex flex-wrap gap-2">
-                <a href="{{ route('descuentos-cgr.utm.index') }}" class="btn btn-outline-primary"><i class="bi bi-currency-exchange me-1"></i>Valores UTM</a>
-                <a href="{{ route('descuentos-cgr.create') }}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Nuevo descuento</a>
+                @if (auth()->user()?->hasRole('admin')) <a href="{{ route('descuentos-cgr.notificaciones.index') }}" class="btn btn-outline-primary"><i class="bi bi-bell me-1"></i>Notificaciones</a> @endif
+                @if ($puedeRegistrar)
+                    <a href="{{ route('descuentos-cgr.utm.index') }}" class="btn btn-outline-primary"><i class="bi bi-currency-exchange me-1"></i>Valores UTM</a>
+                    <a href="{{ route('descuentos-cgr.create') }}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Nuevo descuento</a>
+                @endif
             </div>
         </div>
 
@@ -19,10 +23,25 @@
             <div class="alert alert-success d-flex gap-2"><i class="bi bi-check-circle" aria-hidden="true"></i><span>{{ session('status') }}</span></div>
         @endif
 
+        @php
+            $pestanas = [
+                'ingresado' => 'Registros CGR: Ingresados',
+                'descuentos_realizados' => 'Registros CGR: En registro de Finanzas',
+                'en_auditoria' => 'Registros CGR: En gestión de Auditoría',
+                'cerrado' => 'Registros CGR: Finalizados',
+            ];
+        @endphp
+        <nav class="nav nav-pills cgr-tabs flex-wrap gap-2 mb-4" aria-label="Etapas de Descuentos CGR">
+            @foreach ($pestanas as $clave => $etiqueta)
+                <a class="nav-link {{ $estado === $clave ? 'active' : '' }}" href="{{ route('descuentos-cgr.index', array_merge(request()->except('page', 'estado'), ['estado' => $clave])) }}" @if ($estado === $clave) aria-current="page" @endif>{{ $etiqueta }} <span class="badge {{ $estado === $clave ? 'text-bg-light' : 'text-bg-secondary' }} ms-1">{{ $conteos[$clave] ?? 0 }}</span></a>
+            @endforeach
+        </nav>
+
         <div class="card mb-4">
             <div class="card-header"><i class="bi bi-funnel me-2 text-primary" aria-hidden="true"></i>Buscar descuentos</div>
             <div class="card-body">
                 <form method="GET" class="row g-3 align-items-end">
+                    <input type="hidden" name="estado" value="{{ $estado }}">
                     <div class="col-md-5">
                         <label for="buscar" class="form-label">Buscar</label>
                         <input id="buscar" name="buscar" class="form-control" value="{{ $buscar }}" placeholder="Nombre o RUT">
@@ -50,6 +69,7 @@
                     </div>
                 </form>
 
+                @if ($puedeRegistrar)
                 <hr class="my-4">
                 <div class="fw-semibold mb-3"><i class="bi bi-file-earmark-spreadsheet me-2 text-primary" aria-hidden="true"></i>Exportación mensual</div>
 
@@ -69,11 +89,12 @@
                         <button type="submit" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel mensual</button>
                     </div>
                 </form>
+                @endif
             </div>
         </div>
 
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap"><span><i class="bi bi-list-ul me-2 text-primary" aria-hidden="true"></i>Registros CGR</span><span class="small text-muted">{{ $descuentos->total() }} registro(s)</span></div>
+            <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap"><span><i class="bi bi-list-ul me-2 text-primary" aria-hidden="true"></i>{{ $pestanas[$estado] }}</span><span class="small text-muted">{{ $descuentos->total() }} registro(s)</span></div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
@@ -84,6 +105,7 @@
                             <th class="text-end">Deuda</th>
                             <th class="text-end">Cuota UTM</th>
                             <th>Primer descuento</th>
+                            <th>Estado</th>
                             <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
@@ -106,20 +128,23 @@
                                 <td class="text-end">${{ number_format($descuento->deuda_definitiva_pesos, 0, ',', '.') }}<br><span class="text-muted small">{{ number_format((float) $descuento->deuda_equivalente_utm, 4, ',', '.') }} UTM</span></td>
                                 <td class="text-end">{{ number_format((float) $descuento->cuota_utm, 4, ',', '.') }}<br><span class="text-muted small">{{ $descuento->numero_cuotas }} cuotas</span></td>
                                 <td>{{ $descuento->fecha_primer_descuento->translatedFormat('m-Y') }}</td>
+                                <td><span class="badge {{ match($descuento->estadoActual()) { 'cerrado' => 'text-bg-success', 'en_auditoria' => 'text-bg-info', 'descuentos_realizados' => 'text-bg-warning', default => 'text-bg-primary' } }}">{{ $descuento->etiquetaEstado() }}</span></td>
                                 <td class="text-end">
                                     <div class="d-flex flex-wrap justify-content-end gap-2">
                                     <a href="{{ route('descuentos-cgr.show', $descuento) }}" class="btn btn-sm btn-outline-primary" aria-label="Ver cronograma de {{ $descuento->nombre }}"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Ver</a>
+                                    @if ($puedeRegistrar && $descuento->estadoActual() === 'ingresado')
                                     <a href="{{ route('descuentos-cgr.edit', $descuento) }}" class="btn btn-sm btn-outline-secondary" aria-label="Editar descuento de {{ $descuento->nombre }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Editar</a>
                                     <form method="POST" action="{{ route('descuentos-cgr.destroy', $descuento) }}" class="d-inline" onsubmit="return confirm('Se eliminará el descuento CGR, su cronograma y la resolución PDF asociada. Esta acción no se puede deshacer. ¿Deseas continuar?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Eliminar descuento de {{ $descuento->nombre }}"><i class="bi bi-trash me-1" aria-hidden="true"></i>Eliminar</button>
                                     </form>
+                                    @endif
                                     </div>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7"><div class="cgr-empty"><i class="bi bi-inbox" aria-hidden="true"></i>No hay descuentos CGR registrados para los filtros seleccionados.</div></td></tr>
+                            <tr><td colspan="8"><div class="cgr-empty"><i class="bi bi-inbox" aria-hidden="true"></i>No hay descuentos CGR registrados para los filtros seleccionados.</div></td></tr>
                         @endforelse
                     </tbody>
                 </table>

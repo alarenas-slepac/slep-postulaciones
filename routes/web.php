@@ -83,6 +83,7 @@ use App\Http\Controllers\Endeudamiento\MaeCuotasController;
 use App\Http\Controllers\Liquidaciones\LiquidacionCargaController;
 use App\Http\Controllers\Liquidaciones\MisLiquidacionesController;
 use App\Http\Controllers\Remuneraciones\DescuentoCgrController;
+use App\Http\Controllers\Remuneraciones\DescuentoCgrWorkflowController;
 use App\Http\Controllers\Remuneraciones\UtmValorController;
 use App\Http\Controllers\Remuneraciones\VerificarDescuentoCgrController;
 use App\Http\Controllers\Remuneraciones\VerificarDescuentoCgrMensualController;
@@ -1357,20 +1358,42 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::get('/liquidaciones/{liquidacion}/descargar', [LiquidacionCargaController::class, 'descargar'])->name('cargas.liquidaciones.descargar');
     });
 
-    Route::prefix('descuentos-cgr')->name('descuentos-cgr.')->middleware('ensure.role:admin|funcionario_slep')->group(function () {
-        Route::get('/utm', [UtmValorController::class, 'index'])->name('utm.index');
-        Route::post('/utm', [UtmValorController::class, 'store'])->name('utm.store');
-        Route::put('/utm/{utmValor}', [UtmValorController::class, 'update'])->name('utm.update');
-        Route::post('/utm/importar', [UtmValorController::class, 'importar'])->name('utm.importar');
-        Route::get('/utm/plantilla', [UtmValorController::class, 'plantilla'])->name('utm.plantilla');
+    Route::prefix('descuentos-cgr')->name('descuentos-cgr.')->middleware('ensure.role:admin|funcionario_slep|funcionario_daf|auditoria_slep')->group(function () {
+        Route::middleware('ensure.role:admin|funcionario_slep')->group(function () {
+            Route::get('/utm', [UtmValorController::class, 'index'])->name('utm.index');
+            Route::post('/utm', [UtmValorController::class, 'store'])->name('utm.store');
+            Route::put('/utm/{utmValor}', [UtmValorController::class, 'update'])->name('utm.update');
+            Route::post('/utm/importar', [UtmValorController::class, 'importar'])->name('utm.importar');
+            Route::get('/utm/plantilla', [UtmValorController::class, 'plantilla'])->name('utm.plantilla');
+            Route::get('/crear', [DescuentoCgrController::class, 'create'])->name('create');
+            Route::get('/funcionario/buscar', [DescuentoCgrController::class, 'buscarFuncionario'])->name('funcionario.buscar');
+            Route::post('/', [DescuentoCgrController::class, 'store'])->name('store');
+        });
+        Route::middleware('ensure.role:admin')->group(function () {
+            Route::get('/notificaciones', [DescuentoCgrWorkflowController::class, 'configuracion'])->name('notificaciones.index');
+            Route::put('/notificaciones', [DescuentoCgrWorkflowController::class, 'guardarConfiguracion'])->name('notificaciones.update');
+        });
         Route::get('/', [DescuentoCgrController::class, 'index'])->name('index');
-        Route::get('/crear', [DescuentoCgrController::class, 'create'])->name('create');
-        Route::get('/funcionario/buscar', [DescuentoCgrController::class, 'buscarFuncionario'])->name('funcionario.buscar');
-        Route::post('/', [DescuentoCgrController::class, 'store'])->name('store');
         Route::get('/{descuentoCgr}', [DescuentoCgrController::class, 'show'])->whereNumber('descuentoCgr')->name('show');
-        Route::get('/{descuentoCgr}/editar', [DescuentoCgrController::class, 'edit'])->whereNumber('descuentoCgr')->name('edit');
-        Route::put('/{descuentoCgr}', [DescuentoCgrController::class, 'update'])->whereNumber('descuentoCgr')->name('update');
-        Route::delete('/{descuentoCgr}', [DescuentoCgrController::class, 'destroy'])->whereNumber('descuentoCgr')->name('destroy');
+        Route::middleware('ensure.role:admin|funcionario_slep')->group(function () {
+            Route::get('/{descuentoCgr}/editar', [DescuentoCgrController::class, 'edit'])->whereNumber('descuentoCgr')->name('edit');
+            Route::put('/{descuentoCgr}', [DescuentoCgrController::class, 'update'])->whereNumber('descuentoCgr')->name('update');
+            Route::delete('/{descuentoCgr}', [DescuentoCgrController::class, 'destroy'])->whereNumber('descuentoCgr')->name('destroy');
+            Route::post('/{descuentoCgr}/liquidaciones', [DescuentoCgrWorkflowController::class, 'liquidaciones'])->whereNumber('descuentoCgr')->name('liquidaciones');
+            Route::post('/{descuentoCgr}/enviar-finanzas', [DescuentoCgrWorkflowController::class, 'enviarFinanzas'])->whereNumber('descuentoCgr')->name('enviar-finanzas');
+        });
+        Route::middleware('ensure.role:admin|funcionario_daf')->group(function () {
+            Route::post('/{descuentoCgr}/comprobantes/{tipo}', [DescuentoCgrWorkflowController::class, 'comprobante'])->whereNumber('descuentoCgr')->name('comprobantes');
+            Route::post('/{descuentoCgr}/enviar-auditoria', [DescuentoCgrWorkflowController::class, 'enviarAuditoria'])->whereNumber('descuentoCgr')->name('enviar-auditoria');
+        });
+        Route::middleware('ensure.role:admin|auditoria_slep')->group(function () {
+            Route::post('/{descuentoCgr}/auditoria/liquidaciones', [DescuentoCgrWorkflowController::class, 'liquidaciones'])->whereNumber('descuentoCgr')->name('auditoria.liquidaciones');
+            Route::get('/{descuentoCgr}/auditoria/certificado', [DescuentoCgrWorkflowController::class, 'certificado'])->whereNumber('descuentoCgr')->name('auditoria.certificado');
+            Route::post('/{descuentoCgr}/auditoria/certificado-firmado', [DescuentoCgrWorkflowController::class, 'certificadoFirmado'])->whereNumber('descuentoCgr')->name('auditoria.certificado-firmado');
+            Route::post('/{descuentoCgr}/auditoria/cerrar', [DescuentoCgrWorkflowController::class, 'cerrar'])->whereNumber('descuentoCgr')->name('auditoria.cerrar');
+        });
+        Route::get('/{descuentoCgr}/archivos/{archivo}', [DescuentoCgrWorkflowController::class, 'archivo'])->whereNumber(['descuentoCgr', 'archivo'])->name('archivos.show');
+        Route::get('/{descuentoCgr}/certificado-firmado', [DescuentoCgrWorkflowController::class, 'verCertificado'])->whereNumber('descuentoCgr')->name('certificado-firmado.show');
         Route::get('/{descuentoCgr}/resolucion', [DescuentoCgrController::class, 'pdf'])->whereNumber('descuentoCgr')->name('pdf');
         Route::get('/{descuentoCgr}/informe-pdf', [DescuentoCgrController::class, 'informePdf'])->whereNumber('descuentoCgr')->name('informe.pdf');
         Route::get('/{descuentoCgr}/cronograma/{cuota}/pdf', [DescuentoCgrController::class, 'cronogramaPdf'])

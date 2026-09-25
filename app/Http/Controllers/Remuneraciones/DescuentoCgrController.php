@@ -25,12 +25,13 @@ class DescuentoCgrController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['auth', 'ensure.role:admin|funcionario_slep']);
+        $this->middleware(['auth', 'ensure.role:admin|funcionario_slep|funcionario_daf|auditoria_slep']);
     }
 
     public function index(Request $request): View|StreamedResponse
     {
         if ($request->boolean('exportar')) {
+            abort_unless($request->user()->hasAnyRole(['admin', 'funcionario_slep']), 403);
             $data = $request->validate([
                 'mes_exportacion' => ['required', 'date_format:Y-m'],
             ], [
@@ -49,11 +50,16 @@ class DescuentoCgrController extends Controller
         $anio = (int) $request->integer('anio');
         $origenes = ReemplazoPersonalRutService::opcionesOrigen() + ['sin_clasificar' => 'Sin clasificar'];
         $origen = trim((string) $request->get('origen', ''));
+        $estado = (string) $request->get('estado', 'ingresado');
+        if (! in_array($estado, ['ingresado', 'descuentos_realizados', 'en_auditoria', 'cerrado'], true)) {
+            $estado = 'ingresado';
+        }
         if (! array_key_exists($origen, $origenes)) {
             $origen = '';
         }
 
         $descuentos = DescuentoCgr::query()
+            ->where('estado', $estado)
             ->when($buscar !== '', function ($query) use ($buscar, $buscarRut) {
                 $termino = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $buscar).'%';
                 $query->where(function ($subquery) use ($termino, $buscarRut) {
@@ -85,11 +91,14 @@ class DescuentoCgrController extends Controller
             ->sortDesc()
             ->values();
 
-        return view('remuneraciones.descuentos-cgr.index', compact('descuentos', 'buscar', 'anio', 'anios', 'origen', 'origenes'));
+        $conteos = DescuentoCgr::query()->selectRaw('estado, COUNT(*) as total')->groupBy('estado')->pluck('total', 'estado');
+
+        return view('remuneraciones.descuentos-cgr.index', compact('descuentos', 'buscar', 'anio', 'anios', 'origen', 'origenes', 'estado', 'conteos'));
     }
 
     public function create(): View
     {
+        abort_unless(request()->user()->hasAnyRole(['admin', 'funcionario_slep']), 403);
         return view('remuneraciones.descuentos-cgr.form', ['descuentoCgr' => new DescuentoCgr]);
     }
 
@@ -97,7 +106,7 @@ class DescuentoCgrController extends Controller
     {
         $data = $this->datosPersistencia($request, $funcionarios);
         $data += $this->guardarPdf($request);
-        $data += ['creado_por_id' => $request->user()->id, 'actualizado_por_id' => $request->user()->id];
+        $data += ['estado' => 'ingresado', 'creado_por_id' => $request->user()->id, 'actualizado_por_id' => $request->user()->id];
 
         $descuento = DescuentoCgr::create($data);
 
@@ -107,7 +116,7 @@ class DescuentoCgrController extends Controller
 
     public function show(DescuentoCgr $descuentoCgr, CronogramaDescuentoCgrService $cronograma): View
     {
-        $descuentoCgr->load('creadoPor', 'actualizadoPor');
+        $descuentoCgr->load('creadoPor', 'actualizadoPor', 'archivos.cargadoPor');
         $calculo = $cronograma->calcular($descuentoCgr);
 
         return view('remuneraciones.descuentos-cgr.show', compact('descuentoCgr', 'calculo'));
@@ -115,6 +124,7 @@ class DescuentoCgrController extends Controller
 
     public function edit(DescuentoCgr $descuentoCgr): View
     {
+        $this->autorizarEdicion($descuentoCgr);
         return view('remuneraciones.descuentos-cgr.form', compact('descuentoCgr'));
     }
 
@@ -143,7 +153,17 @@ class DescuentoCgrController extends Controller
         DescuentoCgr $descuentoCgr,
         ReemplazoPersonalRutService $funcionarios
     ): RedirectResponse {
+        $this->autorizarEdicion($descuentoCgr);
         $data = $this->datosPersistencia($request, $funcionarios, $descuentoCgr);
+        if ($descuentoCgr->archivos()->exists()) {
+            foreach (['numero_cuotas', 'fecha_primer_descuento', 'deuda_definitiva_pesos', 'deuda_equivalente_utm', 'cuota_utm', 'tasa_interes_anual', 'tasa_interes_mensual'] as $campo) {
+                $actual = $campo === 'fecha_primer_descuento' ? $descuentoCgr->fecha_primer_descuento?->toDateString() : (float) $descuentoCgr->{$campo};
+                $nuevo = $campo === 'fecha_primer_descuento' ? (string) ($data[$campo] ?? '') : (float) ($data[$campo] ?? 0);
+                if ($campo === 'fecha_primer_descuento' ? $actual !== $nuevo : abs($actual - $nuevo) > 0.00001) {
+                    throw ValidationException::withMessages([$campo => 'No se pueden cambiar los parámetros del cronograma después de cargar liquidaciones.']);
+                }
+            }
+        }
         $data['actualizado_por_id'] = $request->user()->id;
 
         if ($request->hasFile('resolucion_pdf')) {
@@ -158,18 +178,22 @@ class DescuentoCgrController extends Controller
 
     public function destroy(DescuentoCgr $descuentoCgr): RedirectResponse
     {
+        $this->autorizarEdicion($descuentoCgr);
         $resolucionPdfPath = $descuentoCgr->resolucion_pdf_path;
+        $archivosPaths = $descuentoCgr->archivos()->pluck('path')->unique()->all();
 
         DB::transaction(function () use ($descuentoCgr): void {
             // La eliminación explícita conserva el comportamiento en instalaciones
             // históricas donde la llave foránea pudiera no tener ON DELETE CASCADE.
             $descuentoCgr->documentosMensuales()->delete();
+            $descuentoCgr->archivos()->delete();
             $descuentoCgr->delete();
         });
 
         if ($resolucionPdfPath) {
             Storage::disk('local')->delete($resolucionPdfPath);
         }
+        Storage::disk('local')->delete($archivosPaths);
 
         return redirect()->route('descuentos-cgr.index')
             ->with('status', 'Descuento CGR eliminado junto con su cronograma asociado.');
@@ -257,5 +281,11 @@ class DescuentoCgrController extends Controller
             'resolucion_pdf_nombre' => $archivo->getClientOriginalName(),
             'resolucion_pdf_tamano' => $archivo->getSize(),
         ];
+    }
+
+    private function autorizarEdicion(DescuentoCgr $descuento): void
+    {
+        abort_unless(request()->user()?->hasAnyRole(['admin', 'funcionario_slep']), 403);
+        abort_unless($descuento->estadoActual() === 'ingresado', 403);
     }
 }

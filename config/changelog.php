@@ -1,6 +1,42 @@
 <?php
 
 return [
+    '2026.9.25.513' => [
+        'date' => '2026-09-25',
+        'module' => 'Descuentos CGR',
+        'title' => 'Flujo de reintegro por cuotas para Finanzas y Auditoría',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrWorkflowController.php',
+            'app/Http/Requests/Remuneraciones/GuardarDescuentoCgrRequest.php',
+            'app/Mail/DescuentoCgrEtapaMail.php',
+            'app/Models/DescuentoCgr.php',
+            'app/Models/DescuentoCgrArchivo.php',
+            'app/Models/DescuentoCgrNotificacion.php',
+            'app/Services/Remuneraciones/DescuentoCgrCertificadoService.php',
+            'app/Services/Remuneraciones/DescuentoCgrWorkflowService.php',
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+            'database/migrations/2026_09_25_150000_add_flujo_reintegro_descuentos_cgr.php',
+            'database/seeders/RolesAndAdminSeeder.php',
+            'docs/DESIGN_SYSTEM.md',
+            'resources/templates/descuentos-cgr/certificado-auditoria.docx',
+            'resources/views/emails/descuentos-cgr/etapa.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/_styles.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/_workflow.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/form.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/index.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/notificaciones.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Incorpora cuatro etapas, documentos por cuota y rol Auditoria SLEP con permisos propios.',
+            'Permite comprobantes SIGFE y TGR compartidos entre cuotas, notificaciones configurables y certificado Word basado en la plantilla original.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP', 'Funcionario DAF', 'Auditoria SLEP'],
+    ],
     '2026.9.25.512' => [
         'date' => '2026-09-25',
         'module' => 'Descuentos CGR',

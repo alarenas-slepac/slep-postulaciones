@@ -58,6 +58,8 @@ class GuardarDescuentoCgrRequest extends FormRequest
             'fecha_primer_descuento' => ['required', 'date_format:Y-m-d'],
             'resolucion_pdf' => [$pdf, 'file', 'mimes:pdf', 'max:20480'],
             'observaciones' => ['nullable', 'string', 'max:5000'],
+            'institucion_reintegro' => ['nullable', 'string', 'max:255'],
+            'estamento_funcionario' => ['nullable', 'string', 'max:255'],
         ];
     }
 

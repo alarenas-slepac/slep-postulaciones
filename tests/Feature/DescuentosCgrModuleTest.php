@@ -4,11 +4,15 @@ namespace Tests\Feature;
 
 use App\Exports\DescuentosCgrMensualExport;
 use App\Http\Controllers\Remuneraciones\DescuentoCgrController;
+use App\Mail\DescuentoCgrEtapaMail;
 use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
+use App\Models\DescuentoCgrNotificacion;
 use App\Models\UtmValor;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
 use App\Services\Remuneraciones\DescuentoCgrPdfService;
+use App\Services\Remuneraciones\DescuentoCgrWorkflowService;
+use App\Services\Remuneraciones\DescuentoCgrCertificadoService;
 use App\Services\Remuneraciones\ReemplazoPersonalRutService;
 use App\Services\Remuneraciones\UtmImportService;
 use App\Support\ModuleRegistry;
@@ -73,6 +77,18 @@ class DescuentosCgrModuleTest extends TestCase
             $table->string('rut', 12);
             $table->string('nombre');
             $table->string('origen_funcionario', 30)->nullable()->index();
+            $table->string('estado', 32)->default('ingresado');
+            $table->string('institucion_reintegro')->nullable();
+            $table->string('estamento_funcionario')->nullable();
+            $table->timestamp('enviado_finanzas_en')->nullable();
+            $table->timestamp('enviado_auditoria_en')->nullable();
+            $table->timestamp('cerrado_en')->nullable();
+            $table->timestamp('certificado_generado_en')->nullable();
+            $table->unsignedBigInteger('certificado_generado_por_id')->nullable();
+            $table->string('certificado_firmado_path')->nullable();
+            $table->string('certificado_firmado_nombre')->nullable();
+            $table->timestamp('certificado_firmado_en')->nullable();
+            $table->unsignedBigInteger('certificado_firmado_por_id')->nullable();
             $table->string('numero_resolucion', 100);
             $table->string('numero_resolucion_clave', 100)->nullable()->unique();
             $table->date('fecha_resolucion')->nullable();
@@ -95,6 +111,30 @@ class DescuentosCgrModuleTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('descuentos_cgr_archivos', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('descuento_cgr_id');
+            $table->unsignedSmallInteger('numero_cuota');
+            $table->string('tipo', 32);
+            $table->uuid('grupo_archivo');
+            $table->string('path');
+            $table->string('nombre_original');
+            $table->unsignedBigInteger('tamano');
+            $table->string('folio')->nullable();
+            $table->date('fecha_reintegro')->nullable();
+            $table->unsignedBigInteger('monto_reintegro_pesos')->nullable();
+            $table->unsignedBigInteger('cargado_por_id')->nullable();
+            $table->timestamps();
+            $table->unique(['descuento_cgr_id', 'numero_cuota', 'tipo']);
+        });
+
+        Schema::create('descuentos_cgr_notificaciones', function (Blueprint $table) {
+            $table->id();
+            $table->string('evento', 32)->unique();
+            $table->text('correos_adicionales')->nullable();
+            $table->timestamps();
+        });
+
         Schema::create('descuentos_cgr_documentos_mensuales', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('descuento_cgr_id');
@@ -110,6 +150,8 @@ class DescuentosCgrModuleTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('descuentos_cgr_notificaciones');
+        Schema::dropIfExists('descuentos_cgr_archivos');
         Schema::dropIfExists('descuentos_cgr_documentos_mensuales');
         Schema::dropIfExists('descuentos_cgr');
         Schema::dropIfExists('funcionarios_ac_autorizados');
@@ -296,7 +338,7 @@ class DescuentosCgrModuleTest extends TestCase
         ]));
         $this->assertSame([$administracionCentral->id], $vistaAc->getData()['descuentos']->pluck('id')->all());
         $this->assertStringContainsString('Administración Central', $vistaAc->render());
-        $this->assertStringContainsString('Exportar Excel mensual', $vistaAc->render());
+        $this->assertStringNotContainsString('Exportar Excel mensual', $vistaAc->render());
 
         $vistaEstablecimiento = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', [
             'origen' => ReemplazoPersonalRutService::ORIGEN_ESTABLECIMIENTO,
@@ -404,10 +446,14 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertSame(145128.70184, $hoja->getCell('L2')->getValue());
         $libro->disconnectWorksheets();
 
-        $respuesta = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', [
+        $solicitud = Request::create('/descuentos-cgr', 'GET', [
             'exportar' => 1,
             'mes_exportacion' => '2026-03',
-        ]));
+        ]);
+        $solicitud->setUserResolver(fn () => new class {
+            public function hasAnyRole(array $roles): bool { return true; }
+        });
+        $respuesta = app(DescuentoCgrController::class)->index($solicitud);
         $this->assertInstanceOf(StreamedResponse::class, $respuesta);
         $this->assertStringContainsString('descuentos_cgr_2026_03_', (string) $respuesta->headers->get('content-disposition'));
     }
@@ -483,6 +529,11 @@ class DescuentosCgrModuleTest extends TestCase
             'documento_emitido_en' => now(),
         ]);
 
+        $solicitud = Request::create('/descuentos-cgr/'.$descuento->id, 'DELETE');
+        $solicitud->setUserResolver(fn () => new class {
+            public function hasAnyRole(array $roles): bool { return true; }
+        });
+        request()->setUserResolver($solicitud->getUserResolver());
         $respuesta = app(DescuentoCgrController::class)->destroy($descuento);
 
         $this->assertSame(route('descuentos-cgr.index'), $respuesta->getTargetUrl());
@@ -597,6 +648,168 @@ class DescuentosCgrModuleTest extends TestCase
             $this->assertStringContainsString('.logo { height: auto; width: 80px; }', $contenido);
             $this->assertStringNotContainsString('max-height:', $contenido);
         }
+    }
+
+    public function test_flujo_exige_respaldo_por_cuota_y_permite_comprobante_compartido(): void
+    {
+        Storage::fake('local');
+        $descuento = $this->crearDescuento(['numero_cuotas' => 2]);
+        $flujo = app(DescuentoCgrWorkflowService::class);
+
+        $flujo->guardarArchivos($descuento, 'liquidacion', [[
+            'archivo' => UploadedFile::fake()->create('liquidacion-1.pdf', 10, 'application/pdf'), 'cuotas' => [1],
+        ]], 1);
+        $this->assertFalse($flujo->completos($descuento, ['liquidacion']));
+        try {
+            $flujo->avanzar($descuento, 'ingresado', 'descuentos_realizados', ['liquidacion'], 'enviado_finanzas_en', 'funcionario_daf', 'finanzas');
+            $this->fail('El envío sin todas las liquidaciones debió fallar.');
+        } catch (ValidationException) {
+            $this->assertSame('ingresado', $descuento->fresh()->estadoActual());
+        }
+
+        $flujo->guardarArchivos($descuento, 'liquidacion', [[
+            'archivo' => UploadedFile::fake()->create('liquidacion-2.pdf', 10, 'application/pdf'), 'cuotas' => [2],
+        ]], 1);
+        $flujo->avanzar($descuento, 'ingresado', 'descuentos_realizados', ['liquidacion'], 'enviado_finanzas_en', 'funcionario_daf', 'finanzas');
+        $this->assertSame('descuentos_realizados', $descuento->fresh()->estadoActual());
+
+        foreach (['sigfe', 'tgr'] as $tipo) {
+            $flujo->guardarArchivos($descuento, $tipo, [[
+                'archivo' => UploadedFile::fake()->create($tipo.'.pdf', 10, 'application/pdf'), 'cuotas' => [1, 2],
+            ]], 2, ['folio' => 'F-1', 'fecha_reintegro' => '2026-05-01', 'monto_reintegro_pesos' => 100000]);
+        }
+        $this->assertTrue($flujo->completos($descuento, ['sigfe', 'tgr']));
+        $this->assertSame(1, $descuento->archivos()->where('tipo', 'sigfe')->distinct()->count('grupo_archivo'));
+        $flujo->avanzar($descuento, 'descuentos_realizados', 'en_auditoria', ['sigfe', 'tgr'], 'enviado_auditoria_en', 'auditoria_slep', 'auditoria');
+        $this->assertSame('en_auditoria', $descuento->fresh()->estadoActual());
+
+        $this->expectException(ValidationException::class);
+        $flujo->guardarArchivos($descuento, 'sigfe', [[
+            'archivo' => UploadedFile::fake()->create('tarde.pdf', 10, 'application/pdf'), 'cuotas' => [1],
+        ]], 2);
+    }
+
+    public function test_certificado_reemplaza_solo_contenido_y_repite_fila_de_plantilla(): void
+    {
+        UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
+        UtmValor::create(['anio' => 2026, 'mes' => 3, 'valor' => 69889]);
+        $descuento = $this->crearDescuento(['numero_cuotas' => 2, 'estamento_funcionario' => 'Docente']);
+        $auditor = new \App\Models\User(['nombres' => 'Auditor', 'apellido_paterno' => 'Ejemplo']);
+        $contenido = app(DescuentoCgrCertificadoService::class)->generar($descuento, $auditor);
+        $temporal = tempnam(sys_get_temp_dir(), 'cgr_test_');
+        file_put_contents($temporal, $contenido);
+        $plantilla = new \ZipArchive;
+        $generado = new \ZipArchive;
+        try {
+            $this->assertTrue($plantilla->open(resource_path('templates/descuentos-cgr/certificado-auditoria.docx')));
+            $this->assertTrue($generado->open($temporal));
+            $xml = $generado->getFromName('word/document.xml');
+            $this->assertStringContainsString('Auditor Ejemplo', $xml);
+            $this->assertStringContainsString('Docente', $xml);
+            $this->assertStringNotContainsString('{Nombre completo}', $xml);
+            $this->assertStringNotContainsString('{Capital $}', $xml);
+            $this->assertSame($plantilla->getFromName('word/styles.xml'), $generado->getFromName('word/styles.xml'));
+            $this->assertSame($plantilla->getFromName('word/media/image1.png'), $generado->getFromName('word/media/image1.png'));
+        } finally {
+            $plantilla->close();
+            $generado->close();
+            @unlink($temporal);
+        }
+    }
+
+    public function test_certificado_no_declara_reintegro_completo_si_falta_valor_utm(): void
+    {
+        $descuento = $this->crearDescuento();
+        $auditor = new \App\Models\User(['nombres' => 'Auditor']);
+
+        $this->expectException(ValidationException::class);
+        app(DescuentoCgrCertificadoService::class)->generar($descuento, $auditor);
+    }
+
+    public function test_notificaciones_aceptan_varios_correos_sin_duplicados_y_rutas_restringen_acciones(): void
+    {
+        DescuentoCgrNotificacion::create([
+            'evento' => 'finanzas',
+            'correos_adicionales' => "uno@example.test; dos@example.test\nUNO@example.test",
+        ]);
+        $this->assertSame(['uno@example.test', 'dos@example.test'], DescuentoCgrNotificacion::destinatarios('finanzas', 'funcionario_daf'));
+
+        foreach ([
+            'descuentos-cgr.liquidaciones' => 'ensure.role:admin|funcionario_slep',
+            'descuentos-cgr.comprobantes' => 'ensure.role:admin|funcionario_daf',
+            'descuentos-cgr.auditoria.liquidaciones' => 'ensure.role:admin|auditoria_slep',
+            'descuentos-cgr.auditoria.cerrar' => 'ensure.role:admin|auditoria_slep',
+            'descuentos-cgr.notificaciones.update' => 'ensure.role:admin',
+        ] as $nombre => $middleware) {
+            $ruta = app('router')->getRoutes()->getByName($nombre);
+            $this->assertNotNull($ruta);
+            $this->assertContains($middleware, $ruta->gatherMiddleware());
+        }
+    }
+
+    public function test_migracion_agrega_estado_ingresado_a_registros_historicos(): void
+    {
+        Schema::dropIfExists('descuentos_cgr_archivos');
+        Schema::dropIfExists('descuentos_cgr_notificaciones');
+        Schema::dropIfExists('descuentos_cgr');
+        Schema::create('descuentos_cgr', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nombre');
+        });
+        $id = DB::table('descuentos_cgr')->insertGetId(['nombre' => 'Registro histórico de prueba']);
+        $migracion = require database_path('migrations/2026_09_25_150000_add_flujo_reintegro_descuentos_cgr.php');
+        $migracion->up();
+
+        $this->assertSame('ingresado', DB::table('descuentos_cgr')->where('id', $id)->value('estado'));
+        $this->assertTrue(Schema::hasTable('descuentos_cgr_archivos'));
+        $this->assertTrue(Schema::hasTable('descuentos_cgr_notificaciones'));
+        $migracion->down();
+        $this->assertFalse(Schema::hasColumn('descuentos_cgr', 'estado'));
+    }
+
+    public function test_detalle_muestra_estado_cronograma_y_respaldo_pendiente(): void
+    {
+        $descuento = $this->crearDescuento();
+        $html = app(DescuentoCgrController::class)->show($descuento, app(CronogramaDescuentoCgrService::class))->render();
+
+        $this->assertStringContainsString('Avance del cronograma', $html);
+        $this->assertStringContainsString('Ingresado', $html);
+        $this->assertStringContainsString('Liquidación', $html);
+        $this->assertStringContainsString('Pendiente', $html);
+    }
+
+    public function test_controles_de_finanzas_y_auditoria_se_renderizan_por_etapa(): void
+    {
+        $descuentoCgr = $this->crearDescuento();
+        $calculo = app(CronogramaDescuentoCgrService::class)->calcular($descuentoCgr);
+        $archivosPorCuota = collect();
+        $completos = fn (string $tipo) => false;
+        $errors = new \Illuminate\Support\ViewErrorBag;
+
+        $estado = 'descuentos_realizados';
+        $puedeRegistrar = false;
+        $puedeFinanzas = true;
+        $puedeAuditoria = false;
+        $finanzas = view('remuneraciones.descuentos-cgr._workflow', compact('descuentoCgr', 'calculo', 'archivosPorCuota', 'completos', 'errors', 'estado', 'puedeRegistrar', 'puedeFinanzas', 'puedeAuditoria'))->render();
+        $this->assertStringContainsString('Comprobante de reintegro SIGFE', $finanzas);
+        $this->assertStringContainsString('Comprobante de reintegro a TGR', $finanzas);
+
+        $estado = 'en_auditoria';
+        $puedeFinanzas = false;
+        $puedeAuditoria = true;
+        $auditoria = view('remuneraciones.descuentos-cgr._workflow', compact('descuentoCgr', 'calculo', 'archivosPorCuota', 'completos', 'errors', 'estado', 'puedeRegistrar', 'puedeFinanzas', 'puedeAuditoria'))->render();
+        $this->assertStringContainsString('Liquidaciones validadas', $auditoria);
+        $this->assertStringContainsString('Generar certificado Word', $auditoria);
+    }
+
+    public function test_correo_de_cambio_de_etapa_utiliza_layout_institucional(): void
+    {
+        $descuento = $this->crearDescuento(['estado' => 'descuentos_realizados']);
+        $html = (new DescuentoCgrEtapaMail($descuento, 'finanzas'))->render();
+
+        $this->assertStringContainsString('Descuento CGR para Finanzas', $html);
+        $this->assertStringContainsString('Plataforma SLEP', $html);
+        $this->assertStringContainsString($descuento->numero_resolucion, $html);
     }
 
     private function crearDescuento(array $atributos = []): DescuentoCgr

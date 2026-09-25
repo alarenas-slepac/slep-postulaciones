@@ -62,6 +62,16 @@
                         @error('resolucion_pdf') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         <div class="form-text">Máximo 20 MB. @if ($editando)Deja vacío para conservar el documento actual.@endif</div>
                     </div>
+                    <div class="col-md-6">
+                        <label for="institucion_reintegro" class="form-label">Institución a la que se debe reintegrar</label>
+                        <input id="institucion_reintegro" name="institucion_reintegro" class="form-control @error('institucion_reintegro') is-invalid @enderror" value="{{ $valor('institucion_reintegro') }}" maxlength="255" placeholder="Opcional">
+                        @error('institucion_reintegro') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="col-md-6">
+                        <label for="estamento_funcionario" class="form-label">Estamento o escalafón del funcionario</label>
+                        <input id="estamento_funcionario" name="estamento_funcionario" class="form-control @error('estamento_funcionario') is-invalid @enderror" value="{{ $valor('estamento_funcionario') }}" maxlength="255" placeholder="Para el certificado de Auditoría">
+                        @error('estamento_funcionario') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
                 </div>
             </div>
 
