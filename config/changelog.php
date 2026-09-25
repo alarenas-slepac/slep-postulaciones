@@ -1,6 +1,29 @@
 <?php
 
 return [
+    '2026.9.25.512' => [
+        'date' => '2026-09-25',
+        'module' => 'Descuentos CGR',
+        'title' => 'Adaptación integral al Design System',
+        'files' => [
+            'config/changelog.php',
+            'docs/DESIGN_SYSTEM.md',
+            'resources/views/pdf/descuentos-cgr/informe.blade.php',
+            'resources/views/pdf/descuentos-cgr/mensual.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/_styles.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/form.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/index.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/utm/index.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/verificar.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/verificar-mensual.blade.php',
+        ],
+        'changes' => [
+            'Unifica encabezados, tarjetas, formularios, tablas, acciones, estados y vistas públicas de Descuentos CGR con el Design System.',
+            'Alinea la paleta de los informes PDF e incorpora la obligación de adaptar componentes existentes divergentes al intervenir un módulo.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP'],
+    ],
     '2026.9.25.511' => [
         'date' => '2026-09-25',
         'module' => 'Dotación docente',

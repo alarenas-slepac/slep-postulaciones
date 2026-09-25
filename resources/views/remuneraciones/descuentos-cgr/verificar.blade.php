@@ -1,11 +1,12 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-5">
-    <div class="card border-0 shadow-sm mx-auto" style="max-width: 900px;">
-        <div class="card-header bg-white border-0 px-4 pt-4">
-            <div class="text-uppercase small fw-semibold text-primary mb-1">Remuneraciones · Descuentos CGR</div>
-            <h1 class="h4 mb-0">Verificación documental</h1>
+@include('remuneraciones.descuentos-cgr._styles')
+<div class="cgr-page py-4">
+    <div class="card cgr-verification-card mx-auto">
+        <div class="card-header cgr-verification-header">
+            <div class="cgr-page-header__eyebrow"><span class="cgr-page-header__icon"><i class="bi bi-shield-check" aria-hidden="true"></i></span> Remuneraciones · Descuentos CGR</div>
+            <h1 class="mb-0">Verificación documental</h1>
         </div>
         <div class="card-body px-4 pb-4">
             <div class="alert {{ $verificacion['integro'] ? 'alert-success' : 'alert-danger' }} d-flex align-items-start gap-2">
@@ -16,7 +17,7 @@
                 </div>
             </div>
 
-            <dl class="row mb-0">
+            <dl class="row cgr-data-list mb-0">
                 <dt class="col-md-4">Tipo de documento</dt><dd class="col-md-8">Informe de descuento CGR</dd>
                 <dt class="col-md-4">Registro</dt><dd class="col-md-8">N° {{ $descuentoCgr->id }}</dd>
                 <dt class="col-md-4">Resolución</dt><dd class="col-md-8">{{ $descuentoCgr->numero_resolucion }}</dd>
