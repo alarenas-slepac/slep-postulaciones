@@ -529,14 +529,13 @@ class DotacionAsignacionController extends Controller
         $seleccionado = collect($proceso['docentes'] ?? [])->first(
             fn (array $docente) => ($docente['rut_normalizado'] ?? '') === $rut
         );
-        $prioridad = (int) ($seleccionado['prioridad_2027'] ?? 6);
-        $hayPrioridadAnterior = collect($proceso['docentes'] ?? [])->contains(
-            fn (array $docente) => (int) ($docente['prioridad_2027'] ?? 6) < $prioridad
-                && (float) ($docente['horas_disponibles'] ?? 0) > 0.01
+        $hayPrelacionAnterior = DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
+            collect($proceso['docentes'] ?? []),
+            $seleccionado ?? []
         );
-        if ($hayPrioridadAnterior && blank($payload['excepcion_prelacion'] ?? null)) {
+        if ($hayPrelacionAnterior && blank($payload['excepcion_prelacion'] ?? null)) {
             throw ValidationException::withMessages([
-                'excepcion_prelacion' => 'Existen docentes de prioridad superior con horas disponibles. Para continuar debe indicar una justificación de excepción.',
+                'excepcion_prelacion' => 'Existen docentes de prioridad superior o de mayor antigüedad en el mismo grupo con horas disponibles. Para continuar debe indicar una justificación de excepción.',
             ]);
         }
 
