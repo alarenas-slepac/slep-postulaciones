@@ -15,22 +15,31 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertFalse(DotacionProceso2027Calculator::aplica(2028));
     }
 
-    public function test_ordena_fuero_tramos_titulares_y_contrata_y_calcula_saldos(): void
+    public function test_agrupa_avanzado_y_expertos_en_una_prioridad_reconociendo_numeros_y_romanos(): void
     {
         $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
-            $this->docente('Contrata', 0, 20, 0, null, null, '2020-01-01'),
-            $this->docente('Experto I', 30, 0, 10, null, 'Experto I', '2010-01-01'),
+            $this->docente('Contrata experto', 0, 20, 0, null, 'Experto 2', '1980-01-01'),
+            $this->docente('Resto titular', 20, 0, 0, null, 'Inicial', '1990-01-01'),
+            $this->docente('Experto 1', 30, 0, 10, null, 'Experto 1', '2010-01-01'),
+            $this->docente('Experto I', 30, 0, 10, null, 'Experto I', '2011-01-01'),
             $this->docente('Avanzado', 30, 0, 4, null, 'Avanzado', '2000-01-01'),
             $this->docente('Gremial', 0, 44, 8, 'horas_gremiales', null, '2024-01-01'),
             $this->docente('Lactancia', 20, 0, 0, 'horas_lactancia', null, '2025-01-01'),
+            $this->docente('Experto 2', 40, 0, 5, null, ' experto   2 ', '2005-01-01'),
             $this->docente('Experto II', 40, 0, 5, null, 'Experto II', '2015-01-01'),
         ]));
 
-        $this->assertSame(['Gremial', 'Lactancia', 'Experto II', 'Experto I', 'Avanzado', 'Contrata'], $docentes->pluck('nombre')->all());
+        $this->assertSame([
+            'Gremial', 'Lactancia', 'Avanzado', 'Experto 2', 'Experto 1', 'Experto I', 'Experto II',
+            'Resto titular', 'Contrata experto',
+        ], $docentes->pluck('nombre')->all());
+        $this->assertSame([1, 1, 2, 2, 2, 2, 2, 3, 4], $docentes->pluck('prioridad_2027')->all());
+        $this->assertCount(1, $docentes->filter(fn ($docente) => $docente['prioridad_2027'] === 2)->pluck('prioridad_2027_label')->unique());
+        $this->assertStringContainsString('Experto 1 / Experto 2', $docentes->firstWhere('nombre', 'Experto II')['prioridad_2027_label']);
         $experto = $docentes->firstWhere('nombre', 'Experto II');
         $this->assertSame(35.0, $experto['horas_titulares_disponibles']);
         $this->assertSame(35.0, $experto['horas_disponibles']);
-        $this->assertSame(6, $docentes->last()['prioridad_2027']);
+        $this->assertSame(4, $docentes->last()['prioridad_2027']);
     }
 
     public function test_trabajo_colaborativo_nt_se_contabiliza_en_bloque_parvularia(): void

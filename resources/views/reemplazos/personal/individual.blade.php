@@ -135,7 +135,7 @@
                         <div class="col-md-6">
                             <label for="tramo" class="form-label">Tramo</label>
                             <input id="tramo" name="tramo" class="form-control" maxlength="100" value="{{ old('tramo', $item?->tramo) }}" list="tramos">
-                            <datalist id="tramos"><option>Acceso</option><option>Inicial</option><option>Temprano</option><option>Avanzado</option><option>Experto I</option><option>Experto II</option></datalist>
+                            <datalist id="tramos"><option>Acceso</option><option>Inicial</option><option>Temprano</option><option>Avanzado</option><option>Experto 1</option><option>Experto 2</option></datalist>
                         </div>
                         <div class="col-12">
                             <label for="justificacion" class="form-label">Justificación del ingreso o modificación</label>

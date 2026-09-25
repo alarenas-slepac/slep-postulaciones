@@ -219,21 +219,18 @@ class DotacionProceso2027Calculator
             $planta = max(0.0, (float) ($docente['horas_planta'] ?? 0));
             $contrata = max(0.0, (float) ($docente['horas_contrata'] ?? 0));
             $asignadas = max(0.0, (float) ($docente['horas_asignadas_total'] ?? 0));
+            $tramoPreferente = preg_match('/\b(?:AVANZADO|EXPERTO (?:II|I|2|1))\b/', $tramo) === 1;
             $prioridad = match (true) {
                 in_array($motivo, ['horas_gremiales', 'horas_lactancia'], true) => 1,
-                $planta > 0 && str_contains($tramo, 'EXPERTO II') => 2,
-                $planta > 0 && str_contains($tramo, 'EXPERTO I') => 3,
-                $planta > 0 && str_contains($tramo, 'AVANZADO') => 4,
-                $planta > 0 => 5,
-                default => 6,
+                $planta > 0 && $tramoPreferente => 2,
+                $planta > 0 => 3,
+                default => 4,
             };
             $label = match ($prioridad) {
                 1 => '1. Fuero: gremiales o lactancia',
-                2 => '2. Titular · Experto II',
-                3 => '3. Titular · Experto I',
-                4 => '4. Titular · Avanzado',
-                5 => '5. Resto titular',
-                default => '6. Horas a contrata',
+                2 => '2. Titular · Avanzado / Experto 1 / Experto 2',
+                3 => '3. Resto titular',
+                default => '4. Horas a contrata',
             };
 
             $docente['prioridad_2027'] = $prioridad;

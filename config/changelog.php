@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.25.516' => [
+        'date' => '2026-09-25',
+        'module' => 'Dotación docente 2027',
+        'title' => 'Prelación común para tramos Avanzado y Experto',
+        'files' => [
+            'app/Http/Controllers/Reemplazos/PersonalImportController.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'resources/views/reemplazos/personal/individual.blade.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'Agrupa Avanzado, Experto 1 y Experto 2 en la misma prioridad titular y ordena por antigüedad.',
+            'Reconoce también Experto I y Experto II sin modificar los tramos históricos guardados.',
+            'Actualiza las etiquetas de prelación y las sugerencias de tramo del padrón.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.9.25.515' => [
         'date' => '2026-09-25',
         'module' => 'Descuentos CGR',
