@@ -241,7 +241,7 @@ class PersonalImportController extends Controller
             ['La carga debe contener un solo periodo mensual: todas las filas con el mismo anio y mes.'],
             ['Bienios es obligatorio como encabezado y se guardará como número entero si viene informado.'],
             ['Tramo se procesa si viene informado; se recomienda completarlo para docentes. Para no docentes puede quedar vacío.'],
-            ['Valores sugeridos para Tramo: Acceso, Inicial, Temprano, Avanzado, Experto I, Experto II, Sin tramo.'],
+            ['Valores sugeridos para Tramo: Acceso, Inicial, Temprano, Avanzado, Experto 1, Experto 2, Sin tramo. Se reconocen también Experto I y Experto II.'],
             ['fecha_antiguedad: fecha YYYY-MM-DD o DD/MM/YYYY. Si está ausente o vacía no se propone borrar la fecha existente.'],
             ['La previsualización revisa el padrón completo sin modificar IDs, contratos ni asignaciones.'],
         ], null, 'A1');

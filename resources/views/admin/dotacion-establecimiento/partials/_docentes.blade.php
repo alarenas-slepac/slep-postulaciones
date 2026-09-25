@@ -69,7 +69,7 @@
             <span class="badge text-bg-warning">Sin info: {{ $countSinInfo }}</span>
         </div>
         @if ($proceso2027Docentes['aplica'] ?? false)
-            <div class="alert alert-primary small mt-3 mb-0"><i class="bi bi-sort-numeric-down"></i> La nómina está ordenada por prelación 2027: fuero, titulares Expertos II/I/Avanzado por antigüedad, resto titular y contrata. Las horas disponibles se muestran en la ficha de cada docente.</div>
+            <div class="alert alert-primary small mt-3 mb-0"><i class="bi bi-sort-numeric-down"></i> La nómina está ordenada por prelación 2027: fuero; titulares Avanzado, Experto 1 y Experto 2 en un mismo grupo, por antigüedad; resto titular; y contrata. También se reconocen las formas Experto I y Experto II. Las horas disponibles se muestran en la ficha de cada docente.</div>
         @endif
     </div>
 </div>
