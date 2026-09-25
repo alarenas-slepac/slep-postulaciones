@@ -803,6 +803,7 @@ class DescuentosCgrModuleTest extends TestCase
             ]], 2, ['folio' => 'F-1', 'fecha_reintegro' => '2026-05-01', 'monto_reintegro_pesos' => 100000]);
         }
         $this->assertTrue($flujo->completos($descuento, ['sigfe', 'tgr']));
+        $this->assertSame(0, $descuento->archivos()->where('tipo', 'transferencia_institucion')->count());
         $this->assertSame(1, $descuento->archivos()->where('tipo', 'sigfe')->distinct()->count('grupo_archivo'));
         $flujo->avanzar($descuento, 'descuentos_realizados', 'en_auditoria', ['sigfe', 'tgr'], 'enviado_auditoria_en', 'auditoria_slep', 'auditoria');
         $this->assertSame('en_auditoria', $descuento->fresh()->estadoActual());
@@ -810,6 +811,42 @@ class DescuentosCgrModuleTest extends TestCase
         $this->expectException(ValidationException::class);
         $flujo->guardarArchivos($descuento, 'sigfe', [[
             'archivo' => UploadedFile::fake()->create('tarde.pdf', 10, 'application/pdf'), 'cuotas' => [1],
+        ]], 2);
+    }
+
+    public function test_finanzas_asocia_y_corrige_transferencia_opcional_en_varias_cuotas(): void
+    {
+        Storage::fake('local');
+        $descuento = $this->crearDescuento(['numero_cuotas' => 2, 'estado' => 'descuentos_realizados']);
+        $flujo = app(DescuentoCgrWorkflowService::class);
+
+        $flujo->guardarArchivos($descuento, 'transferencia_institucion', [[
+            'archivo' => UploadedFile::fake()->create('transferencia.pdf', 10, 'application/pdf'),
+            'cuotas' => [1, 2],
+        ]], 2, ['folio' => 'TR-1', 'fecha_reintegro' => '2026-03-15', 'monto_reintegro_pesos' => 150000]);
+
+        $archivos = $descuento->archivos()->where('tipo', 'transferencia_institucion')->orderBy('numero_cuota')->get();
+        $this->assertCount(2, $archivos);
+        $this->assertSame($archivos[0]->grupo_archivo, $archivos[1]->grupo_archivo);
+        $this->assertSame('TR-1', $archivos[0]->folio);
+        $this->assertSame('2026-03-15', $archivos[0]->fecha_reintegro->format('Y-m-d'));
+        $this->assertSame(150000, $archivos[0]->monto_reintegro_pesos);
+        Storage::disk('local')->assertExists($archivos[0]->path);
+
+        $flujo->guardarArchivos($descuento, 'transferencia_institucion', [[
+            'archivo' => UploadedFile::fake()->create('transferencia-corregida.pdf', 10, 'application/pdf'),
+            'cuotas' => [1],
+        ]], 2, ['folio' => 'TR-2', 'fecha_reintegro' => '2026-03-16', 'monto_reintegro_pesos' => 75000]);
+
+        $this->assertSame('TR-2', $descuento->archivos()->where('tipo', 'transferencia_institucion')->where('numero_cuota', 1)->value('folio'));
+        $this->assertSame('TR-1', $descuento->archivos()->where('tipo', 'transferencia_institucion')->where('numero_cuota', 2)->value('folio'));
+        Storage::disk('local')->assertExists($archivos[0]->path);
+
+        $descuento->update(['estado' => 'en_auditoria']);
+        $this->expectException(ValidationException::class);
+        $flujo->guardarArchivos($descuento, 'transferencia_institucion', [[
+            'archivo' => UploadedFile::fake()->create('fuera-de-etapa.pdf', 10, 'application/pdf'),
+            'cuotas' => [1],
         ]], 2);
     }
 
@@ -839,6 +876,34 @@ class DescuentosCgrModuleTest extends TestCase
             $generado->close();
             @unlink($temporal);
         }
+    }
+
+    public function test_certificado_incluye_transferencia_solo_si_finanzas_cargo_comprobante(): void
+    {
+        UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
+        UtmValor::create(['anio' => 2026, 'mes' => 3, 'valor' => 69889]);
+        $descuento = $this->crearDescuento([
+            'numero_cuotas' => 2,
+            'institucion_reintegro' => 'Institución de prueba',
+        ]);
+        $auditor = new \App\Models\User(['nombres' => 'Auditor']);
+        $servicio = app(DescuentoCgrCertificadoService::class);
+        $sinTransferencia = $this->textoCertificado($servicio->generar($descuento, $auditor));
+        $this->assertStringNotContainsString('comprobantes de transferencia a', $sinTransferencia);
+
+        $descuento->archivos()->create([
+            'numero_cuota' => 2,
+            'tipo' => 'transferencia_institucion',
+            'grupo_archivo' => (string) \Illuminate\Support\Str::uuid(),
+            'path' => 'descuentos-cgr/pruebas/transferencia.pdf',
+            'nombre_original' => 'transferencia.pdf',
+            'tamano' => 100,
+            'folio' => 'TR-1',
+            'fecha_reintegro' => '2026-03-15',
+            'monto_reintegro_pesos' => 150000,
+        ]);
+        $conTransferencia = $this->textoCertificado($servicio->generar($descuento, $auditor));
+        $this->assertStringContainsString('comprobantes de transferencia a Institución de prueba correspondientes a marzo 2026', $conTransferencia);
     }
 
     public function test_certificado_no_declara_reintegro_completo_si_falta_valor_utm(): void
@@ -917,6 +982,8 @@ class DescuentosCgrModuleTest extends TestCase
         $finanzas = view('remuneraciones.descuentos-cgr._workflow', compact('descuentoCgr', 'calculo', 'archivosPorCuota', 'completos', 'errors', 'estado', 'puedeRegistrar', 'puedeFinanzas', 'puedeAuditoria'))->render();
         $this->assertStringContainsString('Comprobante de reintegro SIGFE', $finanzas);
         $this->assertStringContainsString('Comprobante de reintegro a TGR', $finanzas);
+        $this->assertStringContainsString('Comprobante de transferencia a otra institución', $finanzas);
+        $this->assertStringContainsString('Esta carga es opcional', $finanzas);
 
         $estado = 'en_auditoria';
         $puedeFinanzas = false;
@@ -970,5 +1037,23 @@ class DescuentosCgrModuleTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function textoCertificado(string $contenido): string
+    {
+        $temporal = tempnam(sys_get_temp_dir(), 'cgr_xml_');
+        file_put_contents($temporal, $contenido);
+        $zip = new \ZipArchive;
+        try {
+            $this->assertTrue($zip->open($temporal));
+
+            $documento = new \DOMDocument;
+            $documento->loadXML((string) $zip->getFromName('word/document.xml'));
+
+            return $documento->textContent;
+        } finally {
+            $zip->close();
+            @unlink($temporal);
+        }
     }
 }

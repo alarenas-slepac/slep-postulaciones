@@ -16,13 +16,13 @@ use Throwable;
 
 class DescuentoCgrWorkflowService
 {
-    public const TIPOS = ['liquidacion', 'sigfe', 'tgr', 'liquidacion_validada'];
+    public const TIPOS = ['liquidacion', 'sigfe', 'tgr', 'transferencia_institucion', 'liquidacion_validada'];
 
     public function guardarArchivos(DescuentoCgr $descuento, string $tipo, array $archivos, int $usuarioId, array $metadatos = []): void
     {
         $estado = match ($tipo) {
             'liquidacion' => 'ingresado',
-            'sigfe', 'tgr' => 'descuentos_realizados',
+            'sigfe', 'tgr', 'transferencia_institucion' => 'descuentos_realizados',
             'liquidacion_validada' => 'en_auditoria',
         };
         $guardados = [];

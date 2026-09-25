@@ -40,7 +40,7 @@ class DescuentoCgrWorkflowController extends Controller
     public function comprobante(Request $request, DescuentoCgr $descuentoCgr, string $tipo, DescuentoCgrWorkflowService $flujo): RedirectResponse
     {
         $this->autorizar($request, ['admin', 'funcionario_daf']);
-        abort_unless(in_array($tipo, ['sigfe', 'tgr'], true), 404);
+        abort_unless(in_array($tipo, ['sigfe', 'tgr', 'transferencia_institucion'], true), 404);
         $data = $request->validate([
             'archivo' => ['required', 'file', 'mimes:pdf', 'max:20480'],
             'cuotas' => ['required', 'array', 'min:1'],
@@ -51,7 +51,9 @@ class DescuentoCgrWorkflowController extends Controller
         ]);
         $flujo->guardarArchivos($descuentoCgr, $tipo, [['archivo' => $data['archivo'], 'cuotas' => $data['cuotas']]], $request->user()->id, $data);
 
-        return back()->with('status', 'Comprobante de reintegro asociado a las cuotas seleccionadas.');
+        return back()->with('status', $tipo === 'transferencia_institucion'
+            ? 'Comprobante de transferencia asociado a las cuotas seleccionadas.'
+            : 'Comprobante de reintegro asociado a las cuotas seleccionadas.');
     }
 
     public function enviarFinanzas(Request $request, DescuentoCgr $descuentoCgr, DescuentoCgrWorkflowService $flujo): RedirectResponse
