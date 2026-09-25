@@ -33,20 +33,21 @@
         @endphp
         <nav class="nav nav-pills cgr-tabs flex-wrap gap-2 mb-4" aria-label="Etapas de Descuentos CGR">
             @foreach ($pestanas as $clave => $etiqueta)
-                <a class="nav-link {{ $estado === $clave ? 'active' : '' }}" href="{{ route('descuentos-cgr.index', array_merge(request()->except('page', 'estado'), ['estado' => $clave])) }}" @if ($estado === $clave) aria-current="page" @endif>{{ $etiqueta }} <span class="badge {{ $estado === $clave ? 'text-bg-light' : 'text-bg-secondary' }} ms-1">{{ $conteos[$clave] ?? 0 }}</span></a>
+                <a class="nav-link {{ $estado === $clave ? 'active' : '' }}" href="{{ route('descuentos-cgr.index', ['estado' => $clave]) }}" @if ($estado === $clave) aria-current="page" @endif>{{ $etiqueta }} <span class="badge {{ $estado === $clave ? 'text-bg-light' : 'text-bg-secondary' }} ms-1">{{ $conteos[$clave] ?? 0 }}</span></a>
             @endforeach
         </nav>
 
         <div class="card mb-4">
-            <div class="card-header"><i class="bi bi-funnel me-2 text-primary" aria-hidden="true"></i>Buscar descuentos</div>
+            <div class="card-header"><i class="bi bi-funnel me-2 text-primary" aria-hidden="true"></i>Filtros de {{ $pestanas[$estado] }}</div>
             <div class="card-body">
                 <form method="GET" class="row g-3 align-items-end">
                     <input type="hidden" name="estado" value="{{ $estado }}">
-                    <div class="col-md-5">
+                    <input type="hidden" name="filtrar" value="1">
+                    <div class="col-md-4">
                         <label for="buscar" class="form-label">Buscar</label>
                         <input id="buscar" name="buscar" class="form-control" value="{{ $buscar }}" placeholder="Nombre o RUT">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label for="origen" class="form-label">Tipo de funcionario</label>
                         <select id="origen" name="origen" class="form-select">
                             <option value="">Todos</option>
@@ -55,7 +56,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-4">
                         <label for="anio" class="form-label">Año primer descuento</label>
                         <select id="anio" name="anio" class="form-select">
                             <option value="">Todos</option>
@@ -64,8 +65,23 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-2 d-grid">
+                    <div class="col-md-4">
+                        <label for="ultimo_mes" class="form-label">Último mes de descuento</label>
+                        <input id="ultimo_mes" type="month" name="ultimo_mes" class="form-control {{ isset($errors) && $errors->has('ultimo_mes') ? 'is-invalid' : '' }}" value="{{ $ultimoMes }}">
+                        @if (isset($errors) && $errors->has('ultimo_mes')) <div class="invalid-feedback">{{ $errors->first('ultimo_mes') }}</div> @endif
+                        <div class="form-text">Se calcula desde el primer mes y el número de cuotas.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="mes_descuento" class="form-label">Mes de descuento</label>
+                        <input id="mes_descuento" type="month" name="mes_descuento" class="form-control {{ isset($errors) && $errors->has('mes_descuento') ? 'is-invalid' : '' }}" value="{{ $mesDescuento }}">
+                        @if (isset($errors) && $errors->has('mes_descuento')) <div class="invalid-feedback">{{ $errors->first('mes_descuento') }}</div> @endif
+                        <div class="form-text">Incluye registros con una cuota programada en ese mes.</div>
+                    </div>
+                    <div class="col-md-4 d-flex flex-wrap gap-2 align-items-start">
                         <button class="btn btn-outline-primary"><i class="bi bi-search me-1"></i>Filtrar</button>
+                        @if ($filtrosActivos)
+                            <a href="{{ route('descuentos-cgr.index', ['estado' => $estado, 'limpiar' => 1]) }}" class="btn btn-outline-secondary">Limpiar filtros</a>
+                        @endif
                     </div>
                 </form>
 
@@ -105,6 +121,7 @@
                             <th class="text-end">Deuda</th>
                             <th class="text-end">Cuota UTM</th>
                             <th>Primer descuento</th>
+                            <th>Último descuento</th>
                             <th>Estado</th>
                             <th class="text-end">Acciones</th>
                         </tr>
@@ -128,6 +145,7 @@
                                 <td class="text-end">${{ number_format($descuento->deuda_definitiva_pesos, 0, ',', '.') }}<br><span class="text-muted small">{{ number_format((float) $descuento->deuda_equivalente_utm, 4, ',', '.') }} UTM</span></td>
                                 <td class="text-end">{{ number_format((float) $descuento->cuota_utm, 4, ',', '.') }}<br><span class="text-muted small">{{ $descuento->numero_cuotas }} cuotas</span></td>
                                 <td>{{ $descuento->fecha_primer_descuento->translatedFormat('m-Y') }}</td>
+                                <td>{{ $descuento->fecha_primer_descuento->copy()->addMonthsNoOverflow(max(0, $descuento->numero_cuotas - 1))->format('m-Y') }}</td>
                                 <td><span class="badge {{ match($descuento->estadoActual()) { 'cerrado' => 'text-bg-success', 'en_auditoria' => 'text-bg-info', 'descuentos_realizados' => 'text-bg-warning', default => 'text-bg-primary' } }}">{{ $descuento->etiquetaEstado() }}</span></td>
                                 <td class="text-end">
                                     <div class="d-flex flex-wrap justify-content-end gap-2">
@@ -144,7 +162,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8"><div class="cgr-empty"><i class="bi bi-inbox" aria-hidden="true"></i>No hay descuentos CGR registrados para los filtros seleccionados.</div></td></tr>
+                            <tr><td colspan="9"><div class="cgr-empty"><i class="bi bi-inbox" aria-hidden="true"></i>No hay descuentos CGR registrados para los filtros seleccionados.</div></td></tr>
                         @endforelse
                     </tbody>
                 </table>
