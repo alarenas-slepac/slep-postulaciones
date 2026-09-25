@@ -30,6 +30,15 @@
     .cgr-page .cgr-kpi__value { color: #0b3d91; font-size: 1.45rem; font-weight: 800; line-height: 1.2; margin: .35rem 0; }
     .cgr-page .cgr-empty { padding: 2.5rem 1rem; text-align: center; color: #64748b; }
     .cgr-page .cgr-empty i { display: block; color: #0d6efd; font-size: 1.6rem; margin-bottom: .5rem; }
+    .cgr-page .cgr-tabs .nav-link { border: 1px solid #dbe4f0; border-radius: 999px; background: #fff; color: #334155; font-weight: 700; }
+    .cgr-page .cgr-tabs .nav-link.active { border-color: #0d6efd; background: #eaf3ff; color: #0b3d91; }
+    .cgr-page .cgr-tabs .nav-link.active .badge { background: #0d6efd !important; color: #fff !important; }
+    .cgr-page .cgr-respaldos { min-width: 16rem; max-width: 22rem; overflow-wrap: anywhere; }
+    .cgr-page .cgr-document-modal .modal-content { border: 1px solid #dbe4f0; border-radius: 1.15rem; }
+    .cgr-page .cgr-document-modal .modal-header { background: #f8fbff; border-bottom-color: #e5edf6; }
+    .cgr-page .cgr-document-modal .modal-footer { border-top-color: #e5edf6; }
+    .cgr-page .cgr-quota-choice { border: 1px solid #dbe4f0; border-radius: .75rem; padding: .75rem .75rem .75rem 2.25rem; margin: 0; min-height: 3.5rem; }
+    .cgr-page .cgr-quota-choice:has(input:checked) { border-color: #9ec5fe; background: #eff6ff; }
     .cgr-page .cgr-data-list dt { color: #64748b; font-size: .85rem; font-weight: 800; }
     .cgr-page .cgr-data-list dd { color: #0f172a; overflow-wrap: anywhere; }
     .cgr-page .cgr-data-list dt, .cgr-page .cgr-data-list dd { border-bottom: 1px solid #e5edf6; padding: .65rem 0; margin-bottom: 0; }

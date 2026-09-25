@@ -12,7 +12,7 @@ class RolesAndAdminSeeder extends Seeder
     public function run(): void
     {
         // Crear roles (guard web)
-        foreach (['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'coordinador_gdp', 'supervisor_plani', 'funcionario_estab', 'funcionario_daf', 'funcionario_juridica', 'funcionario', 'postulante'] as $name) {
+        foreach (['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'coordinador_gdp', 'supervisor_plani', 'funcionario_estab', 'funcionario_daf', 'auditoria_slep', 'funcionario_juridica', 'funcionario', 'postulante'] as $name) {
             Role::findOrCreate($name, 'web');
         }
 

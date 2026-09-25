@@ -92,6 +92,10 @@ Usar chips redondeados con texto explícito para estados; reutilizar el signific
 
 Mostrar los datos en bloques de etiqueta/valor sobre superficie suave, con textos largos que puedan partirse. Separar los documentos por nombre, metadatos y acciones de ver/descargar. Para procesos con varias aprobaciones, usar tarjetas de etapas y un historial cronológico como en `show.blade.php`; cada etapa debe presentar estado y responsable o siguiente acción de forma legible.
 
+### Correos de notificación
+
+Usar `resources/views/emails/layouts/institutional.blade.php` como base para correos transaccionales. El asunto, preencabezado y título deben identificar la etapa; el cuerpo presenta el motivo, un resumen breve con datos necesarios para actuar y una llamada a la acción hacia la vista autorizada. Reutilizar la identidad azul, superficies claras, tipografía legible y espaciado del layout institucional. Evitar tablas densas, colores como única señal de estado y datos personales que no sean necesarios para la gestión. Los destinatarios adicionales configurables se validan, se deduplican y se suman a los usuarios del rol responsable; documentar el evento y registrar el resultado del envío cuando exista auditoría de notificaciones.
+
 ## Adaptación y accesibilidad
 
 - Seguir los cortes de Bootstrap que ya usa Cometidos: alrededor de `1200px` para panel lateral, `992px` para cuadrículas amplias, `768px` para encabezados/listas y `576px` para formularios compactos. Reducir columnas progresivamente hasta una columna cuando sea necesario.
