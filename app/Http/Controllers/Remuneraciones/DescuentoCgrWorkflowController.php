@@ -7,6 +7,7 @@ use App\Models\DescuentoCgr;
 use App\Models\DescuentoCgrArchivo;
 use App\Models\DescuentoCgrNotificacion;
 use App\Services\Remuneraciones\DescuentoCgrCertificadoService;
+use App\Services\Remuneraciones\DescuentoCgrExpedienteService;
 use App\Services\Remuneraciones\DescuentoCgrWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -78,6 +79,22 @@ class DescuentoCgrWorkflowController extends Controller
         abort_unless(Storage::disk('local')->exists($archivo->path), 404);
 
         return Storage::disk('local')->response($archivo->path, $archivo->nombre_original, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline']);
+    }
+
+    public function descargarExpediente(Request $request, DescuentoCgr $descuentoCgr, DescuentoCgrExpedienteService $expediente): mixed
+    {
+        $estado = $descuentoCgr->estadoActual();
+        abort_unless(in_array($estado, ['en_auditoria', 'cerrado'], true), 404);
+        $this->autorizar($request, $estado === 'en_auditoria'
+            ? ['admin', 'auditoria_slep']
+            : ['admin', 'funcionario_slep', 'funcionario_daf', 'auditoria_slep']);
+
+        $path = $expediente->generar($descuentoCgr);
+        $rut = strtoupper(preg_replace('/[^0-9kK-]/', '', (string) $descuentoCgr->rut)) ?: 'sin-rut';
+
+        return response()->download($path, 'respaldos-cgr-'.$descuentoCgr->id.'-'.$rut.'.zip', [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
     }
 
     public function certificado(Request $request, DescuentoCgr $descuentoCgr, DescuentoCgrWorkflowService $flujo, DescuentoCgrCertificadoService $certificados): mixed

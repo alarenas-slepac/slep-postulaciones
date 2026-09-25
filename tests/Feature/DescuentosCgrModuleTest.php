@@ -13,6 +13,7 @@ use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
 use App\Services\Remuneraciones\DescuentoCgrPdfService;
 use App\Services\Remuneraciones\DescuentoCgrWorkflowService;
 use App\Services\Remuneraciones\DescuentoCgrCertificadoService;
+use App\Services\Remuneraciones\DescuentoCgrExpedienteService;
 use App\Services\Remuneraciones\ReemplazoPersonalRutService;
 use App\Services\Remuneraciones\UtmImportService;
 use App\Support\ModuleRegistry;
@@ -848,6 +849,86 @@ class DescuentosCgrModuleTest extends TestCase
             'archivo' => UploadedFile::fake()->create('fuera-de-etapa.pdf', 10, 'application/pdf'),
             'cuotas' => [1],
         ]], 2);
+    }
+
+    public function test_expediente_zip_organiza_documentos_y_no_duplica_comprobantes_compartidos(): void
+    {
+        Storage::fake('local');
+        $descuento = $this->crearDescuento(['numero_cuotas' => 3, 'estado' => 'en_auditoria']);
+        $documentos = [
+            ['liquidacion', [1], 'liquidacion.pdf'],
+            ['sigfe', [1, 3], 'sigfe-compartido.pdf'],
+            ['tgr', [2], 'tgr.pdf'],
+            ['transferencia_institucion', [1, 2, 3], 'transferencia-compartida.pdf'],
+            ['liquidacion_validada', [2], 'validada.pdf'],
+        ];
+
+        foreach ($documentos as [$tipo, $cuotas, $nombre]) {
+            $path = 'descuentos-cgr/pruebas/'.$nombre;
+            Storage::disk('local')->put($path, 'PDF de prueba: '.$tipo);
+            $grupo = (string) \Illuminate\Support\Str::uuid();
+            foreach ($cuotas as $cuota) {
+                $descuento->archivos()->create([
+                    'numero_cuota' => $cuota,
+                    'tipo' => $tipo,
+                    'grupo_archivo' => $grupo,
+                    'path' => $path,
+                    'nombre_original' => $nombre,
+                    'tamano' => 20,
+                    'folio' => 'F-1',
+                ]);
+            }
+        }
+
+        $path = app(DescuentoCgrExpedienteService::class)->generar($descuento);
+        $zip = new \ZipArchive;
+        try {
+            $this->assertTrue($zip->open($path));
+            $nombres = [];
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $nombres[] = $zip->getNameIndex($i);
+            }
+
+            $pdfs = array_values(array_filter($nombres, fn (string $nombre) => str_ends_with($nombre, '.pdf')));
+            $this->assertCount(5, $pdfs);
+            $this->assertContains('01-liquidaciones/liquidacion-12345678-5-02-2026.pdf', $pdfs);
+            $this->assertContains('02-comprobantes-sigfe/comprobante-sigfe-12345678-5-02-2026_a_04-2026-2-meses.pdf', $pdfs);
+            $this->assertContains('04-transferencias-otras-instituciones/comprobante-transferencia-12345678-5-02-2026_a_04-2026-3-meses.pdf', $pdfs);
+            $this->assertSame('PDF de prueba: sigfe', $zip->getFromName('02-comprobantes-sigfe/comprobante-sigfe-12345678-5-02-2026_a_04-2026-2-meses.pdf'));
+            $indice = $zip->getFromName('indice-documentos.csv');
+            $this->assertStringContainsString('02-2026, 04-2026', $indice);
+            $this->assertStringContainsString('1, 3', $indice);
+        } finally {
+            $zip->close();
+            @unlink($path);
+        }
+    }
+
+    public function test_descarga_de_expediente_solo_aparece_en_las_etapas_permitidas(): void
+    {
+        $ruta = app('router')->getRoutes()->getByName('descuentos-cgr.expediente.zip');
+        $this->assertNotNull($ruta);
+        $this->assertContains('ensure.role:admin|funcionario_slep|funcionario_daf|auditoria_slep', $ruta->gatherMiddleware());
+
+        $descuento = $this->crearDescuento(['estado' => 'en_auditoria']);
+        $usuario = \Mockery::mock();
+        $usuario->shouldReceive('hasAnyRole')->andReturn(false, true, true);
+        $request = Request::create('/');
+        $request->setUserResolver(fn () => $usuario);
+        $controlador = app(\App\Http\Controllers\Remuneraciones\DescuentoCgrWorkflowController::class);
+
+        try {
+            $controlador->descargarExpediente($request, $descuento, app(DescuentoCgrExpedienteService::class));
+            $this->fail('Finanzas no debe descargar el expediente en Auditoría.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $error) {
+            $this->assertSame(403, $error->getStatusCode());
+        }
+
+        $descuento->update(['estado' => 'cerrado']);
+        Storage::fake('local');
+        $respuesta = $controlador->descargarExpediente($request, $descuento, app(DescuentoCgrExpedienteService::class));
+        $this->assertSame('application/zip', $respuesta->headers->get('Content-Type'));
+        @unlink($respuesta->getFile()->getPathname());
     }
 
     public function test_certificado_reemplaza_solo_contenido_y_repite_fila_de_plantilla(): void

@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.25.519' => [
+        'date' => '2026-09-25',
+        'module' => 'Descuentos CGR',
+        'title' => 'Descarga estructurada de respaldos del cronograma',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrWorkflowController.php',
+            'app/Services/Remuneraciones/DescuentoCgrExpedienteService.php',
+            'config/changelog.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Permite descargar un ZIP con liquidaciones, SIGFE, TGR, transferencias a otra institución y liquidaciones validadas, organizadas por tipo.',
+            'Renombra los PDF con RUT y período; los comprobantes compartidos aparecen una vez y un índice identifica todas sus cuotas y meses.',
+            'La descarga está disponible en Auditoría para el rol auditor y en Cerrado para todos los roles del módulo.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP', 'Funcionario DAF', 'Auditoria SLEP'],
+    ],
     '2026.9.25.518' => [
         'date' => '2026-09-25',
         'module' => 'Descuentos CGR',
