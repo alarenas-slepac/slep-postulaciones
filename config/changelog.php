@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.25.515' => [
+        'date' => '2026-09-25',
+        'module' => 'Descuentos CGR',
+        'title' => 'Indicadores por etapa en la bandeja de descuentos',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrController.php',
+            'app/Services/Remuneraciones/DescuentoCgrIndicadoresService.php',
+            'config/changelog.php',
+            'resources/views/remuneraciones/descuentos-cgr/index.blade.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Muestra deuda original y cantidad de registros filtrados en cada etapa.',
+            'Resume documentos por cuota, registros listos para avanzar, certificados firmados y cierres del mes según la pestaña.',
+        ],
+        'roles' => ['Administrador', 'Funcionario SLEP', 'Funcionario DAF', 'Auditoria SLEP'],
+    ],
     '2026.9.25.514' => [
         'date' => '2026-09-25',
         'module' => 'Descuentos CGR',

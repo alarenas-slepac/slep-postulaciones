@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
+use App\Services\Remuneraciones\DescuentoCgrIndicadoresService;
 use App\Services\Remuneraciones\DescuentoCgrPdfService;
 use App\Services\Remuneraciones\ReemplazoPersonalRutService;
 use Carbon\CarbonImmutable;
@@ -89,7 +90,7 @@ class DescuentoCgrController extends Controller
             return (int) substr($mes, 0, 4) * 12 + (int) substr($mes, 5, 2);
         };
 
-        $descuentos = DescuentoCgr::query()
+        $consulta = DescuentoCgr::query()
             ->where('estado', $estado)
             ->when($buscar !== '', function ($query) use ($buscar, $buscarRut) {
                 $termino = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $buscar).'%';
@@ -109,7 +110,10 @@ class DescuentoCgrController extends Controller
             ->when($ultimoMes !== '', fn ($query) => $query->whereRaw("{$indicePrimerMes} + numero_cuotas - 1 = ?", [$mesIndice($ultimoMes)]))
             ->when($mesDescuento !== '', fn ($query) => $query
                 ->whereRaw("{$indicePrimerMes} <= ?", [$mesIndice($mesDescuento)])
-                ->whereRaw("{$indicePrimerMes} + numero_cuotas - 1 >= ?", [$mesIndice($mesDescuento)]))
+                ->whereRaw("{$indicePrimerMes} + numero_cuotas - 1 >= ?", [$mesIndice($mesDescuento)]));
+
+        $indicadores = app(DescuentoCgrIndicadoresService::class)->calcular($consulta, $estado);
+        $descuentos = (clone $consulta)
             ->orderByDesc('fecha_primer_descuento')
             ->latest('id')
             ->paginate(20)
@@ -130,7 +134,7 @@ class DescuentoCgrController extends Controller
 
         $filtrosActivos = $buscar !== '' || $origen !== '' || $anio > 0 || $ultimoMes !== '' || $mesDescuento !== '';
 
-        return view('remuneraciones.descuentos-cgr.index', compact('descuentos', 'buscar', 'anio', 'anios', 'origen', 'origenes', 'estado', 'conteos', 'ultimoMes', 'mesDescuento', 'filtrosActivos'));
+        return view('remuneraciones.descuentos-cgr.index', compact('descuentos', 'buscar', 'anio', 'anios', 'origen', 'origenes', 'estado', 'conteos', 'ultimoMes', 'mesDescuento', 'filtrosActivos', 'indicadores'));
     }
 
     public function create(): View

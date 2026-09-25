@@ -414,6 +414,68 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertSame('Finanzas', $listar(['estado' => 'descuentos_realizados'])['buscar']);
     }
 
+    public function test_indicadores_de_ingresados_y_finanzas_respetan_filtros_y_documentos_por_cuota(): void
+    {
+        $incompleto = $this->crearDescuento(['numero_resolucion' => 'KPI-ING-1', 'nombre' => 'KPI Incompleto', 'numero_cuotas' => 2, 'deuda_definitiva_pesos' => 100000]);
+        $completo = $this->crearDescuento(['numero_resolucion' => 'KPI-ING-2', 'nombre' => 'KPI Completo', 'numero_cuotas' => 1, 'deuda_definitiva_pesos' => 200000]);
+        $this->crearDescuento(['numero_resolucion' => 'OTRO-ING', 'nombre' => 'Otro registro', 'deuda_definitiva_pesos' => 900000]);
+        $this->registrarArchivoKpi($incompleto, 1, 'liquidacion');
+        $this->registrarArchivoKpi($completo, 1, 'liquidacion');
+
+        $ingresados = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', ['buscar' => 'KPI']))->getData()['indicadores'];
+        $this->assertSame(['registros' => 2, 'deuda_pesos' => 300000, 'cuotas' => 3, 'documentos' => 2, 'listos' => 1, 'firmados' => 0, 'cierres_mes' => 0], $ingresados);
+
+        $finanzas = $this->crearDescuento(['numero_resolucion' => 'KPI-FIN-1', 'estado' => 'descuentos_realizados', 'numero_cuotas' => 2]);
+        $this->registrarArchivoKpi($finanzas, 1, 'sigfe');
+        $this->registrarArchivoKpi($finanzas, 2, 'sigfe');
+        $this->registrarArchivoKpi($finanzas, 1, 'tgr');
+        $datosFinanzas = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', ['estado' => 'descuentos_realizados']))->getData();
+        $this->assertSame(1, $datosFinanzas['indicadores']['registros']);
+        $this->assertSame(2, $datosFinanzas['indicadores']['cuotas']);
+        $this->assertSame(3, $datosFinanzas['indicadores']['documentos']);
+        $this->assertSame(0, $datosFinanzas['indicadores']['listos']);
+
+        $this->registrarArchivoKpi($finanzas, 2, 'tgr');
+        $finanzasCompletas = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', ['estado' => 'descuentos_realizados']))->getData()['indicadores'];
+        $this->assertSame(4, $finanzasCompletas['documentos']);
+        $this->assertSame(1, $finanzasCompletas['listos']);
+    }
+
+    public function test_indicadores_de_auditoria_y_finalizados_reflejan_firmas_y_cierres_del_mes(): void
+    {
+        $auditoria = $this->crearDescuento(['numero_resolucion' => 'KPI-AUD-1', 'estado' => 'en_auditoria', 'numero_cuotas' => 2]);
+        $firmado = $this->crearDescuento(['numero_resolucion' => 'KPI-AUD-2', 'estado' => 'en_auditoria', 'certificado_firmado_path' => 'certificados/firmado.pdf']);
+        $this->registrarArchivoKpi($auditoria, 1, 'liquidacion_validada');
+        $this->registrarArchivoKpi($firmado, 1, 'liquidacion_validada');
+        $auditoriaIndicadores = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', ['estado' => 'en_auditoria']))->getData()['indicadores'];
+        $this->assertSame(2, $auditoriaIndicadores['registros']);
+        $this->assertSame(3, $auditoriaIndicadores['cuotas']);
+        $this->assertSame(2, $auditoriaIndicadores['documentos']);
+        $this->assertSame(1, $auditoriaIndicadores['firmados']);
+
+        $this->crearDescuento(['numero_resolucion' => 'KPI-CER-1', 'estado' => 'cerrado', 'numero_cuotas' => 2, 'cerrado_en' => now()]);
+        $this->crearDescuento(['numero_resolucion' => 'KPI-CER-2', 'estado' => 'cerrado', 'cerrado_en' => now()->subMonth()]);
+        $vistaCerrados = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET', ['estado' => 'cerrado']));
+        $cerrados = $vistaCerrados->getData();
+        $this->assertSame(2, $cerrados['indicadores']['registros']);
+        $this->assertSame(3, $cerrados['indicadores']['cuotas']);
+        $this->assertSame(1, $cerrados['indicadores']['cierres_mes']);
+        $this->assertStringContainsString('Cerrados este mes', $vistaCerrados->render());
+    }
+
+    public function test_indicadores_incluyen_registros_fuera_de_la_primera_pagina(): void
+    {
+        for ($numero = 1; $numero <= 21; $numero++) {
+            $this->crearDescuento(['numero_resolucion' => 'KPI-PAG-'.$numero, 'deuda_definitiva_pesos' => 1000]);
+        }
+
+        $datos = app(DescuentoCgrController::class)->index(Request::create('/descuentos-cgr', 'GET'))->getData();
+        $this->assertCount(20, $datos['descuentos']);
+        $this->assertSame(21, $datos['indicadores']['registros']);
+        $this->assertSame(21000, $datos['indicadores']['deuda_pesos']);
+        $this->assertSame(21, $datos['indicadores']['cuotas']);
+    }
+
     public function test_migracion_clasifica_registros_historicos_sin_inventar_origenes(): void
     {
         DB::table('funcionarios_ac_autorizados')->insert([
@@ -893,5 +955,20 @@ class DescuentosCgrModuleTest extends TestCase
             'resolucion_pdf_nombre' => 'resolucion.pdf',
             'resolucion_pdf_tamano' => 15,
         ], $atributos));
+    }
+
+    private function registrarArchivoKpi(DescuentoCgr $descuento, int $cuota, string $tipo): void
+    {
+        DB::table('descuentos_cgr_archivos')->insert([
+            'descuento_cgr_id' => $descuento->id,
+            'numero_cuota' => $cuota,
+            'tipo' => $tipo,
+            'grupo_archivo' => (string) \Illuminate\Support\Str::uuid(),
+            'path' => "descuentos-cgr/pruebas/{$tipo}-{$descuento->id}-{$cuota}.pdf",
+            'nombre_original' => 'documento.pdf',
+            'tamano' => 100,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }
