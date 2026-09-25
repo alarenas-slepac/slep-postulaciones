@@ -1393,6 +1393,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::post('/{descuentoCgr}/auditoria/cerrar', [DescuentoCgrWorkflowController::class, 'cerrar'])->whereNumber('descuentoCgr')->name('auditoria.cerrar');
         });
         Route::get('/{descuentoCgr}/archivos/{archivo}', [DescuentoCgrWorkflowController::class, 'archivo'])->whereNumber(['descuentoCgr', 'archivo'])->name('archivos.show');
+        Route::get('/{descuentoCgr}/expediente-zip', [DescuentoCgrWorkflowController::class, 'descargarExpediente'])->whereNumber('descuentoCgr')->name('expediente.zip');
         Route::get('/{descuentoCgr}/certificado-firmado', [DescuentoCgrWorkflowController::class, 'verCertificado'])->whereNumber('descuentoCgr')->name('certificado-firmado.show');
         Route::get('/{descuentoCgr}/resolucion', [DescuentoCgrController::class, 'pdf'])->whereNumber('descuentoCgr')->name('pdf');
         Route::get('/{descuentoCgr}/informe-pdf', [DescuentoCgrController::class, 'informePdf'])->whereNumber('descuentoCgr')->name('informe.pdf');

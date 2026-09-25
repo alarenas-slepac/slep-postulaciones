@@ -70,7 +70,15 @@
         <div class="card mb-4"><div class="card-header"><i class="bi bi-building me-2 text-primary"></i>Reintegro y antecedentes</div><div class="card-body row g-3"><div class="col-md-6"><span class="small text-muted">Institución de reintegro</span><div class="fw-semibold">{{ $descuentoCgr->institucion_reintegro ?: 'No informada' }}</div></div><div class="col-md-6"><span class="small text-muted">Estamento o escalafón</span><div class="fw-semibold">{{ $descuentoCgr->estamento_funcionario ?: 'No informado' }}</div></div></div></div>
 
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap"><span><i class="bi bi-calendar3 me-2 text-primary" aria-hidden="true"></i>Cronograma de descuentos</span><span class="text-muted small">Montos en pesos redondeados visualmente</span></div>
+            <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                <span><i class="bi bi-calendar3 me-2 text-primary" aria-hidden="true"></i>Cronograma de descuentos</span>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="text-muted small">Montos en pesos redondeados visualmente</span>
+                    @if ($puedeAuditoria || $estado === 'cerrado')
+                        <a href="{{ route('descuentos-cgr.expediente.zip', $descuentoCgr) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download me-1" aria-hidden="true"></i>Descargar respaldos ZIP</a>
+                    @endif
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead class="table-light text-center align-middle">
