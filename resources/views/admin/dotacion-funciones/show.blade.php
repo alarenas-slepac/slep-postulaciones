@@ -24,8 +24,8 @@
             <div class="text-muted small">{{ $establecimiento->rbd }} — {{ $establecimiento->nombre_establecimiento }} · {{ $establecimiento->comuna ?: 'Sin comuna' }} · Año {{ $anio }}</div>
         </div>
         <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary" href="{{ route('admin.dotacion-funciones.index', ['anio' => $anio]) }}">
-                <i class="bi bi-arrow-left"></i> Volver
+            <a class="btn btn-outline-secondary rounded-pill" href="{{ $volverUrl }}">
+                <i class="bi bi-arrow-left"></i> {{ $accionesContexto ? 'Volver a Dotación docente' : 'Volver a establecimientos' }}
             </a>
         </div>
     </div>
@@ -73,7 +73,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white fw-semibold">Parámetros del establecimiento</div>
                 <div class="card-body">
-                    <form method="POST" action="{{ route('admin.dotacion-funciones.config', [$establecimiento]) }}">
+                    <form method="POST" action="{{ route('admin.dotacion-funciones.config', [$establecimiento, ...$accionesContexto]) }}">
                         @csrf
                         <input type="hidden" name="anio" value="{{ $anio }}">
                         <div class="alert alert-info small mb-3">
@@ -228,19 +228,19 @@
                                 <td><span class="badge text-bg-{{ $estadoClass[$funcion->estado] ?? 'secondary' }}">{{ $funcion->estadoLabel() }}</span></td>
                                 <td class="text-end">
                                     @if ($canValidate)
-                                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.validar', [$establecimiento, $funcion]) }}" class="d-inline-flex gap-1 mb-1">
+                                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.validar', [$establecimiento, $funcion, ...$accionesContexto]) }}" class="d-inline-flex gap-1 mb-1">
                                             @csrf
                                             <input type="number" name="horas_aprobadas" class="form-control form-control-sm" style="width: 80px" min="0" max="200" value="{{ $funcion->horas_aprobadas ?? $funcion->horas_declaradas }}" title="Horas aprobadas">
                                             <button class="btn btn-sm btn-success" title="Validar"><i class="bi bi-check-lg"></i></button>
                                         </form>
-                                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.observar', [$establecimiento, $funcion]) }}" class="d-inline-flex gap-1 mb-1">
+                                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.observar', [$establecimiento, $funcion, ...$accionesContexto]) }}" class="d-inline-flex gap-1 mb-1">
                                             @csrf
                                             <input type="text" name="observacion" class="form-control form-control-sm" style="width: 120px" placeholder="Observación" required>
                                             <button class="btn btn-sm btn-outline-warning" title="Observar"><i class="bi bi-exclamation-triangle"></i></button>
                                         </form>
                                     @endif
                                     @if ($canEdit)
-                                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.destroy', [$establecimiento, $funcion]) }}" class="d-inline" onsubmit="return confirm('¿Eliminar esta función declarada?')">
+                                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.destroy', [$establecimiento, $funcion, ...$accionesContexto]) }}" class="d-inline" onsubmit="return confirm('¿Eliminar esta función declarada?')">
                                             @csrf
                                             @method('DELETE')
                                             <button class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
@@ -269,7 +269,7 @@
                 <div class="card shadow-sm h-100">
                     <div class="card-header bg-white fw-semibold">Agregar coordinación técnico-pedagógica</div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.store', [$establecimiento]) }}">
+                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.store', [$establecimiento, ...$accionesContexto]) }}">
                             @csrf
                             <input type="hidden" name="anio" value="{{ $anio }}">
                             <input type="hidden" name="tipo" value="coordinacion">
@@ -316,7 +316,7 @@
                 <div class="card shadow-sm h-100">
                     <div class="card-header bg-white fw-semibold">Agregar otra función docente</div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.store', [$establecimiento]) }}">
+                        <form method="POST" action="{{ route('admin.dotacion-funciones.manual.store', [$establecimiento, ...$accionesContexto]) }}">
                             @csrf
                             <input type="hidden" name="anio" value="{{ $anio }}">
                             <div class="row g-3">
@@ -353,4 +353,5 @@
             </div>
         </div>
     @endif
+    @include('admin.dotacion-establecimiento.partials._restore_context')
 @endsection

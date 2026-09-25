@@ -35,6 +35,8 @@ class DotacionProyeccionAccessTest extends TestCase
             'activeRole' => $role, 'anio' => 2026,
             'establecimiento' => $this->establecimiento(),
         ]);
+        $this->assertStringContainsString('desde_dotacion=1', $html);
+        $this->assertStringContainsString('tab_origen=resumen', $html);
         if ($permitido) {
             $this->assertStringContainsString('Proyección 2027', $html);
             $this->assertStringContainsString('proyeccion=1', $html);
@@ -55,6 +57,20 @@ class DotacionProyeccionAccessTest extends TestCase
                 $this->assertSame(403, $exception->getStatusCode());
             }
         }
+    }
+
+    public function test_enlace_a_funciones_conserva_la_pestana_de_asignacion(): void
+    {
+        $source = file_get_contents(resource_path('views/admin/dotacion-establecimiento/show.blade.php'));
+        $start = strpos($source, '<div class="dotacion-hero');
+        $end = strpos($source, '@if (!empty($alertas))', $start);
+        $html = Blade::render(substr($source, $start, $end - $start), [
+            'activeRole' => 'admin', 'anio' => 2027, 'tab' => 'asignacion',
+            'establecimiento' => $this->establecimiento(),
+        ]);
+
+        $this->assertStringContainsString('tab_origen=asignacion', $html);
+        $this->assertStringContainsString('data-dotacion-contexto-salida', $html);
     }
 
     public function test_directivo_conserva_autorizacion_al_modulo_y_a_su_establecimiento(): void
