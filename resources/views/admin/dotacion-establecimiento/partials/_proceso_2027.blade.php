@@ -108,7 +108,7 @@
 
             <div class="table-responsive mt-4">
                 <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light"><tr><th>Componente</th><th class="text-end">Normativas potenciales</th><th class="text-end">Máximo</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Contrato registrado</th><th class="text-end">Cobertura obligatoria</th><th class="text-end">Pendiente obligatorio</th><th class="text-end">Saldo no normativas</th></tr></thead>
+                    <thead class="table-light"><tr><th>Componente</th><th class="text-end">Normativas potenciales</th><th class="text-end">Máximo</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Sin padrón vigente</th><th class="text-end">Contrato registrado</th><th class="text-end">Cobertura obligatoria</th><th class="text-end">Pendiente obligatorio</th><th class="text-end">Saldo no normativas</th></tr></thead>
                     <tbody>
                         @foreach (($proceso['bloques'] ?? []) as $bloque)
                             <tr>
@@ -117,10 +117,14 @@
                                 <td class="text-end">{{ $bloque['maximo'] === null ? 'Pendiente' : $fmtProceso($bloque['maximo']) }}</td>
                                 <td class="text-end text-success">{{ $fmtProceso($bloque['titulares_asignadas']) }}</td>
                                 <td class="text-end text-primary">{{ $fmtProceso($bloque['contrata_asignadas']) }}</td>
+                                <td class="text-end {{ $bloque['sin_padron_asignadas'] > 0.01 ? 'text-warning fw-semibold' : '' }}">{{ $fmtProceso($bloque['sin_padron_asignadas']) }}</td>
                                 <td class="text-end fw-semibold">{{ $fmtProceso($bloque['asignadas']) }}</td>
                                 <td class="text-end">{{ $fmtProceso($bloque['asignadas_obligatorias']) }}
                                     @if (abs($bloque['ajuste_cobertura_plan'] ?? 0) > 0.01)
                                         <div class="small text-muted">Plan consolidado: {{ ($bloque['ajuste_cobertura_plan'] ?? 0) > 0 ? '+' : '' }}{{ $fmtProceso($bloque['ajuste_cobertura_plan']) }} h</div>
+                                    @endif
+                                    @if (($bloque['asignadas_asistentes_obligatorias'] ?? 0) > 0.01)
+                                        <div class="small text-muted">Cobertura AAEE: +{{ $fmtProceso($bloque['asignadas_asistentes_obligatorias']) }} h</div>
                                     @endif
                                 </td>
                                 <td class="text-end {{ $bloque['pendientes'] > 0.01 ? 'text-warning fw-semibold' : 'text-success' }}">{{ $fmtProceso($bloque['pendientes']) }}</td>
@@ -130,7 +134,7 @@
                     </tbody>
                 </table>
             </div>
-            <div class="small text-muted mt-2">La cobertura del plan se confirma con las horas aula de cada asignatura. Su contrato necesario se calcula consolidado por curso; el saldo reserva esa necesidad antes de habilitar funciones no normativas.</div>
+            <div class="small text-muted mt-2">Titulares y contrata provienen de las jornadas del padrón vigente; «Sin padrón vigente» identifica asignaciones que requieren revisión de su origen. La cobertura del plan se confirma con las horas aula de cada asignatura y su contrato necesario se calcula consolidado por curso. La cobertura AAEE de otras necesidades obligatorias se muestra por separado del contrato docente.</div>
             @if (!($proceso['funciones_no_normativas_habilitadas'] ?? false))
                 @php
                     $etapasPendientes = collect($proceso['pasos'] ?? [])->filter(fn ($paso) => ! $paso['completo'])->pluck('label');
