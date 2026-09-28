@@ -779,16 +779,20 @@ class DotacionAsignacionController extends Controller
         }
 
         $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? ''));
-        $seleccionado = collect($proceso['docentes'] ?? [])->first(
+        $docentesPrelacion = DotacionProceso2027Calculator::docentesPrelacionParaAsignacion(
+            collect($proceso['docentes'] ?? []), $persona, $payload, $bloque
+        );
+        $seleccionado = $docentesPrelacion->first(
             fn (array $docente) => ($docente['rut_normalizado'] ?? '') === $rut
         );
         $hayPrelacionAnterior = DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
-            collect($proceso['docentes'] ?? []),
-            $seleccionado ?? []
+            $docentesPrelacion,
+            $seleccionado ?? [],
+            $horas
         );
         if ($hayPrelacionAnterior && blank($payload['excepcion_prelacion'] ?? null)) {
             throw ValidationException::withMessages([
-                'excepcion_prelacion' => 'Existen docentes de prioridad superior o de mayor antigüedad en el mismo grupo con horas disponibles. Para continuar debe indicar una justificación de excepción.',
+                'excepcion_prelacion' => 'Existen docentes de prioridad superior o de mayor antigüedad en el mismo grupo con horas suficientes para cubrir esta asignación. Para continuar debe indicar una justificación de excepción.',
             ]);
         }
 

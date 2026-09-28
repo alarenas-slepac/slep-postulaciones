@@ -392,18 +392,44 @@ class DotacionProceso2027Calculator
     }
 
     /** @param Collection<int, array<string, mixed>> $docentes */
-    public static function hayPrelacionAnteriorDisponible(Collection $docentes, array $seleccionado): bool
+    public static function docentesPrelacionParaAsignacion(
+        Collection $docentes,
+        array $persona,
+        array $payload,
+        ?string $bloque
+    ): Collection {
+        if ($bloque !== 'bloque_2'
+            || ! in_array((string) ($payload['tipo_asignacion'] ?? ''), ['plan_estudio', 'acompanamiento_parvularia'], true)
+            || ! DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos']) {
+            return $docentes;
+        }
+
+        return $docentes->filter(fn (array $docente) =>
+            DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos']
+        )->values();
+    }
+
+    /** @param Collection<int, array<string, mixed>> $docentes */
+    public static function hayPrelacionAnteriorDisponible(Collection $docentes, array $seleccionado, float $horasRequeridas = 0.0): bool
     {
         $prioridad = (int) ($seleccionado['prioridad_2027'] ?? 6);
         $rut = (string) ($seleccionado['rut_normalizado'] ?? '');
 
-        return $docentes->contains(function (array $docente) use ($prioridad, $rut, $seleccionado): bool {
-            if ((string) ($docente['rut_normalizado'] ?? '') === $rut
-                || (float) ($docente['horas_disponibles'] ?? 0) <= 0.01) {
+        return $docentes->contains(function (array $docente) use ($prioridad, $rut, $seleccionado, $horasRequeridas): bool {
+            if ((string) ($docente['rut_normalizado'] ?? '') === $rut) {
                 return false;
             }
 
             $prioridadDocente = (int) ($docente['prioridad_2027'] ?? 6);
+            $saldo = in_array($prioridadDocente, [2, 3], true)
+                ? min(
+                    (float) ($docente['horas_disponibles'] ?? 0),
+                    (float) ($docente['horas_titulares_disponibles'] ?? $docente['horas_disponibles'] ?? 0)
+                )
+                : (float) ($docente['horas_disponibles'] ?? 0);
+            if ($saldo <= 0.01 || round($saldo, 2) < round(max(0.0, $horasRequeridas), 2)) {
+                return false;
+            }
 
             return $prioridadDocente < $prioridad
                 || ($prioridadDocente === $prioridad

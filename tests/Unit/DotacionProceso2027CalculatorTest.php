@@ -201,6 +201,53 @@ class DotacionProceso2027CalculatorTest extends TestCase
         ));
     }
 
+    public function test_saldos_titulares_insuficientes_no_bloquean_una_asignacion_mayor(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('Titular experto', 20, 0, 19.63, null, 'Experto 1', '2000-01-01'),
+            $this->docente('Titular antiguo', 20, 0, 19.63, null, 'Inicial', '2005-01-01'),
+            $this->docente('Titular reciente', 20, 0, 0, null, 'Inicial', '2015-01-01'),
+        ]));
+        $seleccionado = $docentes->firstWhere('nombre', 'Titular reciente');
+
+        $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($docentes, $seleccionado, 2));
+        $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($docentes, $seleccionado, 0.38));
+        $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($docentes, $seleccionado, 0.37));
+
+        $conTitularSuficiente = $docentes->map(function (array $docente): array {
+            if ($docente['nombre'] === 'Titular antiguo') {
+                $docente['horas_titulares_disponibles'] = 2.0;
+                $docente['horas_disponibles'] = 2.0;
+            }
+            return $docente;
+        });
+        $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($conTitularSuficiente, $seleccionado, 2));
+    }
+
+    public function test_prelacion_de_aula_parvularia_considera_solo_educadoras_habilitadas(): void
+    {
+        $general = $this->docente('Titular general', 20, 0, 0, null, 'Experto 1', '2000-01-01');
+        $general['titulo'] = 'Pedagogía en Educación Básica';
+        $educadoraAnterior = $this->docente('Educadora anterior', 20, 0, 19.63, null, 'Inicial', '2005-01-01');
+        $educadoraAnterior['titulo'] = 'Pedagogía en Educación de Párvulos';
+        $educadoraSeleccionada = $this->docente('Educadora seleccionada', 20, 0, 0, null, 'Inicial', '2015-01-01');
+        $educadoraSeleccionada['titulo'] = 'Pedagogía en Educación de Párvulos';
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $general, $educadoraAnterior, $educadoraSeleccionada,
+        ]));
+
+        $elegibles = DotacionProceso2027Calculator::docentesPrelacionParaAsignacion(
+            $docentes, $educadoraSeleccionada, ['tipo_asignacion' => 'plan_estudio'], 'bloque_2'
+        );
+        $this->assertSame(['Educadora anterior', 'Educadora seleccionada'], $elegibles->pluck('nombre')->all());
+        $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
+            $elegibles, $elegibles->firstWhere('nombre', 'Educadora seleccionada'), 2
+        ));
+        $this->assertCount(3, DotacionProceso2027Calculator::docentesPrelacionParaAsignacion(
+            $docentes, $educadoraSeleccionada, ['tipo_asignacion' => 'pie_colaborativo'], 'bloque_2'
+        ));
+    }
+
     public function test_trabajo_colaborativo_nt_se_contabiliza_en_bloque_parvularia(): void
     {
         $resumen = DotacionProceso2027Calculator::resumen(
