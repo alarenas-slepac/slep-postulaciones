@@ -57,8 +57,10 @@
         @if (abs((float) $descuentoCgr->tasa_interes_mensual - $tasaEsperada) > 0.0001)
             <div class="alert alert-info"><i class="bi bi-info-circle me-2" aria-hidden="true"></i>La tasa mensual informada ({{ number_format((float) $descuentoCgr->tasa_interes_mensual, 4, ',', '.') }}%) difiere de la tasa anual dividida por 12 ({{ number_format($tasaEsperada, 4, ',', '.') }}%). El cronograma respeta la tasa mensual de la resolución.</div>
         @endif
-        @if ($calculo['saldo_final_utm'] > 0.00005)
+        @if ($calculo['saldo_final_utm'] > \App\Services\Remuneraciones\DescuentoCgrCertificadoService::RESIDUO_MAXIMO_UTM)
             <div class="alert alert-danger"><i class="bi bi-exclamation-octagon me-2" aria-hidden="true"></i>Las {{ $descuentoCgr->numero_cuotas }} cuotas indicadas no extinguen la deuda: queda un saldo de {{ $utm($calculo['saldo_final_utm']) }} UTM. Revisa los datos de la resolución.</div>
+        @elseif ($estado === 'en_auditoria' && $calculo['saldo_final_utm'] > 0.00005)
+            <div class="alert alert-info"><i class="bi bi-info-circle me-2" aria-hidden="true"></i>El cronograma muestra un saldo residual de {{ $utm($calculo['saldo_final_utm']) }} UTM. Auditoría podrá confirmarlo para generar el certificado cuando estén completas las liquidaciones validadas y los valores UTM.</div>
         @endif
 
         <div class="row g-3 mb-4">

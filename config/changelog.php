@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.9.28.524' => [
+        'date' => '2026-09-28',
+        'module' => 'Descuentos CGR',
+        'title' => 'Confirmación de saldo residual mínimo en certificado de Auditoría',
+        'files' => [
+            'app/Http/Controllers/Remuneraciones/DescuentoCgrWorkflowController.php',
+            'app/Models/DescuentoCgr.php',
+            'app/Services/Remuneraciones/DescuentoCgrCertificadoService.php',
+            'app/Services/Remuneraciones/DescuentoCgrWorkflowService.php',
+            'config/changelog.php',
+            'database/migrations/2026_09_28_150000_add_certificado_residuo_utm_aceptado_to_descuentos_cgr.php',
+            'resources/views/remuneraciones/descuentos-cgr/_workflow.blade.php',
+            'resources/views/remuneraciones/descuentos-cgr/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'Auditoría puede confirmar expresamente que se descontaron todas las cuotas y generar el Word cuando solo resta 0,0001 UTM.',
+            'Registra el saldo aceptado junto con la fecha y el usuario que generaron el certificado; mantiene la exigencia de valores UTM y liquidaciones validadas.',
+        ],
+        'roles' => ['Administrador', 'Auditoría SLEP'],
+    ],
     '2026.9.28.523' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

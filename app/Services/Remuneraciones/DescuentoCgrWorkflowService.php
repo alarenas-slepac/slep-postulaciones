@@ -66,6 +66,7 @@ class DescuentoCgrWorkflowService
                     $registro->update([
                         'certificado_generado_en' => null,
                         'certificado_generado_por_id' => null,
+                        'certificado_residuo_utm_aceptado' => null,
                         'certificado_firmado_path' => null,
                         'certificado_firmado_nombre' => null,
                         'certificado_firmado_en' => null,
