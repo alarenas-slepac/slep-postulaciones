@@ -260,5 +260,6 @@ class DotacionParvulariaBasesTest extends TestCase
         );
         $this->assertSame(27.5, $payload['horas_contrato']);
         $this->assertStringContainsString('19 / 38', $payload['fuente_calculo']);
+        $this->assertGreaterThan(255, mb_strlen($payload['fuente_calculo']));
     }
 }
