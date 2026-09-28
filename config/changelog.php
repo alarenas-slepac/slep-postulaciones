@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.28.520' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Corrige el guardado de asignaciones de Educación Parvularia',
+        'files' => [
+            'config/changelog.php',
+            'database/migrations/2026_09_28_100000_expand_dotacion_fuente_calculo_column.php',
+            'tests/Feature/DotacionParvulariaBasesTest.php',
+            'tests/Feature/DotacionFuenteCalculoMigrationTest.php',
+        ],
+        'changes' => [
+            'Amplía la explicación del cálculo de horas a texto para evitar el error al guardar asignaciones NT1/NT2 con descripciones extensas.',
+            'Conserva íntegramente las explicaciones de asignaciones históricas y del recálculo de proporciones.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor planificación'],
+    ],
     '2026.9.25.519' => [
         'date' => '2026-09-25',
         'module' => 'Descuentos CGR',
