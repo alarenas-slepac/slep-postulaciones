@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.28.535' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Prelación según saldo suficiente para la asignación 2027',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Solo exige justificar la omisión de prelación cuando un docente anterior puede cubrir por sí mismo todas las horas de contrato de la asignación; los saldos titulares parciales, como 0,37 h frente a 2 h, no bloquean.',
+            'La comparación de los grupos titulares utiliza su saldo titular y, para el aula de Parvularia, considera solo a Educadoras de Párvulos. El aviso explica que debe existir saldo suficiente.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.534' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',
