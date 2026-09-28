@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.28.533' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Acompañamiento NT1/NT2 con cupo por contratar de Parvularia',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'tests/Feature/DotacionDocenteVirtualTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La validación del cupo virtual reconoce el acompañamiento en libre disposición NT1/NT2 como asignación del bloque Parvularia.',
+            'Conserva el límite de horas del cupo y rechaza el acompañamiento en cursos ajenos a NT1/NT2.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.532' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',
