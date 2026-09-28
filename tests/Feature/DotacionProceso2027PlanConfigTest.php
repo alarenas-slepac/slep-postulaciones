@@ -63,6 +63,16 @@ class DotacionProceso2027PlanConfigTest extends TestCase
             $table->unsignedBigInteger('plan_estudio_bloque_id');
             $table->decimal('horas_semanales', 8, 2);
         });
+        Schema::create('dotacion_proceso_2027_configuraciones', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('establecimiento_id');
+            $table->unsignedSmallInteger('anio');
+            $table->string('decision_combinacion')->nullable();
+            $table->decimal('max_horas_bloque_1', 8, 2)->nullable();
+            $table->decimal('max_horas_bloque_2', 8, 2)->nullable();
+            $table->decimal('max_horas_bloque_3', 8, 2)->nullable();
+            $table->json('funciones_normativas')->nullable();
+        });
 
         DB::table('establecimientos')->insert(['id' => 1, 'rbd' => 99999, 'nombre_establecimiento' => 'Establecimiento de prueba']);
         DB::table('cursos')->insert(['id' => 1, 'nombre' => 'NT1']);
@@ -100,6 +110,7 @@ class DotacionProceso2027PlanConfigTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('dotacion_proceso_2027_configuraciones');
         Schema::dropIfExists('establecimiento_planes_estudio_asignaturas');
         Schema::dropIfExists('establecimiento_planes_estudio');
         Schema::dropIfExists('establecimiento_cursos');
@@ -128,6 +139,72 @@ class DotacionProceso2027PlanConfigTest extends TestCase
 
         $this->assertTrue($segundo['pasos']['planes']['completo']);
         $this->assertSame(0, $segundo['estado_planes']['libre_disposicion_pendiente']);
+    }
+
+    public function test_habilita_funciones_no_normativas_con_aula_y_pie_cubiertos_aunque_el_contrato_por_asignatura_sea_menor(): void
+    {
+        DB::table('dotacion_proceso_2027_configuraciones')->insert([
+            'establecimiento_id' => 1,
+            'anio' => 2027,
+            'decision_combinacion' => 'sin_combinacion',
+            'max_horas_bloque_1' => 12,
+            'max_horas_bloque_2' => 0,
+            'max_horas_bloque_3' => 0,
+            'funciones_normativas' => json_encode([]),
+        ]);
+        $data = [
+            'resumen' => [
+                'contrato_plan_general_mas_trabajo_colaborativo_pie' => 10,
+                'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 0,
+                'contrato_plan_por_ensenanza_desglose' => [
+                    'contrato_plan_general' => 10,
+                    'contrato_plan_parvularia' => 0,
+                ],
+            ],
+            'cursos' => [
+                'totales' => ['cursos' => 1, 'sin_horas_plan' => 0],
+                'configuracion_planes' => ['completo' => true, 'total' => 1, 'configurados' => 1],
+            ],
+            'asignacion' => [
+                'necesidades' => ['plan_estudio' => [[
+                    'key' => 'plan:general',
+                    'horas_plan_requeridas' => 6,
+                    'horas_plan_asignadas' => 6,
+                ]]],
+                'asignaciones' => [[
+                    'necesidad_key' => 'plan:general',
+                    'tipo_asignacion' => 'plan_estudio',
+                    'horas_contrato' => 8,
+                ]],
+            ],
+            'docentes' => [[
+                'rut_normalizado' => '111111111',
+                'nombre' => 'Docente de prueba',
+                'horas_contrato' => 12,
+                'horas_planta' => 0,
+                'horas_contrata' => 12,
+                'horas_asignadas_total' => 8,
+            ]],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ];
+
+        $proceso = DotacionProceso2027Calculator::resumen(Establecimiento::findOrFail(1), 2027, $data);
+
+        $this->assertTrue($proceso['funciones_no_normativas_habilitadas']);
+        $this->assertSame(0.0, $proceso['bloques']['bloque_1']['pendientes']);
+        $this->assertSame(2.0, $proceso['bloques']['bloque_1']['saldo_maximo']);
+        $this->assertSame(2.0, $proceso['capacidad_no_normativas']);
+
+        $dataConNoNormativa = $data;
+        $dataConNoNormativa['asignacion']['asignaciones'][] = [
+            'tipo_asignacion' => 'otra_funcion', 'dotacion_funcion_id' => 10, 'horas_contrato' => 1,
+        ];
+        $conNoNormativa = DotacionProceso2027Calculator::resumen(Establecimiento::findOrFail(1), 2027, $dataConNoNormativa);
+        $this->assertSame(1.0, $conNoNormativa['bloques']['bloque_1']['saldo_maximo']);
+
+        $data['asignacion']['necesidades']['plan_estudio'][0]['horas_plan_asignadas'] = 5;
+        $incompleto = DotacionProceso2027Calculator::resumen(Establecimiento::findOrFail(1), 2027, $data);
+        $this->assertFalse($incompleto['funciones_no_normativas_habilitadas']);
     }
 
     private function data(): array
