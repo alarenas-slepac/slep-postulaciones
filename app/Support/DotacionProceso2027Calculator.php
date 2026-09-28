@@ -76,6 +76,7 @@ class DotacionProceso2027Calculator
             'asignadas_plan_obligatorias' => 0.0,
             'asignadas_no_normativas' => 0.0,
             'asignadas_acompanamiento' => 0.0,
+            'asignadas_libre_disposicion_nt_otro_docente' => 0.0,
             'ajuste_cobertura_plan' => 0.0,
             'titulares_asignadas' => 0.0,
             'contrata_asignadas' => 0.0,
@@ -197,7 +198,12 @@ class DotacionProceso2027Calculator
                 ? ($needBlocks[$keyNecesidad] ?? null)
                 : ($needBlocksPorAsignacion[$asignacionId] ?? null);
             $bloqueNecesidad = $bloqueObligatorio ?? ($needBlocks[$keyNecesidad] ?? null);
+            $bloqueDocenteExterno = self::bloqueLibreDisposicionNtOtroDocente($asignacion, $bloqueNecesidad);
+            if ($bloqueDocenteExterno && $bloqueObligatorio) {
+                $bloqueObligatorio = $bloqueDocenteExterno;
+            }
             $bloque = ($docente ? self::bloqueFuncionPorDocente($asignacion, $docente) : null)
+                ?? $bloqueDocenteExterno
                 ?? $bloqueNecesidad
                 ?? self::bloqueParaAsignacion($asignacion);
             if (! $bloque || ! isset($bloques[$bloque])) {
@@ -205,6 +211,9 @@ class DotacionProceso2027Calculator
             }
             $horas = max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
             $bloques[$bloque]['asignadas'] += $horas;
+            if ($bloqueDocenteExterno) {
+                $bloques[$bloque]['asignadas_libre_disposicion_nt_otro_docente'] += $horas;
+            }
             if ((string) data_get($asignacion, 'tipo_asignacion', '') === 'acompanamiento_parvularia') {
                 $bloques[$bloque]['asignadas_acompanamiento'] += $horas;
             }
@@ -275,6 +284,7 @@ class DotacionProceso2027Calculator
             $bloque['asignadas_plan_obligatorias'] = round((float) $bloque['asignadas_plan_obligatorias'], 2);
             $bloque['asignadas_no_normativas'] = round((float) $bloque['asignadas_no_normativas'], 2);
             $bloque['asignadas_acompanamiento'] = round((float) $bloque['asignadas_acompanamiento'], 2);
+            $bloque['asignadas_libre_disposicion_nt_otro_docente'] = round((float) $bloque['asignadas_libre_disposicion_nt_otro_docente'], 2);
             $bloque['ajuste_cobertura_plan'] = round((float) $bloque['ajuste_cobertura_plan'], 2);
             $bloque['titulares_asignadas'] = round((float) $bloque['titulares_asignadas'], 2);
             $bloque['contrata_asignadas'] = round((float) $bloque['contrata_asignadas'], 2);
@@ -609,6 +619,26 @@ class DotacionProceso2027Calculator
             'funcion_directiva', 'plan_normativo', 'otra_funcion' => 'bloque_1',
             default => null,
         };
+    }
+
+    /** La libre disposición NT impartida por otro docente corresponde a Plan general. */
+    public static function bloqueLibreDisposicionNtOtroDocente(
+        object|array $asignacion,
+        ?string $bloqueNecesidad,
+        ?array $docente = null
+    ): ?string {
+        if ((string) data_get($asignacion, 'tipo_asignacion') !== 'plan_estudio'
+            || (string) data_get($asignacion, 'subtipo_asignacion') !== 'libre_disposicion'
+            || ($bloqueNecesidad !== 'bloque_2' && ! self::esNt(data_get($asignacion, 'establecimientoCurso')))) {
+            return null;
+        }
+
+        $perfil = $docente ? DotacionProfesionDocenteResolver::perfilTitulo($docente) : null;
+        $esEducadora = $perfil && $perfil['titulo_declarado'] !== ''
+            ? $perfil['es_educacion_parvulos']
+            : DotacionProfesionDocenteResolver::esAsignacionParvularia($asignacion);
+
+        return $esEducadora ? null : 'bloque_1';
     }
 
     /** Imputa funciones al bloque contractual del docente, sin alterar la necesidad que cubren. */

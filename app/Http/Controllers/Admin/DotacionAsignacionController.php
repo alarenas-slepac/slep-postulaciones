@@ -711,8 +711,10 @@ class DotacionAsignacionController extends Controller
             ]);
         }
 
+        $bloqueNecesidad = data_get($proceso, 'need_blocks.'.($payload['necesidad_key'] ?? ''));
         $bloque = DotacionProceso2027Calculator::bloqueFuncionPorDocente($payload, $persona)
-            ?: data_get($proceso, 'need_blocks.'.($payload['necesidad_key'] ?? ''))
+            ?: DotacionProceso2027Calculator::bloqueLibreDisposicionNtOtroDocente($payload, $bloqueNecesidad, $persona)
+            ?: $bloqueNecesidad
             ?: DotacionProceso2027Calculator::bloqueParaAsignacion($payload);
         if (! $bloque) {
             return;
@@ -730,8 +732,10 @@ class DotacionAsignacionController extends Controller
             $personaActual = collect($proceso['docentes'] ?? [])->first(fn (array $docente) =>
                 DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) === $rutActual
             );
+            $bloqueNecesidadActual = data_get($proceso, 'need_blocks.'.($current->necesidad_key ?? ''));
             $bloqueActual = ($personaActual ? DotacionProceso2027Calculator::bloqueFuncionPorDocente($current, $personaActual) : null)
-                ?: data_get($proceso, 'need_blocks.'.($current->necesidad_key ?? ''))
+                ?: DotacionProceso2027Calculator::bloqueLibreDisposicionNtOtroDocente($current, $bloqueNecesidadActual)
+                ?: $bloqueNecesidadActual
                 ?: DotacionProceso2027Calculator::bloqueParaAsignacion($current);
             if ($bloqueActual === $bloque) {
                 $asignadasMaximo = max(0.0, $asignadasMaximo - DotacionProceso2027Calculator::horasImputablesAlMaximo(
