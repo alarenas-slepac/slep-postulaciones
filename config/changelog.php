@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.28.525' => [
+        'date' => '2026-09-28',
+        'module' => 'Descuentos CGR',
+        'title' => 'Formato limpio del certificado Word de Auditoría',
+        'files' => [
+            'app/Services/Remuneraciones/DescuentoCgrCertificadoService.php',
+            'config/changelog.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'El número de registro incorpora el año de emisión con formato número-año.',
+            'Los datos reemplazados se escriben en negrita y el Word generado elimina el resaltado amarillo de la plantilla sin modificar su archivo original.',
+        ],
+        'roles' => ['Administrador', 'Auditoría SLEP'],
+    ],
     '2026.9.28.524' => [
         'date' => '2026-09-28',
         'module' => 'Descuentos CGR',

@@ -67,7 +67,7 @@ class DescuentoCgrCertificadoService
                 $palabras = (new NumberFormatter('es_CL', NumberFormatter::SPELLOUT))->format($monto);
                 $reemplazos = [
                     '{XX-XX-XXXX}' => $hoy->format('d-m-Y'),
-                    '{N° DE REGISTRO}' => (string) $descuento->id,
+                    '{N° DE REGISTRO}' => $descuento->id.'-'.$hoy->format('Y'),
                     '{DIA}' => $hoy->format('d'),
                     '{MES}' => $hoy->locale('es')->translatedFormat('F'),
                     '{AÑO}' => $hoy->format('Y'),
@@ -95,6 +95,7 @@ class DescuentoCgrCertificadoService
                     }
                 }
                 $this->campoNumeroPaginas($doc, $xpath);
+                $this->quitarResaltados($xpath);
                 $zip->addFromString('word/document.xml', $doc->saveXML());
                 $settings = $zip->getFromName('word/settings.xml');
                 if ($settings !== false && ! str_contains($settings, 'w:updateFields')) {
@@ -166,6 +167,9 @@ class DescuentoCgrCertificadoService
                         if ($primero !== $nodo) {
                             $nodo->textContent = $sufijo;
                         }
+                        if ($valor !== '') {
+                            $this->marcarNegrita($xpath, $primero->parentNode);
+                        }
                         $desde = $inicio + mb_strlen($valor);
                         break;
                     }
@@ -175,6 +179,28 @@ class DescuentoCgrCertificadoService
                 }
                 $posicion = $limite;
             }
+        }
+    }
+
+    private function marcarNegrita(DOMXPath $xpath, \DOMNode $run): void
+    {
+        $propiedades = $xpath->query('./w:rPr', $run)->item(0);
+        if (! $propiedades) {
+            $propiedades = $run->ownerDocument->createElementNS(self::W, 'w:rPr');
+            $run->insertBefore($propiedades, $run->firstChild);
+        }
+        $negrita = $xpath->query('./w:b', $propiedades)->item(0);
+        if (! $negrita) {
+            $negrita = $run->ownerDocument->createElementNS(self::W, 'w:b');
+            $propiedades->appendChild($negrita);
+        }
+        $negrita->setAttributeNS(self::W, 'w:val', '1');
+    }
+
+    private function quitarResaltados(DOMXPath $xpath): void
+    {
+        foreach (iterator_to_array($xpath->query('//w:highlight')) as $resaltado) {
+            $resaltado->parentNode->removeChild($resaltado);
         }
     }
 
@@ -188,6 +214,7 @@ class DescuentoCgrCertificadoService
             $field = $doc->createElementNS(self::W, 'w:fldSimple');
             $field->setAttributeNS(self::W, 'w:instr', 'NUMPAGES');
             $run = $doc->createElementNS(self::W, 'w:r');
+            $this->marcarNegrita($xpath, $run);
             $run->appendChild($doc->createElementNS(self::W, 'w:t', '1'));
             $field->appendChild($run);
             $parrafo->appendChild($field);

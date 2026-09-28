@@ -932,7 +932,7 @@ class DescuentosCgrModuleTest extends TestCase
         @unlink($respuesta->getFile()->getPathname());
     }
 
-    public function test_certificado_reemplaza_solo_contenido_y_repite_fila_de_plantilla(): void
+    public function test_certificado_resalta_valores_en_negrita_sin_amarillo_y_repite_fila_de_plantilla(): void
     {
         UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
         UtmValor::create(['anio' => 2026, 'mes' => 3, 'valor' => 69889]);
@@ -951,6 +951,23 @@ class DescuentosCgrModuleTest extends TestCase
             $this->assertStringContainsString('Docente', $xml);
             $this->assertStringNotContainsString('{Nombre completo}', $xml);
             $this->assertStringNotContainsString('{Capital $}', $xml);
+            $documento = new \DOMDocument;
+            $this->assertTrue($documento->loadXML($xml));
+            $xpath = new \DOMXPath($documento);
+            $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+            $this->assertSame(0, $xpath->query('//w:highlight')->length);
+            $registro = $descuento->id.'-'.now()->format('Y');
+            $this->assertStringContainsString('N° de Registro: '.$registro, $documento->textContent);
+            foreach ([$registro, 'Auditor Ejemplo', 'Docente', '142.000', '2,0560'] as $valor) {
+                $enNegrita = false;
+                foreach ($xpath->query('//w:r[w:rPr/w:b]') as $run) {
+                    if (str_contains($run->textContent, $valor)) {
+                        $enNegrita = true;
+                        break;
+                    }
+                }
+                $this->assertTrue($enNegrita, "El valor {$valor} debe insertarse en negrita.");
+            }
             $this->assertSame($plantilla->getFromName('word/styles.xml'), $generado->getFromName('word/styles.xml'));
             $this->assertSame($plantilla->getFromName('word/media/image1.png'), $generado->getFromName('word/media/image1.png'));
         } finally {
