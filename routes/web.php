@@ -48,6 +48,7 @@ use App\Http\Controllers\Admin\EstablecimientoCursoController;
 use App\Http\Controllers\Admin\EstablecimientoCursoPieController;
 use App\Http\Controllers\Admin\DotacionFuncionesController;
 use App\Http\Controllers\Admin\DotacionCursoCombinadoController;
+use App\Http\Controllers\Admin\DotacionContrataHabilitacionController;
 use App\Http\Controllers\Admin\DotacionDocenteExclusionController;
 use App\Http\Controllers\Admin\DotacionEstablecimientoController;
 use App\Http\Controllers\Admin\DotacionProceso2027Controller;
@@ -672,6 +673,15 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::get('dotacion-establecimiento', [DotacionEstablecimientoController::class, 'index'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->name('dotacion-establecimiento.index');
+        Route::post('dotacion-establecimiento/{establecimiento}/contrata-habilitaciones', [DotacionContrataHabilitacionController::class, 'store'])
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp')
+            ->whereNumber('establecimiento')
+            ->name('dotacion-establecimiento.contrata-habilitaciones.store');
+        Route::delete('dotacion-establecimiento/{establecimiento}/contrata-habilitaciones/{habilitacion}', [DotacionContrataHabilitacionController::class, 'destroy'])
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp')
+            ->whereNumber('establecimiento')
+            ->whereNumber('habilitacion')
+            ->name('dotacion-establecimiento.contrata-habilitaciones.destroy');
         Route::get('dotacion-establecimiento/{establecimiento}/pdf', [DotacionEstablecimientoController::class, 'pdf'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')

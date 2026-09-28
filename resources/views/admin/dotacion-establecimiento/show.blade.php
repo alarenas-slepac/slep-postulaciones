@@ -236,6 +236,7 @@
             </div>
         </div>
         {{-- Fin de filas de indicadores --}}
+        @include('admin.dotacion-establecimiento.partials._contrata_habilitaciones')
         <div class="col-12">
             <div class="card dotacion-kpi dotacion-breakdown border-0">
                 <div class="card-body">
