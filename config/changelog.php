@@ -1,6 +1,30 @@
 <?php
 
 return [
+    '2026.9.28.530' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Acompañamiento de Parvularia en libre disposición y límite individual CPEIP',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Models/DotacionDocenteAsignacion.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionCursoCombinadoCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProfesionDocenteResolver.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Feature/DotacionParvulariaBasesTest.php',
+            'tests/Unit/DotacionParvulariaLibreDisposicionTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Permite asignar a la Educadora de Párvulos la presencia simultánea en aula durante libre disposición NT1/NT2 con JEC impartida por otro docente, sin duplicar la cobertura del plan.',
+            'Valida que las horas de acompañamiento no excedan la docencia externa y evita reducir esta última mientras exista acompañamiento asociado.',
+            'En asignaciones nuevas aplica la equivalencia individual CPEIP 65/35, con tope de 35 horas pedagógicas y 41 horas de contrato de aula por Educadora; mantiene las 55 horas de necesidad contractual del grupo y las 3 horas PIE separadas.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.529' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

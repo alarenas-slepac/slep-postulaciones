@@ -156,6 +156,10 @@ class DotacionAsignacionCalculator
                 self::schemaHasTable('establecimiento_cursos') && self::schemaHasTable('cursos'),
                 fn ($query) => $query->with('establecimientoCurso.curso')
             )
+            ->when(
+                self::schemaHasTable('declaracion_sostenedores'),
+                fn ($query) => $query->with('declaracionSostenedor')
+            )
             ->where('establecimiento_id', $establecimiento->id)
             ->where('anio', $anio)
             ->where('estado', 'activa')
@@ -385,7 +389,7 @@ class DotacionAsignacionCalculator
             ->filter(fn ($row) => self::coverageEstamento($row) === 'docente')
             ->groupBy(fn ($row) => DotacionEstablecimientoCalculator::normalizeRut($row->docente_rut_normalizado ?: $row->docente_rut))
             ->map(function ($items) {
-                $plan = $items->where('tipo_asignacion', 'plan_estudio')->values();
+                $plan = $items->filter(fn ($row) => in_array($row->tipo_asignacion, ['plan_estudio', 'acompanamiento_parvularia'], true))->values();
                 $plan65 = $plan->filter(fn ($row) => self::proportionGroup($row->proporcion_aplicada) === '65_35');
                 $plan60 = $plan->filter(fn ($row) => self::proportionGroup($row->proporcion_aplicada) === '60_40');
                 $planEspecial = $plan->filter(fn ($row) => self::proportionGroup($row->proporcion_aplicada) === 'especial');
@@ -468,7 +472,9 @@ class DotacionAsignacionCalculator
                 'subvencion' => $subvencion,
                 'horas' => (float) $rows->sum(fn ($row) => (float) $row->horas_contrato),
                 'horas_aula' => (float) $rows->where('tipo_asignacion', 'plan_estudio')->sum(fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0)),
-                'horas_contrato_funciones' => (float) $rows->filter(fn ($row) => $row->tipo_asignacion !== 'plan_estudio')->sum(fn ($row) => (float) $row->horas_contrato),
+                'horas_aula_acompanamiento' => (float) $rows->where('tipo_asignacion', 'acompanamiento_parvularia')->sum(fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0)),
+                'horas_contrato_acompanamiento' => (float) $rows->where('tipo_asignacion', 'acompanamiento_parvularia')->sum(fn ($row) => (float) ($row->horas_contrato ?? 0)),
+                'horas_contrato_funciones' => (float) $rows->filter(fn ($row) => ! in_array($row->tipo_asignacion, ['plan_estudio', 'acompanamiento_parvularia'], true))->sum(fn ($row) => (float) $row->horas_contrato),
             ])
             ->sortKeys()
             ->values();
@@ -797,7 +803,7 @@ class DotacionAsignacionCalculator
             $asignaciones,
             $establecimiento,
             $anio
-        );
+        )->map(fn (array $item) => self::withAcompanamientoParvularia($item))->values();
     }
 
     private static function asignaturasPersonalizadas(EstablecimientoCurso $curso, int $planEstudioId): Collection
@@ -1047,7 +1053,7 @@ class DotacionAsignacionCalculator
         return $asignaciones
             ->filter(function ($row) use ($tiposFuncion, $keysVigentes, $funcionesVigentes, $reglasVigentes, $planesVigentes, $necesidadesPlanEstudio) {
                 $tipo = (string) ($row->tipo_asignacion ?? '');
-                $esPlanEstudio = $tipo === 'plan_estudio';
+                $esPlanEstudio = in_array($tipo, ['plan_estudio', 'acompanamiento_parvularia'], true);
                 $esPlanNormativo = self::esAsignacionPlanNormativo($row);
 
                 if ($esPlanEstudio) {
@@ -1081,7 +1087,7 @@ class DotacionAsignacionCalculator
                 $funcionId = (int) ($row->dotacion_funcion_id ?? 0);
                 $reglaId = (int) ($row->dotacion_funcion_regla_id ?? 0);
                 $key = trim((string) ($row->necesidad_key ?? ''));
-                $esPlanEstudio = $tipo === 'plan_estudio';
+                $esPlanEstudio = in_array($tipo, ['plan_estudio', 'acompanamiento_parvularia'], true);
                 $esPlanNormativo = self::esAsignacionPlanNormativo($row);
 
                 $motivo = 'La necesidad asociada ya no existe en Dotación funciones y planes.';
@@ -1396,6 +1402,10 @@ class DotacionAsignacionCalculator
             return $dotacionFuncionReglaId > 0
                 && (int) ($row->dotacion_funcion_regla_id ?? 0) === $dotacionFuncionReglaId;
         });
+        $acompanamientos = $tipo === 'plan_estudio'
+            ? $assigned->where('tipo_asignacion', 'acompanamiento_parvularia')->values()
+            : collect();
+        $assigned = $assigned->reject(fn ($row) => $row->tipo_asignacion === 'acompanamiento_parvularia')->values();
         $horasContrato = (float) ($data['horas_contrato'] ?? 0);
         $horasPlan = isset($data['horas_plan']) ? (float) $data['horas_plan'] : null;
         $assignedContrato = (float) $assigned->sum(fn ($row) => (float) $row->horas_contrato);
@@ -1443,6 +1453,7 @@ class DotacionAsignacionCalculator
             'horas_contrato_pendientes' => max(0.0, round($horasContrato - $estadoAsignadas, 2)),
             'estado' => self::estadoNecesidad($estadoRequeridas, $estadoAsignadas),
             'asignaciones' => $assigned->values(),
+            'acompanamientos' => $acompanamientos,
             'asignacion_automatica' => $assigned->contains(
                 fn ($row): bool => (bool) data_get($row, 'asignacion_automatica', false)
             ),
@@ -1451,6 +1462,27 @@ class DotacionAsignacionCalculator
             'subvencion' => $data['subvencion'] ?? 'General',
             'fuente' => $data['fuente'] ?? null,
         ], $data);
+    }
+
+    /** El acompañamiento acredita presencia de la educadora, sin cubrir de nuevo el plan. */
+    private static function withAcompanamientoParvularia(array $item): array
+    {
+        $asignaciones = collect($item['asignaciones'] ?? []);
+        $acompanamientos = collect($item['acompanamientos'] ?? []);
+        $externas = $asignaciones->filter(fn ($row) =>
+            $row->tipo_asignacion === 'plan_estudio'
+            && ($row->estamento_cobertura ?? 'docente') === 'docente'
+            && ! DotacionProfesionDocenteResolver::esAsignacionParvularia($row)
+        );
+        $horasExternas = round((float) $externas->sum(fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0)), 2);
+        $horasAcompanadas = round((float) $acompanamientos->sum(fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0)), 2);
+
+        $item['acompanamientos'] = $acompanamientos->values();
+        $item['horas_externas_libre_disposicion'] = $horasExternas;
+        $item['horas_acompanamiento_asignadas'] = $horasAcompanadas;
+        $item['horas_acompanamiento_disponibles'] = max(0.0, round($horasExternas - $horasAcompanadas, 2));
+
+        return $item;
     }
 
     private static function estadoNecesidad(float $requeridas, float $asignadas): array

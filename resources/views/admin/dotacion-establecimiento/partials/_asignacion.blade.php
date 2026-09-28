@@ -147,7 +147,8 @@
             <div class="alert alert-warning rounded-4"><i class="bi bi-lock"></i> La asignación 2027 está bloqueada hasta completar planes, declarar combinación de cursos, definir las funciones normativas y configurar máximos suficientes. Revise el proceso guiado superior.</div>
         @endif
         <div class="alert alert-info rounded-4 small">
-            <strong>Regla NT1/NT2:</strong> para <em>Pedagogía en Educación de Párvulos</em>, el contrato asignado se distribuye proporcionalmente: horas de plan asignadas / total del plan × base contractual. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición de otro docente con JEC mantiene 65/35 y se contabiliza en Plan General, una vez por grupo combinado.
+            <strong>Regla NT1/NT2:</strong> la necesidad contractual del plan se distribuye proporcionalmente por asignatura. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. En nuevas asignaciones individuales de una Educadora con JEC, el contrato de aula se obtiene de la tabla CPEIP 65/35. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición impartida por otro docente con JEC se contabiliza en Plan General, una vez por grupo combinado.
+            <span class="d-block mt-1">Para asignaciones nuevas de una Educadora en NT1/NT2 con JEC se aplica la tabla CPEIP 65/35: como máximo 35 h pedagógicas de aula (26 h 15 min cronológicas) equivalen a 41 h de contrato de aula. En una jornada de 44 h, las otras 3 h corresponden a trabajo colaborativo PIE. La necesidad contractual del curso o grupo permanece en 55 h más 3 h PIE cuando corresponda.</span>
             <span class="d-block mt-1">Las asignaciones históricas conservan sus valores guardados hasta que se revisen y actualicen o se ejecute un recálculo explícito. La nueva necesidad no modifica contratos del padrón.</span>
         </div>
         <div class="row g-3">
@@ -185,6 +186,10 @@
                     <div class="p-3 rounded-4 border h-100">
                         <div class="small text-muted mb-1">{{ $row['subvencion'] }}</div>
                         <div class="d-flex justify-content-between"><span class="small">Horas aula</span><strong class="text-primary">{{ $fmt($row['horas_aula'] ?? 0) }}</strong></div>
+                        @if (($row['horas_aula_acompanamiento'] ?? 0) > 0)
+                            <div class="d-flex justify-content-between"><span class="small">Aula acompañamiento</span><strong class="text-primary">{{ $fmt($row['horas_aula_acompanamiento']) }}</strong></div>
+                            <div class="d-flex justify-content-between"><span class="small">Contrato acompañamiento</span><strong>{{ $fmt($row['horas_contrato_acompanamiento'] ?? 0) }}</strong></div>
+                        @endif
                         <div class="d-flex justify-content-between"><span class="small">Contrato funciones</span><strong>{{ $fmt($row['horas_contrato_funciones'] ?? 0) }}</strong></div>
                     </div>
                 </div>
@@ -385,7 +390,47 @@
                                                 </form>
                                             </td>
                                         </tr>
-                                        @if (count($item['asignaciones'] ?? []) > 0)
+                                        @if (($cursoNt instanceof \App\Models\EstablecimientoCurso)
+                                            && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)
+                                            && \App\Support\DotacionParvulariaCalculator::conJec($cursoNt, $item['proporcion_key'] ?? null)
+                                            && (($item['subtipo_asignacion'] ?? '') === 'libre_disposicion' || ($item['curso_combinado_libre_disposicion'] ?? false))
+                                            && ($item['horas_externas_libre_disposicion'] ?? 0) > 0)
+                                            <tr>
+                                                <td colspan="7" class="bg-light">
+                                                    <div class="fw-semibold small mb-1">Acompañamiento de Educadora de Párvulos</div>
+                                                    <div class="small text-muted mb-2">Otro docente imparte {{ $fmt($item['horas_externas_libre_disposicion']) }} h de libre disposición. Puede asignar hasta {{ $fmt($item['horas_acompanamiento_disponibles'] ?? 0) }} h adicionales a la Educadora que permanece en aula. Estas horas cuentan en su contrato, sin duplicar la cobertura del plan.</div>
+                                                    @if (($item['horas_acompanamiento_disponibles'] ?? 0) > 0.01)
+                                                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form">
+                                                            @csrf
+                                                            <input type="hidden" name="anio" value="{{ $anio }}">
+                                                            <input type="hidden" name="tipo_asignacion" value="acompanamiento_parvularia">
+                                                            <input type="hidden" name="estamento_cobertura" value="docente">
+                                                            <input type="hidden" name="necesidad_key" value="{{ $item['key'] }}">
+                                                            <label class="form-label small mb-1" for="acompanamiento-docente-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Educadora de Párvulos</label>
+                                                            <select id="acompanamiento-docente-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar Educadora de Párvulos..." required>
+                                                                <option value="">Seleccione Educadora de Párvulos...</option>
+                                                                @foreach ($docenteOptions as $doc)
+                                                                    @continue(! $doc['es_parvularia'] || ($doc['virtual'] && $doc['cupo_bloque'] !== 'parvularia'))
+                                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                            <div class="row g-2 align-items-end">
+                                                                <div class="col-md-4">
+                                                                    <label class="form-label small mb-1" for="acompanamiento-horas-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Horas aula de acompañamiento</label>
+                                                                    <input id="acompanamiento-horas-{{ $cursoCollapseId }}-{{ $loop->iteration }}" type="number" name="horas_plan_pedagogicas" step="0.25" min="0.25" max="{{ $item['horas_acompanamiento_disponibles'] }}" value="{{ $item['horas_acompanamiento_disponibles'] }}" class="form-control form-control-sm" required>
+                                                                </div>
+                                                                <div class="col-md-8">
+                                                                    <button class="btn btn-sm btn-outline-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar acompañamiento</button>
+                                                                </div>
+                                                            </div>
+                                                            <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si omite prelación o antigüedad">
+                                                            <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
+                                                        </form>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endif
+                                        @if (count($item['asignaciones'] ?? []) + count($item['acompanamientos'] ?? []) > 0)
                                             <tr>
                                                 <td colspan="7" class="bg-light">
                                                     <div class="small fw-semibold mb-2">Asignaciones registradas para esta asignatura</div>
@@ -393,9 +438,9 @@
                                                         <table class="table table-sm mb-0">
                                                             <thead><tr><th>Personal</th><th>Estamento</th><th>Subvención</th><th class="text-end">Horas aula asignadas</th><th class="text-end">Contrato asignado</th><th>Obs.</th><th></th></tr></thead>
                                                             <tbody>
-                                                                @foreach ($item['asignaciones'] as $asig)
+                                                                @foreach (collect($item['asignaciones'] ?? [])->concat($item['acompanamientos'] ?? []) as $asig)
                                                                     <tr>
-                                                                        <td>{{ $asig->docente_nombre }}<div class="text-muted small">{{ $asig->docente_rut }}</div>@if($asig->tipo_asignacion === 'plan_estudio')<div class="small text-primary">{{ $asig->proporcion_aplicada ?: 'Regla no informada' }}</div>@endif</td>
+                                                                        <td>{{ $asig->docente_nombre }}<div class="text-muted small">{{ $asig->docente_rut }}</div>@if($asig->tipo_asignacion === 'acompanamiento_parvularia')<span class="badge rounded-pill text-bg-info">Acompañamiento en aula</span>@elseif($asig->tipo_asignacion === 'plan_estudio')<div class="small text-primary">{{ $asig->proporcion_aplicada ?: 'Regla no informada' }}</div>@endif</td>
                                                                         <td><span class="badge rounded-pill {{ ($asig->estamento_cobertura ?? 'docente') === 'asistente' ? 'text-bg-info' : 'text-bg-primary' }}">{{ ($asig->estamento_cobertura ?? 'docente') === 'asistente' ? 'Asistente' : 'Docente' }}</span></td>
                                                                         <td>{{ $asig->subvencion }}</td>
                                                                         <td class="text-end fw-semibold text-primary">{{ $asig->horas_plan_pedagogicas !== null ? $fmt($asig->horas_plan_pedagogicas) : '—' }}</td>

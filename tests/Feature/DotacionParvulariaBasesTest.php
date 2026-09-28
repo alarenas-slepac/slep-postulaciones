@@ -6,6 +6,8 @@ use App\Exports\DotacionResumenSobredotacionExport;
 use App\Http\Controllers\Admin\DotacionAsignacionController;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
+use App\Models\DeclaracionSostenedor;
+use App\Models\DotacionDocenteAsignacion;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionContratoEnsenanzaCalculator;
 use App\Support\DotacionCursoCombinadoCalculator;
@@ -283,5 +285,171 @@ class DotacionParvulariaBasesTest extends TestCase
             $this->assertSame('General', $payload['subvencion']);
             $this->assertSame($subtipo, $payload['subtipo_asignacion']);
         }
+    }
+
+    public function test_acompanamiento_parvularia_no_duplica_cobertura_de_libre_disposicion(): void
+    {
+        $this->curso(1, 'NT1', 'Con JEC', 38, false);
+        DB::table('planes_estudio_asignaturas')->where('asignatura', 'Lenguaje')
+            ->update(['tipo_bloque' => 'libre_disposicion', 'horas_semanales' => 6]);
+        DB::table('planes_estudio_asignaturas')->where('asignatura', 'Matemática')
+            ->update(['horas_semanales' => 32]);
+
+        $establecimiento = $this->establecimiento();
+        $base = DotacionAsignacionCalculator::necesidades($establecimiento, 2026, [], [], collect());
+        $libre = $base['plan_estudio']->first(fn ($item) => ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion');
+        $this->assertNotNull($libre);
+
+        $otro = (new DotacionDocenteAsignacion)->forceFill([
+            'tipo_asignacion' => 'plan_estudio', 'estamento_cobertura' => 'docente',
+            'necesidad_key' => $libre['key'], 'horas_plan_pedagogicas' => 6, 'horas_contrato' => 7,
+        ]);
+        $otro->setRelation('declaracionSostenedor', (new DeclaracionSostenedor)->forceFill(['nombre_titulo' => 'Pedagogía en Educación Básica']));
+        $educadora = (new DotacionDocenteAsignacion)->forceFill([
+            'tipo_asignacion' => 'acompanamiento_parvularia', 'estamento_cobertura' => 'docente',
+            'necesidad_key' => $libre['key'], 'horas_plan_pedagogicas' => 6, 'horas_contrato' => 8.68,
+        ]);
+        $needs = DotacionAsignacionCalculator::necesidades($establecimiento, 2026, [], [], collect([$otro, $educadora]));
+        $libre = $needs['plan_estudio']->first(fn ($item) => ($item['key'] ?? '') === $libre['key']);
+
+        $this->assertSame(6.0, $libre['horas_plan_asignadas']);
+        $this->assertSame(0.0, $libre['horas_plan_pendientes']);
+        $this->assertSame(6.0, $libre['horas_externas_libre_disposicion']);
+        $this->assertSame(6.0, $libre['horas_acompanamiento_asignadas']);
+        $this->assertSame(0.0, $libre['horas_acompanamiento_disponibles']);
+        $this->assertCount(1, $libre['asignaciones']);
+        $this->assertCount(1, $libre['acompanamientos']);
+    }
+
+    public function test_acompanamiento_exige_horas_de_otro_docente_y_calcula_contrato_de_educadora(): void
+    {
+        $this->curso(1, 'NT2', 'Con JEC', 38, false);
+        DB::table('planes_estudio_asignaturas')->where('asignatura', 'Lenguaje')
+            ->update(['tipo_bloque' => 'libre_disposicion', 'horas_semanales' => 6]);
+        DB::table('planes_estudio_asignaturas')->where('asignatura', 'Matemática')
+            ->update(['horas_semanales' => 32]);
+        Schema::create('declaracion_sostenedores', function (Blueprint $t): void {
+            $t->id(); $t->string('nombre_titulo');
+        });
+        Schema::create('dotacion_docente_asignaciones', function (Blueprint $t): void {
+            $t->id(); $t->integer('establecimiento_id'); $t->integer('anio'); $t->string('estado');
+            $t->string('tipo_asignacion'); $t->string('subtipo_asignacion')->nullable();
+            $t->string('estamento_cobertura'); $t->string('necesidad_key');
+            $t->integer('declaracion_sostenedor_id')->nullable(); $t->integer('establecimiento_curso_id')->nullable();
+            $t->decimal('horas_plan_pedagogicas', 8, 2); $t->decimal('horas_contrato', 8, 2);
+            $t->string('asignatura_nombre')->nullable(); $t->string('docente_nombre')->nullable();
+            $t->string('docente_rut')->nullable(); $t->string('docente_rut_normalizado')->nullable();
+        });
+        $this->resetCaches();
+        $establecimiento = $this->establecimiento();
+        $need = DotacionAsignacionCalculator::necesidades($establecimiento, 2026, [], [], collect())['plan_estudio']
+            ->first(fn ($item) => ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion');
+        $this->assertNotNull($need);
+        DB::table('declaracion_sostenedores')->insert(['id' => 1, 'nombre_titulo' => 'Pedagogía en Educación Básica']);
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'establecimiento_id' => 1, 'anio' => 2026, 'estado' => 'activa',
+            'tipo_asignacion' => 'plan_estudio', 'subtipo_asignacion' => 'libre_disposicion',
+            'estamento_cobertura' => 'docente', 'necesidad_key' => $need['key'],
+            'declaracion_sostenedor_id' => 1, 'establecimiento_curso_id' => 1,
+            'horas_plan_pedagogicas' => 6, 'horas_contrato' => 7,
+            'asignatura_nombre' => $need['asignatura_nombre'], 'docente_nombre' => 'Otro docente',
+            'docente_rut' => '111111111', 'docente_rut_normalizado' => '111111111',
+        ]);
+        $controller = new DotacionAsignacionController;
+        $payload = (new ReflectionMethod($controller, 'buildPayload'))->invoke(
+            $controller, Request::create('/'), $establecimiento,
+            ['titulo' => 'Pedagogía en Educación de Párvulos', 'rut' => '222222222',
+                'rut_normalizado' => '222222222', 'nombre' => 'Educadora sintética'],
+            ['tipo_asignacion' => 'acompanamiento_parvularia', 'estamento_cobertura' => 'docente',
+                'necesidad_key' => $need['key'], 'anio' => 2026, 'horas_plan_pedagogicas' => 6,
+                'subvencion' => 'SEP', 'establecimiento_curso_id' => 999]
+        );
+        $this->assertSame('General', $payload['subvencion']);
+        $this->assertSame('libre_disposicion', $payload['subtipo_asignacion']);
+        $this->assertSame(1, $payload['establecimiento_curso_id']);
+        $this->assertSame(8.68, $payload['horas_contrato']);
+        (new ReflectionMethod($controller, 'validateAcompanamientoParvularia'))
+            ->invoke($controller, $establecimiento, $payload);
+
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'establecimiento_id' => 1, 'anio' => 2026, 'estado' => 'activa',
+            'tipo_asignacion' => 'acompanamiento_parvularia', 'subtipo_asignacion' => 'libre_disposicion',
+            'estamento_cobertura' => 'docente', 'necesidad_key' => $need['key'],
+            'declaracion_sostenedor_id' => null, 'establecimiento_curso_id' => 1,
+            'horas_plan_pedagogicas' => 6, 'horas_contrato' => 8.68,
+            'asignatura_nombre' => $need['asignatura_nombre'], 'docente_nombre' => 'Educadora sintética',
+            'docente_rut' => '222222222', 'docente_rut_normalizado' => '222222222',
+        ]);
+        try {
+            (new ReflectionMethod($controller, 'validateAcompanamientoParvularia'))
+                ->invoke($controller, $establecimiento, null, DotacionDocenteAsignacion::findOrFail(1));
+            $this->fail('La asignación del otro docente no puede eliminarse mientras exista acompañamiento.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('horas_plan_pedagogicas', $e->errors());
+        }
+
+        $payload['horas_plan_pedagogicas'] = 6.25;
+        $this->expectException(ValidationException::class);
+        (new ReflectionMethod($controller, 'validateAcompanamientoParvularia'))
+            ->invoke($controller, $establecimiento, $payload);
+    }
+
+    public function test_tabla_cpeip_limita_a_35_horas_pedagogicas_y_41_de_contrato_aula(): void
+    {
+        $this->curso(1, 'NT1', 'Con JEC', 38, false);
+        Schema::create('docente_horas_proporciones', function (Blueprint $t): void {
+            $t->id(); $t->string('proporcion'); $t->integer('horas_contrato');
+            $t->decimal('horas_aula_pedagogicas', 8, 2); $t->boolean('vigente');
+        });
+        foreach ([7 => 6, 11 => 10, 29 => 25, 41 => 35, 42 => 36, 44 => 38] as $contrato => $aula) {
+            DB::table('docente_horas_proporciones')->insert([
+                'proporcion' => '65_35', 'horas_contrato' => $contrato,
+                'horas_aula_pedagogicas' => $aula, 'vigente' => true,
+            ]);
+        }
+        Schema::create('dotacion_docente_asignaciones', function (Blueprint $t): void {
+            $t->id(); $t->integer('establecimiento_id'); $t->integer('anio'); $t->string('estado');
+            $t->string('docente_rut_normalizado'); $t->string('proporcion_aplicada');
+            $t->string('tipo_asignacion'); $t->integer('establecimiento_curso_id');
+            $t->decimal('horas_plan_pedagogicas', 8, 2); $t->decimal('horas_contrato', 8, 2);
+        });
+        $this->resetCaches();
+        $persona = ['titulo' => 'Pedagogía en Educación de Párvulos', 'rut' => '222222222',
+            'rut_normalizado' => '222222222', 'nombre' => 'Educadora sintética'];
+        $controller = new DotacionAsignacionController;
+        $data = ['tipo_asignacion' => 'plan_estudio', 'estamento_cobertura' => 'docente',
+            'establecimiento_curso_id' => 1, 'anio' => 2026, 'horas_plan_pedagogicas' => 35];
+        $payload = (new ReflectionMethod($controller, 'buildPayload'))->invoke(
+            $controller, Request::create('/'), $this->establecimiento(), $persona, $data
+        );
+        $this->assertSame(41.0, $payload['horas_contrato']);
+        $this->assertSame(26.25, $payload['horas_cronologicas_aula']);
+        $this->assertSame('NT JEC · CPEIP 65/35', $payload['proporcion_aplicada']);
+        (new ReflectionMethod($controller, 'validateLimiteAulaParvularia'))
+            ->invoke($controller, $this->establecimiento(), $payload);
+
+        foreach ([1 => 10, 2 => 25] as $id => $horas) {
+            DB::table('dotacion_docente_asignaciones')->insert([
+                'id' => $id, 'establecimiento_id' => 1, 'anio' => 2026, 'estado' => 'activa',
+                'docente_rut_normalizado' => '222222222', 'proporcion_aplicada' => 'NT JEC · CPEIP 65/35',
+                'tipo_asignacion' => 'plan_estudio', 'establecimiento_curso_id' => 1,
+                'horas_plan_pedagogicas' => $horas, 'horas_contrato' => 0,
+            ]);
+        }
+        $recalcular = new ReflectionMethod($controller, 'recalcularContratoAulaParvularia');
+        $recalcular->invoke($controller, $this->establecimiento(), 2026, '222222222');
+        $this->assertEqualsCanonicalizing([11.0, 30.0], DB::table('dotacion_docente_asignaciones')
+            ->orderBy('id')->pluck('horas_contrato')->map(fn ($value) => (float) $value)->all());
+        DB::table('dotacion_docente_asignaciones')->where('id', 1)->delete();
+        $recalcular->invoke($controller, $this->establecimiento(), 2026, '222222222');
+        $this->assertSame(29.0, (float) DB::table('dotacion_docente_asignaciones')->where('id', 2)->value('horas_contrato'));
+
+        $payloadExcedido = (new ReflectionMethod($controller, 'buildPayload'))->invoke(
+            $controller, Request::create('/'), $this->establecimiento(), $persona,
+            array_replace($data, ['horas_plan_pedagogicas' => 35.25])
+        );
+        $this->expectException(ValidationException::class);
+        (new ReflectionMethod($controller, 'validateLimiteAulaParvularia'))
+            ->invoke($controller, $this->establecimiento(), $payloadExcedido);
     }
 }

@@ -22,6 +22,7 @@ class DotacionParvulariaLibreDisposicionTest extends TestCase
             $this->asignacion(10, 4, 'Profesor de Educación General Básica'),
             $this->asignacion(10, 3, null),
             $this->asignacion(10, 6, 'Pedagogía en Educación de Párvulos'),
+            $this->asignacion(10, 6, null)->forceFill(['proporcion_aplicada' => 'NT JEC · CPEIP 65/35']),
             $this->asignacion(10, 6, 'Profesor de Educación General Básica', 'asistente'),
             $this->asignacion(20, 6, 'Profesor de Educación General Básica'),
             $this->asignacion(30, 6, 'Profesor de Educación General Básica'),

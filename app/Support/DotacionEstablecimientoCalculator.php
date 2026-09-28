@@ -619,15 +619,7 @@ class DotacionEstablecimientoCalculator
                     return false;
                 }
 
-                $declaracion = $asignacion instanceof DotacionDocenteAsignacion
-                    && $asignacion->relationLoaded('declaracionSostenedor')
-                        ? $asignacion->getRelation('declaracionSostenedor')
-                        : null;
-                $perfil = DotacionProfesionDocenteResolver::perfilTitulo([
-                    'declaracion' => $declaracion,
-                ]);
-
-                return ! $perfil['es_educacion_parvulos']
+                return ! DotacionProfesionDocenteResolver::esAsignacionParvularia($asignacion)
                     && (float) data_get($asignacion, 'horas_plan_pedagogicas', 0) > 0;
             })
             ->groupBy(fn ($asignacion) => (int) data_get($asignacion, 'establecimiento_curso_id'))

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\DotacionDocenteAsignacion;
 use App\Models\EstablecimientoCurso;
 use Illuminate\Support\Str;
 
@@ -91,6 +92,25 @@ class DotacionProfesionDocenteResolver
                 ? 'Perfil de cupo por contratar'
                 : ($declaracion ? 'Declaración de Sostenedores' : 'Sin declaración'),
         ];
+    }
+
+    /** Reconoce también los cupos virtuales, que no tienen declaración de sostenedor. */
+    public static function esAsignacionParvularia(object|array $asignacion): bool
+    {
+        $declaracion = $asignacion instanceof DotacionDocenteAsignacion
+            && $asignacion->relationLoaded('declaracionSostenedor')
+                ? $asignacion->getRelation('declaracionSostenedor')
+                : null;
+        if (self::perfilTitulo(['declaracion' => $declaracion])['es_educacion_parvulos']) {
+            return true;
+        }
+
+        $proporcion = Str::of((string) data_get($asignacion, 'proporcion_aplicada', ''))
+            ->ascii()->upper()->replaceMatches('/[^A-Z0-9]+/', ' ')->squish()->toString();
+
+        return str_starts_with($proporcion, 'NT CON JEC')
+            || str_starts_with($proporcion, 'NT SIN JEC')
+            || str_starts_with($proporcion, 'NT JEC CPEIP');
     }
 
     public static function esCursoNt(EstablecimientoCurso $curso): bool
