@@ -446,6 +446,119 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertFalse($pieIncompleto['pasos']['asignacion']['completo']);
     }
 
+    public function test_cuenta_cobertura_normativa_aaee_sin_duplicar_contrato_docente(): void
+    {
+        $docente = [
+            'id' => 1, 'necesidad_key' => 'funcion:normativa',
+            'tipo_asignacion' => 'funcion_directiva', 'estamento_cobertura' => 'docente',
+            'horas_contrato' => 197, 'estado' => 'activa',
+        ];
+        $asistente = [
+            'id' => 2, 'necesidad_key' => 'funcion:normativa',
+            'tipo_asignacion' => 'funcion_directiva', 'estamento_cobertura' => 'asistente',
+            'horas_contrato' => 6, 'estado' => 'activa',
+        ];
+        $data = [
+            'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+            'asignacion' => [
+                'necesidades' => ['funciones' => [[
+                    'key' => 'funcion:normativa', 'tipo_asignacion' => 'funcion_directiva',
+                    'horas_contrato_requeridas' => 203, 'horas_contrato_asignadas' => 203,
+                    'asignaciones' => [$docente, $asistente],
+                ]]],
+                'asignaciones' => [$docente, $asistente],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ];
+
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, $data);
+
+        $this->assertSame(197.0, $resumen['bloques']['bloque_1']['asignadas']);
+        $this->assertSame(203.0, $resumen['bloques']['bloque_1']['asignadas_obligatorias']);
+        $this->assertSame(6.0, $resumen['bloques']['bloque_1']['asignadas_asistentes_obligatorias']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['pendientes']);
+        $this->assertTrue($resumen['pasos']['asignacion']['completo']);
+
+        $data['asignacion']['necesidades']['funciones'][0]['horas_contrato_requeridas'] = 197;
+        $sinDobleConteo = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, $data);
+        $this->assertSame(0.0, $sinDobleConteo['bloques']['bloque_1']['asignadas_asistentes_obligatorias']);
+    }
+
+    public function test_acredita_aaee_de_trabajo_colaborativo_sin_sumarlos_al_contrato_docente(): void
+    {
+        $asistente = [
+            'id' => 7, 'necesidad_key' => 'pie:colaborativo',
+            'tipo_asignacion' => 'pie_colaborativo', 'estamento_cobertura' => 'asistente',
+            'horas_contrato' => 6, 'estado' => 'activa',
+        ];
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+            'asignacion' => [
+                'necesidades' => ['pie_colaborativo' => [[
+                    'key' => 'pie:colaborativo', 'horas_contrato_requeridas' => 6,
+                    'horas_contrato_asignadas' => 6, 'asignaciones' => [$asistente],
+                ]]],
+                'asignaciones' => [$asistente],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $this->assertSame(6.0, $resumen['bloques']['bloque_1']['asignadas_obligatorias']);
+        $this->assertSame(6.0, $resumen['bloques']['bloque_1']['asignadas_asistentes_obligatorias']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['asignadas']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['pendientes']);
+    }
+
+    public function test_no_acredita_la_plaza_automatica_de_director_por_asumir(): void
+    {
+        $porAsumir = [
+            'necesidad_key' => 'funcion:director', 'tipo_asignacion' => 'funcion_directiva',
+            'horas_contrato' => 44, 'asignacion_automatica' => true,
+        ];
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+            'asignacion' => [
+                'necesidades' => ['funciones' => [[
+                    'key' => 'funcion:director', 'tipo_asignacion' => 'funcion_directiva',
+                    'horas_contrato_requeridas' => 44, 'horas_contrato_asignadas' => 44,
+                    'horas_contrato_asignadas_calculo' => 0, 'asignacion_automatica' => true,
+                    'asignaciones' => [$porAsumir],
+                ]]],
+                'asignaciones' => [$porAsumir],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['asignadas_obligatorias']);
+        $this->assertSame(44.0, $resumen['bloques']['bloque_1']['pendientes']);
+        $this->assertFalse($resumen['pasos']['asignacion']['completo']);
+    }
+
+    public function test_clasifica_titular_y_contrata_desde_el_padron_sin_descontar_dos_veces_las_asignaciones(): void
+    {
+        $docente = $this->docente('Docente prueba', 30, 14, 44, null, 'Inicial', '2000-01-01');
+        $docente['rut_normalizado'] = '111111111';
+        $asignaciones = [
+            ['docente_rut_normalizado' => '111111111', 'tipo_asignacion' => 'plan_estudio', 'horas_contrato' => 35],
+            ['docente_rut_normalizado' => '111111111', 'tipo_asignacion' => 'plan_estudio', 'horas_contrato' => 9],
+            ['docente_rut_normalizado' => '222222222', 'tipo_asignacion' => 'plan_estudio', 'horas_contrato' => 6],
+        ];
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+            'asignacion' => ['necesidades' => [], 'asignaciones' => $asignaciones, 'docentes' => [$docente]],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $this->assertSame(30.0, $resumen['bloques']['bloque_1']['titulares_asignadas']);
+        $this->assertSame(14.0, $resumen['bloques']['bloque_1']['contrata_asignadas']);
+        $this->assertSame(6.0, $resumen['bloques']['bloque_1']['sin_padron_asignadas']);
+        $this->assertSame(50.0, $resumen['bloques']['bloque_1']['asignadas']);
+        $this->assertSame(0.0, $resumen['docentes']->first()['horas_disponibles']);
+    }
+
     private function docente(
         string $nombre,
         float $planta,

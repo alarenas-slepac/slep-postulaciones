@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.28.529' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Cobertura AAEE y origen contractual de las horas asignadas en 2027',
+        'files' => [
+            'app/Exports/DotacionEstablecimientoAvanceExport.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Feature/DotacionProceso2027PlanConfigTest.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'Acredita la cobertura registrada de cada necesidad obligatoria, incluidas horas AAEE, sin duplicarla ni sumarla como contrato docente.',
+            'Clasifica las horas titulares y a contrata desde las jornadas vigentes del padrón sin descontar dos veces las asignaciones ya guardadas.',
+            'Separa las asignaciones sin padrón vigente en la vista y el informe de avance para revisar su origen.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.528' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

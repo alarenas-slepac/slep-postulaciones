@@ -222,7 +222,9 @@ class DotacionEstablecimientoAvanceExport
             $headers[] = $label.' - máximo';
             $headers[] = $label.' - titulares';
             $headers[] = $label.' - contrata';
+            $headers[] = $label.' - sin padrón vigente';
             $headers[] = $label.' - total asignado';
+            $headers[] = $label.' - cobertura AAEE normativa';
             $headers[] = $label.' - pendiente obligatorio';
             $headers[] = $label.' - saldo máximo';
         }
@@ -281,7 +283,9 @@ class DotacionEstablecimientoAvanceExport
                 $values[] = data_get($bloque, 'maximo') === null ? null : $this->hoursValue((float) data_get($bloque, 'maximo', 0));
                 $values[] = $this->hoursValue((float) data_get($bloque, 'titulares_asignadas', 0));
                 $values[] = $this->hoursValue((float) data_get($bloque, 'contrata_asignadas', 0));
+                $values[] = $this->hoursValue((float) data_get($bloque, 'sin_padron_asignadas', 0));
                 $values[] = $this->hoursValue((float) data_get($bloque, 'asignadas', 0));
+                $values[] = $this->hoursValue((float) data_get($bloque, 'asignadas_asistentes_obligatorias', 0));
                 $values[] = $this->hoursValue((float) data_get($bloque, 'pendientes', 0));
                 $values[] = data_get($bloque, 'saldo_maximo') === null ? null : $this->hoursValue((float) data_get($bloque, 'saldo_maximo', 0));
             }

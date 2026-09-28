@@ -51,6 +51,8 @@ class DotacionProceso2027Calculator
         $needBlocks = [];
         $needKeysObligatorias = [];
         $needBlocksPorAsignacion = [];
+        $needKeysConCoberturaCalculada = [];
+        $needIdsConCoberturaCalculada = [];
         $seleccionNormativas = (array) ($config?->funciones_normativas ?? []);
         $funcionesNormativas = collect();
         $resumenContractual = (array) data_get($data, 'resumen', []);
@@ -62,11 +64,13 @@ class DotacionProceso2027Calculator
             'requeridas' => 0.0,
             'asignadas' => 0.0,
             'asignadas_obligatorias' => 0.0,
+            'asignadas_asistentes_obligatorias' => 0.0,
             'asignadas_plan_obligatorias' => 0.0,
             'asignadas_no_normativas' => 0.0,
             'ajuste_cobertura_plan' => 0.0,
             'titulares_asignadas' => 0.0,
             'contrata_asignadas' => 0.0,
+            'sin_padron_asignadas' => 0.0,
             'horas_normativas_potenciales' => 0.0,
             'horas_normativas_definidas' => 0.0,
             'maximo' => $config ? self::numero($config->{'max_horas_'.$key}) : null,
@@ -107,6 +111,39 @@ class DotacionProceso2027Calculator
                 if (! self::esNecesidadObligatoria($groupKey, $item)) {
                     continue;
                 }
+                $horasRequeridas = $esNormativaDefinible
+                    ? max(0.0, (float) data_get($item, 'horas_contrato_requeridas', 0))
+                    : DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item);
+                // Las necesidades ya consolidan docentes y AAEE. En plan de
+                // estudios se mantiene la acreditación contractual por curso.
+                $horasAsignadasCalculadas = data_get($item, 'horas_contrato_asignadas_calculo',
+                    data_get($item, 'horas_contrato_asignadas'));
+                $tieneCoberturaCalculada = $groupKey !== 'plan_estudio'
+                    && $horasAsignadasCalculadas !== null;
+                if ($tieneCoberturaCalculada) {
+                    $coberturaCalculada = min($horasRequeridas, max(0.0, (float) $horasAsignadasCalculadas));
+                    $bloques[$bloque]['asignadas_obligatorias'] += $coberturaCalculada;
+                    if ($key !== '') {
+                        $needKeysConCoberturaCalculada[$key] = true;
+                    }
+                }
+                if ($tieneCoberturaCalculada) {
+                    $vinculadas = collect(data_get($item, 'asignaciones', []))
+                        ->filter(fn ($row) => (string) data_get($row, 'estado', 'activa') === 'activa');
+                    $horasDocentes = (float) $vinculadas
+                        ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row))
+                        ->sum(fn ($row) => max(0.0, (float) data_get($row, 'horas_contrato', 0)));
+                    $horasAsistentes = (float) $vinculadas
+                        ->filter(fn ($row) => DotacionAsignacionCalculator::coverageEstamento($row) === 'asistente')
+                        ->sum(fn ($row) => max(0.0, (float) data_get($row, 'horas_contrato', 0)));
+                    // La cobertura AAEE completa la misma necesidad normativa,
+                    // sin convertirse en contrato docente ni duplicar cobertura.
+                    $creditoAsistentes = max(0.0,
+                        min($coberturaCalculada, $horasDocentes + $horasAsistentes)
+                        - min($coberturaCalculada, $horasDocentes)
+                    );
+                    $bloques[$bloque]['asignadas_asistentes_obligatorias'] += $creditoAsistentes;
+                }
                 if ($key !== '') {
                     $needKeysObligatorias[$key] = true;
                 }
@@ -116,15 +153,16 @@ class DotacionProceso2027Calculator
                     $asignacionId = (int) data_get($asignacionVinculada, 'id', 0);
                     if ($asignacionId > 0 && DotacionAsignacionCalculator::esAsignacionDocenteReal($asignacionVinculada)) {
                         $needBlocksPorAsignacion[$asignacionId] ??= $bloque;
+                        if ($tieneCoberturaCalculada) {
+                            $needIdsConCoberturaCalculada[$asignacionId] = true;
+                        }
                     }
                 }
                 if ($usarResumenContractualPorComponente
                     && in_array($groupKey, ['plan_estudio', 'pie_colaborativo'], true)) {
                     continue;
                 }
-                $bloques[$bloque]['requeridas'] += $esNormativaDefinible
-                    ? max(0.0, (float) data_get($item, 'horas_contrato_requeridas', 0))
-                    : DotacionAsignacionCalculator::horasContratoRequeridasParaCalculo($item);
+                $bloques[$bloque]['requeridas'] += $horasRequeridas;
             }
         }
 
@@ -140,6 +178,7 @@ class DotacionProceso2027Calculator
         $docentesPorRut = $docentes->keyBy('rut_normalizado');
         $asignaciones = collect(data_get($data, 'asignacion.asignaciones', []))
             ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row));
+        $horasClasificadasPorRut = [];
         foreach ($asignaciones as $asignacion) {
             $rut = DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($asignacion, 'docente_rut_normalizado') ?: data_get($asignacion, 'docente_rut', '')));
             $docente = $docentesPorRut->get($rut);
@@ -161,7 +200,9 @@ class DotacionProceso2027Calculator
                 || (string) data_get($asignacion, 'tipo_asignacion', '') === 'otra_funcion') {
                 $bloques[$bloque]['asignadas_no_normativas'] += $horas;
             }
-            if ($bloqueObligatorio) {
+            if ($bloqueObligatorio
+                && ! isset($needKeysConCoberturaCalculada[$keyNecesidad])
+                && ! isset($needIdsConCoberturaCalculada[$asignacionId])) {
                 // La cobertura de la necesidad conserva su bloque de origen;
                 // las horas de contrato respetan el estamento del docente.
                 $bloques[$bloqueObligatorio]['asignadas_obligatorias'] += $horas;
@@ -170,14 +211,20 @@ class DotacionProceso2027Calculator
                 }
             }
             if ($docente) {
-                $titularDisponible = max(0.0, (float) $docente['horas_planta'] - (float) $docente['horas_asignadas_previas']);
+                // horas_asignadas_total ya contiene estas mismas filas. Para
+                // clasificar su origen se recorre el contrato desde cero.
+                $horasPrevias = $horasClasificadasPorRut[$rut] ?? 0.0;
+                $titularDisponible = max(0.0,
+                    min((float) $docente['horas_planta'], (float) $docente['horas_contrato']) - $horasPrevias
+                );
                 $titular = min($horas, $titularDisponible);
                 $bloques[$bloque]['titulares_asignadas'] += $titular;
                 $bloques[$bloque]['contrata_asignadas'] += max(0.0, $horas - $titular);
-                $docente['horas_asignadas_previas'] += $horas;
-                $docentesPorRut->put($rut, $docente);
+                $horasClasificadasPorRut[$rut] = $horasPrevias + $horas;
             } else {
-                $bloques[$bloque]['contrata_asignadas'] += $horas;
+                // Un registro sin contrato vigente no acredita calidad de
+                // contrata; se informa aparte para revisar su origen.
+                $bloques[$bloque]['sin_padron_asignadas'] += $horas;
             }
         }
 
@@ -211,11 +258,13 @@ class DotacionProceso2027Calculator
             $bloque['requeridas'] = round((float) $bloque['requeridas'], 2);
             $bloque['asignadas'] = round((float) $bloque['asignadas'], 2);
             $bloque['asignadas_obligatorias'] = round((float) $bloque['asignadas_obligatorias'], 2);
+            $bloque['asignadas_asistentes_obligatorias'] = round((float) $bloque['asignadas_asistentes_obligatorias'], 2);
             $bloque['asignadas_plan_obligatorias'] = round((float) $bloque['asignadas_plan_obligatorias'], 2);
             $bloque['asignadas_no_normativas'] = round((float) $bloque['asignadas_no_normativas'], 2);
             $bloque['ajuste_cobertura_plan'] = round((float) $bloque['ajuste_cobertura_plan'], 2);
             $bloque['titulares_asignadas'] = round((float) $bloque['titulares_asignadas'], 2);
             $bloque['contrata_asignadas'] = round((float) $bloque['contrata_asignadas'], 2);
+            $bloque['sin_padron_asignadas'] = round((float) $bloque['sin_padron_asignadas'], 2);
             $bloque['horas_normativas_potenciales'] = round((float) $bloque['horas_normativas_potenciales'], 2);
             $bloque['horas_normativas_definidas'] = round((float) $bloque['horas_normativas_definidas'], 2);
             $bloque['pendientes'] = max(0.0, round($bloque['requeridas'] - $bloque['asignadas_obligatorias'], 2));
@@ -297,7 +346,6 @@ class DotacionProceso2027Calculator
             $docente['prioridad_2027_label'] = $label;
             $docente['tramo'] = $docente['tramo'] ?? null;
             $docente['fecha_antiguedad'] = $docente['fecha_antiguedad'] ?? null;
-            $docente['horas_asignadas_previas'] = $asignadas;
             $docente['horas_disponibles'] = max(0.0, round((float) ($docente['horas_contrato'] ?? 0) - $asignadas, 2));
             $docente['horas_titulares_disponibles'] = max(0.0, round($planta - min($planta, $asignadas), 2));
             $docente['horas_contrata_disponibles'] = max(0.0, round($contrata - max(0.0, $asignadas - $planta), 2));

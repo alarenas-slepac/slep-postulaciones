@@ -207,6 +207,62 @@ class DotacionProceso2027PlanConfigTest extends TestCase
         $this->assertFalse($incompleto['funciones_no_normativas_habilitadas']);
     }
 
+    public function test_habilita_funciones_no_normativas_al_completar_la_ultima_necesidad_con_aaee(): void
+    {
+        DB::table('dotacion_proceso_2027_configuraciones')->insert([
+            'establecimiento_id' => 1,
+            'anio' => 2027,
+            'decision_combinacion' => 'sin_combinacion',
+            'max_horas_bloque_1' => 20,
+            'max_horas_bloque_2' => 0,
+            'max_horas_bloque_3' => 0,
+            'funciones_normativas' => json_encode([]),
+        ]);
+        $asistente = [
+            'id' => 6, 'necesidad_key' => 'funcion:normativa',
+            'tipo_asignacion' => 'funcion_directiva', 'estamento_cobertura' => 'asistente',
+            'horas_contrato' => 6, 'estado' => 'activa',
+        ];
+        $data = [
+            'resumen' => [
+                'contrato_plan_general_mas_trabajo_colaborativo_pie' => 10,
+                'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 0,
+                'contrato_plan_por_ensenanza_desglose' => [
+                    'contrato_plan_general' => 10,
+                    'contrato_plan_parvularia' => 0,
+                ],
+            ],
+            'cursos' => [
+                'totales' => ['cursos' => 1, 'sin_horas_plan' => 0],
+                'configuracion_planes' => ['completo' => true, 'total' => 1, 'configurados' => 1],
+            ],
+            'asignacion' => [
+                'necesidades' => [
+                    'plan_estudio' => [[
+                        'key' => 'plan:general', 'horas_plan_requeridas' => 6, 'horas_plan_asignadas' => 6,
+                    ]],
+                    'funciones' => [[
+                        'key' => 'funcion:normativa', 'tipo_asignacion' => 'funcion_directiva',
+                        'horas_contrato_requeridas' => 6, 'horas_contrato_asignadas' => 6,
+                        'asignaciones' => [$asistente],
+                    ]],
+                ],
+                'asignaciones' => [[
+                    'necesidad_key' => 'plan:general', 'tipo_asignacion' => 'plan_estudio',
+                    'horas_contrato' => 8,
+                ], $asistente],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ];
+
+        $proceso = DotacionProceso2027Calculator::resumen(Establecimiento::findOrFail(1), 2027, $data);
+
+        $this->assertSame(0.0, $proceso['bloques']['bloque_1']['pendientes']);
+        $this->assertSame(6.0, $proceso['bloques']['bloque_1']['asignadas_asistentes_obligatorias']);
+        $this->assertTrue($proceso['funciones_no_normativas_habilitadas']);
+    }
+
     private function data(): array
     {
         return [
