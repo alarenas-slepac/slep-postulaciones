@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.28.526' => [
+        'date' => '2026-09-28',
+        'module' => 'Descuentos CGR',
+        'title' => 'Resolución y certificado firmado en respaldos ZIP',
+        'files' => [
+            'app/Services/Remuneraciones/DescuentoCgrExpedienteService.php',
+            'config/changelog.php',
+            'tests/Feature/DescuentosCgrModuleTest.php',
+        ],
+        'changes' => [
+            'El ZIP incluye la resolución PDF registrada y el certificado firmado cuando se encuentra cargado.',
+            'Organiza ambos documentos en carpetas propias y los incorpora al índice CSV del expediente.',
+        ],
+        'roles' => ['Administrador', 'Auditoría SLEP', 'Funcionario SLEP', 'Funcionario DAF'],
+    ],
     '2026.9.28.525' => [
         'date' => '2026-09-28',
         'module' => 'Descuentos CGR',
