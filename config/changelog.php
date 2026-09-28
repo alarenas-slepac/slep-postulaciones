@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.9.28.534' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Conversión consolidada de libre disposición NT1/NT2',
+        'files' => [
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Feature/DotacionParvulariaBasesTest.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'En el proceso 2027, las horas aula de libre disposición NT1/NT2 impartidas por otros docentes se consolidan después de combinar cursos y se convierten una vez mediante la tabla CPEIP 65/35; 8 horas aula equivalen a 9 horas de contrato necesarias. Los años anteriores conservan su cálculo.',
+            'El proceso guiado distingue la necesidad del bloque de las horas de contrato individuales ya registradas, sin reescribir asignaciones históricas.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.533' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

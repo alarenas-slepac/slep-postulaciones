@@ -523,7 +523,9 @@ class DotacionEstablecimientoCalculator
      *
      * Solo se consideran asignaciones docentes activas cuyo título no sea
      * Pedagogía en Educación de Párvulos. Las horas plan se limitan a seis por
-     * curso y su contrato equivalente se obtiene desde la tabla oficial 65/35.
+     * curso. En el proceso 2027, tras consolidar cursos combinados, el
+     * contrato del bloque se obtiene una sola vez desde la tabla 65/35 y se
+     * distribuye al desglose. Los años anteriores conservan su cálculo.
      *
      * @return array<int, array{horas_plan: float, horas_contrato: float, asignaciones: int}>
      */
@@ -578,20 +580,34 @@ class DotacionEstablecimientoCalculator
             $horasPorCurso = DotacionParvulariaCalculator::consolidarRefuerzos($horasPorCurso, $grupos);
         }
 
-        return collect($horasPorCurso)
-            ->map(function (array $detalle): array {
-                $conversion = DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula(
-                    DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL,
-                    (float) $detalle['horas_plan']
-                );
+        // En 2027 la necesidad se convierte una sola vez para el bloque del
+        // establecimiento, después de reducir los cursos combinados. La
+        // diferencia marginal se reparte entre cursos solo para conservar
+        // los desgloses; no modifica el contrato guardado de cada docente.
+        ksort($horasPorCurso, SORT_NUMERIC);
+        $consolidarBloque = DotacionProceso2027Calculator::aplica($anio);
+        $horasAulaAcumuladas = 0.0;
+        $contratoAcumulado = 0.0;
+        $resultado = [];
+        foreach ($horasPorCurso as $cursoId => $detalle) {
+            $horasAula = (float) $detalle['horas_plan'];
+            $horasAulaAcumuladas = round($horasAulaAcumuladas + $horasAula, 2);
+            $conversion = DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula(
+                DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL,
+                $consolidarBloque ? $horasAulaAcumuladas : $horasAula
+            );
+            $nuevoContratoAcumulado = (float) ($conversion['horas_contrato'] ?? 0);
+            $resultado[$cursoId] = [
+                'horas_plan' => $horasAula,
+                'horas_contrato' => round($consolidarBloque
+                    ? $nuevoContratoAcumulado - $contratoAcumulado
+                    : $nuevoContratoAcumulado, 2),
+                'asignaciones' => (int) $detalle['asignaciones'],
+            ];
+            $contratoAcumulado = $nuevoContratoAcumulado;
+        }
 
-                return [
-                    'horas_plan' => (float) $detalle['horas_plan'],
-                    'horas_contrato' => (float) ($conversion['horas_contrato'] ?? 0),
-                    'asignaciones' => (int) $detalle['asignaciones'],
-                ];
-            })
-            ->all();
+        return $resultado;
     }
 
     /**
