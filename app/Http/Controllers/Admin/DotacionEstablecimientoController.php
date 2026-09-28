@@ -308,6 +308,15 @@ class DotacionEstablecimientoController extends Controller
             : null;
         $canManageProporcionExcepcion = in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true);
         $docenteExclusionesTableReady = Schema::hasTable('dotacion_docente_exclusiones');
+        $contrataHabilitacionesTableReady = Schema::hasTable('dotacion_contrata_habilitaciones');
+        $contrataHabilitaciones = $contrataHabilitacionesTableReady
+            ? DB::table('dotacion_contrata_habilitaciones')
+                ->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)
+                ->orderBy('id')
+                ->get()
+                ->groupBy('bloque')
+            : collect();
 
         $asignaturasFiltros = [
             'q' => trim((string) $request->query('asignatura_q', '')),
@@ -348,6 +357,9 @@ class DotacionEstablecimientoController extends Controller
             'proporcionExcepcionTableReady' => $proporcionExcepcionTableReady,
             'canManageProporcionExcepcion' => $canManageProporcionExcepcion,
             'docenteExclusionesTableReady' => $docenteExclusionesTableReady,
+            'contrataHabilitacionesTableReady' => $contrataHabilitacionesTableReady,
+            'contrataHabilitaciones' => $contrataHabilitaciones,
+            'canManageContrataHabilitaciones' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp'], true),
             'canManageDocenteExclusiones' => in_array($activeRole, $this->allowedRoles, true),
             'continuidadDisponible' => $continuidadDisponible,
             'continuidadPorRut' => $continuidadPorRut,

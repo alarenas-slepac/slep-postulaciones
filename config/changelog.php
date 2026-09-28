@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.9.28.522' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Habilitación de funcionarios a contrata para Parvularia y PIE',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionContrataHabilitacionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Services/Dotacion/ContratacionHabilitacionService.php',
+            'config/changelog.php',
+            'database/migrations/2026_09_28_140000_create_dotacion_contrata_habilitaciones_table.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_contrata_habilitaciones.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'routes/web.php',
+            'tests/Feature/DotacionContrataHabilitacionTest.php',
+        ],
+        'changes' => [
+            'Permite habilitar cupos a contrata por establecimiento, año y bloque cuando existe una brecha positiva de Parvularia o PIE.',
+            'Limita cada funcionario a 44 horas y el total habilitado al saldo de horas por contratar; permite retirar cupos sin alterar contratos vigentes.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.521' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',
