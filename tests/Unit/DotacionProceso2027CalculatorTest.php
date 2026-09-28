@@ -15,6 +15,13 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertFalse(DotacionProceso2027Calculator::aplica(2028));
     }
 
+    public function test_el_maximo_reserva_el_plan_consolidado_y_agrega_funciones_no_normativas(): void
+    {
+        $this->assertSame(593.0, DotacionProceso2027Calculator::contratoComprometidoParaMaximo(593, 569, 0));
+        $this->assertSame(603.0, DotacionProceso2027Calculator::contratoComprometidoParaMaximo(593, 579, 10));
+        $this->assertSame(614.0, DotacionProceso2027Calculator::contratoComprometidoParaMaximo(593, 614, 10));
+    }
+
     public function test_agrupa_avanzado_y_expertos_en_una_prioridad_reconociendo_numeros_y_romanos(): void
     {
         $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
@@ -360,6 +367,83 @@ class DotacionProceso2027CalculatorTest extends TestCase
 
         $this->assertSame(392.0, $resumen['bloques']['bloque_1']['requeridas']);
         $this->assertSame(72.0, $resumen['bloques']['bloque_2']['requeridas']);
+    }
+
+    public function test_acredita_el_plan_completo_con_su_contrato_consolidado_sin_liberar_horas_del_maximo(): void
+    {
+        $data = [
+            'resumen' => [
+                'contrato_plan_general_mas_trabajo_colaborativo_pie' => 390,
+                'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 116,
+                'contrato_plan_por_ensenanza_desglose' => [
+                    'contrato_plan_general' => 366,
+                    'contrato_plan_parvularia' => 110,
+                ],
+            ],
+            'cursos' => [
+                'rows' => [
+                    'NT1' => ['detalles' => [['establecimiento_curso_id' => 99]]],
+                    '1B' => ['detalles' => [['establecimiento_curso_id' => 100]]],
+                ],
+                'totales' => ['cursos' => 2, 'sin_horas_plan' => 0],
+            ],
+            'asignacion' => [
+                'necesidades' => [
+                    'plan_estudio' => [
+                        ['key' => 'plan:general', 'establecimiento_curso_id' => 100, 'horas_plan_requeridas' => 300, 'horas_plan_asignadas' => 300],
+                        ['key' => 'plan:nt', 'establecimiento_curso_id' => 99, 'horas_plan_requeridas' => 80, 'horas_plan_asignadas' => 80],
+                    ],
+                    'pie_colaborativo' => [
+                        ['key' => 'pie:general', 'establecimiento_curso_id' => 100, 'horas_contrato_requeridas' => 24],
+                        ['key' => 'pie:nt', 'establecimiento_curso_id' => 99, 'horas_contrato_requeridas' => 6],
+                    ],
+                    'pie_educadora_diferencial' => [['key' => 'pie:especializado', 'horas_contrato_requeridas' => 224]],
+                    'funciones' => [['key' => 'funcion:normativa', 'horas_contrato_requeridas' => 203]],
+                ],
+                'asignaciones' => [
+                    ['necesidad_key' => 'plan:general', 'tipo_asignacion' => 'plan_estudio', 'horas_contrato' => 342],
+                    ['necesidad_key' => 'plan:nt', 'tipo_asignacion' => 'plan_estudio', 'horas_contrato' => 106.4],
+                    ['necesidad_key' => 'pie:general', 'tipo_asignacion' => 'pie_colaborativo', 'horas_contrato' => 24],
+                    ['necesidad_key' => 'pie:nt', 'tipo_asignacion' => 'pie_colaborativo', 'horas_contrato' => 6],
+                    ['necesidad_key' => 'pie:especializado', 'tipo_asignacion' => 'pie_educadora_diferencial', 'horas_contrato' => 224],
+                    ['necesidad_key' => 'funcion:normativa', 'tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 203],
+                ],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ];
+
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, $data);
+
+        $this->assertSame(569.0, $resumen['bloques']['bloque_1']['asignadas']);
+        $this->assertSame(112.4, $resumen['bloques']['bloque_2']['asignadas']);
+        $this->assertSame(24.0, $resumen['bloques']['bloque_1']['ajuste_cobertura_plan']);
+        $this->assertSame(3.6, $resumen['bloques']['bloque_2']['ajuste_cobertura_plan']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['pendientes']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_2']['pendientes']);
+        $this->assertSame(593.0, $resumen['bloques']['bloque_1']['contrato_comprometido']);
+        $this->assertSame(116.0, $resumen['bloques']['bloque_2']['contrato_comprometido']);
+        $this->assertTrue($resumen['pasos']['asignacion']['completo']);
+
+        $dataConNoNormativa = $data;
+        $dataConNoNormativa['asignacion']['asignaciones'][] = [
+            'tipo_asignacion' => 'otra_funcion', 'dotacion_funcion_id' => 10, 'horas_contrato' => 10,
+        ];
+        $conNoNormativa = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, $dataConNoNormativa);
+        $this->assertSame(10.0, $conNoNormativa['bloques']['bloque_1']['asignadas_no_normativas']);
+        $this->assertSame(603.0, $conNoNormativa['bloques']['bloque_1']['contrato_comprometido']);
+
+        $data['asignacion']['necesidades']['plan_estudio'][0]['horas_plan_asignadas'] = 299;
+        $incompleto = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, $data);
+        $this->assertSame(0.0, $incompleto['bloques']['bloque_1']['ajuste_cobertura_plan']);
+        $this->assertSame(24.0, $incompleto['bloques']['bloque_1']['pendientes']);
+        $this->assertFalse($incompleto['pasos']['asignacion']['completo']);
+
+        $data['asignacion']['necesidades']['plan_estudio'][0]['horas_plan_asignadas'] = 300;
+        $data['asignacion']['asignaciones'][2]['horas_contrato'] = 23;
+        $pieIncompleto = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, $data);
+        $this->assertSame(1.0, $pieIncompleto['bloques']['bloque_1']['pendientes']);
+        $this->assertFalse($pieIncompleto['pasos']['asignacion']['completo']);
     }
 
     private function docente(

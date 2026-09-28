@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.28.528' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Cobertura del plan consolidado en la dotación 2027',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Feature/DotacionProceso2027PlanConfigTest.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'Acredita el contrato necesario consolidado del plan al completar todas sus horas aula por asignatura, sin reescribir asignaciones históricas.',
+            'Reserva ese contrato consolidado al calcular el saldo y validar funciones no normativas, evitando superar los máximos autorizados.',
+            'Distingue contrato registrado de cobertura obligatoria en el proceso guiado 2027.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.527' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

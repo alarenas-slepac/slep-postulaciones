@@ -504,6 +504,9 @@ class DotacionAsignacionController extends Controller
         $horas = max(0.0, (float) ($payload['horas_contrato'] ?? 0));
         $bloqueProceso = data_get($proceso, 'bloques.'.$bloque, []);
         $asignadas = (float) ($bloqueProceso['asignadas'] ?? 0);
+        $noNormativas = (float) ($bloqueProceso['asignadas_no_normativas'] ?? 0);
+        $esNoNormativa = (int) ($payload['dotacion_funcion_id'] ?? 0) > 0
+            || (string) ($payload['tipo_asignacion'] ?? '') === 'otra_funcion';
         if ($current) {
             $rutActual = DotacionEstablecimientoCalculator::normalizeRut((string) ($current->docente_rut_normalizado ?: $current->docente_rut));
             $personaActual = collect($proceso['docentes'] ?? [])->first(fn (array $docente) =>
@@ -514,10 +517,22 @@ class DotacionAsignacionController extends Controller
                 ?: DotacionProceso2027Calculator::bloqueParaAsignacion($current);
             if ($bloqueActual === $bloque) {
                 $asignadas = max(0.0, $asignadas - (float) $current->horas_contrato);
+                if ((int) ($current->dotacion_funcion_id ?? 0) > 0
+                    || (string) $current->tipo_asignacion === 'otra_funcion') {
+                    $noNormativas = max(0.0, $noNormativas - (float) $current->horas_contrato);
+                }
             }
         }
         $maximo = $bloqueProceso['maximo'] ?? null;
-        if ($maximo !== null && $asignadas + $horas > (float) $maximo + 0.01) {
+        // Las horas aula completas acreditan el plan consolidado, aunque las
+        // asignaciones históricas conserven un contrato menor por asignatura.
+        // Ese contrato necesario ocupa cupo antes de agregar funciones optativas.
+        $contratoComprometido = $esNoNormativa
+            ? DotacionProceso2027Calculator::contratoComprometidoParaMaximo(
+                (float) ($bloqueProceso['requeridas'] ?? 0), $asignadas, $noNormativas
+            )
+            : $asignadas;
+        if ($maximo !== null && $contratoComprometido + $horas > (float) $maximo + 0.01) {
             throw ValidationException::withMessages([
                 'horas_contrato' => 'La asignación supera el máximo autorizado del bloque '.$bloqueProceso['label'].'.',
             ]);

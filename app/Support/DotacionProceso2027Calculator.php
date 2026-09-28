@@ -32,6 +32,11 @@ class DotacionProceso2027Calculator
         return $anio === self::ANIO;
     }
 
+    public static function contratoComprometidoParaMaximo(float $requeridas, float $asignadas, float $noNormativas): float
+    {
+        return round(max($requeridas, $asignadas - $noNormativas) + $noNormativas, 2);
+    }
+
     /** @return array<string, mixed> */
     public static function resumen(Establecimiento $establecimiento, int $anio, ?array $data = null): array
     {
@@ -57,6 +62,9 @@ class DotacionProceso2027Calculator
             'requeridas' => 0.0,
             'asignadas' => 0.0,
             'asignadas_obligatorias' => 0.0,
+            'asignadas_plan_obligatorias' => 0.0,
+            'asignadas_no_normativas' => 0.0,
+            'ajuste_cobertura_plan' => 0.0,
             'titulares_asignadas' => 0.0,
             'contrata_asignadas' => 0.0,
             'horas_normativas_potenciales' => 0.0,
@@ -149,10 +157,17 @@ class DotacionProceso2027Calculator
             }
             $horas = max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
             $bloques[$bloque]['asignadas'] += $horas;
+            if ((int) data_get($asignacion, 'dotacion_funcion_id', 0) > 0
+                || (string) data_get($asignacion, 'tipo_asignacion', '') === 'otra_funcion') {
+                $bloques[$bloque]['asignadas_no_normativas'] += $horas;
+            }
             if ($bloqueObligatorio) {
                 // La cobertura de la necesidad conserva su bloque de origen;
                 // las horas de contrato respetan el estamento del docente.
                 $bloques[$bloqueObligatorio]['asignadas_obligatorias'] += $horas;
+                if ((string) data_get($asignacion, 'tipo_asignacion', '') === 'plan_estudio') {
+                    $bloques[$bloqueObligatorio]['asignadas_plan_obligatorias'] += $horas;
+                }
             }
             if ($docente) {
                 $titularDisponible = max(0.0, (float) $docente['horas_planta'] - (float) $docente['horas_asignadas_previas']);
@@ -166,16 +181,48 @@ class DotacionProceso2027Calculator
             }
         }
 
+        if ($usarResumenContractualPorComponente) {
+            $desglose = (array) ($resumenContractual['contrato_plan_por_ensenanza_desglose'] ?? []);
+            $necesidadesPlan = collect(data_get($data, 'asignacion.necesidades.plan_estudio', []))
+                ->filter(fn ($item) => (float) data_get($item, 'horas_plan_requeridas', 0) > 0.01);
+            $planCompleto = $necesidadesPlan->isNotEmpty() && $necesidadesPlan->every(fn ($item) =>
+                (float) data_get($item, 'horas_plan_asignadas', 0) + 0.01
+                    >= (float) data_get($item, 'horas_plan_requeridas', 0));
+            if ($planCompleto) {
+                // El plan se cubre en horas aula. Su contrato necesario se
+                // consolida por curso, mientras cada asignatura conserva el
+                // valor contractual guardado al asignarla. Al completar todas
+                // las filas se acredita la base consolidada sin reescribirlas.
+                // El desglose también traslada a Plan General la libre
+                // disposición NT1/NT2 impartida por otro docente.
+                foreach (['bloque_1' => 'contrato_plan_general', 'bloque_2' => 'contrato_plan_parvularia'] as $bloqueKey => $campo) {
+                    if (! array_key_exists($campo, $desglose)) {
+                        continue;
+                    }
+                    $contratoPlan = max(0.0, (float) $desglose[$campo]);
+                    $ajuste = $contratoPlan - $bloques[$bloqueKey]['asignadas_plan_obligatorias'];
+                    $bloques[$bloqueKey]['asignadas_obligatorias'] += $ajuste;
+                    $bloques[$bloqueKey]['ajuste_cobertura_plan'] = $ajuste;
+                }
+            }
+        }
+
         foreach ($bloques as &$bloque) {
             $bloque['requeridas'] = round((float) $bloque['requeridas'], 2);
             $bloque['asignadas'] = round((float) $bloque['asignadas'], 2);
             $bloque['asignadas_obligatorias'] = round((float) $bloque['asignadas_obligatorias'], 2);
+            $bloque['asignadas_plan_obligatorias'] = round((float) $bloque['asignadas_plan_obligatorias'], 2);
+            $bloque['asignadas_no_normativas'] = round((float) $bloque['asignadas_no_normativas'], 2);
+            $bloque['ajuste_cobertura_plan'] = round((float) $bloque['ajuste_cobertura_plan'], 2);
             $bloque['titulares_asignadas'] = round((float) $bloque['titulares_asignadas'], 2);
             $bloque['contrata_asignadas'] = round((float) $bloque['contrata_asignadas'], 2);
             $bloque['horas_normativas_potenciales'] = round((float) $bloque['horas_normativas_potenciales'], 2);
             $bloque['horas_normativas_definidas'] = round((float) $bloque['horas_normativas_definidas'], 2);
             $bloque['pendientes'] = max(0.0, round($bloque['requeridas'] - $bloque['asignadas_obligatorias'], 2));
-            $bloque['saldo_maximo'] = $bloque['maximo'] === null ? null : round(max(0.0, $bloque['maximo'] - $bloque['asignadas']), 2);
+            $bloque['contrato_comprometido'] = self::contratoComprometidoParaMaximo(
+                $bloque['requeridas'], $bloque['asignadas'], $bloque['asignadas_no_normativas']
+            );
+            $bloque['saldo_maximo'] = $bloque['maximo'] === null ? null : round(max(0.0, $bloque['maximo'] - $bloque['contrato_comprometido']), 2);
             $bloque['maximo_insuficiente'] = $bloque['maximo'] !== null && $bloque['maximo'] + 0.01 < $bloque['requeridas'];
         }
         unset($bloque);
