@@ -896,7 +896,7 @@ class DotacionAsignacionController extends Controller
             : null;
         $bloqueAsignacion = match (true) {
             $bloqueFuncion !== null => $bloqueFuncion,
-            in_array($tipo, ['plan_estudio', 'pie_colaborativo'], true) => $curso && DotacionProfesionDocenteResolver::esCursoNt($curso) ? 'bloque_2' : 'bloque_1',
+            in_array($tipo, ['plan_estudio', 'pie_colaborativo', 'acompanamiento_parvularia'], true) => $curso && DotacionProfesionDocenteResolver::esCursoNt($curso) ? 'bloque_2' : 'bloque_1',
             $tipo === 'pie_educadora_diferencial' => 'bloque_3',
             default => DotacionProceso2027Calculator::bloqueParaAsignacion($payload),
         };

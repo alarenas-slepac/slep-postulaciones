@@ -97,9 +97,16 @@ class DotacionDocenteVirtualTest extends TestCase
                 'establecimiento_curso_id' => $establecimientoCursoNt, 'horas_contrato' => 30,
             ]);
             $this->addToAssertionCount(1);
+            $validar->invoke($controller, $establecimiento, $persona, [
+                'anio' => 2026, 'tipo_asignacion' => 'acompanamiento_parvularia',
+                'subtipo_asignacion' => 'libre_disposicion',
+                'establecimiento_curso_id' => $establecimientoCursoNt, 'horas_contrato' => 8,
+            ]);
+            $this->addToAssertionCount(1);
 
             foreach ([
                 ['tipo_asignacion' => 'plan_estudio', 'establecimiento_curso_id' => $establecimientoCursoBasica],
+                ['tipo_asignacion' => 'acompanamiento_parvularia', 'establecimiento_curso_id' => $establecimientoCursoBasica],
                 ['tipo_asignacion' => 'pie_educadora_diferencial', 'establecimiento_curso_id' => null],
             ] as $noPermitida) {
                 try {
