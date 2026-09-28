@@ -118,7 +118,11 @@
                                 <td class="text-end text-success">{{ $fmtProceso($bloque['titulares_asignadas']) }}</td>
                                 <td class="text-end text-primary">{{ $fmtProceso($bloque['contrata_asignadas']) }}</td>
                                 <td class="text-end {{ $bloque['sin_padron_asignadas'] > 0.01 ? 'text-warning fw-semibold' : '' }}">{{ $fmtProceso($bloque['sin_padron_asignadas']) }}</td>
-                                <td class="text-end fw-semibold">{{ $fmtProceso($bloque['asignadas']) }}</td>
+                                <td class="text-end fw-semibold">{{ $fmtProceso($bloque['asignadas']) }}
+                                    @if (($bloque['asignadas_acompanamiento'] ?? 0) > 0.01)
+                                        <div class="small text-muted fw-normal">Incluye {{ $fmtProceso($bloque['asignadas_acompanamiento']) }} h de acompañamiento simultáneo</div>
+                                    @endif
+                                </td>
                                 <td class="text-end">{{ $fmtProceso($bloque['asignadas_obligatorias']) }}
                                     @if (abs($bloque['ajuste_cobertura_plan'] ?? 0) > 0.01)
                                         <div class="small text-muted">Plan consolidado: {{ ($bloque['ajuste_cobertura_plan'] ?? 0) > 0 ? '+' : '' }}{{ $fmtProceso($bloque['ajuste_cobertura_plan']) }} h</div>
@@ -134,7 +138,7 @@
                     </tbody>
                 </table>
             </div>
-            <div class="small text-muted mt-2">Titulares y contrata provienen de las jornadas del padrón vigente; «Sin padrón vigente» identifica asignaciones que requieren revisión de su origen. La cobertura del plan se confirma con las horas aula de cada asignatura y su contrato necesario se calcula consolidado por curso. La cobertura AAEE de otras necesidades obligatorias se muestra por separado del contrato docente.</div>
+            <div class="small text-muted mt-2">Titulares y contrata provienen de las jornadas del padrón vigente; «Sin padrón vigente» identifica asignaciones que requieren revisión de su origen. La cobertura del plan se confirma con las horas aula de cada asignatura y su contrato necesario se calcula consolidado por curso. El acompañamiento simultáneo de Parvularia cuenta en el contrato de la Educadora, sin ocupar un segundo cupo del máximo del bloque. La cobertura AAEE de otras necesidades obligatorias se muestra por separado del contrato docente.</div>
             @if (!($proceso['funciones_no_normativas_habilitadas'] ?? false))
                 @php
                     $etapasPendientes = collect($proceso['pasos'] ?? [])->filter(fn ($paso) => ! $paso['completo'])->pluck('label');

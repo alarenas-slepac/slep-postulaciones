@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.28.531' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Máximo de Parvularia sin doble cupo por acompañamiento simultáneo',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El acompañamiento simultáneo de la Educadora en libre disposición NT1/NT2 cuenta en su contrato individual y en el total registrado, sin duplicar el cupo del máximo curricular del bloque.',
+            'El proceso guiado muestra por separado las horas de acompañamiento y la validación informa el saldo del bloque cuando corresponde.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.530' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',
