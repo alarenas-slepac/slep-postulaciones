@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.9.28.521' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Plan de estudio siempre clasificado como General',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionCursoCombinadoCalculator.php',
+            'config/changelog.php',
+            'database/migrations/2026_09_28_130000_normalize_plan_estudio_subvencion_general.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Feature/DotacionParvulariaBasesTest.php',
+            'tests/Feature/DotacionPlanSubvencionGeneralTest.php',
+            'tests/Unit/DotacionPlanHorasCompletasTest.php',
+        ],
+        'changes' => [
+            'Fija General en todas las asignaciones de plan de estudio, incluidas libre disposición y cursos combinados, aunque el formulario envíe otra subvención.',
+            'Muestra el selector de subvención bloqueado en el formulario y clasifica como General las asignaciones de plan ya guardadas.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor planificación'],
+    ],
     '2026.9.28.520' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

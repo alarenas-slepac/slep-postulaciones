@@ -560,7 +560,7 @@ class DotacionAsignacionCalculator
                 $horasPlanOriginal = $horas;
                 $fuente = 'Asignatura oficial del plan';
                 $bloque = self::bloqueLabel($subtipo);
-                $subvencion = $subtipo === 'libre_disposicion' ? 'Libre disposición' : 'General';
+                $subvencion = 'General';
 
                 if ($esOrientacionOficial && $horasLibreDisposicionOrientacion > 0) {
                     // Orientacion puede venir fraccionada: 0,5 h del plan oficial y 0,5 h de libre disposicion.
@@ -569,7 +569,6 @@ class DotacionAsignacionCalculator
                     $horas = round($horas + $horasLibreDisposicionOrientacion, 2);
                     $orientacionOficialConsolidada = true;
                     $bloque = 'Plan de estudios + libre disposición';
-                    $subvencion = 'General';
                     $fuente = 'Asignatura oficial del plan consolidada con libre disposición: '.$horasPlanOriginal.' h plan + '.$horasLibreDisposicionOrientacion.' h libre disposición';
                 }
 
@@ -627,7 +626,7 @@ class DotacionAsignacionCalculator
                     'origen_proporcion' => $calc['origen_proporcion'] ?? 'regla_general',
                     'origen_proporcion_label' => $calc['origen_proporcion_label'] ?? 'Regla general',
                     'motivo_proporcion' => $calc['motivo'] ?? null,
-                    'subvencion' => 'Libre disposición',
+                    'subvencion' => 'General',
                     'plan_estudio_id' => $plan->id,
                     'plan_referencial_estimado' => $planEsReferencial,
                     'plan_bloque_id' => $custom['plan_bloque_id'] ?? null,
@@ -670,7 +669,7 @@ class DotacionAsignacionCalculator
                         'origen_proporcion' => $calc['origen_proporcion'] ?? 'regla_general',
                         'origen_proporcion_label' => $calc['origen_proporcion_label'] ?? 'Regla general',
                         'motivo_proporcion' => $calc['motivo'] ?? null,
-                        'subvencion' => $subtipo === 'libre_disposicion' ? 'Libre disposición' : 'General',
+                        'subvencion' => 'General',
                         'plan_estudio_id' => $plan->id,
                         'plan_referencial_estimado' => $planEsReferencial,
                         'plan_bloque_id' => $bloque->id,
@@ -762,7 +761,7 @@ class DotacionAsignacionCalculator
                 'libre_disposicion',
                 'Horas de libre disposición',
                 'Libre disposición',
-                'Libre disposición',
+                'General',
                 $horasLibreDisposicionFaltantes,
                 $horasPlanDesglosadas,
                 'Diferencia de libre disposición',

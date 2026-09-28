@@ -374,7 +374,9 @@ class DotacionAsignacionController extends Controller
             'estamento_cobertura' => $estamentoCobertura,
             'tipo_asignacion' => $tipo,
             'subtipo_asignacion' => $subtipo,
-            'subvencion' => ($data['subvencion'] ?? null) ?: $this->defaultSubvencion($tipo, $subtipo),
+            'subvencion' => $tipo === 'plan_estudio'
+                ? 'General'
+                : (($data['subvencion'] ?? null) ?: $this->defaultSubvencion($tipo, $subtipo)),
             'necesidad_key' => $data['necesidad_key'] ?? null,
             'establecimiento_curso_id' => $establecimientoCursoId,
             'dotacion_curso_combinado_id' => $cursoCombinadoIdValidado,
@@ -590,7 +592,7 @@ class DotacionAsignacionController extends Controller
         if (in_array($tipo, ['pie_colaborativo', 'pie_educadora_diferencial'], true)) {
             return 'PIE';
         }
-        if ($subtipo === 'libre_disposicion') {
+        if ($tipo !== 'plan_estudio' && $subtipo === 'libre_disposicion') {
             return 'Libre disposición';
         }
         return 'General';

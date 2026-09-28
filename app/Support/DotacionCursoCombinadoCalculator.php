@@ -130,7 +130,7 @@ class DotacionCursoCombinadoCalculator
                     'horas_contrato_pendientes' => max(0.0, round($requiredContract - $assignedContract, 2)),
                     'estado' => self::status($hours, $assignedPlan),
                     'asignaciones' => $assigned,
-                    'subvencion' => self::resolvedSubsidy($subjectItems),
+                    'subvencion' => 'General',
                     'fuente' => 'Necesidad consolidada de cursos combinados',
                     'proporcion' => $proportion['label'],
                     'proporcion_key' => $proportion['key'],
@@ -642,12 +642,6 @@ class DotacionCursoCombinadoCalculator
         $withJec = $proportion === 'parvularia_jec_especial_65_35_ld';
 
         return DotacionParvulariaCalculator::convertir($hours, $hours, $withJec ? 55.0 : 35.0, $withJec);
-    }
-
-    private static function resolvedSubsidy(Collection $items): string
-    {
-        $values = $items->pluck('subvencion')->filter()->unique()->values();
-        return $values->count() === 1 ? (string) $values->first() : 'Mixta';
     }
 
     private static function subjectName(Collection $items): string

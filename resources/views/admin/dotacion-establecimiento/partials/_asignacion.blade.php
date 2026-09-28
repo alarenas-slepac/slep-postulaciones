@@ -367,11 +367,11 @@
                                                             <input type="number" name="horas_contrato" step="0.25" min="0.25" class="form-control form-control-sm js-horas-contrato-aaee" placeholder="Contrato AAEE" disabled>
                                                         </div>
                                                         <div class="col-md-4">
-                                                            <select name="subvencion" class="form-select form-select-sm">
-                                                                @foreach ($subvencionesOptions as $subvencion)
-                                                                    <option value="{{ $subvencion }}" @selected(($item['subvencion'] ?? 'General') === $subvencion)>{{ $subvencion }}</option>
-                                                                @endforeach
+                                                            <label class="visually-hidden" for="subvencion-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Subvención del plan de estudio</label>
+                                                            <select id="subvencion-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" class="form-select form-select-sm" disabled>
+                                                                <option value="General" selected>General</option>
                                                             </select>
+                                                            <input type="hidden" name="subvencion" value="General">
                                                         </div>
                                                     </div>
                                                     <div class="form-text js-ayuda-aaee d-none">Para asistentes, ingrese las horas aula cubiertas y las horas de contrato AAEE. No se aplica conversión 65/35 ni 60/40.</div>

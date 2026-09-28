@@ -262,4 +262,26 @@ class DotacionParvulariaBasesTest extends TestCase
         $this->assertStringContainsString('19 / 38', $payload['fuente_calculo']);
         $this->assertGreaterThan(255, mb_strlen($payload['fuente_calculo']));
     }
+
+    public function test_plan_estudio_fuerza_subvencion_general_incluso_en_libre_disposicion(): void
+    {
+        $this->curso(1, 'NT1', 'Con JEC', 38);
+        $persona = ['titulo' => 'Pedagogía en Educación de Párvulos', 'rut' => '111111111',
+            'rut_normalizado' => '111111111', 'nombre' => 'Educadora sintética'];
+        $metodo = new ReflectionMethod(DotacionAsignacionController::class, 'buildPayload');
+
+        foreach (['tiempo_minimo' => 'SEP', 'libre_disposicion' => 'Libre disposición'] as $subtipo => $subvencion) {
+            $payload = $metodo->invoke(new DotacionAsignacionController, Request::create('/'), $this->establecimiento(), $persona, [
+                'tipo_asignacion' => 'plan_estudio',
+                'subtipo_asignacion' => $subtipo,
+                'establecimiento_curso_id' => 1,
+                'anio' => 2026,
+                'horas_plan_pedagogicas' => 3,
+                'subvencion' => $subvencion,
+            ]);
+
+            $this->assertSame('General', $payload['subvencion']);
+            $this->assertSame($subtipo, $payload['subtipo_asignacion']);
+        }
+    }
 }
