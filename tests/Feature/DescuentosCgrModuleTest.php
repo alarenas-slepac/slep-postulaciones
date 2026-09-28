@@ -856,6 +856,7 @@ class DescuentosCgrModuleTest extends TestCase
     {
         Storage::fake('local');
         $descuento = $this->crearDescuento(['numero_cuotas' => 3, 'estado' => 'en_auditoria']);
+        Storage::disk('local')->put($descuento->resolucion_pdf_path, 'PDF de resolución de prueba');
         $documentos = [
             ['liquidacion', [1], 'liquidacion.pdf'],
             ['sigfe', [1, 3], 'sigfe-compartido.pdf'],
@@ -891,14 +892,44 @@ class DescuentosCgrModuleTest extends TestCase
             }
 
             $pdfs = array_values(array_filter($nombres, fn (string $nombre) => str_ends_with($nombre, '.pdf')));
-            $this->assertCount(5, $pdfs);
+            $this->assertCount(6, $pdfs);
+            $this->assertContains('00-resolucion/resolucion-cgr-12345678-5-4553-2026.pdf', $pdfs);
             $this->assertContains('01-liquidaciones/liquidacion-12345678-5-02-2026.pdf', $pdfs);
             $this->assertContains('02-comprobantes-sigfe/comprobante-sigfe-12345678-5-02-2026_a_04-2026-2-meses.pdf', $pdfs);
             $this->assertContains('04-transferencias-otras-instituciones/comprobante-transferencia-12345678-5-02-2026_a_04-2026-3-meses.pdf', $pdfs);
             $this->assertSame('PDF de prueba: sigfe', $zip->getFromName('02-comprobantes-sigfe/comprobante-sigfe-12345678-5-02-2026_a_04-2026-2-meses.pdf'));
+            $this->assertSame('PDF de resolución de prueba', $zip->getFromName('00-resolucion/resolucion-cgr-12345678-5-4553-2026.pdf'));
             $indice = $zip->getFromName('indice-documentos.csv');
+            $this->assertStringContainsString('resolucion,00-resolucion/resolucion-cgr-12345678-5-4553-2026.pdf', $indice);
+            $this->assertNotContains('06-certificado-firmado/certificado-firmado-12345678-5-'.$descuento->id.'.pdf', $pdfs);
             $this->assertStringContainsString('02-2026, 04-2026', $indice);
             $this->assertStringContainsString('1, 3', $indice);
+        } finally {
+            $zip->close();
+            @unlink($path);
+        }
+    }
+
+    public function test_expediente_incluye_certificado_firmado_si_esta_cargado(): void
+    {
+        Storage::fake('local');
+        $descuento = $this->crearDescuento([
+            'estado' => 'cerrado',
+            'certificado_firmado_path' => 'descuentos-cgr/pruebas/certificado-firmado.pdf',
+            'certificado_firmado_nombre' => 'certificado.pdf',
+            'certificado_firmado_en' => '2026-09-28 10:30:00',
+        ]);
+        Storage::disk('local')->put($descuento->resolucion_pdf_path, 'PDF de resolución');
+        Storage::disk('local')->put($descuento->certificado_firmado_path, 'PDF firmado');
+
+        $path = app(DescuentoCgrExpedienteService::class)->generar($descuento);
+        $zip = new \ZipArchive;
+        try {
+            $this->assertTrue($zip->open($path));
+            $destino = '06-certificado-firmado/certificado-firmado-12345678-5-'.$descuento->id.'.pdf';
+            $this->assertSame('PDF firmado', $zip->getFromName($destino));
+            $this->assertSame('PDF de resolución', $zip->getFromName('00-resolucion/resolucion-cgr-12345678-5-4553-2026.pdf'));
+            $this->assertStringContainsString('certificado_firmado,'.$destino, $zip->getFromName('indice-documentos.csv'));
         } finally {
             $zip->close();
             @unlink($path);
@@ -927,6 +958,7 @@ class DescuentosCgrModuleTest extends TestCase
 
         $descuento->update(['estado' => 'cerrado']);
         Storage::fake('local');
+        Storage::disk('local')->put($descuento->resolucion_pdf_path, 'PDF de resolución de prueba');
         $respuesta = $controlador->descargarExpediente($request, $descuento, app(DescuentoCgrExpedienteService::class));
         $this->assertSame('application/zip', $respuesta->headers->get('Content-Type'));
         @unlink($respuesta->getFile()->getPathname());

@@ -4,6 +4,7 @@ namespace App\Services\Remuneraciones;
 
 use App\Models\DescuentoCgr;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 use ZipArchive;
 
@@ -53,6 +54,12 @@ class DescuentoCgrExpedienteService
                 fwrite($indice, "\xEF\xBB\xBF");
                 fputcsv($indice, ['Tipo', 'Archivo', 'Cuotas', 'Meses', 'Folio', 'Fecha de reintegro', 'Monto de reintegro (pesos)', 'Última carga']);
 
+                $zip->addEmptyDir('00-resolucion');
+                $this->agregarDocumentoGeneral(
+                    $zip, $indice, $descuento->resolucion_pdf_path, 'resolucion',
+                    '00-resolucion/resolucion-cgr-'.$rut.'-'.Str::slug((string) $descuento->numero_resolucion).'.pdf'
+                );
+
                 foreach (self::CARPETAS as $tipo => $carpeta) {
                     $zip->addEmptyDir($carpeta);
                     $archivos = $descuento->archivos()->where('tipo', $tipo)->orderBy('numero_cuota')->get()->groupBy('path');
@@ -93,6 +100,13 @@ class DescuentoCgrExpedienteService
                     }
                 }
 
+                $zip->addEmptyDir('06-certificado-firmado');
+                $this->agregarDocumentoGeneral(
+                    $zip, $indice, $descuento->certificado_firmado_path, 'certificado_firmado',
+                    '06-certificado-firmado/certificado-firmado-'.$rut.'-'.$descuento->id.'.pdf',
+                    $descuento->certificado_firmado_en?->format('d-m-Y H:i')
+                );
+
                 rewind($indice);
                 $zip->addFromString('indice-documentos.csv', stream_get_contents($indice));
             } finally {
@@ -109,5 +123,22 @@ class DescuentoCgrExpedienteService
             @unlink($temporal);
             throw $error;
         }
+    }
+
+    private function agregarDocumentoGeneral(ZipArchive $zip, mixed $indice, ?string $path, string $tipo, string $destino, ?string $fechaCarga = null): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        $disco = Storage::disk('local');
+        if (! $disco->exists($path)) {
+            throw new RuntimeException('Falta el archivo de '.$tipo.' asociado al registro. Revisa el documento antes de descargar el expediente.');
+        }
+        if (! $zip->addFile($disco->path($path), $destino)) {
+            throw new RuntimeException('No fue posible agregar el archivo de '.$tipo.' al ZIP del expediente.');
+        }
+
+        fputcsv($indice, [$tipo, $destino, '', '', '', '', '', $fechaCarga ?? '']);
     }
 }
