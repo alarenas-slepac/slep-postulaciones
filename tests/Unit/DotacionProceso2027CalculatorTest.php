@@ -22,6 +22,42 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame(614.0, DotacionProceso2027Calculator::contratoComprometidoParaMaximo(593, 614, 10));
     }
 
+    public function test_el_acompanamiento_simultaneo_no_ocupa_un_segundo_cupo_del_maximo(): void
+    {
+        $this->assertSame(0.0, DotacionProceso2027Calculator::horasImputablesAlMaximo('acompanamiento_parvularia', 8));
+        $this->assertSame(8.0, DotacionProceso2027Calculator::horasImputablesAlMaximo('plan_estudio', 8));
+
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'resumen' => [
+                'contrato_plan_general_mas_trabajo_colaborativo_pie' => 0,
+                'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 55,
+                'contrato_plan_por_ensenanza_desglose' => ['contrato_plan_parvularia' => 55],
+            ],
+            'cursos' => [
+                'rows' => ['NT1' => ['detalles' => [['establecimiento_curso_id' => 99]]]],
+                'totales' => ['cursos' => 1, 'sin_horas_plan' => 0],
+            ],
+            'asignacion' => [
+                'necesidades' => ['plan_estudio' => [[
+                    'key' => 'plan:nt', 'establecimiento_curso_id' => 99,
+                    'horas_plan_requeridas' => 35, 'horas_plan_asignadas' => 35,
+                ]]],
+                'asignaciones' => [
+                    ['necesidad_key' => 'plan:nt', 'tipo_asignacion' => 'plan_estudio', 'horas_contrato' => 55],
+                    ['necesidad_key' => 'plan:nt', 'tipo_asignacion' => 'acompanamiento_parvularia', 'horas_contrato' => 8],
+                ],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $bloque = $resumen['bloques']['bloque_2'];
+        $this->assertSame(63.0, $bloque['asignadas']);
+        $this->assertSame(8.0, $bloque['asignadas_acompanamiento']);
+        $this->assertSame(55.0, $bloque['contrato_comprometido']);
+        $this->assertSame(0.0, $bloque['pendientes']);
+    }
+
     public function test_agrupa_avanzado_y_expertos_en_una_prioridad_reconociendo_numeros_y_romanos(): void
     {
         $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([

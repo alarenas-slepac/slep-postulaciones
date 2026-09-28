@@ -721,6 +721,7 @@ class DotacionAsignacionController extends Controller
         $horas = max(0.0, (float) ($payload['horas_contrato'] ?? 0));
         $bloqueProceso = data_get($proceso, 'bloques.'.$bloque, []);
         $asignadas = (float) ($bloqueProceso['asignadas'] ?? 0);
+        $asignadasMaximo = max(0.0, $asignadas - (float) ($bloqueProceso['asignadas_acompanamiento'] ?? 0));
         $noNormativas = (float) ($bloqueProceso['asignadas_no_normativas'] ?? 0);
         $esNoNormativa = (int) ($payload['dotacion_funcion_id'] ?? 0) > 0
             || (string) ($payload['tipo_asignacion'] ?? '') === 'otra_funcion';
@@ -733,7 +734,9 @@ class DotacionAsignacionController extends Controller
                 ?: data_get($proceso, 'need_blocks.'.($current->necesidad_key ?? ''))
                 ?: DotacionProceso2027Calculator::bloqueParaAsignacion($current);
             if ($bloqueActual === $bloque) {
-                $asignadas = max(0.0, $asignadas - (float) $current->horas_contrato);
+                $asignadasMaximo = max(0.0, $asignadasMaximo - DotacionProceso2027Calculator::horasImputablesAlMaximo(
+                    (string) $current->tipo_asignacion, (float) $current->horas_contrato
+                ));
                 if ((int) ($current->dotacion_funcion_id ?? 0) > 0
                     || (string) $current->tipo_asignacion === 'otra_funcion') {
                     $noNormativas = max(0.0, $noNormativas - (float) $current->horas_contrato);
@@ -746,12 +749,16 @@ class DotacionAsignacionController extends Controller
         // Ese contrato necesario ocupa cupo antes de agregar funciones optativas.
         $contratoComprometido = $esNoNormativa
             ? DotacionProceso2027Calculator::contratoComprometidoParaMaximo(
-                (float) ($bloqueProceso['requeridas'] ?? 0), $asignadas, $noNormativas
+                (float) ($bloqueProceso['requeridas'] ?? 0), $asignadasMaximo, $noNormativas
             )
-            : $asignadas;
-        if ($maximo !== null && $contratoComprometido + $horas > (float) $maximo + 0.01) {
+            : $asignadasMaximo;
+        $horasMaximo = DotacionProceso2027Calculator::horasImputablesAlMaximo(
+            (string) ($payload['tipo_asignacion'] ?? ''), $horas
+        );
+        if ($maximo !== null && $horasMaximo > 0.01
+            && $contratoComprometido + $horasMaximo > (float) $maximo + 0.01) {
             throw ValidationException::withMessages([
-                'horas_contrato' => 'La asignación supera el máximo autorizado del bloque '.$bloqueProceso['label'].'.',
+                'horas_contrato' => 'La asignación supera el máximo autorizado del bloque '.$bloqueProceso['label'].' (saldo del bloque: '.max(0, round((float) $maximo - $contratoComprometido, 2)).' h). El saldo del contrato individual se valida por separado.',
             ]);
         }
 
