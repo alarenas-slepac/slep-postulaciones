@@ -42,6 +42,7 @@ class DescuentoCgr extends Model
         'cerrado_en',
         'certificado_generado_en',
         'certificado_generado_por_id',
+        'certificado_residuo_utm_aceptado',
         'certificado_firmado_path',
         'certificado_firmado_nombre',
         'certificado_firmado_en',
@@ -65,6 +66,7 @@ class DescuentoCgr extends Model
             'enviado_auditoria_en' => 'datetime',
             'cerrado_en' => 'datetime',
             'certificado_generado_en' => 'datetime',
+            'certificado_residuo_utm_aceptado' => 'decimal:4',
             'certificado_firmado_en' => 'datetime',
         ];
     }

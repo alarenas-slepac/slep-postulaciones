@@ -18,12 +18,29 @@
             @php $validadas = $descuentoCgr->archivos->where('tipo', 'liquidacion_validada')->pluck('numero_cuota')->unique()->count(); @endphp
             <p class="mb-3">Liquidaciones validadas: <strong>{{ $validadas }} de {{ $descuentoCgr->numero_cuotas }}</strong>.</p>
             @if ($puedeAuditoria)
+                @php
+                    $documentosYValoresCompletos = $completos('liquidacion_validada') && $calculo['utm_faltantes'] === [];
+                    $residuoAceptable = $documentosYValoresCompletos && $calculo['saldo_final_utm'] > 0.00005 && $calculo['saldo_final_utm'] <= \App\Services\Remuneraciones\DescuentoCgrCertificadoService::RESIDUO_MAXIMO_UTM;
+                @endphp
+                @if ($residuoAceptable)
+                    <form method="POST" action="{{ route('descuentos-cgr.auditoria.certificado-residuo', $descuentoCgr) }}" class="mb-3">
+                        @csrf
+                        <div class="alert alert-warning mb-3"><i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>Queda un saldo residual de <strong>{{ number_format($calculo['saldo_final_utm'], 4, ',', '.') }} UTM</strong> tras las {{ $descuentoCgr->numero_cuotas }} cuotas. Auditoría puede confirmar que los descuentos se realizaron para generar el certificado.</div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" id="aceptar_residuo_utm" name="aceptar_residuo_utm" value="1" class="form-check-input @error('aceptar_residuo_utm') is-invalid @enderror" required>
+                            <label for="aceptar_residuo_utm" class="form-check-label">Confirmo que se descontaron todas las cuotas y acepto generar el certificado con el saldo residual indicado.</label>
+                            @error('aceptar_residuo_utm')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="generar_certificado_residuo"><i class="bi bi-file-earmark-word me-1" aria-hidden="true"></i>Generar certificado Word</button>
+                    </form>
+                @endif
                 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-                    @if ($completos('liquidacion_validada') && $calculo['utm_faltantes'] === [] && $calculo['saldo_final_utm'] <= 0.00005) <a href="{{ route('descuentos-cgr.auditoria.certificado', $descuentoCgr) }}" class="btn btn-primary"><i class="bi bi-file-earmark-word me-1"></i>Generar certificado Word</a>
-                    @else <button type="button" class="btn btn-primary" disabled>Generar certificado Word</button> @endif
+                    @if ($documentosYValoresCompletos && $calculo['saldo_final_utm'] <= 0.00005) <a href="{{ route('descuentos-cgr.auditoria.certificado', $descuentoCgr) }}" class="btn btn-primary"><i class="bi bi-file-earmark-word me-1"></i>Generar certificado Word</a>
+                    @elseif (! $residuoAceptable) <button type="button" class="btn btn-primary" disabled>Generar certificado Word</button> @endif
                     @if ($descuentoCgr->certificado_firmado_path) <a href="{{ route('descuentos-cgr.certificado-firmado.show', $descuentoCgr) }}" target="_blank" rel="noopener" class="btn btn-outline-danger">Ver certificado firmado</a><span class="small text-muted">Cargado: {{ $descuentoCgr->certificado_firmado_en?->format('d-m-Y H:i') }}</span> @endif
                 </div>
-                @if ($completos('liquidacion_validada') && ($calculo['utm_faltantes'] !== [] || $calculo['saldo_final_utm'] > 0.00005)) <div class="alert alert-warning">Completa los valores UTM y verifica que las cuotas extingan la deuda para generar el certificado.</div> @endif
+                @if ($completos('liquidacion_validada') && ! $documentosYValoresCompletos) <div class="alert alert-warning">Completa los valores UTM para generar el certificado.</div>
+                @elseif ($completos('liquidacion_validada') && $calculo['saldo_final_utm'] > \App\Services\Remuneraciones\DescuentoCgrCertificadoService::RESIDUO_MAXIMO_UTM) <div class="alert alert-warning">Las cuotas no extinguen la deuda. Revisa los datos de la resolución para generar el certificado.</div> @endif
                 @if ($completos('liquidacion_validada'))
                     <p class="form-text">Descarga primero el certificado Word, complétalo con la firma electrónica y carga aquí el PDF firmado.</p>
                     <form method="POST" action="{{ route('descuentos-cgr.auditoria.certificado-firmado', $descuentoCgr) }}" enctype="multipart/form-data" class="row g-3 align-items-end mb-3">
@@ -40,6 +57,9 @@
             <div class="alert alert-success mb-0"><i class="bi bi-check-circle me-1"></i>Registro cerrado el {{ $descuentoCgr->cerrado_en?->format('d-m-Y H:i') ?? 'día no informado' }}.
                 @if ($descuentoCgr->certificado_firmado_path) <a href="{{ route('descuentos-cgr.certificado-firmado.show', $descuentoCgr) }}" target="_blank" rel="noopener">Ver certificado firmado</a> (cargado: {{ $descuentoCgr->certificado_firmado_en?->format('d-m-Y H:i') }}) @endif
             </div>
+        @endif
+        @if ($descuentoCgr->certificado_residuo_utm_aceptado !== null && $descuentoCgr->certificado_generado_en)
+            <div class="alert alert-info mt-3 mb-0"><i class="bi bi-info-circle me-2" aria-hidden="true"></i>Auditoría aceptó un saldo residual de {{ number_format((float) $descuentoCgr->certificado_residuo_utm_aceptado, 4, ',', '.') }} UTM al generar el certificado el {{ $descuentoCgr->certificado_generado_en->format('d-m-Y H:i') }}.</div>
         @endif
     </div>
 </div>
@@ -85,6 +105,13 @@
 
 @push('scripts')
 <script>
+const residuoCheck = document.getElementById('aceptar_residuo_utm');
+if (residuoCheck) {
+    const generar = document.getElementById('generar_certificado_residuo');
+    const actualizar = () => { generar.disabled = !residuoCheck.checked; };
+    residuoCheck.addEventListener('change', actualizar);
+    actualizar();
+}
 document.querySelectorAll('.cgr-document-modal').forEach((modal) => {
     modal.addEventListener('show.bs.modal', (event) => {
         const cuota = event.relatedTarget?.dataset?.cuota;

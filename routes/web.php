@@ -1399,6 +1399,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::middleware('ensure.role:admin|auditoria_slep')->group(function () {
             Route::post('/{descuentoCgr}/auditoria/liquidaciones', [DescuentoCgrWorkflowController::class, 'liquidaciones'])->whereNumber('descuentoCgr')->name('auditoria.liquidaciones');
             Route::get('/{descuentoCgr}/auditoria/certificado', [DescuentoCgrWorkflowController::class, 'certificado'])->whereNumber('descuentoCgr')->name('auditoria.certificado');
+            Route::post('/{descuentoCgr}/auditoria/certificado/residuo', [DescuentoCgrWorkflowController::class, 'certificado'])->whereNumber('descuentoCgr')->name('auditoria.certificado-residuo');
             Route::post('/{descuentoCgr}/auditoria/certificado-firmado', [DescuentoCgrWorkflowController::class, 'certificadoFirmado'])->whereNumber('descuentoCgr')->name('auditoria.certificado-firmado');
             Route::post('/{descuentoCgr}/auditoria/cerrar', [DescuentoCgrWorkflowController::class, 'cerrar'])->whereNumber('descuentoCgr')->name('auditoria.cerrar');
         });

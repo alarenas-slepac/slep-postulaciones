@@ -86,6 +86,7 @@ class DescuentosCgrModuleTest extends TestCase
             $table->timestamp('cerrado_en')->nullable();
             $table->timestamp('certificado_generado_en')->nullable();
             $table->unsignedBigInteger('certificado_generado_por_id')->nullable();
+            $table->decimal('certificado_residuo_utm_aceptado', 14, 4)->nullable();
             $table->string('certificado_firmado_path')->nullable();
             $table->string('certificado_firmado_nombre')->nullable();
             $table->timestamp('certificado_firmado_en')->nullable();
@@ -996,6 +997,89 @@ class DescuentosCgrModuleTest extends TestCase
         app(DescuentoCgrCertificadoService::class)->generar($descuento, $auditor);
     }
 
+    public function test_auditoria_confirma_residuo_minimo_para_generar_certificado_y_deja_registro(): void
+    {
+        UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
+        $descuento = $this->crearDescuento([
+            'estado' => 'en_auditoria',
+            'deuda_equivalente_utm' => 2.0561,
+        ]);
+        $this->registrarArchivoKpi($descuento, 1, 'liquidacion_validada');
+        $auditor = \Mockery::mock(\App\Models\User::class)->makePartial();
+        $auditor->id = 777;
+        $auditor->name = 'Auditor de prueba';
+        $auditor->shouldReceive('hasAnyRole')->andReturn(true);
+        $controlador = app(\App\Http\Controllers\Remuneraciones\DescuentoCgrWorkflowController::class);
+        $flujo = app(DescuentoCgrWorkflowService::class);
+        $certificados = app(DescuentoCgrCertificadoService::class);
+
+        $sinConfirmacion = Request::create('/certificado', 'GET');
+        $sinConfirmacion->setUserResolver(fn () => $auditor);
+        try {
+            $controlador->certificado($sinConfirmacion, $descuento, $flujo, $certificados);
+            $this->fail('El saldo residual requiere confirmación expresa.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('cronograma', $error->errors());
+        }
+
+        $sinCasilla = Request::create('/certificado/residuo', 'POST');
+        $sinCasilla->setUserResolver(fn () => $auditor);
+        try {
+            $controlador->certificado($sinCasilla, $descuento, $flujo, $certificados);
+            $this->fail('La casilla debe ser obligatoria.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('aceptar_residuo_utm', $error->errors());
+        }
+        $this->assertNull($descuento->fresh()->certificado_generado_en);
+
+        $confirmacion = Request::create('/certificado/residuo', 'POST', ['aceptar_residuo_utm' => '1']);
+        $confirmacion->setUserResolver(fn () => $auditor);
+        $respuesta = $controlador->certificado($confirmacion, $descuento, $flujo, $certificados);
+        $this->assertStringContainsString('wordprocessingml.document', $respuesta->headers->get('Content-Type'));
+        $this->assertNotEmpty($respuesta->getContent());
+        $this->assertSame('0.0001', $descuento->fresh()->certificado_residuo_utm_aceptado);
+        $this->assertSame(777, $descuento->fresh()->certificado_generado_por_id);
+    }
+
+    public function test_confirmacion_no_permite_saldo_superior_ni_utm_faltante(): void
+    {
+        $auditor = new \App\Models\User(['nombres' => 'Auditor']);
+        $servicio = app(DescuentoCgrCertificadoService::class);
+        $descuento = $this->crearDescuento(['deuda_equivalente_utm' => 2.0562]);
+
+        foreach ([false, true] as $conUtm) {
+            if ($conUtm) {
+                UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
+            }
+            try {
+                $servicio->generar($descuento, $auditor, true);
+                $this->fail('La confirmación no debe omitir valores UTM ni aceptar saldos mayores.');
+            } catch (ValidationException $error) {
+                $this->assertArrayHasKey('cronograma', $error->errors());
+            }
+        }
+    }
+
+    public function test_confirmacion_no_omite_liquidaciones_validadas(): void
+    {
+        UtmValor::create(['anio' => 2026, 'mes' => 2, 'valor' => 69611]);
+        $descuento = $this->crearDescuento(['estado' => 'en_auditoria', 'deuda_equivalente_utm' => 2.0561]);
+        $auditor = \Mockery::mock(\App\Models\User::class)->makePartial();
+        $auditor->shouldReceive('hasAnyRole')->andReturn(true);
+        $solicitud = Request::create('/certificado/residuo', 'POST', ['aceptar_residuo_utm' => '1']);
+        $solicitud->setUserResolver(fn () => $auditor);
+
+        try {
+            app(\App\Http\Controllers\Remuneraciones\DescuentoCgrWorkflowController::class)->certificado(
+                $solicitud, $descuento, app(DescuentoCgrWorkflowService::class), app(DescuentoCgrCertificadoService::class)
+            );
+            $this->fail('Las liquidaciones validadas siguen siendo obligatorias.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('documentos', $error->errors());
+        }
+        $this->assertNull($descuento->fresh()->certificado_generado_en);
+    }
+
     public function test_notificaciones_aceptan_varios_correos_sin_duplicados_y_rutas_restringen_acciones(): void
     {
         DescuentoCgrNotificacion::create([
@@ -1008,6 +1092,7 @@ class DescuentosCgrModuleTest extends TestCase
             'descuentos-cgr.liquidaciones' => 'ensure.role:admin|funcionario_slep',
             'descuentos-cgr.comprobantes' => 'ensure.role:admin|funcionario_daf',
             'descuentos-cgr.auditoria.liquidaciones' => 'ensure.role:admin|auditoria_slep',
+            'descuentos-cgr.auditoria.certificado-residuo' => 'ensure.role:admin|auditoria_slep',
             'descuentos-cgr.auditoria.cerrar' => 'ensure.role:admin|auditoria_slep',
             'descuentos-cgr.notificaciones.update' => 'ensure.role:admin',
         ] as $nombre => $middleware) {
@@ -1072,6 +1157,13 @@ class DescuentosCgrModuleTest extends TestCase
         $auditoria = view('remuneraciones.descuentos-cgr._workflow', compact('descuentoCgr', 'calculo', 'archivosPorCuota', 'completos', 'errors', 'estado', 'puedeRegistrar', 'puedeFinanzas', 'puedeAuditoria'))->render();
         $this->assertStringContainsString('Liquidaciones validadas', $auditoria);
         $this->assertStringContainsString('Generar certificado Word', $auditoria);
+
+        $calculo['utm_faltantes'] = [];
+        $calculo['saldo_final_utm'] = 0.0001;
+        $completos = fn (string $tipo) => true;
+        $conResiduo = view('remuneraciones.descuentos-cgr._workflow', compact('descuentoCgr', 'calculo', 'archivosPorCuota', 'completos', 'errors', 'estado', 'puedeRegistrar', 'puedeFinanzas', 'puedeAuditoria'))->render();
+        $this->assertStringContainsString('aceptar_residuo_utm', $conResiduo);
+        $this->assertStringContainsString('0,0001 UTM', $conResiduo);
     }
 
     public function test_correo_de_cambio_de_etapa_utiliza_layout_institucional(): void

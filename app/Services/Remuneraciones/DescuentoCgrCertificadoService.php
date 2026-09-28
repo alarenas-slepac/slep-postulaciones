@@ -15,10 +15,11 @@ use Illuminate\Validation\ValidationException;
 class DescuentoCgrCertificadoService
 {
     private const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    public const RESIDUO_MAXIMO_UTM = 0.0001;
 
     public function __construct(private readonly CronogramaDescuentoCgrService $cronograma) {}
 
-    public function generar(DescuentoCgr $descuento, User $auditor): string
+    public function generar(DescuentoCgr $descuento, User $auditor, bool $aceptarResiduo = false): string
     {
         $origen = resource_path('templates/descuentos-cgr/certificado-auditoria.docx');
         $temporal = tempnam(sys_get_temp_dir(), 'cgr_cert_');
@@ -41,7 +42,7 @@ class DescuentoCgrCertificadoService
                 $xpath = new DOMXPath($doc);
                 $xpath->registerNamespace('w', self::W);
                 $calculo = $this->cronograma->calcular($descuento);
-                if ($calculo['utm_faltantes'] !== [] || $calculo['saldo_final_utm'] > 0.00005) {
+                if ($calculo['utm_faltantes'] !== [] || ($calculo['saldo_final_utm'] > 0.00005 && (! $aceptarResiduo || $calculo['saldo_final_utm'] > self::RESIDUO_MAXIMO_UTM))) {
                     throw ValidationException::withMessages(['cronograma' => 'Completa los valores UTM y verifica que las cuotas extingan la deuda antes de generar el certificado.']);
                 }
                 $filas = $calculo['filas'];

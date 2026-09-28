@@ -100,16 +100,26 @@ class DescuentoCgrWorkflowController extends Controller
     public function certificado(Request $request, DescuentoCgr $descuentoCgr, DescuentoCgrWorkflowService $flujo, DescuentoCgrCertificadoService $certificados): mixed
     {
         $this->autorizar($request, ['admin', 'auditoria_slep']);
+        $aceptarResiduo = $request->isMethod('post');
+        if ($aceptarResiduo) {
+            $request->validate(['aceptar_residuo_utm' => ['required', 'accepted']]);
+        }
         $firmadoAnterior = null;
-        $contenido = DB::transaction(function () use ($descuentoCgr, $request, $flujo, $certificados, &$firmadoAnterior): string {
+        $contenido = DB::transaction(function () use ($descuentoCgr, $request, $flujo, $certificados, $aceptarResiduo, &$firmadoAnterior): string {
             $registro = DescuentoCgr::query()->lockForUpdate()->findOrFail($descuentoCgr->id);
             $flujo->exigirEstado($registro, 'en_auditoria');
             if (! $flujo->completos($registro, ['liquidacion_validada'])) {
                 throw ValidationException::withMessages(['documentos' => 'Carga todas las liquidaciones validadas antes de generar el certificado.']);
             }
-            $contenido = $certificados->generar($registro, $request->user());
+            $calculo = app(\App\Services\Remuneraciones\CronogramaDescuentoCgrService::class)->calcular($registro);
+            $saldo = $calculo['saldo_final_utm'];
+            if ($aceptarResiduo && ($calculo['utm_faltantes'] !== [] || $saldo <= 0.00005 || $saldo > DescuentoCgrCertificadoService::RESIDUO_MAXIMO_UTM)) {
+                throw ValidationException::withMessages(['aceptar_residuo_utm' => 'La confirmación solo aplica a un saldo residual de hasta 0,0001 UTM con todos los valores UTM registrados.']);
+            }
+            $contenido = $certificados->generar($registro, $request->user(), $aceptarResiduo);
             $firmadoAnterior = $registro->certificado_firmado_path;
             $registro->update(['certificado_generado_en' => now(), 'certificado_generado_por_id' => $request->user()->id,
+                'certificado_residuo_utm_aceptado' => $aceptarResiduo ? $saldo : null,
                 'certificado_firmado_path' => null, 'certificado_firmado_nombre' => null, 'certificado_firmado_en' => null, 'certificado_firmado_por_id' => null]);
 
             return $contenido;
