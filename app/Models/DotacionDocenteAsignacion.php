@@ -70,6 +70,7 @@ class DotacionDocenteAsignacion extends Model
 
     public const TIPOS = [
         'plan_estudio' => 'Plan de estudio',
+        'acompanamiento_parvularia' => 'Acompañamiento en aula de Educación Parvularia',
         'pie_colaborativo' => 'Trabajo colaborativo PIE',
         'pie_educadora_diferencial' => 'Educadoras diferenciales PIE',
         'funcion_directiva' => 'Función directiva',

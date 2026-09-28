@@ -200,7 +200,8 @@ class DotacionProceso2027Calculator
                 || (string) data_get($asignacion, 'tipo_asignacion', '') === 'otra_funcion') {
                 $bloques[$bloque]['asignadas_no_normativas'] += $horas;
             }
-            if ($bloqueObligatorio
+            if ((string) data_get($asignacion, 'tipo_asignacion', '') !== 'acompanamiento_parvularia'
+                && $bloqueObligatorio
                 && ! isset($needKeysConCoberturaCalculada[$keyNecesidad])
                 && ! isset($needIdsConCoberturaCalculada[$asignacionId])) {
                 // La cobertura de la necesidad conserva su bloque de origen;
@@ -587,7 +588,7 @@ class DotacionProceso2027Calculator
     public static function bloqueParaAsignacion(object|array $asignacion): ?string
     {
         return match ((string) data_get($asignacion, 'tipo_asignacion')) {
-            'plan_estudio', 'pie_colaborativo' => self::esNt(data_get($asignacion, 'establecimientoCurso')) ? 'bloque_2' : 'bloque_1',
+            'plan_estudio', 'pie_colaborativo', 'acompanamiento_parvularia' => self::esNt(data_get($asignacion, 'establecimientoCurso')) ? 'bloque_2' : 'bloque_1',
             'pie_educadora_diferencial' => 'bloque_3',
             'funcion_tecnico_pedagogica' => DotacionAsignacionCalculator::esAsignacionCoordinacionPie($asignacion) ? 'bloque_3' : 'bloque_1',
             'funcion_directiva', 'plan_normativo', 'otra_funcion' => 'bloque_1',

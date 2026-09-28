@@ -26,6 +26,8 @@ use Illuminate\Validation\ValidationException;
 
 class DotacionAsignacionController extends Controller
 {
+    private const PARVULARIA_CPEIP_LABEL = 'NT JEC · CPEIP 65/35';
+
     private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
 
     public function store(Request $request, Establecimiento $establecimiento): RedirectResponse
@@ -75,9 +77,12 @@ class DotacionAsignacionController extends Controller
         $this->validatePlanHoursAvailable($establecimiento, $data);
         $payload = $this->buildPayload($request, $establecimiento, $persona, $data);
         DB::transaction(function () use ($establecimiento, $persona, $payload): void {
+            $this->validateAcompanamientoParvularia($establecimiento, $payload);
+            $this->validateLimiteAulaParvularia($establecimiento, $payload);
             $this->validateVirtualAssignment($establecimiento, $persona, $payload);
             $this->validateProceso2027Assignment($establecimiento, $persona, $payload);
             DotacionDocenteAsignacion::create($payload);
+            $this->recalcularContratoAulaParvularia($establecimiento, (int) $payload['anio'], (string) $payload['docente_rut_normalizado']);
         });
 
         return back()->with('success', 'Asignación de horas guardada correctamente.');
@@ -133,12 +138,17 @@ class DotacionAsignacionController extends Controller
             'dotacion_funcion_regla_id' => $asignacion->dotacion_funcion_regla_id,
             'estamento_cobertura' => $estamentoCobertura,
         ]);
-        $payload = $this->buildPayload($request, $establecimiento, $persona, array_merge($asignacion->toArray(), $data));
+        $payload = $this->buildPayload($request, $establecimiento, $persona, array_merge($asignacion->toArray(), $data), $asignacion);
         $payload['updated_by'] = $request->user()?->id;
         DB::transaction(function () use ($establecimiento, $persona, $payload, $asignacion): void {
+            $rutAnterior = (string) $asignacion->docente_rut_normalizado;
+            $this->validateAcompanamientoParvularia($establecimiento, $payload, $asignacion);
+            $this->validateLimiteAulaParvularia($establecimiento, $payload, $asignacion);
             $this->validateVirtualAssignment($establecimiento, $persona, $payload, $asignacion);
             $this->validateProceso2027Assignment($establecimiento, $persona, $payload, $asignacion);
             $asignacion->update($payload);
+            $this->recalcularContratoAulaParvularia($establecimiento, (int) $asignacion->anio, $rutAnterior);
+            $this->recalcularContratoAulaParvularia($establecimiento, (int) $payload['anio'], (string) $payload['docente_rut_normalizado']);
         });
 
         return back()->with('success', 'Asignación de horas actualizada correctamente.');
@@ -148,12 +158,16 @@ class DotacionAsignacionController extends Controller
     {
         $this->authorizeScope($request, $establecimiento);
         abort_unless((int) $asignacion->establecimiento_id === (int) $establecimiento->id, 404);
-        $asignacion->delete();
+        DB::transaction(function () use ($establecimiento, $asignacion): void {
+            $this->validateAcompanamientoParvularia($establecimiento, null, $asignacion);
+            $asignacion->delete();
+            $this->recalcularContratoAulaParvularia($establecimiento, (int) $asignacion->anio, (string) $asignacion->docente_rut_normalizado);
+        });
 
         return back()->with('success', 'Asignación de horas eliminada correctamente.');
     }
 
-    private function buildPayload(Request $request, Establecimiento $establecimiento, array $docente, array $data): array
+    private function buildPayload(Request $request, Establecimiento $establecimiento, array $docente, array $data, ?DotacionDocenteAsignacion $current = null): array
     {
         $tipo = (string) ($data['tipo_asignacion'] ?? '');
         $estamentoCobertura = (string) ($data['estamento_cobertura'] ?? 'docente');
@@ -190,7 +204,32 @@ class DotacionAsignacionController extends Controller
             }
         }
 
-        if ($tipo === 'plan_estudio') {
+        if (in_array($tipo, ['plan_estudio', 'acompanamiento_parvularia'], true)) {
+            if ($tipo === 'acompanamiento_parvularia') {
+                $necesidad = DotacionAsignacionCalculator::planNeedForKey(
+                    $establecimiento, (int) ($data['anio'] ?? 0), (string) ($data['necesidad_key'] ?? '')
+                );
+                if (! $necesidad) {
+                    throw ValidationException::withMessages(['necesidad_key' => 'La libre disposición seleccionada ya no se encuentra vigente.']);
+                }
+                $data = array_merge($data, [
+                    'establecimiento_curso_id' => $necesidad['establecimiento_curso_id'],
+                    'dotacion_curso_combinado_id' => $necesidad['dotacion_curso_combinado_id'] ?? null,
+                    'plan_estudio_id' => $necesidad['plan_estudio_id'] ?? null,
+                    'plan_bloque_id' => $necesidad['plan_bloque_id'] ?? null,
+                    'asignatura_id' => $necesidad['asignatura_id'] ?? null,
+                    'asignatura_nombre' => $necesidad['asignatura_nombre'] ?? $necesidad['titulo'],
+                    'subtipo_asignacion' => 'libre_disposicion',
+                ]);
+                $subtipo = 'libre_disposicion';
+                $establecimientoCursoId = $data['establecimiento_curso_id'];
+                $planEstudioId = $data['plan_estudio_id'];
+                $planBloqueId = $data['plan_bloque_id'];
+                $asignaturaId = $data['asignatura_id'];
+                $asignaturaNombre = $data['asignatura_nombre'];
+                $dotacionFuncionId = null;
+                $dotacionFuncionReglaId = null;
+            }
             $cursoId = (int) ($data['establecimiento_curso_id'] ?? 0);
             if ($cursoId <= 0) {
                 throw ValidationException::withMessages([
@@ -281,6 +320,11 @@ class DotacionAsignacionController extends Controller
             }
 
             $horasPlan = max(0.0, (float) ($horasPlan ?? 0));
+            if ($tipo === 'acompanamiento_parvularia'
+                && ($estamentoCobertura !== 'docente'
+                    || ! DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos'])) {
+                throw ValidationException::withMessages(['docente_rut' => 'El acompañamiento en aula solo puede asignarse a una Educadora de Párvulos.']);
+            }
             if ($horasPlan <= 0) {
                 throw ValidationException::withMessages([
                     'horas_plan_pedagogicas' => 'Debe ingresar horas plan mayores a 0 para asignar esta asignatura.',
@@ -329,6 +373,19 @@ class DotacionAsignacionController extends Controller
                     $fuente = 'Conversión NT1/NT2 según profesión declarada · '
                         .($calculoNt['origen_proporcion_label'] ?? 'Regla profesional')
                         .' · '.($calculoNt['motivo'] ?? '');
+                    if ($tipo === 'acompanamiento_parvularia') {
+                        $fuente = 'Acompañamiento NT1/NT2 en libre disposición';
+                    }
+                    if ($estamentoCobertura === 'docente'
+                        && DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos']
+                        && \App\Support\DotacionParvulariaCalculator::conJec($curso, $proporcionConfigurada)
+                        && Schema::hasTable('docente_horas_proporciones')) {
+                        $horasContrato = $this->contratoMarginalAulaParvularia(
+                            $establecimiento, (int) $data['anio'], (string) $docente['rut_normalizado'], $horasPlan, $current
+                        );
+                        $proporcion = self::PARVULARIA_CPEIP_LABEL;
+                        $fuente = 'Tabla CPEIP 65/35 · aula NT1/NT2 JEC';
+                    }
                 } elseif ($cursoCombinado) {
                     $proporcionKey = (string) ($necesidadCombinada['proporcion_key'] ?? '65_35');
                     $calc = DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula($proporcionKey, $horasPlan);
@@ -382,7 +439,7 @@ class DotacionAsignacionController extends Controller
             'estamento_cobertura' => $estamentoCobertura,
             'tipo_asignacion' => $tipo,
             'subtipo_asignacion' => $subtipo,
-            'subvencion' => $tipo === 'plan_estudio'
+            'subvencion' => in_array($tipo, ['plan_estudio', 'acompanamiento_parvularia'], true)
                 ? 'General'
                 : (($data['subvencion'] ?? null) ?: $this->defaultSubvencion($tipo, $subtipo)),
             'necesidad_key' => $data['necesidad_key'] ?? null,
@@ -471,6 +528,166 @@ class DotacionAsignacionController extends Controller
                     DotacionEstablecimientoCalculator::formatHoras($available),
                     DotacionEstablecimientoCalculator::formatHoras($requested)
                 ),
+            ]);
+        }
+    }
+
+    /** La educadora acompaña las horas de otro docente sin cubrir de nuevo el plan. */
+    private function validateAcompanamientoParvularia(
+        Establecimiento $establecimiento,
+        ?array $payload,
+        ?DotacionDocenteAsignacion $current = null
+    ): void {
+        $tipo = (string) ($payload['tipo_asignacion'] ?? $current?->tipo_asignacion ?? '');
+        if (! in_array($tipo, ['plan_estudio', 'acompanamiento_parvularia'], true)) {
+            return;
+        }
+        $key = (string) ($payload['necesidad_key'] ?? $current?->necesidad_key ?? '');
+        $need = DotacionAsignacionCalculator::planNeedForKey(
+            $establecimiento, (int) ($payload['anio'] ?? $current?->anio ?? 0), $key
+        );
+        if (! $need) {
+            if ($tipo === 'acompanamiento_parvularia') {
+                throw ValidationException::withMessages(['necesidad_key' => 'La libre disposición asociada ya no está vigente.']);
+            }
+            return;
+        }
+
+        $curso = $need['curso'] ?? null;
+        $esLibreDisposicion = ($need['subtipo_asignacion'] ?? '') === 'libre_disposicion'
+            || (bool) ($need['curso_combinado_libre_disposicion'] ?? false);
+        $esNtJec = $curso instanceof EstablecimientoCurso
+            && DotacionProfesionDocenteResolver::esCursoNt($curso)
+            && \App\Support\DotacionParvulariaCalculator::conJec($curso, $need['proporcion_key'] ?? null);
+        if ($tipo === 'acompanamiento_parvularia' && (! $esLibreDisposicion || ! $esNtJec)) {
+            throw ValidationException::withMessages(['necesidad_key' => 'El acompañamiento solo corresponde a libre disposición de NT1/NT2 con JEC.']);
+        }
+        if (! $esLibreDisposicion || ! $esNtJec) {
+            return;
+        }
+
+        $externas = (float) ($need['horas_externas_libre_disposicion'] ?? 0);
+        $acompanadas = (float) ($need['horas_acompanamiento_asignadas'] ?? 0);
+        if ($current && $current->tipo_asignacion === 'acompanamiento_parvularia') {
+            $acompanadas -= (float) ($current->horas_plan_pedagogicas ?? 0);
+        }
+        if ($tipo === 'acompanamiento_parvularia' && $payload !== null) {
+            $horas = (float) ($payload['horas_plan_pedagogicas'] ?? 0);
+            if ($horas <= 0 || $acompanadas + $horas > $externas + 0.01) {
+                throw ValidationException::withMessages(['horas_plan_pedagogicas' => 'Las horas de acompañamiento no pueden superar las horas de libre disposición impartidas por otro docente en esta asignatura.']);
+            }
+            return;
+        }
+        if ($current && $current->tipo_asignacion === 'plan_estudio') {
+            $current->loadMissing('declaracionSostenedor');
+            $eraExterna = ($current->estamento_cobertura ?? 'docente') === 'docente'
+                && ! DotacionProfesionDocenteResolver::esAsignacionParvularia($current);
+            if ($eraExterna) {
+                $externas -= (float) ($current->horas_plan_pedagogicas ?? 0);
+            }
+        }
+        if ($payload !== null && $tipo === 'plan_estudio' && ($payload['estamento_cobertura'] ?? '') === 'docente') {
+            $declaracion = $payload['declaracion_sostenedor_id']
+                ? \App\Models\DeclaracionSostenedor::find($payload['declaracion_sostenedor_id'])
+                : null;
+            $nuevaAsignacion = (new DotacionDocenteAsignacion)->forceFill($payload);
+            $nuevaAsignacion->setRelation('declaracionSostenedor', $declaracion);
+            if (! DotacionProfesionDocenteResolver::esAsignacionParvularia($nuevaAsignacion)) {
+                $externas += (float) ($payload['horas_plan_pedagogicas'] ?? 0);
+            }
+        }
+        if ($acompanadas > $externas + 0.01) {
+            throw ValidationException::withMessages(['horas_plan_pedagogicas' => 'Reduzca primero el acompañamiento de la Educadora de Párvulos antes de disminuir o eliminar las horas del otro docente.']);
+        }
+    }
+
+    private function contratoCpeip65(float $horasAula): float
+    {
+        if ($horasAula <= 0) {
+            return 0.0;
+        }
+
+        return (float) (DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula(
+            DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL, $horasAula
+        )['horas_contrato'] ?? 0);
+    }
+
+    private function contratoMarginalAulaParvularia(
+        Establecimiento $establecimiento,
+        int $anio,
+        string $rut,
+        float $horasAula,
+        ?DotacionDocenteAsignacion $current = null
+    ): float {
+        $aulaExistente = Schema::hasTable('dotacion_docente_asignaciones')
+            ? (float) DotacionDocenteAsignacion::query()
+                ->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)
+                ->where('estado', 'activa')
+                ->where('docente_rut_normalizado', $rut)
+                ->where('proporcion_aplicada', self::PARVULARIA_CPEIP_LABEL)
+                ->when($current, fn ($query) => $query->whereKeyNot($current->id))
+                ->sum('horas_plan_pedagogicas')
+            : 0.0;
+
+        return round($this->contratoCpeip65($aulaExistente + $horasAula) - $this->contratoCpeip65($aulaExistente), 2);
+    }
+
+    private function recalcularContratoAulaParvularia(Establecimiento $establecimiento, int $anio, string $rut): void
+    {
+        if ($rut === '' || ! Schema::hasTable('docente_horas_proporciones')) {
+            return;
+        }
+        $asignaciones = DotacionDocenteAsignacion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->where('estado', 'activa')
+            ->where('docente_rut_normalizado', $rut)
+            ->where('proporcion_aplicada', self::PARVULARIA_CPEIP_LABEL)
+            ->orderBy('id')
+            ->get();
+        $aula = 0.0;
+        $contrato = 0.0;
+        foreach ($asignaciones as $asignacion) {
+            $aula += (float) ($asignacion->horas_plan_pedagogicas ?? 0);
+            $nuevoContrato = $this->contratoCpeip65($aula);
+            $marginal = round($nuevoContrato - $contrato, 2);
+            if (abs((float) $asignacion->horas_contrato - $marginal) > 0.001) {
+                DB::table('dotacion_docente_asignaciones')->where('id', $asignacion->id)
+                    ->update(['horas_contrato' => $marginal]);
+            }
+            $contrato = $nuevoContrato;
+        }
+    }
+
+    private function validateLimiteAulaParvularia(
+        Establecimiento $establecimiento,
+        array $payload,
+        ?DotacionDocenteAsignacion $current = null
+    ): void {
+        if (($payload['proporcion_aplicada'] ?? '') !== self::PARVULARIA_CPEIP_LABEL
+            || ! Schema::hasTable('dotacion_docente_asignaciones')) {
+            return;
+        }
+        $asignaciones = DotacionDocenteAsignacion::query()
+            ->with('establecimientoCurso.curso')
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', (int) $payload['anio'])
+            ->where('estado', 'activa')
+            ->where('docente_rut_normalizado', $payload['docente_rut_normalizado'])
+            ->when($current, fn ($query) => $query->whereKeyNot($current->id))
+            ->whereIn('tipo_asignacion', ['plan_estudio', 'acompanamiento_parvularia'])
+            ->get()
+            ->filter(fn ($row) => $row->establecimientoCurso
+                && DotacionProfesionDocenteResolver::esCursoNt($row->establecimientoCurso)
+                && \App\Support\DotacionParvulariaCalculator::conJec($row->establecimientoCurso));
+        $aula = (float) $asignaciones->sum(fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0))
+            + (float) ($payload['horas_plan_pedagogicas'] ?? 0);
+        $contrato = (float) $asignaciones->sum(fn ($row) => (float) ($row->horas_contrato ?? 0))
+            + (float) ($payload['horas_contrato'] ?? 0);
+        if ($aula > 35.01 || $contrato > 41.01) {
+            throw ValidationException::withMessages([
+                'horas_plan_pedagogicas' => 'La Educadora de Párvulos no puede superar 35 horas pedagógicas de aula (26 h 15 min cronológicas), equivalentes a 41 horas de contrato de aula según CPEIP 65/35. Reserve las otras 3 horas de una jornada de 44 para PIE.',
             ]);
         }
     }

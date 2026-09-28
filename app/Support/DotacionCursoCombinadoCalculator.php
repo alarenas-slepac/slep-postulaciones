@@ -92,7 +92,8 @@ class DotacionCursoCombinadoCalculator
                         : 0.0)
                     : null;
                 $needKey = self::needKey((int) $grupo->id, (string) $subjectKey);
-                $assigned = $asignaciones->where('necesidad_key', $needKey)->values();
+                $allAssigned = $asignaciones->where('necesidad_key', $needKey)->values();
+                $assigned = $allAssigned->reject(fn ($row) => $row->tipo_asignacion === 'acompanamiento_parvularia')->values();
                 $assignedPlan = round((float) $assigned->sum(
                     fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0)
                 ), 2);
@@ -130,6 +131,7 @@ class DotacionCursoCombinadoCalculator
                     'horas_contrato_pendientes' => max(0.0, round($requiredContract - $assignedContract, 2)),
                     'estado' => self::status($hours, $assignedPlan),
                     'asignaciones' => $assigned,
+                    'acompanamientos' => $allAssigned->where('tipo_asignacion', 'acompanamiento_parvularia')->values(),
                     'subvencion' => 'General',
                     'fuente' => 'Necesidad consolidada de cursos combinados',
                     'proporcion' => $proportion['label'],
