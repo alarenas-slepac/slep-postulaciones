@@ -264,7 +264,9 @@ class DotacionEstablecimientoController extends Controller
         $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
         $proceso2027 = DotacionProceso2027Calculator::resumen($establecimiento, $anio, $data);
         if ($proceso2027['aplica'] ?? false) {
-            $data['docentes'] = $proceso2027['docentes'];
+            $data['docentes'] = collect($proceso2027['docentes'])
+                ->reject(fn (array $docente) => isset($docente['cupo_contrata_id']))
+                ->values();
             $data['asignacion']['docentes'] = $proceso2027['docentes'];
         }
         $continuidadDisponible = DotacionDocenteExclusion::continuidadDisponible();
@@ -317,6 +319,9 @@ class DotacionEstablecimientoController extends Controller
                 ->get()
                 ->groupBy('bloque')
             : collect();
+        $docentesVirtualesPorCupo = collect(data_get($data, 'asignacion.docentes', []))
+            ->filter(fn (array $docente) => isset($docente['cupo_contrata_id']))
+            ->keyBy('cupo_contrata_id');
 
         $asignaturasFiltros = [
             'q' => trim((string) $request->query('asignatura_q', '')),
@@ -359,6 +364,7 @@ class DotacionEstablecimientoController extends Controller
             'docenteExclusionesTableReady' => $docenteExclusionesTableReady,
             'contrataHabilitacionesTableReady' => $contrataHabilitacionesTableReady,
             'contrataHabilitaciones' => $contrataHabilitaciones,
+            'docentesVirtualesPorCupo' => $docentesVirtualesPorCupo,
             'canManageContrataHabilitaciones' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp'], true),
             'canManageDocenteExclusiones' => in_array($activeRole, $this->allowedRoles, true),
             'continuidadDisponible' => $continuidadDisponible,

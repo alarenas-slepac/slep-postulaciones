@@ -6,6 +6,7 @@ use App\Models\DotacionDocenteAsignacion;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
 use App\Models\EstablecimientoPlanEstudio;
+use App\Services\Dotacion\ContratacionHabilitacionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -241,7 +242,8 @@ class DotacionAsignacionCalculator
                 ($docente['rut_normalizado'] ?? null) ?: ($docente['rut'] ?? '')
             ))->filter()->unique();
         $asignacionesDocentes = $asignaciones
-            ->filter(fn ($row) => self::coverageEstamento($row) === 'docente');
+            ->filter(fn ($row) => self::coverageEstamento($row) === 'docente'
+                && ! ContratacionHabilitacionService::esRutVirtual((string) (data_get($row, 'docente_rut_normalizado') ?: data_get($row, 'docente_rut', ''))));
         // La coordinación de un diferencial ya forma parte de su contrato completo.
         $coordinacionPie = (float) $asignacionesDocentes
             ->filter(fn ($row) => self::esAsignacionCoordinacionPie($row))

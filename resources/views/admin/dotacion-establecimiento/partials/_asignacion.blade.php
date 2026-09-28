@@ -29,6 +29,7 @@
             $detalleAntiguedad = $prioridadLabel !== ''
                 ? ($antiguedad !== '' ? ' · Antigüedad: '.$antiguedad : ' · Sin antigüedad')
                 : '';
+            $virtual = (bool) ($persona['cupo_contrata_id'] ?? false);
 
             return [
                 'rut' => $persona['rut'],
@@ -36,7 +37,9 @@
                 'nombre' => $persona['nombre'],
                 'funcion' => $persona['funcion'] ?? 'Sin función',
                 'estamento' => $estamento,
-                'label' => $persona['nombre'].' · '.$persona['rut'].$detallePrioridad.$detalleAntiguedad.$detalleTitulo.' · Disponible: '.$fmt($titularDisponible).' titular + '.$fmt($contrataDisponible).' contrata',
+                'label' => $persona['nombre'].' · '.$persona['rut'].($virtual ? ' · Cupo provisional' : $detallePrioridad.$detalleAntiguedad).$detalleTitulo.' · Disponible: '.$fmt($titularDisponible).' titular + '.$fmt($contrataDisponible).' contrata',
+                'virtual' => $virtual,
+                'cupo_bloque' => $persona['cupo_bloque'] ?? null,
                 'titulo' => $titulo,
                 'es_parvularia' => \App\Support\DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos'],
                 'saldo' => $saldo,
@@ -121,8 +124,8 @@
             <span class="dotacion-icon" style="width:40px;height:40px;background:#0d6efd;"><i class="bi bi-clipboard-plus"></i></span>
             <div>
                 <div class="dotacion-eyebrow">Asignación de carga horaria</div>
-                <h2 class="h5 fw-bold mb-1">Asignar horas a docentes o asistentes vigentes</h2>
-                <div class="text-muted small">Asocia docentes o asistentes de la educación a las horas aula de cada asignatura y a las horas contrato de PIE, funciones directivas, técnico-pedagógicas, planes y otras funciones. La equivalencia contractual 65/35 o 60/40 se consolida en la pestaña Docentes.</div>
+                <h2 class="h5 fw-bold mb-1">Asignar horas a docentes, cupos por contratar o asistentes</h2>
+                <div class="text-muted small">Asocia docentes vigentes o cupos provisionales a las horas de cada bloque. Los cupos por contratar muestran su saldo asignable sin incorporarse a la base contractual vigente.</div>
             </div>
         </div>
     </div>
@@ -346,8 +349,9 @@
                                                     </select>
                                                     <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
                                                         <option value="">Seleccione persona...</option>
-                                                        <optgroup label="Docentes">
+                                                        <optgroup label="Docentes vigentes y por contratar">
                                                             @foreach ($docenteOptions as $doc)
+                                                                @continue($doc['virtual'] && ($doc['cupo_bloque'] !== 'parvularia' || ! (($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2')))
                                                                 @continue($soloParvularia && !$doc['es_parvularia'])
                                                                 <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                             @endforeach
@@ -451,6 +455,14 @@
                                 $pendingContrato = $item['horas_contrato_pendientes'] ?? $item['horas_contrato_requeridas'] ?? 0;
                                 $asignadoContrato = $item['horas_contrato_asignadas_calculo'] ?? $item['horas_contrato_asignadas'] ?? 0;
                                 $asignacionAutomatica = (bool) ($item['asignacion_automatica'] ?? false);
+                                $cursoItem = $item['curso'] ?? null;
+                                $cuposPermitidos = match (true) {
+                                    $groupKey === 'pie_educadora_diferencial' => ['pie'],
+                                    $groupKey === 'pie_colaborativo' && (($cursoItem instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoItem)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2') => ['parvularia'],
+                                    ($item['subtipo_asignacion'] ?? null) === 'pie' => ['pie'],
+                                    ($item['tipo_asignacion'] ?? null) === 'otra_funcion' || (int) ($item['dotacion_funcion_id'] ?? 0) > 0 => ['parvularia', 'pie'],
+                                    default => [],
+                                };
                             @endphp
                             <tr>
                                 <td>
@@ -494,6 +506,7 @@
                                             <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar docente por nombre o RUT..." required>
                                                 <option value="">Seleccione docente...</option>
                                                 @foreach ($docenteOptions as $doc)
+                                                    @continue($doc['virtual'])
                                                     <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </select>
@@ -526,8 +539,9 @@
                                         </select>
                                         <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
                                             <option value="">Seleccione persona...</option>
-                                            <optgroup label="Docentes">
+                                            <optgroup label="Docentes vigentes y por contratar">
                                                 @foreach ($docenteOptions as $doc)
+                                                @continue($doc['virtual'] && ! in_array($doc['cupo_bloque'], $cuposPermitidos, true))
                                                 <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </optgroup>

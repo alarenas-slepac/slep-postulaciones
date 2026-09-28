@@ -119,7 +119,7 @@ class DotacionProceso2027Calculator
             $bloques['bloque_2']['requeridas'] += max(0.0, (float) $resumenContractual['contrato_educacion_parvularia_mas_trabajo_colaborativo_pie']);
         }
 
-        $docentes = self::docentesPriorizados(collect($data['docentes'] ?? []));
+        $docentes = self::docentesPriorizados(collect(data_get($data, 'asignacion.docentes', $data['docentes'] ?? [])));
         $docentesPorRut = $docentes->keyBy('rut_normalizado');
         $asignaciones = collect(data_get($data, 'asignacion.asignaciones', []))
             ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row));
