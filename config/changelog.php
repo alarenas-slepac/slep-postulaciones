@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.28.532' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Libre disposición NT1/NT2 de otros docentes en Plan general',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Las horas registradas de libre disposición NT1/NT2 impartidas por docentes distintos de Educadoras de Párvulos se imputan a Plan general, igual que su necesidad contractual.',
+            'La cobertura del plan y la validación del máximo por bloque utilizan el mismo reparto; el resumen muestra las horas externas y mantiene el acompañamiento de la Educadora separado.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.531' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

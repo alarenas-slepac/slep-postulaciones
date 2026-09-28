@@ -58,6 +58,65 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame(0.0, $bloque['pendientes']);
     }
 
+    public function test_libre_disposicion_nt_de_otro_docente_se_registra_en_plan_general(): void
+    {
+        $asignacionExterna = [
+            'necesidad_key' => 'plan:nt', 'tipo_asignacion' => 'plan_estudio',
+            'subtipo_asignacion' => 'libre_disposicion', 'proporcion_aplicada' => '65/35',
+            'horas_contrato' => 7,
+        ];
+        $this->assertSame('bloque_1', DotacionProceso2027Calculator::bloqueLibreDisposicionNtOtroDocente(
+            $asignacionExterna, 'bloque_2', ['titulo' => 'Pedagogía en Educación Básica']
+        ));
+        $this->assertNull(DotacionProceso2027Calculator::bloqueLibreDisposicionNtOtroDocente(
+            $asignacionExterna, 'bloque_2', ['titulo' => 'Pedagogía en Educación de Párvulos']
+        ));
+        $this->assertNull(DotacionProceso2027Calculator::bloqueLibreDisposicionNtOtroDocente(
+            array_merge($asignacionExterna, ['proporcion_aplicada' => 'NT Con JEC']), 'bloque_2', ['titulo' => '']
+        ));
+
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'resumen' => [
+                'contrato_plan_general_mas_trabajo_colaborativo_pie' => 7,
+                'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 55,
+                'contrato_plan_por_ensenanza_desglose' => [
+                    'contrato_plan_general' => 7, 'contrato_plan_parvularia' => 55,
+                ],
+            ],
+            'cursos' => [
+                'rows' => ['NT1' => ['detalles' => [['establecimiento_curso_id' => 99]]]],
+                'totales' => ['cursos' => 1, 'sin_horas_plan' => 0],
+            ],
+            'asignacion' => [
+                'necesidades' => ['plan_estudio' => [[
+                    'key' => 'plan:nt', 'establecimiento_curso_id' => 99,
+                    'horas_plan_requeridas' => 38, 'horas_plan_asignadas' => 38,
+                ]]],
+                'asignaciones' => [
+                    ['necesidad_key' => 'plan:nt', 'tipo_asignacion' => 'plan_estudio',
+                        'subtipo_asignacion' => 'tiempo_minimo', 'proporcion_aplicada' => 'NT Con JEC',
+                        'horas_contrato' => 48],
+                    $asignacionExterna,
+                ],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $general = $resumen['bloques']['bloque_1'];
+        $parvularia = $resumen['bloques']['bloque_2'];
+        $this->assertSame(7.0, $general['asignadas']);
+        $this->assertSame(7.0, $general['asignadas_libre_disposicion_nt_otro_docente']);
+        $this->assertSame(48.0, $parvularia['asignadas']);
+        $this->assertSame(0.0, $parvularia['asignadas_libre_disposicion_nt_otro_docente']);
+        $this->assertSame(7.0, $general['asignadas_plan_obligatorias']);
+        $this->assertSame(48.0, $parvularia['asignadas_plan_obligatorias']);
+        $this->assertSame(0.0, $general['ajuste_cobertura_plan']);
+        $this->assertSame(7.0, $parvularia['ajuste_cobertura_plan']);
+        $this->assertSame(0.0, $general['pendientes']);
+        $this->assertSame(0.0, $parvularia['pendientes']);
+    }
+
     public function test_agrupa_avanzado_y_expertos_en_una_prioridad_reconociendo_numeros_y_romanos(): void
     {
         $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
