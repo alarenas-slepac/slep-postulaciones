@@ -64,6 +64,7 @@ class DotacionPlanHorasCompletasTest extends TestCase
         $respaldo = $necesidades->firstWhere('subtipo_asignacion', 'plan_sin_desglose');
 
         $this->assertSame(38.0, round((float) $necesidades->sum('horas_plan_requeridas'), 2));
+        $this->assertTrue($necesidades->every(fn ($item) => $item['subvencion'] === 'General'));
         $this->assertNotNull($respaldo);
         $this->assertSame(8.0, (float) $respaldo['horas_plan_requeridas']);
         $this->assertSame(30.0, (float) $respaldo['horas_plan_desglosadas']);
@@ -116,6 +117,7 @@ class DotacionPlanHorasCompletasTest extends TestCase
         $this->assertNotNull($libreDisposicion);
         $this->assertSame('Horas de libre disposición', $libreDisposicion['titulo']);
         $this->assertSame(6.5, (float) $libreDisposicion['horas_plan_requeridas']);
+        $this->assertSame('General', $libreDisposicion['subvencion']);
         $this->assertFalse($necesidades->contains(
             fn ($item) => ($item['subtipo_asignacion'] ?? null) === 'plan_sin_desglose'
         ));
@@ -164,6 +166,7 @@ class DotacionPlanHorasCompletasTest extends TestCase
         ));
         $this->assertSame(38.0, round((float) $necesidades->sum('horas_plan_requeridas'), 2));
         $this->assertSame(76.0, round((float) $necesidades->sum('horas_plan_brutas'), 2));
+        $this->assertTrue($necesidades->every(fn ($item) => $item['subvencion'] === 'General'));
         $this->assertSame(38.0, round((float) $necesidades->sum('horas_plan_reduccion'), 2));
         $this->assertSame(
             ['Horas de libre disposición', 'Horas del plan común sin desglose'],
