@@ -12,10 +12,13 @@
         <section class="card dotacion-section border-0" aria-labelledby="habilitaciones-contrata-titulo">
             <div class="dotacion-section-header">
                 <div class="dotacion-eyebrow mb-1">Planificación de contratación</div>
-                <h2 class="h5 fw-bold mb-1" id="habilitaciones-contrata-titulo">Funcionarios a contrata habilitados</h2>
-                <p class="text-muted small mb-0">Los cupos se calculan por bloque y año. Cada funcionario puede tener hasta 44 horas. Las habilitaciones no se suman a los contratos vigentes.</p>
+                <h2 class="h5 fw-bold mb-1" id="habilitaciones-contrata-titulo">Docentes por contratar</h2>
+                <p class="text-muted small mb-0">Cada cupo crea un docente provisional seleccionable en Asignación de horas. Puede distribuir hasta 44 horas por docente. Los cupos no se suman a los contratos vigentes del padrón.</p>
             </div>
             <div class="card-body">
+                @error('habilitacion')
+                    <div class="alert alert-warning" role="alert">{{ $message }}</div>
+                @enderror
                 @if (! ($contrataHabilitacionesTableReady ?? false))
                     <div class="alert alert-info mb-0">La habilitación estará disponible al aplicar la migración pendiente.</div>
                 @else
@@ -34,7 +37,7 @@
                                             <h3 class="h6 fw-bold mb-1">{{ $titulo }}</h3>
                                             <div class="small text-muted">{{ $fmt($brecha) }} h por contratar · {{ $fmt($habilitadas) }} h habilitadas · {{ $fmt($disponibles) }} h disponibles</div>
                                         </div>
-                                        <span class="badge rounded-pill {{ $disponibles > 0 ? 'text-bg-success' : 'dotacion-badge-soft' }}">{{ $habilitaciones->count() }} funcionario(s)</span>
+                                        <span class="badge rounded-pill {{ $disponibles > 0 ? 'text-bg-success' : 'dotacion-badge-soft' }}">{{ $habilitaciones->count() }} cupo(s)</span>
                                     </div>
                                     @if ($habilitadas > $brecha)
                                         <div class="alert alert-warning small py-2">Las horas habilitadas exceden la brecha actual. Revise los cupos tras el cambio de contratos.</div>
@@ -42,21 +45,33 @@
                                     @if ($habilitaciones->isNotEmpty())
                                         <ul class="list-unstyled mb-3">
                                             @foreach ($habilitaciones as $habilitacion)
+                                                @php
+                                                    $virtual = ($docentesVirtualesPorCupo ?? collect())->get((int) $habilitacion->id, []);
+                                                    $horasAsignadasVirtual = (float) ($virtual['horas_asignadas_total'] ?? 0);
+                                                    $tieneAsignacionesVirtual = collect($virtual['asignaciones'] ?? [])->isNotEmpty();
+                                                @endphp
                                                 <li class="d-flex align-items-center justify-content-between gap-2 border-top py-2">
-                                                    <span class="small">Funcionario {{ $loop->iteration }} · <strong>{{ $fmt($habilitacion->horas) }} h</strong></span>
+                                                    <span class="small"><strong>Docente por contratar #{{ $habilitacion->id }}</strong><br>{{ $fmt($horasAsignadasVirtual) }} de {{ $fmt($habilitacion->horas) }} h asignadas</span>
                                                     @if ($canManageContrataHabilitaciones ?? false)
-                                                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.destroy', [$establecimiento, $habilitacion->id]) }}">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <input type="hidden" name="anio" value="{{ $anio }}">
-                                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" aria-label="Retirar cupo {{ $loop->iteration }} de {{ $titulo }}">Retirar</button>
-                                                        </form>
+                                                        @if ($tieneAsignacionesVirtual)
+                                                            <span class="badge rounded-pill text-bg-info">Con asignaciones</span>
+                                                        @else
+                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.destroy', [$establecimiento, $habilitacion->id]) }}">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <input type="hidden" name="anio" value="{{ $anio }}">
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" aria-label="Retirar cupo {{ $loop->iteration }} de {{ $titulo }}">Retirar</button>
+                                                            </form>
+                                                        @endif
                                                     @endif
                                                 </li>
                                             @endforeach
                                         </ul>
                                     @else
-                                        <p class="small text-muted mb-3">Aún no hay funcionarios habilitados en este bloque.</p>
+                                        <p class="small text-muted mb-3">Aún no hay docentes por contratar en este bloque.</p>
+                                    @endif
+                                    @if ($habilitaciones->isNotEmpty())
+                                        <a class="btn btn-sm btn-outline-primary rounded-pill mb-3" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion']) }}">Ir a Asignación de horas</a>
                                     @endif
                                     @if (($canManageContrataHabilitaciones ?? false) && $disponibles >= 0.01)
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $establecimiento) }}" class="border-top pt-3">
@@ -68,7 +83,7 @@
                                             @endif
                                             <div class="row g-2 align-items-end">
                                                 <div class="col-sm-4">
-                                                    <label for="contrata-cantidad-{{ $bloque }}" class="form-label small fw-semibold">Funcionarios</label>
+                                                    <label for="contrata-cantidad-{{ $bloque }}" class="form-label small fw-semibold">Docentes</label>
                                                     <input id="contrata-cantidad-{{ $bloque }}" name="cantidad" type="number" class="form-control {{ old('bloque') === $bloque && $errors->has('cantidad') ? 'is-invalid' : '' }}" min="1" max="100" value="{{ old('bloque') === $bloque ? old('cantidad', 1) : 1 }}" required>
                                                     @if (old('bloque') === $bloque)
                                                         @error('cantidad') <div class="invalid-feedback">{{ $message }}</div> @enderror
@@ -85,7 +100,7 @@
                                                     <button type="submit" class="btn btn-primary rounded-pill w-100"><i class="bi bi-person-plus" aria-hidden="true"></i> Habilitar</button>
                                                 </div>
                                             </div>
-                                            <div class="form-text">Para cubrir todo el saldo se requieren al menos {{ (int) ceil($disponibles / 44) }} funcionario(s). La cantidad multiplicada por las horas no puede superar las {{ $fmt($disponibles) }} h disponibles.</div>
+                                            <div class="form-text">Para cubrir todo el saldo se requieren al menos {{ (int) ceil($disponibles / 44) }} docente(s). La cantidad multiplicada por las horas no puede superar las {{ $fmt($disponibles) }} h disponibles.</div>
                                         </form>
                                     @endif
                                 </div>

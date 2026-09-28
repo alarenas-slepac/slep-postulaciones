@@ -18,7 +18,7 @@ use Tests\TestCase;
 
 class SupervisorPlaniDotacionAccessTest extends TestCase
 {
-    public function test_todas_las_rutas_de_dotacion_establecimiento_permiten_supervisor_plani(): void
+    public function test_rutas_generales_permiten_supervisor_plani_y_cupos_contrata_quedan_restringidos(): void
     {
         $checked = [];
 
@@ -32,6 +32,15 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
                 ->first(fn (string $middleware) => str_starts_with($middleware, 'ensure.role:'));
 
             $this->assertNotNull($roleMiddleware, "La ruta {$routeName} no tiene middleware de rol.");
+            if (str_contains($routeName, '.contrata-habilitaciones.')) {
+                $this->assertSame(
+                    'ensure.role:admin|coordinador_uatp|coordinador_gdp',
+                    $roleMiddleware,
+                    "La ruta {$routeName} debe reservar la gestión de cupos a los tres roles autorizados."
+                );
+                $checked[] = $routeName;
+                continue;
+            }
             $this->assertStringContainsString(
                 'supervisor_plani',
                 $roleMiddleware,

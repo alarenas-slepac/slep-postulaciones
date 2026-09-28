@@ -27,7 +27,7 @@ class DotacionContrataHabilitacionController extends Controller
 
         return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
             ->withFragment('habilitaciones-contrata')
-            ->with('success', 'Funcionarios a contrata habilitados para el bloque seleccionado.');
+            ->with('success', 'Docentes provisionales creados para el bloque seleccionado. Ya puede asignarles horas.');
     }
 
     public function destroy(Request $request, Establecimiento $establecimiento, int $habilitacion, ContratacionHabilitacionService $service): RedirectResponse

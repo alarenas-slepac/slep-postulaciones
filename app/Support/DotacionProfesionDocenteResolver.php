@@ -87,7 +87,9 @@ class DotacionProfesionDocenteResolver
                 '/^(?:(?:PEDAGOGIA EN |PROFESOR(?:A)? (?:DE |EN )?|LICENCIATURA EN )?EDUCACION DIFERENCIAL|EDUCADOR(?:A| A)? DIFERENCIAL)(?: |$)/',
                 $normalizado
             ),
-            'fuente_titulo' => $declaracion ? 'Declaración de Sostenedores' : 'Sin declaración',
+            'fuente_titulo' => ($persona['cupo_contrata_id'] ?? null)
+                ? 'Perfil de cupo por contratar'
+                : ($declaracion ? 'Declaración de Sostenedores' : 'Sin declaración'),
         ];
     }
 

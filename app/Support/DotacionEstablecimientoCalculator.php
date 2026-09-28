@@ -12,6 +12,7 @@ use App\Models\EstablecimientoCurso;
 use App\Models\EstablecimientoCursoPie;
 use App\Models\ReemplazoPersonal;
 use App\Services\Padron\PadronPeriodoService;
+use App\Services\Dotacion\ContratacionHabilitacionService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -60,6 +61,10 @@ class DotacionEstablecimientoCalculator
             ? self::asistentes($establecimiento, $anio)
             : collect();
         $asignacion = DotacionAsignacionCalculator::build($establecimiento, $anio, $docentes, $cursos, $bloques, $asistentes);
+        $docentesVirtuales = $incluirResumenAsignaturas
+            ? app(ContratacionHabilitacionService::class)->docentesVirtuales($establecimiento, $anio)
+            : collect();
+        $asignacion['docentes'] = $docentes->concat($docentesVirtuales)->values();
         $planNeeds = collect(data_get($asignacion, 'necesidades.plan_estudio', []));
         $cursosCombinados = DotacionCursoCombinadoCalculator::summary(
             $establecimiento,
@@ -69,7 +74,7 @@ class DotacionEstablecimientoCalculator
         $asignaturas = $incluirResumenAsignaturas
             ? DotacionAsignaturaResumenCalculator::build(
                 $planNeeds,
-                $docentes->concat($asistentes)->values()
+                $asignacion['docentes']->concat($asistentes)->values()
             )
             : ['items' => collect(), 'resumen' => [], 'opciones' => []];
 
@@ -1434,6 +1439,10 @@ class DotacionEstablecimientoCalculator
 
     public static function normalizeRut(?string $rut): string
     {
+        if (ContratacionHabilitacionService::esRutVirtual($rut)) {
+            return 'VACANTE_'.ContratacionHabilitacionService::idVirtual($rut);
+        }
+
         return strtoupper(preg_replace('/[^0-9Kk]/', '', (string) $rut));
     }
 

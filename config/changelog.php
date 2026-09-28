@@ -1,6 +1,32 @@
 <?php
 
 return [
+    '2026.9.28.523' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Asignación de horas a docentes provisionales por contratar',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Http/Controllers/Admin/DotacionContrataHabilitacionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Services/Dotacion/ContratacionHabilitacionService.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'app/Support/DotacionProfesionDocenteResolver.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_contrata_habilitaciones.blade.php',
+            'tests/Feature/DotacionDocenteVirtualTest.php',
+            'tests/Feature/SupervisorPlaniDotacionAccessTest.php',
+        ],
+        'changes' => [
+            'Cada cupo habilitado crea un docente provisional seleccionable en Asignación de horas, con perfil de Parvularia o PIE y saldo propio.',
+            'Valida que las horas asignadas no excedan el cupo ni pertenezcan a otro bloque, e impide retirar un cupo con asignaciones activas.',
+            'Mantiene separados los cupos provisionales y los contratos vigentes del padrón en los indicadores de dotación.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.522' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

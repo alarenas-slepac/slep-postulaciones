@@ -10,6 +10,7 @@ use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionFuncionRegla;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
+use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionCursoCombinadoCalculator;
@@ -19,6 +20,7 @@ use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -72,8 +74,11 @@ class DotacionAsignacionController extends Controller
 
         $this->validatePlanHoursAvailable($establecimiento, $data);
         $payload = $this->buildPayload($request, $establecimiento, $persona, $data);
-        $this->validateProceso2027Assignment($establecimiento, $persona, $payload);
-        DotacionDocenteAsignacion::create($payload);
+        DB::transaction(function () use ($establecimiento, $persona, $payload): void {
+            $this->validateVirtualAssignment($establecimiento, $persona, $payload);
+            $this->validateProceso2027Assignment($establecimiento, $persona, $payload);
+            DotacionDocenteAsignacion::create($payload);
+        });
 
         return back()->with('success', 'Asignación de horas guardada correctamente.');
     }
@@ -129,9 +134,12 @@ class DotacionAsignacionController extends Controller
             'estamento_cobertura' => $estamentoCobertura,
         ]);
         $payload = $this->buildPayload($request, $establecimiento, $persona, array_merge($asignacion->toArray(), $data));
-        $this->validateProceso2027Assignment($establecimiento, $persona, $payload, $asignacion);
         $payload['updated_by'] = $request->user()?->id;
-        $asignacion->update($payload);
+        DB::transaction(function () use ($establecimiento, $persona, $payload, $asignacion): void {
+            $this->validateVirtualAssignment($establecimiento, $persona, $payload, $asignacion);
+            $this->validateProceso2027Assignment($establecimiento, $persona, $payload, $asignacion);
+            $asignacion->update($payload);
+        });
 
         return back()->with('success', 'Asignación de horas actualizada correctamente.');
     }
@@ -600,6 +608,10 @@ class DotacionAsignacionController extends Controller
 
     private function findPersonal(Establecimiento $establecimiento, int $anio, string $rut, string $estamentoCobertura): ?array
     {
+        if ($estamentoCobertura === 'docente' && ContratacionHabilitacionService::esRutVirtual($rut)) {
+            return app(ContratacionHabilitacionService::class)->docenteVirtual($establecimiento, $anio, $rut);
+        }
+
         $rutNorm = DotacionEstablecimientoCalculator::normalizeRut($rut);
         $personal = $estamentoCobertura === 'asistente'
             ? DotacionEstablecimientoCalculator::asistentes($establecimiento, $anio)
@@ -608,6 +620,63 @@ class DotacionAsignacionController extends Controller
         return $personal->first(
             fn ($persona) => DotacionEstablecimientoCalculator::normalizeRut($persona['rut_normalizado'] ?? $persona['rut'] ?? '') === $rutNorm
         );
+    }
+
+    private function validateVirtualAssignment(
+        Establecimiento $establecimiento,
+        array $persona,
+        array $payload,
+        ?DotacionDocenteAsignacion $current = null
+    ): void {
+        $cupoId = (int) ($persona['cupo_contrata_id'] ?? 0);
+        if ($cupoId <= 0) {
+            return;
+        }
+
+        $cupo = DB::table('dotacion_contrata_habilitaciones')
+            ->where('id', $cupoId)
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', (int) $payload['anio'])
+            ->lockForUpdate()
+            ->first();
+        if (! $cupo) {
+            throw ValidationException::withMessages(['docente_rut' => 'El docente por contratar ya no está habilitado.']);
+        }
+        if ((float) ($payload['horas_contrato'] ?? 0) <= 0) {
+            throw ValidationException::withMessages(['horas_contrato' => 'Asigne horas mayores que cero al docente por contratar.']);
+        }
+
+        $tipo = (string) ($payload['tipo_asignacion'] ?? '');
+        $bloqueFuncion = DotacionProceso2027Calculator::bloqueFuncionPorDocente($payload, $persona);
+        $curso = (int) ($payload['establecimiento_curso_id'] ?? 0) > 0
+            ? EstablecimientoCurso::query()->with('curso')->find((int) $payload['establecimiento_curso_id'])
+            : null;
+        $bloqueAsignacion = match (true) {
+            $bloqueFuncion !== null => $bloqueFuncion,
+            in_array($tipo, ['plan_estudio', 'pie_colaborativo'], true) => $curso && DotacionProfesionDocenteResolver::esCursoNt($curso) ? 'bloque_2' : 'bloque_1',
+            $tipo === 'pie_educadora_diferencial' => 'bloque_3',
+            default => DotacionProceso2027Calculator::bloqueParaAsignacion($payload),
+        };
+        $bloquePermitido = $cupo->bloque === 'parvularia' ? 'bloque_2' : 'bloque_3';
+        if ($bloqueAsignacion !== $bloquePermitido) {
+            throw ValidationException::withMessages([
+                'docente_rut' => 'El docente por contratar solo puede cubrir necesidades de su bloque '.($cupo->bloque === 'parvularia' ? 'Parvularia' : 'PIE').'.',
+            ]);
+        }
+
+        $rutNormalizado = DotacionEstablecimientoCalculator::normalizeRut((string) $persona['rut']);
+        $asignadas = (float) DotacionDocenteAsignacion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', (int) $payload['anio'])
+            ->where('docente_rut_normalizado', $rutNormalizado)
+            ->where('estado', 'activa')
+            ->when($current, fn ($query) => $query->whereKeyNot($current->id))
+            ->sum('horas_contrato');
+        if ($asignadas + (float) ($payload['horas_contrato'] ?? 0) > (float) $cupo->horas + 0.01) {
+            throw ValidationException::withMessages([
+                'horas_contrato' => 'Las horas asignadas al docente por contratar superan el cupo de '.$cupo->horas.' horas.',
+            ]);
+        }
     }
 
     private function isEducadoraDiferencialOrCoordinadorPie(array $docente): bool
