@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.28.527' => [
+        'date' => '2026-09-28',
+        'module' => 'Dotación docente',
+        'title' => 'Cobertura obligatoria y aviso de bloqueo en el proceso 2027',
+        'files' => [
+            'app/Support/DotacionProceso2027Calculator.php',
+            'config/changelog.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+        ],
+        'changes' => [
+            'Reconoce como cobertura obligatoria las asignaciones vinculadas a una necesidad aunque conserven una clave histórica.',
+            'El aviso de funciones no normativas muestra las etapas y horas obligatorias pendientes por componente.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP'],
+    ],
     '2026.9.28.526' => [
         'date' => '2026-09-28',
         'module' => 'Descuentos CGR',

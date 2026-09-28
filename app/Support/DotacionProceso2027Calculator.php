@@ -45,6 +45,7 @@ class DotacionProceso2027Calculator
         $cursosNt = self::cursosNt($data);
         $needBlocks = [];
         $needKeysObligatorias = [];
+        $needBlocksPorAsignacion = [];
         $seleccionNormativas = (array) ($config?->funciones_normativas ?? []);
         $funcionesNormativas = collect();
         $resumenContractual = (array) data_get($data, 'resumen', []);
@@ -101,6 +102,14 @@ class DotacionProceso2027Calculator
                 if ($key !== '') {
                     $needKeysObligatorias[$key] = true;
                 }
+                // La necesidad ya vinculó asignaciones históricas por regla o función,
+                // aunque su necesidad_key guardada sea distinta de la clave vigente.
+                foreach (collect(data_get($item, 'asignaciones', [])) as $asignacionVinculada) {
+                    $asignacionId = (int) data_get($asignacionVinculada, 'id', 0);
+                    if ($asignacionId > 0 && DotacionAsignacionCalculator::esAsignacionDocenteReal($asignacionVinculada)) {
+                        $needBlocksPorAsignacion[$asignacionId] ??= $bloque;
+                    }
+                }
                 if ($usarResumenContractualPorComponente
                     && in_array($groupKey, ['plan_estudio', 'pie_colaborativo'], true)) {
                     continue;
@@ -127,7 +136,11 @@ class DotacionProceso2027Calculator
             $rut = DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($asignacion, 'docente_rut_normalizado') ?: data_get($asignacion, 'docente_rut', '')));
             $docente = $docentesPorRut->get($rut);
             $keyNecesidad = (string) data_get($asignacion, 'necesidad_key', '');
-            $bloqueNecesidad = $needBlocks[$keyNecesidad] ?? null;
+            $asignacionId = (int) data_get($asignacion, 'id', 0);
+            $bloqueObligatorio = isset($needKeysObligatorias[$keyNecesidad])
+                ? ($needBlocks[$keyNecesidad] ?? null)
+                : ($needBlocksPorAsignacion[$asignacionId] ?? null);
+            $bloqueNecesidad = $bloqueObligatorio ?? ($needBlocks[$keyNecesidad] ?? null);
             $bloque = ($docente ? self::bloqueFuncionPorDocente($asignacion, $docente) : null)
                 ?? $bloqueNecesidad
                 ?? self::bloqueParaAsignacion($asignacion);
@@ -136,10 +149,10 @@ class DotacionProceso2027Calculator
             }
             $horas = max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
             $bloques[$bloque]['asignadas'] += $horas;
-            if (isset($needKeysObligatorias[$keyNecesidad])) {
+            if ($bloqueObligatorio) {
                 // La cobertura de la necesidad conserva su bloque de origen;
                 // las horas de contrato respetan el estamento del docente.
-                $bloques[$bloqueNecesidad ?? $bloque]['asignadas_obligatorias'] += $horas;
+                $bloques[$bloqueObligatorio]['asignadas_obligatorias'] += $horas;
             }
             if ($docente) {
                 $titularDisponible = max(0.0, (float) $docente['horas_planta'] - (float) $docente['horas_asignadas_previas']);

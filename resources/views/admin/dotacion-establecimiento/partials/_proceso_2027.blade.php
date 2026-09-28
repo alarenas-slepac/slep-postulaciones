@@ -127,7 +127,20 @@
                 </table>
             </div>
             @if (!($proceso['funciones_no_normativas_habilitadas'] ?? false))
-                <div class="alert alert-secondary small mt-3 mb-0"><i class="bi bi-lock"></i> Las funciones no normativas aún están bloqueadas. Deben completarse las necesidades obligatorias y mantenerse saldo disponible en el bloque contractual que corresponda a cada docente.</div>
+                @php
+                    $etapasPendientes = collect($proceso['pasos'] ?? [])->filter(fn ($paso) => ! $paso['completo'])->pluck('label');
+                    $bloquesPendientes = collect($proceso['bloques'] ?? [])->filter(fn ($bloque) => $bloque['pendientes'] > 0.01);
+                @endphp
+                <div class="alert alert-warning small mt-3 mb-0" role="status">
+                    <i class="bi bi-lock me-1" aria-hidden="true"></i><strong>Las funciones no normativas aún están bloqueadas.</strong>
+                    @if ($etapasPendientes->isNotEmpty())
+                        <div class="mt-1">Etapas pendientes: {{ $etapasPendientes->implode(', ') }}.</div>
+                    @endif
+                    @if ($bloquesPendientes->isNotEmpty())
+                        <div class="mt-1">Horas obligatorias por asignar: {{ $bloquesPendientes->map(fn ($bloque) => $bloque['label'].' ('.$fmtProceso($bloque['pendientes']).' h)')->implode('; ') }}.</div>
+                    @endif
+                    <div class="mt-1">Revise las etapas indicadas y el saldo disponible del bloque contractual de cada docente.</div>
+                </div>
             @else
                 <div class="alert alert-success small mt-3 mb-0"><i class="bi bi-unlock"></i> Funciones no normativas habilitadas: {{ $fmtProceso($proceso['capacidad_no_normativas'] ?? 0) }} horas disponibles.</div>
             @endif
