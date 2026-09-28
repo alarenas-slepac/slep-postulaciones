@@ -85,18 +85,18 @@ class DotacionParvulariaBasesTest extends TestCase
         (new ReflectionProperty(\App\Support\DocenteHorasNoLectivasCalculator::class, 'proportionRowsCache'))->setValue(null, []);
     }
 
-    private function curso(int $id, string $nivel, string $jec, float $horas, bool $pie = true): EstablecimientoCurso
+    private function curso(int $id, string $nivel, string $jec, float $horas, bool $pie = true, int $anio = 2026): EstablecimientoCurso
     {
         DB::table('cursos')->insert(['id' => $id, 'codigo' => $nivel, 'nombre' => $nivel]);
-        DB::table('planes_estudio')->insert(['id' => $id, 'curso_id' => $id, 'anio' => 2026, 'regimen_jec' => $jec, 'horas_semanales_total' => $horas]);
+        DB::table('planes_estudio')->insert(['id' => $id, 'curso_id' => $id, 'anio' => $anio, 'regimen_jec' => $jec, 'horas_semanales_total' => $horas]);
         DB::table('establecimiento_cursos')->insert(['id' => $id, 'establecimiento_id' => 1, 'curso_id' => $id,
-            'plan_estudio_id' => $id, 'anio' => 2026, 'regimen_jec' => $jec, 'nombre_seccion' => $nivel.' A']);
+            'plan_estudio_id' => $id, 'anio' => $anio, 'regimen_jec' => $jec, 'nombre_seccion' => $nivel.' A']);
         foreach (['Lenguaje', 'Matemática'] as $asignatura) {
             DB::table('planes_estudio_asignaturas')->insert(['plan_estudio_id' => $id, 'asignatura' => $asignatura,
                 'tipo_bloque' => 'tiempo_minimo', 'horas_semanales' => $horas / 2]);
         }
         if ($pie) {
-            DB::table('establecimiento_curso_pie')->insert(['establecimiento_id' => 1, 'anio' => 2026,
+            DB::table('establecimiento_curso_pie')->insert(['establecimiento_id' => 1, 'anio' => $anio,
                 'curso_id' => $id, 'establecimiento_curso_id' => $id, 'total_pie' => 1]);
         }
 
@@ -211,6 +211,7 @@ class DotacionParvulariaBasesTest extends TestCase
         $antes = DB::table('dotacion_docente_asignaciones')->get()->toJson();
         $separados = DotacionEstablecimientoCalculator::cursosPorNivel($this->establecimiento(), 2026);
         $this->assertSame(12.0, $separados['totales']['horas_plan_refuerzo_ld_otro_docente']);
+        $this->assertSame(14.0, $separados['totales']['horas_contrato_refuerzo_ld_otro_docente']);
         DB::table('dotacion_cursos_combinados')->insert(['id' => 1, 'establecimiento_id' => 1, 'anio' => 2026, 'nombre' => 'Grupo sintético']);
         foreach ([1, 2] as $id) {
             DB::table('dotacion_curso_combinado_miembros')->insert(['dotacion_curso_combinado_id' => 1, 'establecimiento_curso_id' => $id]);
@@ -226,6 +227,42 @@ class DotacionParvulariaBasesTest extends TestCase
         $resumen = DotacionCursosPlanesResumenCalculator::build($cursos, $grupo);
         $this->assertSame(7.0, $resumen['refuerzo_plan_general']['horas_contrato_equivalente']);
         $this->assertSame(65.0, $resumen['totales']['contrato_mas_trabajo_colaborativo_pie']);
+        $this->assertSame($antes, DB::table('dotacion_docente_asignaciones')->get()->toJson());
+    }
+
+    public function test_libre_disposicion_nt_se_convierte_como_bloque_consolidado(): void
+    {
+        $this->curso(1, 'NT1', 'Con JEC', 38, true, 2027);
+        $this->curso(2, 'NT2', 'Con JEC', 38, true, 2027);
+        Schema::create('docente_horas_proporciones', function (Blueprint $t) {
+            $t->id(); $t->string('proporcion'); $t->integer('horas_contrato');
+            $t->decimal('horas_aula_pedagogicas', 8, 2); $t->boolean('vigente')->default(true);
+        });
+        DB::table('docente_horas_proporciones')->insert([
+            ['proporcion' => '65_35', 'horas_contrato' => 5, 'horas_aula_pedagogicas' => 4],
+            ['proporcion' => '65_35', 'horas_contrato' => 9, 'horas_aula_pedagogicas' => 8],
+        ]);
+        Schema::create('dotacion_docente_asignaciones', function (Blueprint $t) {
+            $t->id(); $t->integer('establecimiento_id'); $t->integer('anio'); $t->string('estado');
+            $t->string('tipo_asignacion'); $t->string('subtipo_asignacion');
+            $t->integer('establecimiento_curso_id'); $t->decimal('horas_plan_pedagogicas', 8, 2);
+        });
+        foreach ([1, 2] as $id) {
+            DB::table('dotacion_docente_asignaciones')->insert([
+                'establecimiento_id' => 1, 'anio' => 2027, 'estado' => 'activa',
+                'tipo_asignacion' => 'plan_estudio', 'subtipo_asignacion' => 'libre_disposicion',
+                'establecimiento_curso_id' => $id, 'horas_plan_pedagogicas' => 4,
+            ]);
+        }
+
+        $antes = DB::table('dotacion_docente_asignaciones')->get()->toJson();
+        $cursos = DotacionEstablecimientoCalculator::cursosPorNivel($this->establecimiento(), 2027);
+
+        $this->assertSame(8.0, $cursos['totales']['horas_plan_refuerzo_ld_otro_docente']);
+        $this->assertSame(9.0, $cursos['totales']['horas_contrato_refuerzo_ld_otro_docente']);
+        $this->assertSame(119.0, $cursos['totales']['horas_contrato_equivalente']);
+        $split = DotacionContratoEnsenanzaCalculator::split($cursos, [], 119);
+        $this->assertSame(9.0, $split['contrato_general_mas_pie']);
         $this->assertSame($antes, DB::table('dotacion_docente_asignaciones')->get()->toJson());
     }
 

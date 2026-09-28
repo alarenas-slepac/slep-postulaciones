@@ -77,6 +77,8 @@ class DotacionProceso2027Calculator
             'asignadas_no_normativas' => 0.0,
             'asignadas_acompanamiento' => 0.0,
             'asignadas_libre_disposicion_nt_otro_docente' => 0.0,
+            'horas_aula_libre_disposicion_nt_otro_docente' => 0.0,
+            'contrato_necesario_libre_disposicion_nt_otro_docente' => 0.0,
             'ajuste_cobertura_plan' => 0.0,
             'titulares_asignadas' => 0.0,
             'contrata_asignadas' => 0.0,
@@ -85,6 +87,13 @@ class DotacionProceso2027Calculator
             'horas_normativas_definidas' => 0.0,
             'maximo' => $config ? self::numero($config->{'max_horas_'.$key}) : null,
         ]])->all();
+
+        $bloques['bloque_1']['horas_aula_libre_disposicion_nt_otro_docente'] = round(
+            (float) data_get($data, 'cursos.totales.horas_plan_refuerzo_ld_otro_docente', 0), 2
+        );
+        $bloques['bloque_1']['contrato_necesario_libre_disposicion_nt_otro_docente'] = round(
+            (float) data_get($data, 'cursos.totales.horas_contrato_refuerzo_ld_otro_docente', 0), 2
+        );
 
         foreach ($necesidades as $groupKey => $items) {
             foreach (collect($items) as $item) {

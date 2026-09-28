@@ -85,7 +85,11 @@ class DotacionProceso2027CalculatorTest extends TestCase
             ],
             'cursos' => [
                 'rows' => ['NT1' => ['detalles' => [['establecimiento_curso_id' => 99]]]],
-                'totales' => ['cursos' => 1, 'sin_horas_plan' => 0],
+                'totales' => [
+                    'cursos' => 1, 'sin_horas_plan' => 0,
+                    'horas_plan_refuerzo_ld_otro_docente' => 6,
+                    'horas_contrato_refuerzo_ld_otro_docente' => 7,
+                ],
             ],
             'asignacion' => [
                 'necesidades' => ['plan_estudio' => [[
@@ -107,6 +111,8 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $parvularia = $resumen['bloques']['bloque_2'];
         $this->assertSame(7.0, $general['asignadas']);
         $this->assertSame(7.0, $general['asignadas_libre_disposicion_nt_otro_docente']);
+        $this->assertSame(6.0, $general['horas_aula_libre_disposicion_nt_otro_docente']);
+        $this->assertSame(7.0, $general['contrato_necesario_libre_disposicion_nt_otro_docente']);
         $this->assertSame(48.0, $parvularia['asignadas']);
         $this->assertSame(0.0, $parvularia['asignadas_libre_disposicion_nt_otro_docente']);
         $this->assertSame(7.0, $general['asignadas_plan_obligatorias']);

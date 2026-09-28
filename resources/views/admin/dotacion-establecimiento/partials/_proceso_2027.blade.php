@@ -127,6 +127,9 @@
                                     @endif
                                 </td>
                                 <td class="text-end">{{ $fmtProceso($bloque['asignadas_obligatorias']) }}
+                                    @if (($bloque['horas_aula_libre_disposicion_nt_otro_docente'] ?? 0) > 0.01)
+                                        <div class="small text-muted">Libre disposición NT1/NT2: {{ $fmtProceso($bloque['horas_aula_libre_disposicion_nt_otro_docente']) }} h aula → {{ $fmtProceso($bloque['contrato_necesario_libre_disposicion_nt_otro_docente']) }} h contrato necesarios (bloque consolidado)</div>
+                                    @endif
                                     @if (abs($bloque['ajuste_cobertura_plan'] ?? 0) > 0.01)
                                         <div class="small text-muted">Plan consolidado: {{ ($bloque['ajuste_cobertura_plan'] ?? 0) > 0 ? '+' : '' }}{{ $fmtProceso($bloque['ajuste_cobertura_plan']) }} h</div>
                                     @endif
