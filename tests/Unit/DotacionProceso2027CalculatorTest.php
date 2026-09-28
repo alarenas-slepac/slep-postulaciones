@@ -126,6 +126,77 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame(0.0, $resumen['bloques']['bloque_1']['requeridas']);
     }
 
+    public function test_cuenta_la_asignacion_vinculada_a_una_necesidad_con_clave_historica(): void
+    {
+        $asignacion = [
+            'id' => 41,
+            'necesidad_key' => 'funcion:clave_anterior',
+            'docente_rut_normalizado' => '111111111',
+            'tipo_asignacion' => 'funcion_tecnico_pedagogica',
+            'dotacion_funcion_regla_id' => 99,
+            'horas_contrato' => 8,
+            'estamento_cobertura' => 'docente',
+            'estado' => 'activa',
+        ];
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'cursos' => ['totales' => ['cursos' => 1, 'sin_horas_plan' => 0]],
+            'asignacion' => [
+                'necesidades' => ['funciones' => [[
+                    'key' => 'funcion:clave_vigente',
+                    'tipo_asignacion' => 'funcion_tecnico_pedagogica',
+                    'dotacion_funcion_regla_id' => 99,
+                    'horas_contrato_requeridas' => 8,
+                    'horas_contrato_asignadas' => 8,
+                    'necesidad_condicionada_por_asignacion_docente' => true,
+                    'asignaciones' => [$asignacion],
+                ]]],
+                'asignaciones' => [$asignacion],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $this->assertSame(8.0, $resumen['bloques']['bloque_1']['asignadas_obligatorias']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['pendientes']);
+        $this->assertTrue($resumen['pasos']['asignacion']['completo']);
+    }
+
+    public function test_cuenta_horas_obligatorias_asignadas_a_docente_provisional_de_parvularia(): void
+    {
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'resumen' => [
+                'contrato_plan_general_mas_trabajo_colaborativo_pie' => 0,
+                'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 32,
+            ],
+            'cursos' => [
+                'rows' => ['NT1' => ['detalles' => [['establecimiento_curso_id' => 99]]]],
+                'totales' => ['cursos' => 1, 'sin_horas_plan' => 0],
+            ],
+            'asignacion' => [
+                'necesidades' => ['plan_estudio' => [[
+                    'key' => 'plan:nt1',
+                    'establecimiento_curso_id' => 99,
+                    'horas_contrato_requeridas' => 32,
+                ]]],
+                'asignaciones' => [[
+                    'necesidad_key' => 'plan:nt1',
+                    'docente_rut_normalizado' => 'VACANTE_7',
+                    'tipo_asignacion' => 'plan_estudio',
+                    'establecimiento_curso_id' => 99,
+                    'horas_contrato' => 32,
+                    'estamento_cobertura' => 'docente',
+                    'estado' => 'activa',
+                ]],
+            ],
+            'docentes' => [],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $this->assertSame(32.0, $resumen['bloques']['bloque_2']['asignadas_obligatorias']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_2']['pendientes']);
+        $this->assertTrue($resumen['pasos']['asignacion']['completo']);
+    }
+
     public function test_funciones_no_normativas_permanecen_en_parvularia_y_pie(): void
     {
         $parvularia = [
