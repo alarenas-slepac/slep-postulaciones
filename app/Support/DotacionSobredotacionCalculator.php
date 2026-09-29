@@ -213,6 +213,17 @@ class DotacionSobredotacionCalculator
             $reservaPendiente = max(0.0, round($reservaPendiente - ($saldoPlanta - $reservaPlanta), 2));
             $sinAsignacionContrata = round(max(0.0, $saldoContrata - $reservaContrata - $reservaPendiente), 2);
 
+            // La conversión proporcional NT puede dejar centésimas de contrato
+            // aun cuando la Educadora completó su jornada al redondear hacia arriba.
+            // El ajuste sólo afecta el saldo informado, nunca las asignaciones guardadas.
+            $neteoParvularia = min(
+                self::saldoFraccionalParvularia($docente),
+                round($sinAsignacionPlanta + $sinAsignacionContrata, 2)
+            );
+            $neteoPlanta = min($sinAsignacionPlanta, $neteoParvularia);
+            $sinAsignacionPlanta = round($sinAsignacionPlanta - $neteoPlanta, 2);
+            $sinAsignacionContrata = round(max(0.0, $sinAsignacionContrata - ($neteoParvularia - $neteoPlanta)), 2);
+
             return [
                 'rut' => $docente['rut'],
                 'nombre' => $docente['nombre'],
@@ -333,6 +344,9 @@ class DotacionSobredotacionCalculator
                     $vacanteParvularia,
                     (float) $aula['horas_sobredotacion_total'] - ($contratoAula - $contratoParvularia)
                 )), 2);
+                $vacanteParvularia = round(max(
+                    0.0, $vacanteParvularia - self::saldoFraccionalParvularia($docente)
+                ), 2);
                 $vacantePlan = round((float) $aula['horas_sobredotacion_total'] - $vacanteParvularia, 2);
                 $plantaParvularia = min($vacanteParvularia, (float) $aula['horas_sobredotacion_planta']);
 
@@ -369,6 +383,20 @@ class DotacionSobredotacionCalculator
                 'horas_contrata' => self::sumar($items, 'horas_sobredotacion_contrata'),
             ];
         })->all();
+    }
+
+    /** Fracción que completa la jornada NT sin constituir una hora contractual vacante. */
+    private static function saldoFraccionalParvularia(array $docente): float
+    {
+        $contrato = round((float) ($docente['contrato_parvularia'] ?? 0), 2);
+        $asignadas = round((float) ($docente['asignadas_parvularia'] ?? 0), 2);
+        $saldo = round($contrato - $asignadas, 2);
+
+        if ($contrato <= 0 || $asignadas <= 0 || $saldo <= 0.01 || $saldo >= 1) {
+            return 0.0;
+        }
+
+        return ceil($asignadas) >= $contrato ? $saldo : 0.0;
     }
 
     private static function esAsignacionParvularia(object|array $asignacion): bool

@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.29.552' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Neteo de saldos fraccionales de Parvularia',
+        'files' => [
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Cuando las horas asignadas a una Educadora de Párvulos completan su contrato al redondearse hacia arriba, la fracción inferior a una hora no figura como contrato sin asignación.',
+            'El ajuste conserva los saldos reales de Plan de estudio y PIE y no modifica las asignaciones ni los contratos almacenados.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.551' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
