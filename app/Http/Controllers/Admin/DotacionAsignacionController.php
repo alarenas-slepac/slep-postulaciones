@@ -13,6 +13,7 @@ use App\Models\EstablecimientoCurso;
 use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
+use App\Support\DotacionAsignacionPorCursoBloque;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionProfesionDocenteResolver;
@@ -22,6 +23,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -166,6 +168,65 @@ class DotacionAsignacionController extends Controller
         });
 
         return back()->with('success', 'Asignación de horas eliminada correctamente.');
+    }
+
+    public function destroyCourseBlock(Request $request, Establecimiento $establecimiento): RedirectResponse
+    {
+        $this->authorizeScope($request, $establecimiento);
+        $data = $request->validate([
+            'anio' => ['required', 'integer', 'min:2020', 'max:2100'],
+            'grupo' => ['required', 'in:plan_estudio,pie_colaborativo'],
+            'curso_label' => ['required', 'string', 'max:255'],
+            'bloque' => ['nullable', 'string', 'max:255'],
+        ]);
+        $anio = (int) $data['anio'];
+        $grupo = (string) $data['grupo'];
+        $bloque = $data['bloque'] ?? null;
+
+        $resumen = DotacionEstablecimientoCalculator::build($establecimiento, $anio, false);
+        $necesidades = DotacionAsignacionPorCursoBloque::necesidades(
+            data_get($resumen, 'asignacion.necesidades', []),
+            $grupo,
+            (string) $data['curso_label'],
+            $bloque
+        );
+        if ($necesidades->isEmpty()) {
+            throw ValidationException::withMessages(['curso_label' => 'El curso o bloque ya no está vigente. Actualice la página.']);
+        }
+        $asignaciones = DotacionAsignacionPorCursoBloque::asignaciones($necesidades);
+        if ($asignaciones->isEmpty()) {
+            return back()->with('info', 'Este curso y bloque ya no tienen asignaciones para eliminar.');
+        }
+
+        $cantidad = $this->deleteCourseBlockAssignments($establecimiento, $anio, $asignaciones);
+
+        $alcance = $bloque === null ? 'curso seleccionado' : 'curso y bloque seleccionados';
+
+        return back()->with('success', "Se eliminaron {$cantidad} asignaciones del {$alcance}.");
+    }
+
+    /** @param Collection<int, DotacionDocenteAsignacion> $asignaciones */
+    private function deleteCourseBlockAssignments(Establecimiento $establecimiento, int $anio, Collection $asignaciones): int
+    {
+        return DB::transaction(function () use ($establecimiento, $anio, $asignaciones): int {
+            $rows = DotacionDocenteAsignacion::query()
+                ->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)
+                ->where('estado', 'activa')
+                ->whereIn('id', $asignaciones->pluck('id'))
+                ->lockForUpdate()
+                ->get();
+            if ($rows->count() !== $asignaciones->count()) {
+                throw ValidationException::withMessages(['curso_label' => 'Las asignaciones cambiaron. Actualice la página e intente nuevamente.']);
+            }
+            $ruts = $rows->pluck('docente_rut_normalizado')->filter()->unique();
+            $rows->each->delete();
+            foreach ($ruts as $rut) {
+                $this->recalcularContratoAulaParvularia($establecimiento, $anio, (string) $rut);
+            }
+
+            return $rows->count();
+        });
     }
 
     private function buildPayload(Request $request, Establecimiento $establecimiento, array $docente, array $data, ?DotacionDocenteAsignacion $current = null): array
