@@ -374,6 +374,44 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertSame(3.0, $resultado['vacantes_por_bloque']['parvularia']['horas_total']);
     }
 
+    public function test_parvularia_netea_la_fraccion_que_completa_su_contrato_entero(): void
+    {
+        foreach ([42.37, 42.63] as $asignadas) {
+            $docente = $this->docente('11111111-1', 'Educadora de párvulos sintética', 43, 43, 0, $asignadas, 0, 0, true);
+            $docente['titulo'] = 'Pedagogía en Educación de Párvulos';
+            $docente['asignaciones'] = [[
+                'tipo_asignacion' => 'plan_estudio',
+                'proporcion_aplicada' => 'NT Con JEC',
+                'horas_contrato' => $asignadas,
+            ]];
+
+            $resultado = DotacionSobredotacionCalculator::build([$docente], $this->resumen());
+
+            $this->assertSame(0.0, $resultado['aula']['resumen']['horas_sobredotacion_total']);
+            $this->assertSame(0.0, $resultado['vacantes_por_bloque']['parvularia']['horas_total']);
+            $this->assertSame(0, $resultado['vacantes_por_bloque']['parvularia']['items']->count());
+            $this->assertSame(0.0, $resultado['vacantes_por_bloque']['plan_estudio']['horas_total']);
+        }
+    }
+
+    public function test_neteo_parvularia_conserva_el_saldo_real_del_plan_y_deficits_mayores(): void
+    {
+        $general = $this->docente('11111111-1', 'Docente general sintético', 30, 30, 0, 29.63, 0, 0, true);
+        $deficit = $this->docente('22222222-2', 'Educadora con déficit sintética', 43, 43, 0, 40.37, 0, 0, true);
+        $deficit['titulo'] = 'Pedagogía en Educación de Párvulos';
+        $deficit['asignaciones'] = [[
+            'tipo_asignacion' => 'plan_estudio',
+            'proporcion_aplicada' => 'NT Con JEC',
+            'horas_contrato' => 40.37,
+        ]];
+
+        $resultado = DotacionSobredotacionCalculator::build([$general, $deficit], $this->resumen());
+
+        $this->assertSame(0.37, $resultado['vacantes_por_bloque']['plan_estudio']['horas_total']);
+        $this->assertSame(2.63, $resultado['vacantes_por_bloque']['parvularia']['horas_total']);
+        $this->assertSame(3.0, $resultado['aula']['resumen']['horas_sobredotacion_total']);
+    }
+
     public function test_funciones_no_normativas_de_diferencial_cubren_su_contrato_pie(): void
     {
         $docente = $this->docente('11111111-1', 'Diferencial sintética', 20, 0, 20, 0, 0, 20, false);
@@ -444,6 +482,7 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertStringNotContainsString('diferencia por cobertura y distribución individual', $htmlAula);
         $this->assertStringNotContainsString('(50 + 10 + 12)', $htmlAula);
         $this->assertStringContainsString('Contrato sin asignación registrada', $htmlAula);
+        $this->assertStringContainsString('la fracción inferior a 1 h', $htmlAula);
         $this->assertStringContainsString('id="vacantes-plan_estudio"', $htmlAula);
         $this->assertStringContainsString('id="vacantes-parvularia"', $htmlAula);
         $this->assertStringContainsString('id="vacantes-pie"', $htmlAula);

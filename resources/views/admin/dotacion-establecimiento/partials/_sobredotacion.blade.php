@@ -132,6 +132,7 @@
                 <div class="dotacion-eyebrow">Horas contractuales vacantes</div>
                 <h2 class="h5 fw-bold mb-1">Contrato sin asignación registrada</h2>
                 <div class="text-muted small">Saldos contractuales por bloque, descontando las asignaciones registradas y las horas reservadas para otras funciones. Los contratos protegidos quedan fuera de esta nómina.</div>
+                <div class="text-muted small mt-1">En Parvularia, la fracción inferior a 1 h que completa el contrato al redondear hacia arriba se netea y no figura como vacante.</div>
             </div>
             <span class="badge rounded-pill text-bg-danger">{{ collect($vacantesPorBloque)->sum(fn ($bloque) => collect($bloque['items'] ?? [])->count()) }} saldo(s)</span>
         </div>
