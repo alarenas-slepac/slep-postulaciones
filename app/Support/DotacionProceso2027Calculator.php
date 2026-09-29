@@ -75,6 +75,7 @@ class DotacionProceso2027Calculator
             'asignadas_asistentes_obligatorias' => 0.0,
             'asignadas_plan_obligatorias' => 0.0,
             'asignadas_no_normativas' => 0.0,
+            'reservadas_no_normativas' => 0.0,
             'asignadas_acompanamiento' => 0.0,
             'asignadas_libre_disposicion_nt_otro_docente' => 0.0,
             'horas_aula_libre_disposicion_nt_otro_docente' => 0.0,
@@ -196,7 +197,8 @@ class DotacionProceso2027Calculator
         $docentes = self::docentesPriorizados(collect(data_get($data, 'asignacion.docentes', $data['docentes'] ?? [])));
         $docentesPorRut = $docentes->keyBy('rut_normalizado');
         $asignaciones = collect(data_get($data, 'asignacion.asignaciones', []))
-            ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row));
+            ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row))
+            ->sortBy(fn ($row) => (string) data_get($row, 'tipo_asignacion') === 'reserva_no_normativa' ? 0 : 1);
         $horasClasificadasPorRut = [];
         foreach ($asignaciones as $asignacion) {
             $rut = DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($asignacion, 'docente_rut_normalizado') ?: data_get($asignacion, 'docente_rut', '')));
@@ -227,8 +229,11 @@ class DotacionProceso2027Calculator
                 $bloques[$bloque]['asignadas_acompanamiento'] += $horas;
             }
             if ((int) data_get($asignacion, 'dotacion_funcion_id', 0) > 0
-                || (string) data_get($asignacion, 'tipo_asignacion', '') === 'otra_funcion') {
+                || in_array((string) data_get($asignacion, 'tipo_asignacion', ''), ['otra_funcion', 'reserva_no_normativa'], true)) {
                 $bloques[$bloque]['asignadas_no_normativas'] += $horas;
+            }
+            if ((string) data_get($asignacion, 'tipo_asignacion', '') === 'reserva_no_normativa') {
+                $bloques[$bloque]['reservadas_no_normativas'] += $horas;
             }
             if ((string) data_get($asignacion, 'tipo_asignacion', '') !== 'acompanamiento_parvularia'
                 && $bloqueObligatorio
@@ -292,6 +297,7 @@ class DotacionProceso2027Calculator
             $bloque['asignadas_asistentes_obligatorias'] = round((float) $bloque['asignadas_asistentes_obligatorias'], 2);
             $bloque['asignadas_plan_obligatorias'] = round((float) $bloque['asignadas_plan_obligatorias'], 2);
             $bloque['asignadas_no_normativas'] = round((float) $bloque['asignadas_no_normativas'], 2);
+            $bloque['reservadas_no_normativas'] = round((float) $bloque['reservadas_no_normativas'], 2);
             $bloque['asignadas_acompanamiento'] = round((float) $bloque['asignadas_acompanamiento'], 2);
             $bloque['asignadas_libre_disposicion_nt_otro_docente'] = round((float) $bloque['asignadas_libre_disposicion_nt_otro_docente'], 2);
             $bloque['ajuste_cobertura_plan'] = round((float) $bloque['ajuste_cobertura_plan'], 2);
@@ -332,6 +338,10 @@ class DotacionProceso2027Calculator
             (float) collect($bloques)->sum(fn (array $bloque) => max(0.0, (float) ($bloque['saldo_maximo'] ?? 0))),
             $horasDisponiblesDocentes
         );
+        $capacidadReservaNoNormativa = min(
+            $capacidadNoNormativas,
+            max(0.0, $horasDisponiblesDocentes - (float) collect($bloques)->sum('pendientes'))
+        );
 
         return [
             'aplica' => true,
@@ -361,6 +371,7 @@ class DotacionProceso2027Calculator
             'asignacion_habilitada' => $asignacionHabilitada,
             'funciones_no_normativas_habilitadas' => $asignacionHabilitada && $necesidadesCubiertas,
             'capacidad_no_normativas' => round($capacidadNoNormativas, 2),
+            'capacidad_reserva_no_normativa' => round($capacidadReservaNoNormativa, 2),
             'horas_disponibles_docentes' => $horasDisponiblesDocentes,
         ];
     }
@@ -662,7 +673,7 @@ class DotacionProceso2027Calculator
             'plan_estudio', 'pie_colaborativo', 'acompanamiento_parvularia' => self::esNt(data_get($asignacion, 'establecimientoCurso')) ? 'bloque_2' : 'bloque_1',
             'pie_educadora_diferencial' => 'bloque_3',
             'funcion_tecnico_pedagogica' => DotacionAsignacionCalculator::esAsignacionCoordinacionPie($asignacion) ? 'bloque_3' : 'bloque_1',
-            'funcion_directiva', 'plan_normativo', 'otra_funcion' => 'bloque_1',
+            'funcion_directiva', 'plan_normativo', 'otra_funcion', 'reserva_no_normativa' => 'bloque_1',
             default => null,
         };
     }
@@ -691,7 +702,7 @@ class DotacionProceso2027Calculator
     public static function bloqueFuncionPorDocente(object|array $asignacion, array $docente): ?string
     {
         if (! in_array((string) data_get($asignacion, 'tipo_asignacion'), [
-            'funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion',
+            'funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion', 'reserva_no_normativa',
         ], true)) {
             return null;
         }

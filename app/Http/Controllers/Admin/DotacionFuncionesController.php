@@ -416,13 +416,29 @@ class DotacionFuncionesController extends Controller
             ]);
         }
 
-        $reservadas = DotacionFuncionEstablecimiento::query()
+        $funcionesDeclaradas = DotacionFuncionEstablecimiento::query()
             ->where('establecimiento_id', $establecimiento->id)
             ->where('anio', $anio)
             ->when($excepto, fn ($query) => $query->where('id', '<>', $excepto->id))
-            ->get()
-            ->sum(fn (DotacionFuncionEstablecimiento $funcion) => $funcion->horasFinales());
-        $capacidad = max(0.0, round((float) ($proceso['capacidad_no_normativas'] ?? 0) - $reservadas, 2));
+            ->get();
+        $asignadasPorFuncion = DotacionDocenteAsignacion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->where('estado', 'activa')
+            ->whereIn('dotacion_funcion_id', $funcionesDeclaradas->modelKeys())
+            ->selectRaw('dotacion_funcion_id, SUM(horas_contrato) as horas')
+            ->groupBy('dotacion_funcion_id')
+            ->pluck('horas', 'dotacion_funcion_id');
+        $horasDeclaradasSinAsignar = $funcionesDeclaradas->sum(fn (DotacionFuncionEstablecimiento $funcion) =>
+            max(0.0, $funcion->horasFinales() - (float) ($asignadasPorFuncion[$funcion->id] ?? 0))
+        );
+        $horasPorVincular = DotacionDocenteAsignacion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->where('estado', 'activa')
+            ->where('tipo_asignacion', 'reserva_no_normativa')
+            ->sum('horas_contrato');
+        $capacidad = max(0.0, round((float) ($proceso['capacidad_no_normativas'] ?? 0) + (float) $horasPorVincular - $horasDeclaradasSinAsignar, 2));
         if ($horas > $capacidad + 0.01) {
             throw ValidationException::withMessages([
                 'horas_declaradas' => 'La función supera las '.$capacidad.' hora(s) disponibles en los bloques de dotación para funciones no normativas.',

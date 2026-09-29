@@ -214,6 +214,10 @@
     ];
 @endphp
 
+@if ($proceso2027Asignacion['aplica'] ?? false)
+    @include('admin.dotacion-establecimiento.partials._reserva_no_normativa')
+@endif
+
 @foreach ($groups as $groupKey => $meta)
     @php
         $items = collect($necesidades[$groupKey] ?? []);
@@ -444,7 +448,6 @@
                                                         </div>
                                                     </div>
                                                     <div class="form-text js-ayuda-aaee d-none">Para asistentes, ingrese las horas aula cubiertas y las horas de contrato AAEE. No se aplica conversión 65/35 ni 60/40.</div>
-                                                    <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si omite prelación o antigüedad">
                                                     <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
                                                     <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
                                                 </form>
@@ -484,7 +487,6 @@
                                                                     <button class="btn btn-sm btn-outline-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar acompañamiento</button>
                                                                 </div>
                                                             </div>
-                                                            <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si omite prelación o antigüedad">
                                                             <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
                                                         </form>
                                                     @endif
@@ -634,7 +636,6 @@
                                                 @endforeach
                                             </select>
                                             <div class="small text-muted">Contrato fijo: 44 horas.</div>
-                                            <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si omite prelación o antigüedad">
                                             <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
                                         </form>
                                     @else
@@ -688,7 +689,6 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <input type="text" name="excepcion_prelacion" class="form-control form-control-sm" maxlength="2000" placeholder="Justificación si omite prelación o antigüedad">
                                         <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
                                         <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
                                         </form>

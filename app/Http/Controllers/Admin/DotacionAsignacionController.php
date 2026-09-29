@@ -20,6 +20,7 @@ use App\Support\DotacionProfesionDocenteResolver;
 use App\Support\DotacionDocentesSubsector;
 use App\Support\DotacionProceso2027Calculator;
 use App\Support\DotacionPlanTitularPrimero;
+use App\Support\DotacionReservaNoNormativa;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -57,9 +58,11 @@ class DotacionAsignacionController extends Controller
             'dotacion_funcion_regla_id' => ['nullable', 'integer', 'min:1'],
             'horas_plan_pedagogicas' => ['nullable', 'numeric', 'min:0'],
             'horas_contrato' => ['nullable', 'numeric', 'min:0'],
-            'excepcion_prelacion' => ['nullable', 'string', 'max:2000'],
             'observacion' => ['nullable', 'string', 'max:2000'],
         ]);
+        if ($data['tipo_asignacion'] === 'reserva_no_normativa') {
+            throw ValidationException::withMessages(['tipo_asignacion' => 'Use el bloque de traspaso para reservar horas no normativas.']);
+        }
 
         $this->validateDirectorAdpAssignment($establecimiento, (int) $data['anio'], $data);
 
@@ -96,13 +99,15 @@ class DotacionAsignacionController extends Controller
     {
         $this->authorizeScope($request, $establecimiento);
         abort_unless((int) $asignacion->establecimiento_id === (int) $establecimiento->id, 404);
+        if ($asignacion->tipo_asignacion === 'reserva_no_normativa') {
+            throw ValidationException::withMessages(['horas_contrato' => 'Para modificar una reserva, libérela y registre un nuevo traspaso.']);
+        }
 
         $data = $request->validate([
             'docente_rut' => ['required', 'string', 'max:32'],
             'estamento_cobertura' => ['nullable', 'in:docente,asistente'],
             'horas_plan_pedagogicas' => ['nullable', 'numeric', 'min:0'],
             'horas_contrato' => ['nullable', 'numeric', 'min:0'],
-            'excepcion_prelacion' => ['nullable', 'string', 'max:2000'],
             'subvencion' => ['nullable', 'string', 'max:80'],
             'observacion' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -156,6 +161,138 @@ class DotacionAsignacionController extends Controller
         });
 
         return back()->with('success', 'Asignación de horas actualizada correctamente.');
+    }
+
+    public function storeReserva(Request $request, Establecimiento $establecimiento): RedirectResponse
+    {
+        $this->authorizeScope($request, $establecimiento);
+        $data = $request->validate([
+            'anio' => ['required', 'integer', 'in:2027'],
+            'docente_rut' => ['required', 'string', 'max:32'],
+            'horas_contrato' => ['required', 'numeric', 'min:1', 'max:999'],
+        ]);
+
+        DB::transaction(function () use ($request, $establecimiento, $data): void {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            $proceso = DotacionProceso2027Calculator::resumen($establecimiento, 2027);
+            if (! ($proceso['asignacion_habilitada'] ?? false)) {
+                throw ValidationException::withMessages([
+                    'anio' => 'Complete las etapas previas y configure máximos suficientes antes de traspasar horas.',
+                ]);
+            }
+
+            $docentes = DotacionReservaNoNormativa::elegibles($proceso);
+            $fase = DotacionReservaNoNormativa::fase($docentes);
+            $rut = DotacionEstablecimientoCalculator::normalizeRut($data['docente_rut']);
+            $seleccionado = DotacionReservaNoNormativa::opciones($docentes)->first(fn (array $docente) =>
+                DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'])) === $rut
+            );
+            if (! $seleccionado) {
+                throw ValidationException::withMessages([
+                    'docente_rut' => 'Seleccione un docente con al menos 1 h '.$fase.' disponible. Primero deben reservarse las horas titulares.',
+                ]);
+            }
+
+            $maximo = DotacionReservaNoNormativa::maximoParaDocente($proceso, $seleccionado, $fase);
+            $horas = round((float) $data['horas_contrato'], 2);
+            if ($horas > $maximo + 0.001) {
+                throw ValidationException::withMessages([
+                    'horas_contrato' => 'Puede traspasar como máximo '.DotacionEstablecimientoCalculator::formatHoras($maximo).' h: se respeta el saldo individual, el bloque contractual y el saldo no normativo del establecimiento.',
+                ]);
+            }
+
+            DotacionDocenteAsignacion::create([
+                'anio' => 2027,
+                'establecimiento_id' => $establecimiento->id,
+                'docente_rut' => $seleccionado['rut'],
+                'docente_rut_normalizado' => $rut,
+                'docente_nombre' => $seleccionado['nombre'],
+                'declaracion_sostenedor_id' => $seleccionado['declaracion']->id ?? null,
+                'estamento_cobertura' => 'docente',
+                'tipo_asignacion' => 'reserva_no_normativa',
+                'subtipo_asignacion' => $fase,
+                'subvencion' => 'General',
+                'necesidad_key' => 'reserva_no_normativa:'.Str::uuid(),
+                'asignatura_nombre' => 'Horas para otras funciones',
+                'horas_contrato' => $horas,
+                'fuente_calculo' => 'Traspaso de saldo '.$fase.' a otras funciones por definir',
+                'estado' => 'activa',
+                'created_by' => $request->user()?->id,
+                'updated_by' => $request->user()?->id,
+            ]);
+        });
+
+        return back()->with('success', 'Horas traspasadas para otras funciones. Quedarán reservadas hasta vincularlas o liberarlas.');
+    }
+
+    public function vincularReserva(Request $request, Establecimiento $establecimiento, DotacionDocenteAsignacion $asignacion): RedirectResponse
+    {
+        $this->authorizeScope($request, $establecimiento);
+        abort_unless((int) $asignacion->establecimiento_id === (int) $establecimiento->id
+            && (int) $asignacion->anio === 2027 && $asignacion->tipo_asignacion === 'reserva_no_normativa'
+            && $asignacion->estado === 'activa', 404);
+        $data = $request->validate([
+            'necesidad_key' => ['required', 'string', 'max:180'],
+            'horas_contrato' => ['required', 'numeric', 'min:0.01', 'max:999'],
+        ]);
+
+        DB::transaction(function () use ($request, $establecimiento, $asignacion, $data): void {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            $reserva = DotacionDocenteAsignacion::query()->whereKey($asignacion->id)->lockForUpdate()->firstOrFail();
+            abort_unless($reserva->tipo_asignacion === 'reserva_no_normativa' && $reserva->estado === 'activa', 404);
+            $proceso = DotacionProceso2027Calculator::resumen($establecimiento, 2027);
+            if (! ($proceso['funciones_no_normativas_habilitadas'] ?? false)) {
+                throw ValidationException::withMessages(['necesidad_key' => 'Complete primero la cobertura obligatoria antes de vincular la reserva a una función.']);
+            }
+            $necesidades = data_get(DotacionEstablecimientoCalculator::build($establecimiento, 2027), 'asignacion.necesidades.funciones', []);
+            $necesidad = collect($necesidades)->first(fn (array $item) =>
+                ($item['key'] ?? '') === $data['necesidad_key']
+                && (int) ($item['dotacion_funcion_id'] ?? 0) > 0
+            );
+            $horas = round((float) $data['horas_contrato'], 2);
+            if (! $necesidad || $horas > (float) ($necesidad['horas_contrato_pendientes'] ?? 0) + 0.001
+                || $horas > (float) $reserva->horas_contrato + 0.001) {
+                throw ValidationException::withMessages(['horas_contrato' => 'La función ya no existe o sus horas pendientes son menores que las horas solicitadas. Actualice la página.']);
+            }
+
+            $campos = [
+                'anio' => 2027,
+                'docente_rut' => $reserva->docente_rut,
+                'estamento_cobertura' => 'docente',
+                'tipo_asignacion' => $necesidad['tipo_asignacion'],
+                'subtipo_asignacion' => $necesidad['subtipo_asignacion'] ?? null,
+                'subvencion' => $necesidad['subvencion'] ?? 'General',
+                'necesidad_key' => $necesidad['key'],
+                'dotacion_funcion_id' => $necesidad['dotacion_funcion_id'],
+                'dotacion_funcion_regla_id' => $necesidad['dotacion_funcion_regla_id'] ?? null,
+                'asignatura_nombre' => $necesidad['asignatura_nombre'] ?? $necesidad['titulo'],
+                'horas_contrato' => $horas,
+            ];
+            $this->validateDirectorAdpAssignment($establecimiento, 2027, $campos);
+            $request->merge($campos);
+            $esTraspasoCompleto = abs((float) $reserva->horas_contrato - $horas) <= 0.001;
+            if (! $esTraspasoCompleto) {
+                $reserva->update(['horas_contrato' => round((float) $reserva->horas_contrato - $horas, 2)]);
+            }
+            $persona = $this->findPersonal($establecimiento, 2027, (string) $reserva->docente_rut, 'docente');
+            if (! $persona) {
+                throw ValidationException::withMessages(['docente_rut' => 'El docente de la reserva ya no tiene contrato vigente.']);
+            }
+            $payload = $this->buildPayload($request, $establecimiento, $persona, $campos, $esTraspasoCompleto ? $reserva : null);
+            $payload['fuente_calculo'] = 'Vinculada desde reserva de horas para otras funciones';
+            $payload['_desde_reserva'] = true;
+            $this->validateProceso2027Assignment($establecimiento, $persona, $payload, $esTraspasoCompleto ? $reserva : null);
+            unset($payload['_desde_reserva']);
+            if ($esTraspasoCompleto) {
+                $payload['updated_by'] = $request->user()?->id;
+                $payload['created_by'] = $reserva->created_by;
+                $reserva->update($payload);
+            } else {
+                DotacionDocenteAsignacion::create($payload);
+            }
+        });
+
+        return back()->with('success', 'Horas de la reserva vinculadas a la función seleccionada.');
     }
 
     public function destroy(Request $request, Establecimiento $establecimiento, DotacionDocenteAsignacion $asignacion): RedirectResponse
@@ -848,7 +985,7 @@ class DotacionAsignacionController extends Controller
                     (string) $current->tipo_asignacion, (float) $current->horas_contrato
                 ));
                 if ((int) ($current->dotacion_funcion_id ?? 0) > 0
-                    || (string) $current->tipo_asignacion === 'otra_funcion') {
+                    || in_array((string) $current->tipo_asignacion, ['otra_funcion', 'reserva_no_normativa'], true)) {
                     $noNormativas = max(0.0, $noNormativas - (float) $current->horas_contrato);
                 }
             }
@@ -903,9 +1040,9 @@ class DotacionAsignacionController extends Controller
             $seleccionado ?? [],
             $horas
         );
-        if ($hayPrelacionAnterior && blank($payload['excepcion_prelacion'] ?? null)) {
+        if ($hayPrelacionAnterior && ! ($payload['_desde_reserva'] ?? false)) {
             throw ValidationException::withMessages([
-                'excepcion_prelacion' => 'Existen docentes de prioridad superior o de mayor antigüedad en el mismo grupo con horas suficientes para cubrir esta asignación. Para continuar debe indicar una justificación de excepción.',
+                'docente_rut' => 'Existen docentes de prioridad superior o de mayor antigüedad en el mismo grupo con horas suficientes para cubrir esta asignación. Seleccione uno de ellos.',
             ]);
         }
 

@@ -1014,6 +1014,7 @@ class DotacionEstablecimientoCalculator
                 'horas_contrato_60_40' => (float) ($asignacionesDocente['contrato_60_40'] ?? 0),
                 'horas_contrato_especial' => (float) ($asignacionesDocente['contrato_especial'] ?? 0),
                 'horas_funciones_total' => (float) ($asignacionesDocente['funciones_total'] ?? 0),
+                'horas_reservadas_no_normativas' => (float) ($asignacionesDocente['reservadas_no_normativas'] ?? 0),
                 'horas_basica' => $horasBasica,
                 'horas_media' => $horasMedia,
                 'horas_directivas' => (float) ($asignacionesDocente['directivas'] ?? 0),

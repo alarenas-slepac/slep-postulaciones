@@ -1,6 +1,33 @@
 <?php
 
 return [
+    '2026.9.29.544' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Traspaso previo de horas a funciones no normativas',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Http/Controllers/Admin/DotacionFuncionesController.php',
+            'app/Models/DotacionDocenteAsignacion.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'app/Support/DotacionReservaNoNormativa.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_reserva_no_normativa.blade.php',
+            'routes/web.php',
+            'tests/Feature/DotacionContratoPadronTest.php',
+            'tests/Feature/DotacionProceso2027PlanConfigTest.php',
+            'tests/Unit/DotacionReservaNoNormativaTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Antes del plan de estudios se pueden reservar horas de contrato por docente para otras funciones aún no creadas, primero titulares y luego a contrata, sin superar el saldo no normativo ni afectar la cobertura obligatoria.',
+            'Las reservas reducen el saldo individual y del bloque. Tras crear una función y cubrir las necesidades obligatorias, pueden vincularse total o parcialmente sin duplicar horas; también pueden liberarse.',
+            'Los formularios de asignación dejan de pedir justificación para omitir prelación y el servidor exige seleccionar a quien corresponda según prioridad y antigüedad.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.543' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',

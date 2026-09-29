@@ -162,6 +162,31 @@ class DotacionContratoPadronTest extends TestCase
         $this->assertSame($before, $this->snapshot());
     }
 
+    public function test_reserva_descuenta_saldo_individual_y_al_vincular_no_duplica_horas(): void
+    {
+        $this->personal();
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'id' => 401, 'establecimiento_id' => 1, 'anio' => 2026,
+            'docente_rut' => '111111111', 'docente_rut_normalizado' => '111111111',
+            'docente_nombre' => 'Persona sintética', 'tipo_asignacion' => 'reserva_no_normativa',
+            'horas_contrato' => 6,
+        ]);
+
+        $docente = $this->docentes()->sole();
+        $this->assertSame(6.0, $docente['horas_asignadas_total']);
+        $this->assertSame(32.0, $docente['diferencia']);
+        $this->assertSame(6.0, $docente['horas_reservadas_no_normativas']);
+        $detalle = DotacionAsignacionCalculator::assignmentsByRut(Establecimiento::findOrFail(1), 2026)['111111111'];
+        $this->assertSame(0.0, $detalle['funciones_total']);
+
+        DB::table('dotacion_docente_asignaciones')->where('id', 401)->update(['tipo_asignacion' => 'otra_funcion']);
+        $vinculado = $this->docentes()->sole();
+        $this->assertSame(6.0, $vinculado['horas_asignadas_total']);
+        $this->assertSame(0.0, $vinculado['horas_reservadas_no_normativas']);
+        $detalleVinculado = DotacionAsignacionCalculator::assignmentsByRut(Establecimiento::findOrFail(1), 2026)['111111111'];
+        $this->assertSame(6.0, $detalleVinculado['funciones_total']);
+    }
+
     public function test_dotacion_2027_conserva_situaciones_sin_heredar_asignaciones_de_2026(): void
     {
         $this->personal(101, ['anio' => 2026, 'mes' => 8]);
