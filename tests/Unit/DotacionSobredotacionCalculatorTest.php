@@ -308,6 +308,86 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertSame(0.0, $pie['horas_sobredotacion_planta']);
     }
 
+    public function test_vacantes_separan_plan_parvularia_y_pie_sin_incluir_horas_reservadas(): void
+    {
+        $general = $this->docente('11111111-1', 'Docente general sintético', 30, 27, 3, 10, 0, 0, true);
+        $general['asignaciones'] = [[
+            'tipo_asignacion' => 'reserva_no_normativa',
+            'subtipo_asignacion' => 'titular',
+            'horas_contrato' => 7,
+        ]];
+        $general['horas_reservadas_no_normativas'] = 7;
+        $parvularia = $this->docente('22222222-2', 'Educadora de párvulos sintética', 43, 43, 0, 42.63, 0, 0, true);
+        $parvularia['titulo'] = 'Pedagogía en Educación de Párvulos';
+        $pie = $this->docente('33333333-3', 'Educadora diferencial sintética', 20, 0, 20, 0, 0, 20, false);
+        $pie['asignaciones'] = [[
+            'tipo_asignacion' => 'pie_educadora_diferencial',
+            'horas_contrato' => 15,
+        ]];
+        $reservaCompleta = $this->docente('44444444-4', 'Docente con reserva completa', 5, 5, 0, 0, 0, 0, true);
+        $reservaCompleta['asignaciones'] = [[
+            'tipo_asignacion' => 'reserva_no_normativa',
+            'subtipo_asignacion' => 'titular',
+            'horas_contrato' => 5,
+        ]];
+
+        $resultado = DotacionSobredotacionCalculator::build([$general, $parvularia, $pie, $reservaCompleta], $this->resumen());
+
+        $this->assertSame(13.37, $resultado['aula']['resumen']['horas_sobredotacion_total']);
+        $this->assertSame(13.0, $resultado['vacantes_por_bloque']['plan_estudio']['horas_total']);
+        $this->assertSame(0.37, $resultado['vacantes_por_bloque']['parvularia']['horas_total']);
+        $this->assertSame(5.0, $resultado['vacantes_por_bloque']['pie']['horas_total']);
+        $this->assertSame(10.0, $resultado['vacantes_por_bloque']['plan_estudio']['horas_planta']);
+        $this->assertSame(3.0, $resultado['vacantes_por_bloque']['plan_estudio']['horas_contrata']);
+        $this->assertSame(13.37, round(
+            $resultado['vacantes_por_bloque']['plan_estudio']['horas_total']
+            + $resultado['vacantes_por_bloque']['parvularia']['horas_total'], 2
+        ));
+        $this->assertSame(0, collect($resultado['vacantes_por_bloque'])
+            ->flatMap(fn ($bloque) => $bloque['items'])
+            ->where('nombre', 'Docente con reserva completa')->count());
+
+        $establecimiento = new Establecimiento(['nombre_establecimiento' => 'Establecimiento sintético']);
+        $establecimiento->id = 1;
+        $html = view('admin.dotacion-establecimiento.partials._sobredotacion', [
+            'sobredotacion' => $resultado,
+            'sobredotacionTipo' => 'aula',
+            'establecimiento' => $establecimiento,
+            'anio' => 2027,
+        ])->render();
+        $this->assertStringContainsString('Educadora diferencial sintética', $html);
+        $this->assertStringNotContainsString('Docente con reserva completa', $html);
+    }
+
+    public function test_un_contrato_mixto_conserva_el_saldo_de_cada_bloque(): void
+    {
+        $docente = $this->docente('11111111-1', 'Educadora mixta sintética', 44, 44, 0, 39, 0, 0, true);
+        $docente['titulo'] = 'Pedagogía en Educación de Párvulos';
+        $docente['asignaciones'] = [
+            ['tipo_asignacion' => 'plan_estudio', 'proporcion_aplicada' => 'NT Con JEC', 'horas_contrato' => 38],
+            ['tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 3],
+        ];
+
+        $resultado = DotacionSobredotacionCalculator::build([$docente], $this->resumen());
+
+        $this->assertSame(2.0, $resultado['vacantes_por_bloque']['plan_estudio']['horas_total']);
+        $this->assertSame(3.0, $resultado['vacantes_por_bloque']['parvularia']['horas_total']);
+    }
+
+    public function test_funciones_no_normativas_de_diferencial_cubren_su_contrato_pie(): void
+    {
+        $docente = $this->docente('11111111-1', 'Diferencial sintética', 20, 0, 20, 0, 0, 20, false);
+        $docente['titulo'] = 'Pedagogía en Educación Diferencial';
+        $docente['asignaciones'] = [
+            ['tipo_asignacion' => 'pie_educadora_diferencial', 'horas_contrato' => 15],
+            ['tipo_asignacion' => 'otra_funcion', 'horas_contrato' => 3],
+        ];
+
+        $resultado = DotacionSobredotacionCalculator::build([$docente], $this->resumen());
+
+        $this->assertSame(2.0, $resultado['vacantes_por_bloque']['pie']['horas_total']);
+    }
+
     public function test_distingue_brecha_estructural_sobredotacion_factual_y_potencial_de_ajuste(): void
     {
         $resultado = DotacionSobredotacionCalculator::build([
@@ -364,6 +444,9 @@ class DotacionSobredotacionCalculatorTest extends TestCase
         $this->assertStringNotContainsString('diferencia por cobertura y distribución individual', $htmlAula);
         $this->assertStringNotContainsString('(50 + 10 + 12)', $htmlAula);
         $this->assertStringContainsString('Contrato sin asignación registrada', $htmlAula);
+        $this->assertStringContainsString('id="vacantes-plan_estudio"', $htmlAula);
+        $this->assertStringContainsString('id="vacantes-parvularia"', $htmlAula);
+        $this->assertStringContainsString('id="vacantes-pie"', $htmlAula);
         $this->assertStringContainsString('Funciones declaradas asignadas a docentes (revisables)', $htmlAula);
         $this->assertStringContainsString('Declaradas docentes / requeridas', $htmlAula);
         $this->assertStringContainsString('Asignaciones protegidas', $htmlAula);

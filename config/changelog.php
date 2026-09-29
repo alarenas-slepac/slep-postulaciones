@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.29.547' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Saldos contractuales vacantes por bloque',
+        'files' => [
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La nómina de contrato sin asignación separa Plan de estudio, Educación Parvularia y PIE, con subtotales titulares y a contrata por bloque.',
+            'Las reservas de horas para otras funciones se descuentan del saldo vacante y dejan de figurar como horas libres.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.546' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',

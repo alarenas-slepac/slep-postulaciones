@@ -6,6 +6,7 @@
     $ajusteItems = collect($detalle['ajustes'] ?? []);
     $contratosProtegidos = collect($sobredotacion['protegidos'] ?? []);
     $sobredotacionResumen = $detalle['resumen'] ?? [];
+    $vacantesPorBloque = $sobredotacion['vacantes_por_bloque'] ?? [];
     $declaradasAsignadas = $sobredotacionResumen['horas_declaradas_asignadas'] ?? $sobredotacionResumen['horas_declaradas_ajustables'] ?? 0;
     $sobredotacionPieEstructural = $sobredotacionResumen['horas_sobredotacion_estructural'] ?? $sobredotacionResumen['horas_sobredotacion_total'] ?? 0;
     $formula = $detalle['formula'] ?? [];
@@ -129,37 +130,42 @@
             <div>
                 <div class="dotacion-eyebrow">Horas contractuales vacantes</div>
                 <h2 class="h5 fw-bold mb-1">Contrato sin asignación registrada</h2>
-                <div class="text-muted small">Sólo aparecen docentes sin protección por situación cuyo contrato Aula supera la suma de sus asignaciones protegidas y declaradas.</div>
+                <div class="text-muted small">Saldos contractuales por bloque, descontando las asignaciones registradas y las horas reservadas para otras funciones. Los contratos protegidos quedan fuera de esta nómina.</div>
             </div>
-            <span class="badge rounded-pill text-bg-danger">{{ $sobredotacionItems->count() }} docente(s)</span>
+            <span class="badge rounded-pill text-bg-danger">{{ collect($vacantesPorBloque)->sum(fn ($bloque) => collect($bloque['items'] ?? [])->count()) }} saldo(s)</span>
         </div>
-        <div class="table-responsive">
-            <table class="table align-middle mb-0">
-                <thead class="table-light"><tr><th>RUT</th><th>Docente</th><th>Función</th><th class="text-end">Contrato Aula</th><th class="text-end">Protegidas</th><th class="text-end">Declaradas</th><th class="text-end">Total asignado</th><th class="text-end">Sin asignación</th><th class="text-end">Planta</th><th class="text-end">Contrata</th><th class="text-end">Sobreasignadas</th></tr></thead>
-                <tbody>
-                    @forelse ($sobredotacionItems as $docente)
-                        <tr>
-                            <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
-                            <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
-                            <td>{{ $docente['funcion'] }}</td>
-                            <td class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td>
-                            <td class="text-end text-success">{{ $fmt($docente['horas_asignadas_protegidas']) }}</td>
-                            <td class="text-end text-warning-emphasis">{{ $fmt($docente['horas_declaradas_ajustables']) }}</td>
-                            <td class="text-end fw-semibold">{{ $fmt($docente['horas_asignadas_total']) }}</td>
-                            <td class="text-end text-danger fw-bold">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
-                            <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td>
-                            <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td>
-                            <td class="text-end {{ $docente['horas_sobreasignadas'] > 0 ? 'text-danger fw-bold' : 'text-muted' }}">{{ $fmt($docente['horas_sobreasignadas']) }}</td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>No se identificaron horas contractuales sin asignación disponibles para revisión.</td></tr>
-                    @endforelse
-                </tbody>
-                @if ($sobredotacionItems->isNotEmpty())
-                    <tfoot class="table-light fw-bold"><tr><td colspan="7">Total contrato sin asignación registrada</td><td class="text-end text-danger">{{ $fmt($sobredotacionResumen['horas_sobredotacion_total'] ?? 0) }}</td><td class="text-end text-primary">{{ $fmt($sobredotacionResumen['horas_sobredotacion_planta'] ?? 0) }}</td><td class="text-end text-info">{{ $fmt($sobredotacionResumen['horas_sobredotacion_contrata'] ?? 0) }}</td><td></td></tr></tfoot>
-                @endif
-            </table>
-        </div>
+        @foreach (['plan_estudio' => 'Plan de estudio', 'parvularia' => 'Educación Parvularia', 'pie' => 'PIE'] as $claveBloque => $tituloBloque)
+            @php($bloqueVacante = $vacantesPorBloque[$claveBloque] ?? [])
+            <section class="border-top" aria-labelledby="vacantes-{{ $claveBloque }}">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-3 bg-light">
+                    <div><h3 id="vacantes-{{ $claveBloque }}" class="h6 fw-bold mb-0">{{ $tituloBloque }}</h3><div class="small text-muted">{{ collect($bloqueVacante['items'] ?? [])->count() }} docente(s) con saldo libre</div></div>
+                    <span class="badge rounded-pill text-bg-danger">{{ $fmt($bloqueVacante['horas_total'] ?? 0) }} h sin asignación</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light"><tr><th scope="col">RUT</th><th scope="col">Docente</th><th scope="col">Función</th><th scope="col" class="text-end">Contrato del bloque</th><th scope="col" class="text-end">Sin asignación</th><th scope="col" class="text-end">Planta</th><th scope="col" class="text-end">Contrata</th></tr></thead>
+                        <tbody>
+                            @forelse (($bloqueVacante['items'] ?? collect()) as $docente)
+                                <tr>
+                                    <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
+                                    <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
+                                    <td>{{ $docente['funcion'] }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td>
+                                    <td class="text-end text-danger fw-bold">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
+                                    <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td>
+                                    <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="7" class="text-center text-muted py-4">No hay horas contractuales sin asignación en este bloque.</td></tr>
+                            @endforelse
+                        </tbody>
+                        @if (collect($bloqueVacante['items'] ?? [])->isNotEmpty())
+                            <tfoot class="table-light fw-bold"><tr><td colspan="4">Total {{ $tituloBloque }}</td><td class="text-end text-danger">{{ $fmt($bloqueVacante['horas_total']) }}</td><td class="text-end text-primary">{{ $fmt($bloqueVacante['horas_planta']) }}</td><td class="text-end text-info">{{ $fmt($bloqueVacante['horas_contrata']) }}</td></tr></tfoot>
+                        @endif
+                    </table>
+                </div>
+            </section>
+        @endforeach
     </div>
 
     <div class="card dotacion-section">

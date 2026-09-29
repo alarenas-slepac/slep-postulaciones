@@ -31,7 +31,7 @@ class DotacionSobredotacionCalculator
      * @param  iterable<int, array<string, mixed>>  $docentes
      * @param  array<string, mixed>  $resumen
      * @param  iterable<int, array<string, mixed>>  $necesidadesFunciones
-     * @return array{aula: array<string, mixed>, pie: array<string, mixed>, protegidos: Collection}
+     * @return array{aula: array<string, mixed>, pie: array<string, mixed>, protegidos: Collection, vacantes_por_bloque: array<string, array<string, mixed>>}
      */
     public static function build(iterable $docentes, array $resumen, iterable $necesidadesFunciones = []): array
     {
@@ -57,21 +57,24 @@ class DotacionSobredotacionCalculator
         $pie = self::conciliarDotacion($pie, $pieObjetivo, 'Horas de contrato docente PIE no asociadas a docente');
         $necesidadPie = self::numero($resumen, 'horas_contrato_pie_necesarias');
 
+        $aula = self::analizarAula($base, $necesidadAula, $aulaObjetivo, [
+            'contrato_plan_pie' => (float) ($resumen['contrato_plan_general_mas_trabajo_colaborativo_pie']
+                ?? max(0.0, self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie')
+                    - self::numero($resumen, 'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie'))),
+            'bloque_normativo' => self::numero($resumen, 'horas_dotacion_funciones_normativas'),
+            'contrato_aula' => (float) ($resumen['horas_contrato_docentes_aula_general']
+                ?? max(0.0, $aulaObjetivo - self::numero($resumen, 'horas_contrato_docentes_parvularia'))),
+            'bloque_declarado' => $declaradasObjetivo,
+        ]);
+
         return [
             'protegidos' => $base->where('contrato_protegido', true)->values(),
-            'aula' => self::analizarAula($base, $necesidadAula, $aulaObjetivo, [
-                'contrato_plan_pie' => (float) ($resumen['contrato_plan_general_mas_trabajo_colaborativo_pie']
-                    ?? max(0.0, self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie')
-                        - self::numero($resumen, 'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie'))),
-                'bloque_normativo' => self::numero($resumen, 'horas_dotacion_funciones_normativas'),
-                'contrato_aula' => (float) ($resumen['horas_contrato_docentes_aula_general']
-                    ?? max(0.0, $aulaObjetivo - self::numero($resumen, 'horas_contrato_docentes_parvularia'))),
-                'bloque_declarado' => $declaradasObjetivo,
-            ]),
+            'aula' => $aula,
             'pie' => self::distribuirNecesidad($pie, $necesidadPie, [
                 'contrato_pie_necesario' => $necesidadPie,
                 'contrato_docente_pie' => $pieObjetivo,
             ]),
+            'vacantes_por_bloque' => self::vacantesPorBloque($base, $aula['items']),
         ];
     }
 
@@ -82,12 +85,28 @@ class DotacionSobredotacionCalculator
         $motivo = (string) data_get($docente, 'exclusion_docente.motivo', '');
         [$planta, $contrata] = self::contratoPorCalidad($docente, $horasContrato);
         $asignaciones = collect($docente['asignaciones'] ?? []);
+        $reservas = $asignaciones->where('tipo_asignacion', 'reserva_no_normativa');
+        $reservadasPlanta = (float) $reservas->where('subtipo_asignacion', 'titular')->sum(fn ($row) => self::horasAsignacion($row));
+        $reservadasContrata = (float) $reservas->where('subtipo_asignacion', 'contrata')->sum(fn ($row) => self::horasAsignacion($row));
+        $reservadasSinOrigen = max(0.0, round((float) ($docente['horas_reservadas_no_normativas'] ?? $reservas->sum(fn ($row) => self::horasAsignacion($row))) - $reservadasPlanta - $reservadasContrata, 2));
         $contratoPie = array_key_exists('horas_contrato_pie', $docente)
             ? max(0.0, (float) $docente['horas_contrato_pie'])
             : DotacionAsignacionCalculator::contratoPiePorDocente($docente);
         if ($especial) {
             $contratoPie = 0.0;
         }
+        $perfil = DotacionProfesionDocenteResolver::perfilTitulo($docente);
+        $esDiferencial = $perfil['es_educacion_diferencial'];
+        $contratoParvularia = $perfil['es_educacion_parvulos']
+            ? min(max(0.0, $horasContrato - $contratoPie), (float) DotacionEstablecimientoCalculator::contratoParvularia(
+                [$docente], max(0.0, $horasContrato - $contratoPie), 0
+            )['horas_contrato_docentes_parvularia'])
+            : 0.0;
+        $asignadasParvularia = $perfil['es_educacion_parvulos']
+            ? (float) $asignaciones
+                ->filter(fn ($asignacion) => self::esAsignacionParvularia($asignacion))
+                ->sum(fn ($asignacion) => self::horasAsignacion($asignacion))
+            : 0.0;
 
         // La porción PIE se reserva primero desde Contrata para mantener la
         // mayor cantidad posible de horas titulares en la dotación de Aula.
@@ -128,6 +147,10 @@ class DotacionSobredotacionCalculator
             'aula_contrata' => round(max(0.0, $contrata - $pieContrata), 2),
             'pie_planta' => round($piePlanta, 2),
             'pie_contrata' => round($pieContrata, 2),
+            'contrato_parvularia' => round($contratoParvularia, 2),
+            'asignadas_parvularia' => round($asignadasParvularia, 2),
+            'reservadas_planta' => round($reservadasPlanta + $reservadasSinOrigen, 2),
+            'reservadas_contrata' => round($reservadasContrata, 2),
             'asignadas_protegidas' => round($asignadasProtegidas, 2),
             'declaradas_ajustables' => round($declaradasAjustables, 2),
             'declaradas_detalle' => $declaradasDetalle,
@@ -137,6 +160,13 @@ class DotacionSobredotacionCalculator
                     ->filter(fn ($asignacion) => self::esContratoPie($asignacion)
                         && DotacionAsignacionCalculator::coverageEstamento($asignacion) === 'docente')
                     ->sum(fn ($asignacion) => self::horasAsignacion($asignacion)), 2)),
+            'asignadas_pie_registradas' => $especial ? 0.0 : round((float) $asignaciones
+                ->filter(fn ($asignacion) => DotacionAsignacionCalculator::coverageEstamento($asignacion) === 'docente'
+                    && ($esDiferencial
+                        ? ! in_array((string) data_get($asignacion, 'tipo_asignacion'), ['plan_estudio', 'reserva_no_normativa'], true)
+                            && ! DotacionAsignacionCalculator::esAsignacionNormativaAula($asignacion, true)
+                        : self::esContratoPie($asignacion)))
+                ->sum(fn ($asignacion) => self::horasAsignacion($asignacion)), 2),
         ];
     }
 
@@ -170,8 +200,17 @@ class DotacionSobredotacionCalculator
             $asignadasConsideradas = round($protegidasConsideradas + $declaradasConsideradas, 2);
             $asignadasPlanta = round($protegidasPlanta + $declaradasPlanta, 2);
             $asignadasContrata = round($protegidasContrata + $declaradasContrata, 2);
-            $sinAsignacionPlanta = round(max(0.0, $contratoPlanta - $asignadasPlanta), 2);
-            $sinAsignacionContrata = round(max(0.0, $contratoContrata - $asignadasContrata), 2);
+            $saldoPlanta = max(0.0, round($contratoPlanta - $asignadasPlanta, 2));
+            $saldoContrata = max(0.0, round($contratoContrata - $asignadasContrata, 2));
+            $reservaPlanta = min($saldoPlanta, (float) $docente['reservadas_planta']);
+            $reservaContrata = min($saldoContrata, (float) $docente['reservadas_contrata']);
+            $reservaPendiente = max(0.0, round(
+                (float) $docente['reservadas_planta'] + (float) $docente['reservadas_contrata']
+                - $reservaPlanta - $reservaContrata, 2
+            ));
+            $sinAsignacionPlanta = round(max(0.0, $saldoPlanta - $reservaPlanta - $reservaPendiente), 2);
+            $reservaPendiente = max(0.0, round($reservaPendiente - ($saldoPlanta - $reservaPlanta), 2));
+            $sinAsignacionContrata = round(max(0.0, $saldoContrata - $reservaContrata - $reservaPendiente), 2);
 
             return [
                 'rut' => $docente['rut'],
@@ -262,6 +301,107 @@ class DotacionSobredotacionCalculator
                 'tiene_ajuste_no_asociado' => abs($contratoAulaIndividualizado - $contratoAulaResumen) > 0.01,
             ],
             'formula' => $formula,
+        ];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function vacantesPorBloque(Collection $base, Collection $vacantesAula): array
+    {
+        $grupos = [
+            'plan_estudio' => collect(),
+            'parvularia' => collect(),
+            'pie' => collect(),
+        ];
+        $aulaPorRut = $vacantesAula->keyBy('rut');
+
+        foreach ($base as $docente) {
+            if ($docente['contrato_protegido']) {
+                continue;
+            }
+
+            $aula = $aulaPorRut->get($docente['rut']);
+            if ($aula) {
+                $contratoAula = (float) $aula['horas_contrato_categoria'];
+                $contratoParvularia = (float) $docente['contrato_parvularia'];
+                $asignadasParvularia = (float) $docente['asignadas_parvularia'];
+                $vacanteParvularia = round(min(
+                    (float) $aula['horas_sobredotacion_total'],
+                    max(0.0, $contratoParvularia - $asignadasParvularia)
+                ), 2);
+                $vacanteParvularia = round(min($contratoParvularia, max(
+                    $vacanteParvularia,
+                    (float) $aula['horas_sobredotacion_total'] - ($contratoAula - $contratoParvularia)
+                )), 2);
+                $vacantePlan = round((float) $aula['horas_sobredotacion_total'] - $vacanteParvularia, 2);
+                $plantaParvularia = min($vacanteParvularia, (float) $aula['horas_sobredotacion_planta']);
+
+                foreach ([
+                    'plan_estudio' => [$contratoAula - $contratoParvularia, $vacantePlan,
+                        (float) $aula['horas_sobredotacion_planta'] - $plantaParvularia],
+                    'parvularia' => [$contratoParvularia, $vacanteParvularia, $plantaParvularia],
+                ] as $bloque => [$contrato, $vacante, $planta]) {
+                    if ($vacante <= 0.01) {
+                        continue;
+                    }
+                    $grupos[$bloque]->push(self::filaVacante($docente, $contrato, $vacante, $planta));
+                }
+            }
+
+            $contratoPie = round((float) $docente['pie_planta'] + (float) $docente['pie_contrata'], 2);
+            $vacantePie = round(max(0.0, $contratoPie - (float) $docente['asignadas_pie_registradas']), 2);
+            if ($vacantePie > 0.01) {
+                $plantaPie = min($vacantePie, max(0.0, (float) $docente['pie_planta'] - (float) $docente['asignadas_pie_registradas']));
+                $grupos['pie']->push(self::filaVacante($docente, $contratoPie, $vacantePie, $plantaPie));
+            }
+        }
+
+        return collect($grupos)->map(function (Collection $items): array {
+            $items = $items->sortBy([
+                ['horas_sobredotacion_total', 'desc'],
+                ['nombre', 'asc'],
+            ])->values();
+
+            return [
+                'items' => $items,
+                'horas_total' => self::sumar($items, 'horas_sobredotacion_total'),
+                'horas_planta' => self::sumar($items, 'horas_sobredotacion_planta'),
+                'horas_contrata' => self::sumar($items, 'horas_sobredotacion_contrata'),
+            ];
+        })->all();
+    }
+
+    private static function esAsignacionParvularia(object|array $asignacion): bool
+    {
+        $tipo = (string) data_get($asignacion, 'tipo_asignacion', '');
+        if ($tipo === 'acompanamiento_parvularia') {
+            return true;
+        }
+        if (! in_array($tipo, ['plan_estudio', 'pie_colaborativo'], true)) {
+            return false;
+        }
+        $curso = data_get($asignacion, 'establecimientoCurso');
+        if ($curso instanceof \App\Models\EstablecimientoCurso) {
+            return DotacionProfesionDocenteResolver::esCursoNt($curso);
+        }
+
+        $proporcion = Str::of((string) data_get($asignacion, 'proporcion_aplicada', ''))
+            ->ascii()->upper()->trim()->toString();
+
+        return str_starts_with($proporcion, 'NT ') || str_contains($proporcion, 'PARVULARIA');
+    }
+
+    /** @return array<string, mixed> */
+    private static function filaVacante(array $docente, float $contrato, float $vacante, float $planta): array
+    {
+        return [
+            'rut' => $docente['rut'],
+            'nombre' => $docente['nombre'],
+            'funcion' => $docente['funcion'],
+            'tipo_contrato' => $docente['tipo_contrato'],
+            'horas_contrato_categoria' => round($contrato, 2),
+            'horas_sobredotacion_total' => round($vacante, 2),
+            'horas_sobredotacion_planta' => round($planta, 2),
+            'horas_sobredotacion_contrata' => round($vacante - $planta, 2),
         ];
     }
 
