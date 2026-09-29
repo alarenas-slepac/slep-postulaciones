@@ -293,10 +293,6 @@ class DotacionEstablecimientoController extends Controller
                 DotacionDocenteExclusion::conservacionHorasPorRut((int) $establecimiento->id, $anioPadron)
             );
         }
-        $sobredotacionTipo = (string) $request->query('sobredotacion_tipo', 'aula');
-        if (! in_array($sobredotacionTipo, DotacionSobredotacionCalculator::TIPOS, true)) {
-            $sobredotacionTipo = 'aula';
-        }
         $sobredotacion = DotacionSobredotacionCalculator::build(
             $data['docentes'],
             $data['resumen'],
@@ -362,7 +358,6 @@ class DotacionEstablecimientoController extends Controller
             'bloquesContratoDotacion' => $data['bloques_contrato_dotacion'] ?? $data['bloques'],
             'docentes' => $data['docentes'],
             'sobredotacion' => $sobredotacion,
-            'sobredotacionTipo' => $sobredotacionTipo,
             'canViewSobredotacion' => $canViewSobredotacion,
             'justificacionesSobredotacion' => $justificacionesSobredotacion,
             'justificacionesSobredotacionTableReady' => $justificacionesSobredotacionTableReady,

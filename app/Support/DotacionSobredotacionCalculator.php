@@ -399,6 +399,20 @@ class DotacionSobredotacionCalculator
         return ceil($asignadas) >= $contrato ? $saldo : 0.0;
     }
 
+    /** Ajuste visual compartido por la nómina y el proceso guiado; no altera horas guardadas. */
+    public static function redondeoParvulariaDocente(array $docente): float
+    {
+        $saldoLibre = max(0.0, round(
+            (float) ($docente['horas_contrato'] ?? 0)
+            - (float) ($docente['horas_asignadas_total'] ?? 0), 2
+        ));
+        if ($saldoLibre <= 0.01) {
+            return 0.0;
+        }
+
+        return min(self::saldoFraccionalParvularia(self::prepararDocente($docente, collect())), $saldoLibre);
+    }
+
     private static function esAsignacionParvularia(object|array $asignacion): bool
     {
         $tipo = (string) data_get($asignacion, 'tipo_asignacion', '');

@@ -1,17 +1,13 @@
 @php
     $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
-    $tipoDetalle = in_array($sobredotacionTipo ?? 'aula', ['aula', 'pie'], true) ? ($sobredotacionTipo ?? 'aula') : 'aula';
-    $detalle = $sobredotacion[$tipoDetalle] ?? [];
-    $sobredotacionItems = collect($detalle['items'] ?? []);
+    $detalle = $sobredotacion['aula'] ?? [];
     $ajusteItems = collect($detalle['ajustes'] ?? []);
     $contratosProtegidos = collect($sobredotacion['protegidos'] ?? []);
     $sobredotacionResumen = $detalle['resumen'] ?? [];
     $vacantesPorBloque = $sobredotacion['vacantes_por_bloque'] ?? [];
     $justificacionesSobredotacion = $justificacionesSobredotacion ?? collect();
     $declaradasAsignadas = $sobredotacionResumen['horas_declaradas_asignadas'] ?? $sobredotacionResumen['horas_declaradas_ajustables'] ?? 0;
-    $sobredotacionPieEstructural = $sobredotacionResumen['horas_sobredotacion_estructural'] ?? $sobredotacionResumen['horas_sobredotacion_total'] ?? 0;
     $formula = $detalle['formula'] ?? [];
-    $esAula = $tipoDetalle === 'aula';
     $brechaEstructural = (float) ($sobredotacionResumen['brecha_estructural'] ?? 0);
     $resultadoEstructural = $brechaEstructural < -0.01
         ? ['label' => 'Sobredotación estructural', 'value' => $fmt(abs($brechaEstructural)), 'class' => 'alert-danger']
@@ -32,26 +28,12 @@
         </div>
     </div>
     <div class="card-body">
-        <ul class="nav nav-pills gap-2 mb-4" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link {{ $esAula ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion', 'sobredotacion_tipo' => 'aula']) }}">
-                    <i class="bi bi-easel2"></i> Horas contrato Aula
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ !$esAula ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion', 'sobredotacion_tipo' => 'pie']) }}">
-                    <i class="bi bi-universal-access"></i> Horas contrato docente PIE
-                </a>
-            </li>
-        </ul>
-
         <p class="small text-muted">Los contratos con Fuero maternal u Horas gremiales quedan protegidos en su totalidad y se excluyen de las nóminas de posible reducción y del universo sujeto a revisión. Las horas no necesarias siguen fuera del contrato contabilizado.</p>
 
-        @if ($esAula)
-            <div class="alert {{ $resultadoEstructural['class'] }} border-0 rounded-4">
-                <div class="fw-bold mb-1">Sobredotación estructural</div>
-                <div class="fs-4 fw-bold">{{ $resultadoEstructural['value'] }}</div>
-            </div>
+        <div class="alert {{ $resultadoEstructural['class'] }} border-0 rounded-4">
+            <div class="fw-bold mb-1">Sobredotación estructural</div>
+            <div class="fs-4 fw-bold">{{ $resultadoEstructural['value'] }}</div>
+        </div>
 
             <div class="row g-3">
                 <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Docentes analizados</div><div class="h4 fw-bold mb-0">{{ number_format((int) ($sobredotacionResumen['docentes_analizados'] ?? 0), 0, ',', '.') }}</div><div class="small text-muted">Con contrato Aula o asignación</div></div></div>
@@ -63,34 +45,6 @@
                 <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-info-subtle h-100"><div class="small text-muted">Sin asignación Contrata</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_contrata'] ?? 0) }}</div><div class="small text-muted">Horas a contrata</div></div></div>
                 <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-secondary-subtle h-100"><div class="small text-muted">Universo sujeto a revisión</div><div class="h4 fw-bold text-secondary mb-0">{{ $fmt($sobredotacionResumen['horas_universo_revision'] ?? $sobredotacionResumen['horas_potencial_ajuste'] ?? 0) }}</div><div class="small text-muted">Sin asignación + declaradas asignadas</div></div></div>
             </div>
-        @else
-            @php
-                $resultadoPieSobredotacion = (float) $sobredotacionPieEstructural > 0.01;
-                $resultadoPieNecesidad = (float) ($sobredotacionResumen['horas_necesarias_pendientes'] ?? 0) > 0.01;
-            @endphp
-            <div class="alert {{ $resultadoPieSobredotacion ? 'alert-danger' : ($resultadoPieNecesidad ? 'alert-success' : 'alert-primary') }} border-0 rounded-4">
-                <div class="fw-bold mb-1">Dotación PIE</div>
-                <div>Horas de contrato PIE necesarias − horas contrato docente PIE.</div>
-                <div class="fw-semibold mt-1">{{ $fmt($formula['contrato_pie_necesario'] ?? 0) }} − {{ $fmt($formula['contrato_docente_pie'] ?? 0) }}</div>
-                <div class="fs-4 fw-bold mt-2">
-                    @if ($resultadoPieSobredotacion)
-                        Horas de sobredotación estructural: {{ $fmt($sobredotacionPieEstructural) }}
-                    @elseif ($resultadoPieNecesidad)
-                        Horas necesarias: +{{ $fmt($sobredotacionResumen['horas_necesarias_pendientes'] ?? 0) }}
-                    @else
-                        Dotación cuadrada: 0
-                    @endif
-                </div>
-            </div>
-            <div class="row g-3">
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Docentes analizados</div><div class="h4 fw-bold mb-0">{{ number_format((int) ($sobredotacionResumen['docentes_analizados'] ?? 0), 0, ',', '.') }}</div></div></div>
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Contrato docente PIE</div><div class="h4 fw-bold mb-0">{{ $fmt($sobredotacionResumen['horas_dotacion_total'] ?? 0) }}</div></div></div>
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Horas necesarias</div><div class="h4 fw-bold mb-0">{{ $fmt($sobredotacionResumen['horas_necesarias_total'] ?? 0) }}</div></div></div>
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-danger-subtle h-100"><div class="small text-muted">Sobredotación PIE</div><div class="h4 fw-bold text-danger mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_total'] ?? 0) }}</div></div></div>
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-primary-subtle h-100"><div class="small text-muted">Sobredotación Planta</div><div class="h4 fw-bold text-primary mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_planta'] ?? 0) }}</div></div></div>
-                <div class="col-xl-3 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-info-subtle h-100"><div class="small text-muted">Sobredotación Contrata</div><div class="h4 fw-bold text-info mb-0">{{ $fmt($sobredotacionResumen['horas_sobredotacion_contrata'] ?? 0) }}</div></div></div>
-            </div>
-        @endif
     </div>
 </div>
 
@@ -110,11 +64,10 @@
                 </tbody>
             </table>
         </div>
-        <div class="card-body small text-muted">En la categoría consultada, {{ $fmt($sobredotacionResumen['horas_sobredotacion_protegida'] ?? 0) }} h de saldo protegido quedan fuera de revisión.@if ($esAula) También se excluyen {{ $fmt($sobredotacionResumen['horas_declaradas_protegidas'] ?? 0) }} h de funciones declaradas, manteniendo su cobertura registrada.@endif</div>
+        <div class="card-body small text-muted">En la categoría consultada, {{ $fmt($sobredotacionResumen['horas_sobredotacion_protegida'] ?? 0) }} h de saldo protegido quedan fuera de revisión. También se excluyen {{ $fmt($sobredotacionResumen['horas_declaradas_protegidas'] ?? 0) }} h de funciones declaradas, manteniendo su cobertura registrada.</div>
     </section>
 @endif
 
-@if ($esAula)
     <div class="alert alert-info border-0 rounded-4 small">
         <i class="bi bi-info-circle"></i>
         <strong>Cálculo individual:</strong> las funciones directivas, técnico-pedagógicas y planes normativos se imputan directamente al docente que los tiene asignados, junto con contrato plan y trabajo colaborativo PIE. Las horas declaradas también reducen el saldo sin asignación, pero se informan separadamente como posibles ajustes. En contratos mixtos, las asignaciones cubren primero Planta y luego Contrata.
@@ -325,26 +278,3 @@
             </table>
         </div>
     </div>
-@else
-    <div class="alert alert-info border-0 rounded-4 small">
-        <i class="bi bi-info-circle"></i> La necesidad PIE se distribuye conservando primero el aporte de los contratos protegidos por situación docente. Luego se conservan las horas Planta y después Contrata de los demás docentes.
-    </div>
-    <div class="card dotacion-section">
-        <div class="dotacion-section-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div><div class="dotacion-eyebrow">Contrato docente PIE</div><h2 class="h5 fw-bold mb-1">Nómina de sobredotación PIE</h2></div>
-            <span class="badge rounded-pill text-bg-danger">{{ $sobredotacionItems->count() }} registro(s)</span>
-        </div>
-        <div class="table-responsive">
-            <table class="table align-middle mb-0">
-                <thead class="table-light"><tr><th>RUT</th><th>Docente</th><th>Función</th><th class="text-end">Contrato docente PIE</th><th class="text-end">Necesidad cubierta</th><th class="text-end">Sobredotación total</th><th class="text-end">Planta</th><th class="text-end">Contrata</th></tr></thead>
-                <tbody>
-                    @forelse ($sobredotacionItems as $docente)
-                        <tr><td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td><td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td><td>{{ $docente['funcion'] }}</td><td class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td><td class="text-end">{{ $fmt($docente['horas_necesidad_cubierta']) }}</td><td class="text-end text-danger fw-bold">{{ $fmt($docente['horas_sobredotacion_total']) }}</td><td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td><td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td></tr>
-                    @empty
-                        <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>No se identificaron docentes con sobredotación PIE disponibles para revisión.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
-@endif

@@ -84,6 +84,9 @@ class DotacionProceso2027Calculator
             'titulares_asignadas' => 0.0,
             'contrata_asignadas' => 0.0,
             'sin_padron_asignadas' => 0.0,
+            'redondeo_parvularia' => 0.0,
+            'redondeo_parvularia_titular' => 0.0,
+            'redondeo_parvularia_contrata' => 0.0,
             'horas_normativas_potenciales' => 0.0,
             'horas_normativas_definidas' => 0.0,
             'maximo' => $config ? self::numero($config->{'max_horas_'.$key}) : null,
@@ -194,12 +197,19 @@ class DotacionProceso2027Calculator
             $bloques['bloque_2']['requeridas'] += max(0.0, (float) $resumenContractual['contrato_educacion_parvularia_mas_trabajo_colaborativo_pie']);
         }
 
-        $docentes = self::docentesPriorizados(collect(data_get($data, 'asignacion.docentes', $data['docentes'] ?? [])));
+        $docentes = self::docentesPriorizados(collect(data_get($data, 'asignacion.docentes', $data['docentes'] ?? [])))
+            ->map(function (array $docente): array {
+                $docente['redondeo_parvularia'] = isset($docente['cupo_contrata_id'])
+                    ? 0.0 : DotacionSobredotacionCalculator::redondeoParvulariaDocente($docente);
+
+                return $docente;
+            });
         $docentesPorRut = $docentes->keyBy('rut_normalizado');
         $asignaciones = collect(data_get($data, 'asignacion.asignaciones', []))
             ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row))
             ->sortBy(fn ($row) => (string) data_get($row, 'tipo_asignacion') === 'reserva_no_normativa' ? 0 : 1);
         $horasClasificadasPorRut = [];
+        $horasParvulariaPorRut = [];
         foreach ($asignaciones as $asignacion) {
             $rut = DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($asignacion, 'docente_rut_normalizado') ?: data_get($asignacion, 'docente_rut', '')));
             $docente = $docentesPorRut->get($rut);
@@ -222,6 +232,9 @@ class DotacionProceso2027Calculator
             }
             $horas = max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
             $bloques[$bloque]['asignadas'] += $horas;
+            if ($bloque === 'bloque_2' && $docente) {
+                $horasParvulariaPorRut[$rut] = ($horasParvulariaPorRut[$rut] ?? 0.0) + $horas;
+            }
             if ($bloqueDocenteExterno) {
                 $bloques[$bloque]['asignadas_libre_disposicion_nt_otro_docente'] += $horas;
             }
@@ -264,6 +277,23 @@ class DotacionProceso2027Calculator
             }
         }
 
+        // Muestra la jornada NT completada por redondeo individual, sin sumar
+        // horas ficticias a las asignaciones ni a los topes operativos.
+        foreach ($docentes as $docente) {
+            $rut = (string) ($docente['rut_normalizado'] ?? '');
+            $redondeo = min(
+                (float) ($docente['redondeo_parvularia'] ?? 0),
+                (float) ($horasParvulariaPorRut[$rut] ?? 0)
+            );
+            if ($redondeo <= 0.01) {
+                continue;
+            }
+            $titular = min($redondeo, (float) ($docente['horas_titulares_disponibles'] ?? 0));
+            $bloques['bloque_2']['redondeo_parvularia'] += $redondeo;
+            $bloques['bloque_2']['redondeo_parvularia_titular'] += $titular;
+            $bloques['bloque_2']['redondeo_parvularia_contrata'] += $redondeo - $titular;
+        }
+
         if ($usarResumenContractualPorComponente) {
             $desglose = (array) ($resumenContractual['contrato_plan_por_ensenanza_desglose'] ?? []);
             $necesidadesPlan = collect(data_get($data, 'asignacion.necesidades.plan_estudio', []))
@@ -304,6 +334,10 @@ class DotacionProceso2027Calculator
             $bloque['titulares_asignadas'] = round((float) $bloque['titulares_asignadas'], 2);
             $bloque['contrata_asignadas'] = round((float) $bloque['contrata_asignadas'], 2);
             $bloque['sin_padron_asignadas'] = round((float) $bloque['sin_padron_asignadas'], 2);
+            $bloque['redondeo_parvularia'] = round((float) $bloque['redondeo_parvularia'], 2);
+            $bloque['titulares_con_redondeo'] = round($bloque['titulares_asignadas'] + $bloque['redondeo_parvularia_titular'], 2);
+            $bloque['contrata_con_redondeo'] = round($bloque['contrata_asignadas'] + $bloque['redondeo_parvularia_contrata'], 2);
+            $bloque['asignadas_con_redondeo'] = round($bloque['asignadas'] + $bloque['redondeo_parvularia'], 2);
             $bloque['horas_normativas_potenciales'] = round((float) $bloque['horas_normativas_potenciales'], 2);
             $bloque['horas_normativas_definidas'] = round((float) $bloque['horas_normativas_definidas'], 2);
             $bloque['pendientes'] = max(0.0, round($bloque['requeridas'] - $bloque['asignadas_obligatorias'], 2));
