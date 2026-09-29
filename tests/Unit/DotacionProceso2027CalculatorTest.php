@@ -58,6 +58,69 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame(0.0, $bloque['pendientes']);
     }
 
+    public function test_muestra_redondeo_individual_nt_sin_alterar_las_asignaciones_ni_el_maximo(): void
+    {
+        $docentes = collect(['11111111-1', '22222222-2'])->map(function (string $rut): array {
+            return [
+                'rut' => $rut, 'rut_normalizado' => str_replace('-', '', $rut),
+                'nombre' => 'Educadora de prueba', 'titulo' => 'Pedagogía en Educación de Párvulos',
+                'horas_contrato' => 43, 'horas_planta' => 43, 'horas_contrata' => 0,
+                'horas_asignadas_total' => 42.63,
+                'horas_contrato_65_35' => 42.63,
+                'asignaciones' => [['tipo_asignacion' => 'plan_estudio', 'proporcion_aplicada' => 'NT Con JEC', 'horas_contrato' => 42.63]],
+            ];
+        })->all();
+        $asignaciones = collect($docentes)->map(fn (array $docente) => [
+            'docente_rut_normalizado' => $docente['rut_normalizado'],
+            'necesidad_key' => 'plan:nt', 'tipo_asignacion' => 'plan_estudio',
+            'horas_contrato' => 42.63,
+        ])->all();
+
+        $resumen = DotacionProceso2027Calculator::resumen(new Establecimiento(['id' => 1]), 2027, [
+            'resumen' => [
+                'contrato_plan_general_mas_trabajo_colaborativo_pie' => 0,
+                'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 86,
+                'contrato_plan_por_ensenanza_desglose' => ['contrato_plan_parvularia' => 86],
+            ],
+            'cursos' => [
+                'rows' => ['NT1' => ['detalles' => [['establecimiento_curso_id' => 99]]]],
+                'totales' => ['cursos' => 1, 'sin_horas_plan' => 0],
+            ],
+            'asignacion' => [
+                'necesidades' => ['plan_estudio' => [[
+                    'key' => 'plan:nt', 'establecimiento_curso_id' => 99,
+                    'horas_plan_requeridas' => 2, 'horas_plan_asignadas' => 2,
+                ]]],
+                'asignaciones' => $asignaciones, 'docentes' => $docentes,
+            ],
+            'docentes' => $docentes,
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ]);
+
+        $bloque = $resumen['bloques']['bloque_2'];
+        $this->assertSame(85.26, $bloque['asignadas']);
+        $this->assertSame(0.74, $bloque['redondeo_parvularia']);
+        $this->assertSame(86.0, $bloque['asignadas_con_redondeo']);
+        $this->assertSame(86.0, $bloque['titulares_con_redondeo']);
+        $this->assertSame(86.0, $bloque['contrato_comprometido']);
+        $this->assertSame(0.37, $resumen['docentes'][0]['redondeo_parvularia']);
+
+        $establecimiento = new Establecimiento;
+        $establecimiento->id = 1;
+        $html = view('admin.dotacion-establecimiento.partials._proceso_2027', [
+            'proceso2027' => $resumen,
+            'establecimiento' => $establecimiento,
+            'anio' => 2027,
+        ])->render();
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $xpath = new \DOMXPath($dom);
+        $filaParvularia = $xpath->query('//table[contains(@class, "table-sm")]/tbody/tr[2]')->item(0);
+        $this->assertNotNull($filaParvularia);
+        $this->assertStringContainsString('86', $xpath->query('./td[7]', $filaParvularia)->item(0)->textContent);
+        $this->assertStringContainsString('redondeo individual Parvularia', $filaParvularia->textContent);
+    }
+
     public function test_libre_disposicion_nt_de_otro_docente_se_registra_en_plan_general(): void
     {
         $asignacionExterna = [

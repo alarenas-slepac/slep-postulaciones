@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.9.29.553' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Redondeo NT visible en proceso guiado y detalle simplificado',
+        'files' => [
+            'app/Support/DotacionProceso2027Calculator.php',
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Http/Controllers/Admin/DotacionSobredotacionJustificacionController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+            'tests/Unit/DotacionSobredotacionCalculatorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El proceso guiado y la nómina docente muestran el redondeo individual de Parvularia, con las horas registradas visibles como referencia.',
+            'El redondeo no cambia asignaciones, máximos ni cobertura obligatoria; el detalle de sobredotación queda sin la pestaña de contrato PIE.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.552' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',

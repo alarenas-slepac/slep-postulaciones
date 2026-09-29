@@ -74,7 +74,7 @@ class DotacionSobredotacionJustificacionController extends Controller
         ])->save();
 
         return redirect()->to(route('admin.dotacion-establecimiento.show', [
-            $establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion', 'sobredotacion_tipo' => 'aula',
+            $establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion',
         ]).'#vacantes-'.$datos['bloque'])->with('success', 'Justificación guardada para el docente y bloque seleccionados.');
     }
 }

@@ -11,13 +11,21 @@
     $totalContratoEspecial = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_especial'] ?? 0));
     $totalFunciones = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_funciones_total'] ?? 0));
     $totalAsignadas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_asignadas_total'] ?? 0));
-    $totalDiferencia = round($totalContrato - $totalAsignadas, 2);
+    $totalRedondeoParvularia = round((float) $docentes->sum(fn ($docente) => (float) ($docente['redondeo_parvularia'] ?? 0)), 2);
+    $totalAsignadasVisibles = round($totalAsignadas + $totalRedondeoParvularia, 2);
+    $totalDiferencia = round($totalContrato - $totalAsignadasVisibles, 2);
     $mostrarEspecial = $totalContratoEspecial > 0.01;
     $proceso2027Docentes = $proceso2027 ?? ['aplica' => false];
     $tableColspan = ($mostrarEspecial ? 13 : 12) + (($proceso2027Docentes['aplica'] ?? false) ? 1 : 0);
-    $countCuadra = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'cuadra')->count();
-    $countPendiente = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'pendiente_asignacion')->count();
-    $countFaltan = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'faltan_horas')->count();
+    $cuadraPorRedondeo = fn ($docente) => (float) ($docente['redondeo_parvularia'] ?? 0) > 0.01
+        && ($docente['diferencia'] ?? null) !== null
+        && abs((float) $docente['diferencia'] - (float) $docente['redondeo_parvularia']) <= 0.01;
+    $countCuadra = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'cuadra'
+        || $cuadraPorRedondeo($docente))->count();
+    $countPendiente = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'pendiente_asignacion'
+        && ! $cuadraPorRedondeo($docente))->count();
+    $countFaltan = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'faltan_horas'
+        && ((float) ($docente['diferencia'] ?? 0) - (float) ($docente['redondeo_parvularia'] ?? 0)) > 0.01)->count();
     $countSobrecarga = $docentes->filter(fn ($docente) => ($docente['estado_cuadratura']['key'] ?? null) === 'sobrecarga')->count();
     $countSinInfo = $docentes->filter(fn ($docente) => in_array(($docente['estado_cuadratura']['key'] ?? null), ['sin_declaracion', 'sin_horas_contrato'], true))->count();
     $vacanciasPorNoContinuidad = $vacanciasPorNoContinuidad ?? null;
@@ -126,7 +134,7 @@
                 <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Contrato regla especial</div><div class="h5 fw-bold mb-0">{{ $fmt($totalContratoEspecial) }}</div></div></div>
             @endif
             <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Funciones contrato</div><div class="h5 fw-bold mb-0">{{ $fmt($totalFunciones) }}</div></div></div>
-            <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Total contrato calculado</div><div class="h5 fw-bold text-success mb-0">{{ $fmt($totalAsignadas) }}</div></div></div>
+            <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Total contrato calculado</div><div class="h5 fw-bold text-success mb-0">{{ $fmt($totalAsignadasVisibles) }}</div>@if ($totalRedondeoParvularia > 0.01)<div class="small text-muted">Registrado: {{ $fmt($totalAsignadas) }} · redondeo NT: +{{ $fmt($totalRedondeoParvularia) }}</div>@endif</div></div>
         </div>
     </div>
 </div>
@@ -164,8 +172,15 @@
                 @forelse ($docentes as $docente)
                     @php
                         $collapseId = 'docente-detalle-'.$loop->iteration;
-                        $diferencia = $docente['diferencia'];
+                        $redondeoParvularia = (float) ($docente['redondeo_parvularia'] ?? 0);
+                        $redondeoTitular = min($redondeoParvularia, (float) ($docente['horas_titulares_disponibles'] ?? 0));
+                        $redondeoContrata = $redondeoParvularia - $redondeoTitular;
+                        $diferencia = $docente['diferencia'] === null ? null : round((float) $docente['diferencia'] - $redondeoParvularia, 2);
+                        $horasAsignadasVisibles = round((float) $docente['horas_asignadas_total'] + $redondeoParvularia, 2);
                         $estado = $docente['estado_cuadratura'] ?? ['label' => 'Sin estado', 'class' => 'text-bg-secondary', 'detalle' => ''];
+                        if ($redondeoParvularia > 0.01 && $diferencia !== null && abs($diferencia) <= 0.01) {
+                            $estado = ['label' => 'Cuadra por redondeo NT', 'class' => 'text-bg-success'];
+                        }
                         $funcionesDocente = (float) ($docente['horas_funciones_total'] ?? 0);
                         $horasPlanta = (float) ($docente['horas_planta'] ?? 0);
                         $horasContrata = (float) ($docente['horas_contrata'] ?? 0);
@@ -188,7 +203,7 @@
                         <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
                         <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="text-muted small">{{ $docente['niveles_declarados'] }}</div></td>
                         @if ($proceso2027Docentes['aplica'] ?? false)
-                            <td><span class="badge rounded-pill text-bg-primary">{{ $docente['prioridad_2027_label'] ?? 'Sin prioridad' }}</span><div class="small text-muted mt-1">{{ $docente['tramo'] ?: 'Sin tramo' }} · {{ $docente['fecha_antiguedad'] ?: 'Sin antigüedad' }}</div><div class="small text-success">Disp.: {{ $fmt($docente['horas_titulares_disponibles'] ?? 0) }} titular + {{ $fmt($docente['horas_contrata_disponibles'] ?? 0) }} contrata</div></td>
+                            <td><span class="badge rounded-pill text-bg-primary">{{ $docente['prioridad_2027_label'] ?? 'Sin prioridad' }}</span><div class="small text-muted mt-1">{{ $docente['tramo'] ?: 'Sin tramo' }} · {{ $docente['fecha_antiguedad'] ?: 'Sin antigüedad' }}</div><div class="small text-success">Disp.: {{ $fmt(max(0, (float) ($docente['horas_titulares_disponibles'] ?? 0) - $redondeoTitular)) }} titular + {{ $fmt(max(0, (float) ($docente['horas_contrata_disponibles'] ?? 0) - $redondeoContrata)) }} contrata</div>@if ($redondeoParvularia > 0.01)<div class="small text-muted">Neteo Parvularia: {{ $fmt($redondeoParvularia) }} h</div>@endif</td>
                         @endif
                         <td><div class="fw-semibold">{{ $docente['funcion'] }}</div><div class="text-muted small">{{ $docente['titulo'] }}</div></td>
                         <td class="text-end">
@@ -215,7 +230,7 @@
                         <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_contrato_60_40'] ?? 0) }}</td>
                         @if ($mostrarEspecial)<td class="text-end">{{ $fmt($docente['horas_contrato_especial'] ?? 0) }}</td>@endif
                         <td class="text-end">{{ $fmt($funcionesDocente) }}</td>
-                        <td class="text-end fw-bold text-success">{{ $fmt($docente['horas_asignadas_total']) }}</td>
+                        <td class="text-end fw-bold text-success">{{ $fmt($horasAsignadasVisibles) }}@if ($redondeoParvularia > 0.01)<div class="small text-muted fw-normal">{{ $fmt($docente['horas_asignadas_total']) }} + {{ $fmt($redondeoParvularia) }} redondeo NT</div>@endif</td>
                         <td class="text-end">@if ($diferencia === null)—@elseif ($diferencia < -0.01)<span class="text-danger fw-semibold">-{{ $fmt(abs($diferencia)) }}</span>@elseif ($diferencia > 0.01)<span class="text-warning fw-semibold">{{ $fmt($diferencia) }}</span>@else<span class="text-success fw-semibold">0</span>@endif</td>
                         <td>
                             <span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Sin estado' }}</span>
@@ -290,8 +305,9 @@
                                                 @endif
                                                 <div class="d-flex justify-content-between"><span>Funciones asignadas</span><strong>{{ $fmt($funcionesDocente) }}</strong></div>
                                                 <hr class="my-2">
-                                                <div class="d-flex justify-content-between"><span>Total contrato calculado</span><strong class="text-success">{{ $fmt($docente['horas_asignadas_total']) }}</strong></div>
-                                                <div class="d-flex justify-content-between"><span>Diferencia</span><strong>{{ $fmt($docente['diferencia']) }}</strong></div>
+                                                <div class="d-flex justify-content-between"><span>Total contrato calculado</span><strong class="text-success">{{ $fmt($horasAsignadasVisibles) }}</strong></div>
+                                                @if ($redondeoParvularia > 0.01)<div class="small text-muted">Registrado: {{ $fmt($docente['horas_asignadas_total']) }} h · redondeo individual NT: +{{ $fmt($redondeoParvularia) }} h</div>@endif
+                                                <div class="d-flex justify-content-between"><span>Diferencia</span><strong>{{ $diferencia === null ? '—' : $fmt($diferencia) }}</strong></div>
                                             </div>
                                         </div>
                                     </div>

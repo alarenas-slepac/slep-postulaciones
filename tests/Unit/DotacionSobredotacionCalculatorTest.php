@@ -475,8 +475,9 @@ class DotacionSobredotacionCalculatorTest extends TestCase
             'establecimiento' => $establecimiento,
             'anio' => 2026,
         ])->render();
-        $this->assertStringContainsString('Horas contrato Aula', $htmlAula);
         $this->assertStringContainsString('Detalle sobredotación', $htmlAula);
+        $this->assertStringNotContainsString('Horas contrato docente PIE', $htmlAula);
+        $this->assertStringNotContainsString('role="tablist"', $htmlAula);
         $this->assertStringContainsString('Sobredotación estructural', $htmlAula);
         $this->assertStringNotContainsString('Conciliación de indicadores', $htmlAula);
         $this->assertStringNotContainsString('diferencia por cobertura y distribución individual', $htmlAula);
@@ -504,10 +505,8 @@ class DotacionSobredotacionCalculatorTest extends TestCase
             'establecimiento' => $establecimiento,
             'anio' => 2026,
         ])->render();
-        $this->assertStringContainsString('Horas contrato docente PIE', $htmlPie);
-        $this->assertStringContainsString('Necesidad cubierta', $htmlPie);
-        $this->assertStringContainsString('Educadora diferencial', $htmlPie);
-        $this->assertStringNotContainsString('Funciones declaradas asignadas a docentes (revisables)', $htmlPie);
+        $this->assertStringNotContainsString('Horas contrato docente PIE', $htmlPie);
+        $this->assertStringContainsString('Funciones declaradas asignadas a docentes (revisables)', $htmlPie);
     }
 
     /** @return array<string, float> */
