@@ -56,7 +56,7 @@
                                             @foreach ($docentesSubsector as $docente)
                                                 @continue(! \App\Support\DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel']))
                                                 @php $rutDocente = \App\Support\DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')); @endphp
-                                                <option value="{{ $rutDocente }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-prioridad-label="{{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }}" data-antiguedad="{{ $docente['fecha_antiguedad'] ?? '' }}" data-titular-disponible="{{ $fmtProceso($docente['horas_titulares_disponibles'] ?? 0) }}" data-contrata-disponible="{{ $fmtProceso($docente['horas_contrata_disponibles'] ?? 0) }}" @selected(in_array($rutDocente, old('asignatura_key') === $asignatura['key'] ? old('docentes', []) : $asignatura['docentes'], true))>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · {{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }} · Disponible: {{ $fmtProceso($docente['horas_disponibles'] ?? 0) }} h</option>
+                                                <option value="{{ $rutDocente }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }}" data-antiguedad="{{ $docente['fecha_antiguedad'] ?? '' }}" data-titular-disponible="{{ $fmtProceso($docente['horas_titulares_disponibles'] ?? 0) }}" data-contrata-disponible="{{ $fmtProceso($docente['horas_contrata_disponibles'] ?? 0) }}" @selected(in_array($rutDocente, old('asignatura_key') === $asignatura['key'] ? old('docentes', []) : $asignatura['docentes'], true))>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · Título: {{ $docente['titulo'] ?? 'Sin título declarado' }} · {{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }} · Disponible: {{ $fmtProceso($docente['horas_disponibles'] ?? 0) }} h</option>
                                             @endforeach
                                         </select>
                                         <div class="form-text">Puede seleccionar varios docentes; la lista respeta la prelación y antigüedad vigentes.</div>
@@ -112,6 +112,7 @@
                         const name = $('<div>', { class: 'dotacion-subsector-option__name' })
                             .text(option.data('nombre') + ' · ' + option.data('rut'));
                         const meta = $('<div>', { class: 'dotacion-subsector-option__meta' });
+                        meta.append($('<span>').text('Título: ' + option.data('titulo')));
                         meta.append($('<span>', { class: 'dotacion-subsector-option__priority' }).text(option.data('prioridad-label')));
                         if (option.data('antiguedad')) meta.append($('<span>').text('Antigüedad: ' + option.data('antiguedad')));
                         meta.append($('<span>', { class: 'dotacion-subsector-option__availability' })
@@ -121,7 +122,7 @@
                     templateSelection: function (item) {
                         if (!item.id || !item.element) return item.text;
                         const option = $(item.element);
-                        return option.data('nombre') + ' · ' + option.data('rut');
+                        return option.data('nombre') + ' · ' + option.data('rut') + ' · ' + option.data('titulo');
                     },
                     language: { noResults: function () { return 'No se encontraron docentes.'; } }
                 });

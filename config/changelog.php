@@ -1,6 +1,19 @@
 <?php
 
 return [
+    '2026.9.29.539' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Título profesional en el selector de docentes por asignatura',
+        'files' => [
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes_subsector.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El selector de docentes por asignatura muestra el título declarado en las opciones, la búsqueda y los docentes seleccionados.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.538' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
