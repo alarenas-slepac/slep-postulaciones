@@ -9,6 +9,8 @@ use Illuminate\Validation\ValidationException;
 
 class DotacionPlanTitularPrimero
 {
+    private const MINIMO_SALDO_ASIGNABLE = 1.0;
+
     /** @param Collection<int, array<string, mixed>> $docentes
      *  @param array<int, string> $rutsPermitidos
      *  @return Collection<int, array<string, mixed>>
@@ -47,7 +49,7 @@ class DotacionPlanTitularPrimero
     /** @param Collection<int, array<string, mixed>> $docentes */
     public static function fase(Collection $docentes): string
     {
-        return $docentes->contains(fn (array $docente) => self::disponibles($docente, 'titular') > 0.01)
+        return $docentes->contains(fn (array $docente) => self::disponibles($docente, 'titular') >= self::MINIMO_SALDO_ASIGNABLE)
             ? 'titular'
             : 'contrata';
     }
@@ -70,7 +72,7 @@ class DotacionPlanTitularPrimero
     {
         $fase = self::fase($docentes);
 
-        return $docentes->filter(fn (array $docente) => self::disponibles($docente, $fase) > 0.01)->values();
+        return $docentes->filter(fn (array $docente) => self::disponibles($docente, $fase) >= self::MINIMO_SALDO_ASIGNABLE)->values();
     }
 
     /** @param Collection<int, array<string, mixed>> $docentes */
@@ -88,11 +90,11 @@ class DotacionPlanTitularPrimero
         }
 
         $disponibles = $seleccionado ? self::disponibles($seleccionado, $fase) : 0.0;
-        if ($disponibles <= 0.01) {
+        if ($disponibles < self::MINIMO_SALDO_ASIGNABLE) {
             throw ValidationException::withMessages([
                 'docente_rut' => $fase === 'titular'
-                    ? 'Esta asignatura aún tiene horas titulares disponibles. Seleccione un docente con saldo titular.'
-                    : 'Esta asignatura ya agotó las horas titulares. Seleccione un docente con saldo a contrata.',
+                    ? 'Esta asignatura aún tiene docentes con al menos 1 h titular disponible. Seleccione uno de ellos.'
+                    : 'Seleccione un docente con al menos 1 h a contrata disponible para esta asignatura.',
             ]);
         }
         if ($horasContrato > $disponibles + 0.001) {

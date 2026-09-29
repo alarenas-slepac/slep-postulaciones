@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.29.542' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Umbral mínimo de una hora en la asignación del plan',
+        'files' => [
+            'app/Support/DotacionPlanTitularPrimero.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Unit/DotacionPlanTitularPrimeroTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Los saldos individuales menores a 1 h se omiten al determinar la fase titular o a contrata y al mostrar docentes en el selector del plan 2027.',
+            'La validación del servidor aplica el mismo umbral; un saldo titular residual menor a 1 h ya no bloquea la asignación a contrata.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.541' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
