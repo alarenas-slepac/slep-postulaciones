@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.9.29.550' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Administrador puede justificar horas contractuales vacantes',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionSobredotacionJustificacionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'routes/web.php',
+            'tests/Feature/DotacionSobredotacionJustificacionTest.php',
+            'tests/Feature/SupervisorPlaniDotacionAccessTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El administrador puede crear y actualizar las justificaciones de horas titulares y a contrata para cualquier establecimiento.',
+            'El rol directivo mantiene el alcance limitado a su propio establecimiento; los demás roles conservan acceso de consulta.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento'],
+    ],
     '2026.9.29.549' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',

@@ -42,7 +42,7 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
                 continue;
             }
             if ($routeName === 'admin.dotacion-establecimiento.sobredotacion.justificaciones.store') {
-                $this->assertSame('ensure.role:funcionario_directivo_estab', $roleMiddleware);
+                $this->assertSame('ensure.role:admin|funcionario_directivo_estab', $roleMiddleware);
                 $checked[] = $routeName;
                 continue;
             }

@@ -6,6 +6,9 @@ use App\Http\Controllers\Admin\DotacionSobredotacionJustificacionController;
 use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
 use Illuminate\Http\Request;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
@@ -74,7 +77,7 @@ class DotacionSobredotacionJustificacionTest extends TestCase
         $establecimiento->id = 10;
         $controller = app(DotacionSobredotacionJustificacionController::class);
 
-        foreach ([['admin', 10], ['funcionario_directivo_estab', 11]] as [$rol, $idEstablecimiento]) {
+        foreach ([['supervisor_plani', 10], ['funcionario_directivo_estab', 11]] as [$rol, $idEstablecimiento]) {
             $usuario = new class($rol, $idEstablecimiento)
             {
                 public function __construct(private string $rol, public int $establecimiento_id) {}
@@ -88,6 +91,31 @@ class DotacionSobredotacionJustificacionTest extends TestCase
             } catch (HttpException $exception) {
                 $this->assertSame(403, $exception->getStatusCode());
             }
+        }
+    }
+
+    public function test_administrador_puede_ingresar_al_flujo_de_guardado_sin_pertenecer_al_establecimiento(): void
+    {
+        Schema::create('dotacion_sobredotacion_justificaciones', function (Blueprint $table) {
+            $table->id();
+        });
+
+        try {
+            $establecimiento = new Establecimiento();
+            $establecimiento->id = 10;
+            $usuario = new class
+            {
+                public int $id = 1;
+                public ?int $establecimiento_id = null;
+                public function activeRoleName(): string { return 'admin'; }
+            };
+            $request = Request::create('/', 'POST');
+            $request->setUserResolver(fn () => $usuario);
+
+            $this->expectException(ValidationException::class);
+            app(DotacionSobredotacionJustificacionController::class)->store($request, $establecimiento);
+        } finally {
+            Schema::dropIfExists('dotacion_sobredotacion_justificaciones');
         }
     }
 }
