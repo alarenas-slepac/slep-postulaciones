@@ -19,8 +19,10 @@ class DotacionSobredotacionJustificacionController extends Controller
     public function store(Request $request, Establecimiento $establecimiento): RedirectResponse
     {
         $usuario = $request->user();
-        abort_unless($usuario?->activeRoleName() === 'funcionario_directivo_estab'
-            && (int) $usuario->establecimiento_id === (int) $establecimiento->id, 403);
+        $rol = $usuario?->activeRoleName();
+        abort_unless($rol === 'admin'
+            || ($rol === 'funcionario_directivo_estab'
+                && (int) $usuario->establecimiento_id === (int) $establecimiento->id), 403);
         abort_if((bool) $establecimiento->sala_cuna, 404);
         abort_unless(Schema::hasTable('dotacion_sobredotacion_justificaciones'), 503,
             'Debe ejecutar las migraciones antes de registrar justificaciones.');

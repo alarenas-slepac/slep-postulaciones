@@ -675,7 +675,7 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->name('dotacion-establecimiento.index');
         Route::post('dotacion-establecimiento/{establecimiento}/sobredotacion/justificaciones', [DotacionSobredotacionJustificacionController::class, 'store'])
-            ->middleware('ensure.role:funcionario_directivo_estab')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.sobredotacion.justificaciones.store');
         Route::post('dotacion-establecimiento/{establecimiento}/contrata-habilitaciones', [DotacionContrataHabilitacionController::class, 'store'])

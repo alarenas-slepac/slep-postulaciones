@@ -366,7 +366,7 @@ class DotacionEstablecimientoController extends Controller
             'canViewSobredotacion' => $canViewSobredotacion,
             'justificacionesSobredotacion' => $justificacionesSobredotacion,
             'justificacionesSobredotacionTableReady' => $justificacionesSobredotacionTableReady,
-            'canManageJustificacionesSobredotacion' => $activeRole === 'funcionario_directivo_estab',
+            'canManageJustificacionesSobredotacion' => in_array($activeRole, ['admin', 'funcionario_directivo_estab'], true),
             'asignacion' => $data['asignacion'] ?? [],
             'asignaturas' => $asignaturas,
             'asignaturasFiltros' => $asignaturasFiltros,
