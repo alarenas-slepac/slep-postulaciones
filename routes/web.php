@@ -51,6 +51,7 @@ use App\Http\Controllers\Admin\DotacionCursoCombinadoController;
 use App\Http\Controllers\Admin\DotacionContrataHabilitacionController;
 use App\Http\Controllers\Admin\DotacionDocenteExclusionController;
 use App\Http\Controllers\Admin\DotacionEstablecimientoController;
+use App\Http\Controllers\Admin\DotacionSobredotacionJustificacionController;
 use App\Http\Controllers\Admin\DotacionProceso2027Controller;
 use App\Http\Controllers\Admin\DotacionProporcionExcepcionController;
 use App\Http\Controllers\Admin\DotacionAsignacionController;
@@ -673,6 +674,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::get('dotacion-establecimiento', [DotacionEstablecimientoController::class, 'index'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->name('dotacion-establecimiento.index');
+        Route::post('dotacion-establecimiento/{establecimiento}/sobredotacion/justificaciones', [DotacionSobredotacionJustificacionController::class, 'store'])
+            ->middleware('ensure.role:funcionario_directivo_estab')
+            ->whereNumber('establecimiento')
+            ->name('dotacion-establecimiento.sobredotacion.justificaciones.store');
         Route::post('dotacion-establecimiento/{establecimiento}/contrata-habilitaciones', [DotacionContrataHabilitacionController::class, 'store'])
             ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp')
             ->whereNumber('establecimiento')

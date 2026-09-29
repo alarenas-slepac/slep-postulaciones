@@ -11,6 +11,7 @@ class DotacionSobredotacionCalculator
 {
     public const ALLOWED_ROLES = [
         'admin',
+        'funcionario_directivo_estab',
         'coordinador_gdp',
         'supervisor_plani',
         'coordinador_uatp',

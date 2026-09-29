@@ -8,6 +8,7 @@ use App\Exports\DotacionResumenSobredotacionExport;
 use App\Http\Controllers\Controller;
 use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionProporcionExcepcion;
+use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
 use App\Support\DotacionAsignaturaResumenCalculator;
 use App\Support\DotacionEstablecimientoAvanceCalculator;
@@ -301,6 +302,16 @@ class DotacionEstablecimientoController extends Controller
             $data['resumen'],
             data_get($data, 'asignacion.necesidades.funciones', [])
         );
+        $justificacionesSobredotacionTableReady = Schema::hasTable('dotacion_sobredotacion_justificaciones');
+        $justificacionesSobredotacion = $justificacionesSobredotacionTableReady && $canViewSobredotacion
+            ? DotacionSobredotacionJustificacion::query()
+                ->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)
+                ->get()
+                ->keyBy(fn (DotacionSobredotacionJustificacion $item) => DotacionSobredotacionJustificacion::clave(
+                    $item->bloque, $item->docente_rut_normalizado, $item->tipo_horas
+                ))
+            : collect();
         $proporcionExcepcionTableReady = Schema::hasTable('dotacion_proporcion_excepciones');
         $proporcionExcepcion = $proporcionExcepcionTableReady
             ? DotacionProporcionExcepcion::query()
@@ -353,6 +364,9 @@ class DotacionEstablecimientoController extends Controller
             'sobredotacion' => $sobredotacion,
             'sobredotacionTipo' => $sobredotacionTipo,
             'canViewSobredotacion' => $canViewSobredotacion,
+            'justificacionesSobredotacion' => $justificacionesSobredotacion,
+            'justificacionesSobredotacionTableReady' => $justificacionesSobredotacionTableReady,
+            'canManageJustificacionesSobredotacion' => $activeRole === 'funcionario_directivo_estab',
             'asignacion' => $data['asignacion'] ?? [],
             'asignaturas' => $asignaturas,
             'asignaturasFiltros' => $asignaturasFiltros,
