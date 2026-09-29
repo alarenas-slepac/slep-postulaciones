@@ -30,6 +30,8 @@
                 @endforeach
             </div>
 
+            @include('admin.dotacion-establecimiento.partials._docentes_subsector')
+
             <div class="row g-3">
                 <div class="col-lg-5">
                     <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}" class="border rounded-4 p-3 h-100">

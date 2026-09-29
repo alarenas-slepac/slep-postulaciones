@@ -1,6 +1,29 @@
 <?php
 
 return [
+    '2026.9.29.537' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Etapa de docentes por asignatura en el proceso 2027',
+        'files' => [
+            'database/migrations/2026_09_29_130000_create_dotacion_docente_subsectores_table.php',
+            'app/Support/DotacionDocentesSubsector.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'app/Http/Controllers/Admin/DotacionProceso2027Controller.php',
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes_subsector.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'routes/web.php',
+            'tests/Feature/DotacionDocentesSubsectorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Después de planes de estudio se muestran las asignaturas consolidadas por Parvularia, Básica, Media, Especial y EPJA, según los niveles que tenga el establecimiento. Se pueden asociar varios docentes por asignatura.',
+            'La asignación de horas del plan muestra únicamente los docentes asociados, ordenados por prelación, y verifica la asociación en el servidor. Las asignaciones existentes conservan sus docentes mientras tengan horas registradas.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.536' => [
         'date' => '2026-09-29',
         'module' => 'Solicitudes de reemplazo',

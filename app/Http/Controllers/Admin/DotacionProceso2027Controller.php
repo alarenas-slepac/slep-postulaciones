@@ -5,10 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DotacionProceso2027Configuracion;
 use App\Models\Establecimiento;
+use App\Support\DotacionDocentesSubsector;
+use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class DotacionProceso2027Controller extends Controller
 {
@@ -17,6 +21,58 @@ class DotacionProceso2027Controller extends Controller
     private array $maximosRoles = ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
 
     private array $funcionesNormativasRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp'];
+
+    public function syncDocentesSubsector(Request $request, Establecimiento $establecimiento): RedirectResponse
+    {
+        $this->authorizeScope($request, $establecimiento);
+        abort_unless(DotacionDocentesSubsector::disponible(), 503, 'Debe ejecutar la migración de docentes por asignatura.');
+        $data = $request->validate([
+            'anio' => ['required', 'integer', Rule::in([2027])],
+            'asignatura_key' => ['required', 'string', 'size:40'],
+            'docentes' => ['required', 'array', 'min:1', 'max:500'],
+            'docentes.*' => ['required', 'string', 'max:32', 'distinct'],
+        ]);
+        $proceso = DotacionProceso2027Calculator::resumen($establecimiento, 2027);
+        if (! ($proceso['pasos']['planes']['completo'] ?? false)) {
+            throw ValidationException::withMessages(['asignatura_key' => 'Configure primero los planes de estudio del establecimiento.']);
+        }
+        $asignatura = collect($proceso['docentes_subsector']['asignaturas'])
+            ->firstWhere('key', $data['asignatura_key']);
+        if (! $asignatura) {
+            throw ValidationException::withMessages(['asignatura_key' => 'La asignatura ya no forma parte del plan vigente. Actualice la página.']);
+        }
+        $vigentes = collect($proceso['docentes_subsector']['docentes'])
+            ->filter(fn (array $docente) => DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel']))
+            ->mapWithKeys(fn (array $docente) => [
+                DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) => true,
+            ]);
+        $ruts = collect($data['docentes'])
+            ->map(fn ($rut) => DotacionEstablecimientoCalculator::normalizeRut((string) $rut))
+            ->filter()->unique()->values();
+        if ($ruts->count() !== count($data['docentes']) || $ruts->contains(fn ($rut) => ! $vigentes->has($rut))) {
+            throw ValidationException::withMessages(['docentes' => 'Seleccione únicamente docentes vigentes o cupos habilitados del establecimiento.']);
+        }
+
+        DB::transaction(function () use ($establecimiento, $asignatura, $ruts, $request): void {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            DB::table('dotacion_docente_subsectores')
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', 2027)
+                ->where('asignatura_key', $asignatura['key'])->delete();
+            DB::table('dotacion_docente_subsectores')->insert($ruts->map(fn ($rut) => [
+                'establecimiento_id' => $establecimiento->id,
+                'anio' => 2027,
+                'asignatura_key' => $asignatura['key'],
+                'nivel' => $asignatura['nivel'],
+                'asignatura_nombre' => $asignatura['nombre'],
+                'docente_rut_normalizado' => $rut,
+                'created_by' => $request->user()?->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])->all());
+        });
+
+        return back()->with('subsector_success', 'Docentes de la asignatura guardados correctamente.');
+    }
 
     public function update(Request $request, Establecimiento $establecimiento): RedirectResponse
     {
