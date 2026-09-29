@@ -489,4 +489,77 @@ class DotacionParvulariaBasesTest extends TestCase
         (new ReflectionMethod($controller, 'validateLimiteAulaParvularia'))
             ->invoke($controller, $this->establecimiento(), $payloadExcedido);
     }
+
+    public function test_ultima_asignacion_usa_contrato_marginal_del_aula_consolidada(): void
+    {
+        $this->curso(1, '5B', 'Con JEC', 38, false);
+        Schema::create('docente_horas_proporciones', function (Blueprint $t): void {
+            $t->id(); $t->string('proporcion'); $t->integer('horas_contrato');
+            $t->decimal('horas_aula_pedagogicas', 8, 2); $t->boolean('vigente');
+        });
+        foreach ([5 => 3, 34 => 29, 38 => 32, 44 => 38] as $contrato => $aula) {
+            DB::table('docente_horas_proporciones')->insert([
+                'proporcion' => '65_35', 'horas_contrato' => $contrato,
+                'horas_aula_pedagogicas' => $aula, 'vigente' => true,
+            ]);
+        }
+        Schema::create('dotacion_docente_asignaciones', function (Blueprint $t): void {
+            $t->id(); $t->integer('establecimiento_id'); $t->integer('anio');
+            $t->string('estado'); $t->string('docente_rut_normalizado');
+            $t->string('tipo_asignacion'); $t->string('estamento_cobertura');
+            $t->string('proporcion_aplicada'); $t->decimal('horas_plan_pedagogicas', 8, 2);
+            $t->decimal('horas_contrato', 8, 2);
+        });
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'establecimiento_id' => 1, 'anio' => 2027, 'estado' => 'activa',
+            'docente_rut_normalizado' => '111111111', 'tipo_asignacion' => 'plan_estudio',
+            'estamento_cobertura' => 'docente', 'proporcion_aplicada' => '65/35',
+            'horas_plan_pedagogicas' => 29, 'horas_contrato' => 34,
+        ]);
+        $this->resetCaches();
+        $controller = new DotacionAsignacionController;
+        $persona = ['rut' => '111111111', 'rut_normalizado' => '111111111',
+            'nombre' => 'Docente sintético', 'titulo' => 'Pedagogía en Educación Física'];
+        $data = ['tipo_asignacion' => 'plan_estudio', 'estamento_cobertura' => 'docente',
+            'establecimiento_curso_id' => 1, 'anio' => 2027, 'horas_plan_pedagogicas' => 3];
+        $payload = (new ReflectionMethod($controller, 'buildPayload'))->invoke(
+            $controller, Request::create('/'), $this->establecimiento(), $persona, $data
+        );
+
+        $this->assertSame(4.0, $payload['horas_contrato']);
+        $this->assertSame('65/35', $payload['proporcion_aplicada']);
+        $this->assertStringContainsString('aula consolidada', $payload['fuente_calculo']);
+        $this->assertSame(5.0, (float) (\App\Support\DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula('65_35', 3)['horas_contrato'] ?? 0));
+
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'establecimiento_id' => 1, 'anio' => 2027, 'estado' => 'activa',
+            'docente_rut_normalizado' => '111111111', 'tipo_asignacion' => 'plan_estudio',
+            'estamento_cobertura' => 'docente', 'proporcion_aplicada' => '65/35',
+            'horas_plan_pedagogicas' => 3, 'horas_contrato' => $payload['horas_contrato'],
+        ]);
+        $recalcular = new ReflectionMethod($controller, 'recalcularContratoAulaDocente');
+        $recalcular->invoke($controller, $this->establecimiento(), 2027, '111111111');
+        $this->assertSame(38.0, (float) DB::table('dotacion_docente_asignaciones')->sum('horas_contrato'));
+
+        DB::table('dotacion_docente_asignaciones')->where('horas_plan_pedagogicas', 29)->delete();
+        $recalcular->invoke($controller, $this->establecimiento(), 2027, '111111111');
+        $this->assertSame(5.0, (float) DB::table('dotacion_docente_asignaciones')->sum('horas_contrato'));
+
+        foreach ([5 => 3, 33 => 29, 37 => 32] as $contrato => $aula) {
+            DB::table('docente_horas_proporciones')->insert([
+                'proporcion' => '60_40', 'horas_contrato' => $contrato,
+                'horas_aula_pedagogicas' => $aula, 'vigente' => true,
+            ]);
+        }
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'establecimiento_id' => 1, 'anio' => 2027, 'estado' => 'activa',
+            'docente_rut_normalizado' => '111111111', 'tipo_asignacion' => 'plan_estudio',
+            'estamento_cobertura' => 'docente', 'proporcion_aplicada' => '60/40',
+            'horas_plan_pedagogicas' => 29, 'horas_contrato' => 33,
+        ]);
+        $marginal60 = new ReflectionMethod($controller, 'contratoMarginalAulaDocente');
+        $this->assertSame(4.0, $marginal60->invoke(
+            $controller, $this->establecimiento(), 2027, '111111111', '60_40', 3
+        ));
+    }
 }
