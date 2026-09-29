@@ -44,10 +44,13 @@
                                 @csrf
                                 <input type="hidden" name="anio" value="2027">
                                 <input type="hidden" name="asignatura_key" value="{{ $asignatura['key'] }}">
-                                <div class="row g-3 align-items-end">
+                                <div class="row g-3 align-items-center">
                                     <div class="col-lg-4">
                                         <div class="fw-semibold">{{ $asignatura['nombre'] }}</div>
-                                        <div class="small text-muted">{{ count($asignatura['cursos']) }} curso(s) · {{ $fmtProceso($asignatura['horas_aula']) }} h aula</div>
+                                        <div class="small text-muted">{{ count($asignatura['cursos']) }} {{ count($asignatura['cursos']) === 1 ? 'curso' : 'cursos' }} · {{ $fmtProceso($asignatura['horas_aula']) }} h aula</div>
+                                        @if ($asignatura['cursos'] !== [])
+                                            <div class="small text-secondary mt-1"><span class="fw-semibold">Cursos:</span> {{ implode(' · ', $asignatura['cursos']) }}</div>
+                                        @endif
                                         <span class="badge rounded-pill {{ $asignatura['completo'] ? 'text-bg-success' : 'text-bg-warning' }} mt-1">{{ $asignatura['completo'] ? 'Docentes asociados' : 'Pendiente' }}</span>
                                     </div>
                                     <div class="col-lg-6">

@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.9.29.543' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Cursos visibles y alineación en docentes por asignatura',
+        'files' => [
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes_subsector.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Las filas de docentes por asignatura alinean verticalmente el resumen, el selector y el botón Guardar.',
+            'Cada asignatura consolidada muestra los nombres de los cursos a los que pertenece, además del total de cursos y horas aula.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.542' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
