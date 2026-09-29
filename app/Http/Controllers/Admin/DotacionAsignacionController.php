@@ -90,6 +90,7 @@ class DotacionAsignacionController extends Controller
             $this->validateProceso2027Assignment($establecimiento, $persona, $payload);
             DotacionDocenteAsignacion::create($payload);
             $this->recalcularContratoAulaParvularia($establecimiento, (int) $payload['anio'], (string) $payload['docente_rut_normalizado']);
+            $this->recalcularContratoAulaDocente($establecimiento, (int) $payload['anio'], (string) $payload['docente_rut_normalizado']);
         });
 
         return back()->with('success', 'Asignación de horas guardada correctamente.');
@@ -158,6 +159,8 @@ class DotacionAsignacionController extends Controller
             $asignacion->update($payload);
             $this->recalcularContratoAulaParvularia($establecimiento, (int) $asignacion->anio, $rutAnterior);
             $this->recalcularContratoAulaParvularia($establecimiento, (int) $payload['anio'], (string) $payload['docente_rut_normalizado']);
+            $this->recalcularContratoAulaDocente($establecimiento, (int) $asignacion->anio, $rutAnterior);
+            $this->recalcularContratoAulaDocente($establecimiento, (int) $payload['anio'], (string) $payload['docente_rut_normalizado']);
         });
 
         return back()->with('success', 'Asignación de horas actualizada correctamente.');
@@ -303,6 +306,7 @@ class DotacionAsignacionController extends Controller
             $this->validateAcompanamientoParvularia($establecimiento, null, $asignacion);
             $asignacion->delete();
             $this->recalcularContratoAulaParvularia($establecimiento, (int) $asignacion->anio, (string) $asignacion->docente_rut_normalizado);
+            $this->recalcularContratoAulaDocente($establecimiento, (int) $asignacion->anio, (string) $asignacion->docente_rut_normalizado);
         });
 
         return back()->with('success', 'Asignación de horas eliminada correctamente.');
@@ -361,6 +365,7 @@ class DotacionAsignacionController extends Controller
             $rows->each->delete();
             foreach ($ruts as $rut) {
                 $this->recalcularContratoAulaParvularia($establecimiento, $anio, (string) $rut);
+                $this->recalcularContratoAulaDocente($establecimiento, $anio, (string) $rut);
             }
 
             return $rows->count();
@@ -601,6 +606,14 @@ class DotacionAsignacionController extends Controller
                     $proporcion = $calc['proporcion_label'] ?? null;
                     $fuente = 'Conversión automática desde horas aula · '.($calc['origen_proporcion_label'] ?? 'Regla general').' · consolidado contractual en pestaña Docentes';
                 }
+                $grupoProporcion = DotacionAsignacionCalculator::proportionGroup($proporcion);
+                if ($grupoProporcion !== 'especial') {
+                    $horasContrato = $this->contratoMarginalAulaDocente(
+                        $establecimiento, (int) $data['anio'], (string) $docente['rut_normalizado'],
+                        $grupoProporcion, $horasPlan, $current
+                    );
+                    $fuente = 'Conversión CPEIP del aula consolidada por docente · '.$proporcion;
+                }
             }
         }
 
@@ -833,6 +846,39 @@ class DotacionAsignacionController extends Controller
         return round($this->contratoCpeip65($aulaExistente + $horasAula) - $this->contratoCpeip65($aulaExistente), 2);
     }
 
+    private function contratoMarginalAulaDocente(
+        Establecimiento $establecimiento,
+        int $anio,
+        string $rut,
+        string $grupoProporcion,
+        float $horasAula,
+        ?DotacionDocenteAsignacion $current = null
+    ): float {
+        $aulaExistente = Schema::hasTable('dotacion_docente_asignaciones')
+            ? DotacionDocenteAsignacion::query()
+                ->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)
+                ->where('estado', 'activa')
+                ->where('docente_rut_normalizado', $rut)
+                ->whereIn('tipo_asignacion', ['plan_estudio', 'acompanamiento_parvularia'])
+                ->when($current, fn ($query) => $query->whereKeyNot($current->id))
+                ->get()
+                ->filter(fn (DotacionDocenteAsignacion $row) =>
+                    DotacionAsignacionCalculator::coverageEstamento($row) === 'docente'
+                    && DotacionAsignacionCalculator::proportionGroup($row->proporcion_aplicada) === $grupoProporcion
+                )
+                ->sum(fn (DotacionDocenteAsignacion $row) => (float) $row->horas_plan_pedagogicas)
+            : 0.0;
+        $proporcion = $grupoProporcion === '60_40'
+            ? DocenteHorasNoLectivasCalculator::PROPORCION_PRIORITARIOS
+            : DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL;
+        $convertir = fn (float $aula): float => (float) (
+            DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula($proporcion, $aula)['horas_contrato'] ?? 0
+        );
+
+        return round($convertir($aulaExistente + $horasAula) - $convertir($aulaExistente), 2);
+    }
+
     private function recalcularContratoAulaParvularia(Establecimiento $establecimiento, int $anio, string $rut): void
     {
         if ($rut === '' || ! Schema::hasTable('docente_horas_proporciones')) {
@@ -857,6 +903,46 @@ class DotacionAsignacionController extends Controller
                     ->update(['horas_contrato' => $marginal]);
             }
             $contrato = $nuevoContrato;
+        }
+    }
+
+    private function recalcularContratoAulaDocente(Establecimiento $establecimiento, int $anio, string $rut): void
+    {
+        if ($rut === '' || ! Schema::hasTable('docente_horas_proporciones')
+            || ! Schema::hasTable('dotacion_docente_asignaciones')
+            || ! Schema::hasColumn('dotacion_docente_asignaciones', 'horas_contrato')) {
+            return;
+        }
+        $asignaciones = DotacionDocenteAsignacion::query()
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->where('estado', 'activa')
+            ->where('docente_rut_normalizado', $rut)
+            ->whereIn('tipo_asignacion', ['plan_estudio', 'acompanamiento_parvularia'])
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (DotacionDocenteAsignacion $row) =>
+                DotacionAsignacionCalculator::coverageEstamento($row) === 'docente'
+                && DotacionAsignacionCalculator::proportionGroup($row->proporcion_aplicada) !== 'especial'
+            );
+        foreach (['65_35', '60_40'] as $proporcion) {
+            $aula = 0.0;
+            $contrato = 0.0;
+            foreach ($asignaciones as $asignacion) {
+                if (DotacionAsignacionCalculator::proportionGroup($asignacion->proporcion_aplicada) !== $proporcion) {
+                    continue;
+                }
+                $aula += (float) $asignacion->horas_plan_pedagogicas;
+                $nuevoContrato = (float) (DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula(
+                    $proporcion, $aula
+                )['horas_contrato'] ?? 0);
+                $marginal = round($nuevoContrato - $contrato, 2);
+                if (abs((float) $asignacion->horas_contrato - $marginal) > 0.001) {
+                    DB::table('dotacion_docente_asignaciones')->where('id', $asignacion->id)
+                        ->update(['horas_contrato' => $marginal]);
+                }
+                $contrato = $nuevoContrato;
+            }
         }
     }
 

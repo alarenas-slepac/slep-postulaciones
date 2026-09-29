@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.29.545' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Conversión consolidada del aula al completar contrato docente',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'tests/Feature/DotacionParvulariaBasesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Las nuevas horas del plan 65/35 y 60/40 se convierten desde el aula acumulada del docente: se asigna solo el contrato adicional que resulta de la tabla CPEIP.',
+            'Tras crear, editar o eliminar asignaciones se redistribuye el contrato marginal entre sus filas para mantener el total consolidado, sin cambiar las horas aula ni las reglas especiales NT1/NT2.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.544' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
