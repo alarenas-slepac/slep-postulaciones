@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.29.540' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Eliminación de asignaciones por curso y bloque',
+        'files' => [
+            'app/Support/DotacionAsignacionPorCursoBloque.php',
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'routes/web.php',
+            'tests/Unit/DotacionAsignacionPorCursoBloqueTest.php',
+            'tests/Feature/DotacionAsignacionPorCursoBloqueDeleteTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Cada curso puede eliminar de una vez todas las asignaciones del plan de estudio, las de un subbloque específico o las de trabajo colaborativo PIE, con confirmación y recuento previo.',
+            'El servidor vuelve a calcular el curso y bloque vigentes, limita el borrado al establecimiento y año autorizados e incluye acompañamientos vinculados. Recalcula el contrato de Parvularia de los docentes afectados.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.539' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',

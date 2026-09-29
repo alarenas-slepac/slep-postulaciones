@@ -134,7 +134,7 @@
     <div class="card-body">
         @if ($errors->any())
             <div class="alert alert-danger rounded-4">
-                <div class="fw-semibold mb-1">No fue posible guardar la asignación</div>
+                <div class="fw-semibold mb-1">No fue posible completar la acción</div>
                 <ul class="mb-0 small">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -144,6 +144,9 @@
         @endif
         @if (session('success'))
             <div class="alert alert-success rounded-4">{{ session('success') }}</div>
+        @endif
+        @if (session('info'))
+            <div class="alert alert-info rounded-4">{{ session('info') }}</div>
         @endif
         @if (($proceso2027Asignacion['aplica'] ?? false) && !$asignacion2027Habilitada)
             <div class="alert alert-warning rounded-4"><i class="bi bi-lock"></i> La asignación 2027 está bloqueada hasta completar planes, asociar docentes a cada asignatura, declarar combinación de cursos, definir las funciones normativas y configurar máximos suficientes. Revise el proceso guiado superior.</div>
@@ -250,6 +253,7 @@
                         $cursoAsig = $cursoItems->sum(fn ($item) => (float) ($item['horas_plan_asignadas'] ?? 0));
                         $cursoSaldo = max(0, round($cursoAula - $cursoAsig, 2));
                         $cursoCollapseId = $groupCollapseId.'-curso-'.$loop->iteration;
+                        $asignacionesCurso = \App\Support\DotacionAsignacionPorCursoBloque::asignaciones($cursoItems);
                     @endphp
                     <div class="border rounded-4 mb-3 overflow-hidden">
                         <div class="bg-light px-3 py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -262,6 +266,16 @@
                                 <span class="badge rounded-pill text-bg-light border">Horas aula: {{ $fmt($cursoAula) }}</span>
                                 <span class="badge rounded-pill text-bg-primary">Aula asignada: {{ $fmt($cursoAsig) }}</span>
                                 <span class="badge rounded-pill {{ $cursoSaldo > 0.01 ? 'text-bg-warning' : 'text-bg-success' }}">Saldo aula: {{ $fmt($cursoSaldo) }}</span>
+                                @if ($asignacionesCurso->isNotEmpty())
+                                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.curso-bloque.destroy', $establecimiento) }}" data-confirm="¿Eliminar todas las {{ $asignacionesCurso->count() }} asignaciones del plan de estudio en {{ $cursoLabel }}? Esta acción no se puede deshacer." onsubmit="return confirm(this.dataset.confirm);">
+                                        @csrf
+                                        @method('DELETE')
+                                        <input type="hidden" name="anio" value="{{ $anio }}">
+                                        <input type="hidden" name="grupo" value="plan_estudio">
+                                        <input type="hidden" name="curso_label" value="{{ $cursoLabel }}">
+                                        <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Eliminar todas del curso ({{ $asignacionesCurso->count() }})</button>
+                                    </form>
+                                @endif
                                 <button class="btn btn-sm btn-outline-primary rounded-pill" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $cursoCollapseId }}" aria-expanded="false" aria-controls="{{ $cursoCollapseId }}">
                                     <i class="bi bi-chevron-down"></i> Ver asignaturas
                                 </button>
@@ -298,8 +312,28 @@
                                                 : null;
                                         @endphp
                                         @if ($lastBloque !== $bloqueActual)
+                                            @php
+                                                $asignacionesCursoBloque = \App\Support\DotacionAsignacionPorCursoBloque::asignaciones(
+                                                    $cursoItems->filter(fn ($fila) => ($fila['bloque'] ?? 'Sin bloque') === $bloqueActual)
+                                                );
+                                            @endphp
                                             <tr class="table-secondary">
-                                                <td colspan="7" class="fw-semibold small text-uppercase">{{ $bloqueActual }}</td>
+                                                <td colspan="7">
+                                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                                        <span class="fw-semibold small text-uppercase">{{ $bloqueActual }}</span>
+                                                        @if ($asignacionesCursoBloque->isNotEmpty())
+                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.curso-bloque.destroy', $establecimiento) }}" data-confirm="¿Eliminar las {{ $asignacionesCursoBloque->count() }} asignaciones del bloque {{ $bloqueActual }} en {{ $cursoLabel }}? Esta acción no se puede deshacer." onsubmit="return confirm(this.dataset.confirm);">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <input type="hidden" name="anio" value="{{ $anio }}">
+                                                                <input type="hidden" name="grupo" value="plan_estudio">
+                                                                <input type="hidden" name="curso_label" value="{{ $cursoLabel }}">
+                                                                <input type="hidden" name="bloque" value="{{ $bloqueActual }}">
+                                                                <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Eliminar asignaciones del bloque ({{ $asignacionesCursoBloque->count() }})</button>
+                                                            </form>
+                                                        @endif
+                                                    </div>
+                                                </td>
                                             </tr>
                                             @php $lastBloque = $bloqueActual; @endphp
                                         @endif
@@ -532,6 +566,23 @@
                                     @if (!empty($item['bloque']))<div class="small text-muted">{{ $item['bloque'] }}</div>@endif
                                     @if (!empty($item['proporcion']))<span class="badge rounded-pill text-bg-light border">{{ $item['proporcion'] }}</span>@endif
                                                 @if (!empty($item['origen_proporcion_label']))<div class="small text-muted mt-1">{{ $item['origen_proporcion_label'] }}</div>@endif
+                                    @if ($groupKey === 'pie_colaborativo' && count($item['asignaciones'] ?? []) > 0)
+                                        @php
+                                            $asignacionesCursoPie = \App\Support\DotacionAsignacionPorCursoBloque::asignaciones(
+                                                $items->filter(fn ($fila) => ($fila['curso_label'] ?? 'Curso sin identificar') === ($item['curso_label'] ?? 'Curso sin identificar'))
+                                            );
+                                        @endphp
+                                        @if ($asignacionesCursoPie->isNotEmpty())
+                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.curso-bloque.destroy', $establecimiento) }}" class="mt-2" data-confirm="¿Eliminar las {{ $asignacionesCursoPie->count() }} asignaciones de trabajo colaborativo PIE en {{ $item['curso_label'] ?? 'este curso' }}? Esta acción no se puede deshacer." onsubmit="return confirm(this.dataset.confirm);">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="anio" value="{{ $anio }}">
+                                                <input type="hidden" name="grupo" value="pie_colaborativo">
+                                                <input type="hidden" name="curso_label" value="{{ $item['curso_label'] ?? 'Curso sin identificar' }}">
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Eliminar asignaciones del curso ({{ $asignacionesCursoPie->count() }})</button>
+                                            </form>
+                                        @endif
+                                    @endif
                                 </td>
                                 <td class="text-end">{{ $item['horas_plan_requeridas'] !== null ? $fmt($item['horas_plan_requeridas']) : '—' }}</td>
                                 <td class="text-end fw-bold">{{ $fmt($item['horas_contrato_requeridas'] ?? 0) }}</td>

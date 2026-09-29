@@ -703,6 +703,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->whereNumber('establecimiento')
             ->whereNumber('asignacion')
             ->name('dotacion-establecimiento.asignaciones.update');
+        Route::delete('dotacion-establecimiento/{establecimiento}/asignaciones/curso-bloque', [DotacionAsignacionController::class, 'destroyCourseBlock'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
+            ->whereNumber('establecimiento')
+            ->name('dotacion-establecimiento.asignaciones.curso-bloque.destroy');
         Route::delete('dotacion-establecimiento/{establecimiento}/asignaciones/{asignacion}', [DotacionAsignacionController::class, 'destroy'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
