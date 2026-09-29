@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.9.29.536' => [
+        'date' => '2026-09-29',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Fecha de inicio editable al reasignar postulante',
+        'files' => [
+            'app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php',
+            'resources/views/gestion/solicitudes-reemplazo/show.blade.php',
+            'tests/Feature/SolicitudReemplazoReasignacionFechaTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El modal de reasignación permite definir la nueva fecha de inicio; el selector verifica disponibilidad y cruce de jornadas con esa fecha y limpia la selección cuando cambia.',
+            'Al guardar, actualiza la fecha de inicio de la solicitud y, si ya estaba aceptada, sincroniza el inicio de trabajo antes de regenerar la Orden de Trabajo. Valida que el inicio no exceda el término.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.9.28.535' => [
         'date' => '2026-09-28',
         'module' => 'Dotación docente',

@@ -169,6 +169,14 @@
                         @csrf
                         <div class="modal-body">
                             <div class="mb-3">
+                                <label for="reasignar_fecha_inicio" class="form-label fw-semibold">Nueva fecha de inicio de la solicitud <span class="text-danger">*</span></label>
+                                <input type="date" id="reasignar_fecha_inicio" name="fecha_inicio" class="form-control" required
+                                    max="{{ optional($s->fecha_termino)->toDateString() }}"
+                                    value="{{ old('fecha_inicio', optional($s->fecha_inicio)->toDateString()) }}">
+                                <div class="form-text">La búsqueda comprobará la disponibilidad desde esta fecha hasta el término de la solicitud.</div>
+                                @error('fecha_inicio') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="mb-3">
                                 <div class="text-muted small">Postulante / funcionario actual</div>
                                 <div class="fw-semibold">
                                     @if ($s->postulante && $s->postulante->user)
@@ -180,10 +188,11 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Seleccionar postulante / funcionario <span class="text-danger">*</span></label>
+                                <label for="reasignar_postulant_profile_id" class="form-label fw-semibold">Seleccionar postulante / funcionario <span class="text-danger">*</span></label>
                                 <select id="reasignar_postulant_profile_id" name="postulant_profile_id" class="form-select" required>
                                     {{-- Select2 AJAX --}}
                                 </select>
+                                @error('postulant_profile_id') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                                 <div id="reasignacionRestrictionAlert" class="alert alert-warning d-none mt-2 mb-0">
                                     <div class="fw-semibold">Advertencia de restricción manual</div>
                                     <div data-restriction-text class="small mb-0"></div>
@@ -197,9 +206,10 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Motivo de reasignación <span class="text-danger">*</span></label>
-                                <textarea name="reasignacion_postulante_motivo" class="form-control" rows="4" required
-                                    placeholder="Indica el motivo por el cual se reasigna el postulante..."></textarea>
+                                <label for="reasignacion_postulante_motivo" class="form-label fw-semibold">Motivo de reasignación <span class="text-danger">*</span></label>
+                                <textarea id="reasignacion_postulante_motivo" name="reasignacion_postulante_motivo" class="form-control" rows="4" required
+                                    placeholder="Indica el motivo por el cual se reasigna el postulante...">{{ old('reasignacion_postulante_motivo') }}</textarea>
+                                @error('reasignacion_postulante_motivo') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -1977,15 +1987,21 @@
             // Select del modal Reasignar: inicializar cuando el modal se muestra
             const $modal = $('#modalReasignarPostulante');
             const $reasignAlert = $('#reasignacionRestrictionAlert');
+            const $reasignFechaInicio = $modal.find('#reasignar_fecha_inicio');
+            const $reasignSelect = $modal.find('#reasignar_postulant_profile_id');
             $modal.on('shown.bs.modal', function() {
                 initSelect(
-                    $('#reasignar_postulant_profile_id'),
+                    $reasignSelect,
                     postulantesOtUrl,
                     'reasignar',
                     $modal,
                     $reasignAlert,
-                    () => ({ fecha_inicio_trabajo: @json(optional($s->fecha_inicio_trabajo)->toDateString() ?? optional($s->fecha_inicio)->toDateString()) })
+                    () => ({ fecha_inicio: $reasignFechaInicio.val() || '' })
                 );
+            });
+            $reasignFechaInicio.on('change', function() {
+                $reasignSelect.val(null).trigger('change');
+                renderManualRestrictionAlert($reasignAlert, null);
             });
             $modal.on('hidden.bs.modal', function() {
                 renderManualRestrictionAlert($reasignAlert, null);

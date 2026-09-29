@@ -1533,7 +1533,13 @@ class SolicitudReemplazoGestionController extends Controller
 
         // Referencia informativa: postulantes con solicitud aceptada que se cruza en el período efectivo.
         // Ya no bloquea por sí sola; el bloqueo se define por el total de horas del mismo período.
-        $selectedInicioTrabajo = (string) $request->query('fecha_inicio_trabajo', '');
+        $fechaCampo = $mode === 'reasignar' ? 'fecha_inicio' : 'fecha_inicio_trabajo';
+        $fechaReglas = [$mode === 'reasignar' ? 'required' : 'nullable', 'date_format:Y-m-d'];
+        if ($mode === 'reasignar' && $solicitud->fecha_termino) {
+            $fechaReglas[] = 'before_or_equal:'.$solicitud->fecha_termino->toDateString();
+        }
+        $request->validate([$fechaCampo => $fechaReglas]);
+        $selectedInicioTrabajo = (string) $request->query($fechaCampo, '');
         $busyIds = [];
         $busyQuery = $this->buildAcceptedPeriodConflictQuery(
             SolicitudReemplazo::query(),
@@ -2058,10 +2064,16 @@ class SolicitudReemplazoGestionController extends Controller
             return back()->withErrors(['reasignacion_postulante_motivo' => 'No es posible reasignar: la solicitud ya tiene Orden y/o Contrato generado.']);
         }
 
+        $fechaInicioRules = ['required', 'date_format:Y-m-d'];
+        if ($solicitud->fecha_termino) {
+            $fechaInicioRules[] = 'before_or_equal:'.$solicitud->fecha_termino->toDateString();
+        }
         $data = $request->validate([
+            'fecha_inicio' => $fechaInicioRules,
             'postulant_profile_id' => ['required', 'integer', 'exists:postulant_profiles,id'],
             'reasignacion_postulante_motivo' => ['required', 'string', 'min:10', 'max:2000'],
         ], [], [
+            'fecha_inicio' => 'fecha de inicio de la solicitud',
             'postulant_profile_id' => 'postulante',
             'reasignacion_postulante_motivo' => 'motivo de reasignación',
         ]);
@@ -2107,7 +2119,7 @@ class SolicitudReemplazoGestionController extends Controller
         // Se permite coincidencia de período mientras la suma de jornadas aceptadas
         // del mismo período, más la solicitud actual, no supere 44 horas.
         $requestedHours = $this->resolveSolicitudRequestedHours($solicitud);
-        if ($this->wouldExceedMaxActiveHours($postulantProfileId, $solicitud, (string) ($data['fecha_inicio_trabajo'] ?? null), $requestedHours)) {
+        if ($this->wouldExceedMaxActiveHours($postulantProfileId, $solicitud, $data['fecha_inicio'], $requestedHours)) {
             return back()->withErrors([
                 'postulant_profile_id' => 'El postulante supera el máximo permitido de 44 horas considerando sus solicitudes vigentes.',
             ])->withInput();
@@ -2117,6 +2129,11 @@ class SolicitudReemplazoGestionController extends Controller
             $s = SolicitudReemplazo::whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
 
             abort_unless(in_array($s->estado, ['derivada_slep', 'aceptada'], true), 403);
+            if ($s->fecha_termino && $data['fecha_inicio'] > $s->fecha_termino->toDateString()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'fecha_inicio' => 'La fecha de inicio no puede ser posterior al término de la solicitud.',
+                ]);
+            }
             if ($s->estado === 'derivada_slep') {
                 abort_unless(!$this->hasOrdenOrContrato($s), 403);
             }
@@ -2134,6 +2151,10 @@ class SolicitudReemplazoGestionController extends Controller
             $prev = (int) ($s->postulant_profile_id ?? 0);
             $s->reasignacion_postulante_from = $prev > 0 ? $prev : null;
             $s->postulant_profile_id = $postulantProfileId;
+            $s->fecha_inicio = $data['fecha_inicio'];
+            if ($s->estado === 'aceptada' || !empty($s->fecha_inicio_trabajo)) {
+                $s->fecha_inicio_trabajo = $data['fecha_inicio'];
+            }
             $s->reasignacion_postulante_motivo = trim((string) $data['reasignacion_postulante_motivo']);
             $s->reasignacion_postulante_by = (int) $user->id;
             $s->reasignacion_postulante_at = now();
