@@ -23,15 +23,16 @@
         <div class="row g-3 mb-3">
             <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Saldo no normativo por traspasar</div><strong class="h4 mb-0">{{ $fmt($capacidadReserva) }} h</strong></div></div>
             <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Horas reservadas sin función</div><strong class="h4 mb-0">{{ $fmt($reservasActivas->sum(fn ($row) => (float) $row->horas_contrato)) }} h</strong></div></div>
-            <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Orden de traspaso</div><strong>{{ $faseReserva === 'titular' ? 'Horas titulares' : 'Horas a contrata' }}</strong><div class="small text-muted">Los saldos individuales menores a 1 h se omiten.</div></div></div>
+            <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Origen permitido</div><strong>Horas titulares</strong><div class="small text-muted">No se traspasan horas a contrata ni saldos titulares menores a 1 h.</div></div></div>
         </div>
 
+        @if ($capacidadReserva >= 1 && $opcionesReserva->isNotEmpty())
         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.reservas.store', $establecimiento) }}" class="border rounded-4 p-3 bg-light">
             @csrf
             <input type="hidden" name="anio" value="2027">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-7">
-                    <label class="form-label fw-semibold" for="docente-reserva-no-normativa">Docente con saldo {{ $faseReserva }} <span class="text-danger">*</span></label>
+                    <label class="form-label fw-semibold" for="docente-reserva-no-normativa">Docente con saldo titular <span class="text-danger">*</span></label>
                     <div class="dotacion-reserva-picker" data-reserva-picker data-fase="{{ $faseReserva }}" data-maximo-global="{{ $capacidadReserva }}">
                         <select id="docente-reserva-no-normativa" name="docente_rut" class="form-select" required>
                             <option value="">Seleccione docente...</option>
@@ -54,8 +55,18 @@
                     <button class="btn btn-primary rounded-pill w-100" type="submit" @disabled(!$asignacion2027Habilitada || $capacidadReserva < 1 || $opcionesReserva->isEmpty())><i class="bi bi-arrow-left-right"></i> Traspasar horas</button>
                 </div>
             </div>
-            <div class="form-text">El total traspasado no puede superar el saldo no normativo ni el saldo contractual del docente y su bloque. Primero se usan horas titulares; luego, horas a contrata.</div>
+            <div class="form-text">Sólo se pueden traspasar horas titulares, hasta el saldo disponible del docente, su bloque y el establecimiento.</div>
         </form>
+        @else
+            <div class="alert alert-info border-0 rounded-4 small mb-0"><i class="bi bi-info-circle me-1"></i>
+                @if ($capacidadReserva < 1)
+                    No queda saldo no normativo para nuevos traspasos.
+                @else
+                    No hay docentes con al menos 1 h titular disponible para traspasar.
+                @endif
+                Las horas a contrata no se pueden reservar en este bloque.
+            </div>
+        @endif
 
         @if ($reservasActivas->isNotEmpty())
             <div class="table-responsive mt-3">

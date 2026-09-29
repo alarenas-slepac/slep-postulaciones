@@ -2,12 +2,13 @@
 
 namespace Tests\Unit;
 
+use App\Models\Establecimiento;
 use App\Support\DotacionReservaNoNormativa;
 use Tests\TestCase;
 
 class DotacionReservaNoNormativaTest extends TestCase
 {
-    public function test_traspasa_primero_saldos_titulares_y_limita_por_docente_bloque_y_establecimiento(): void
+    public function test_traspasa_solo_saldos_titulares_y_limita_por_docente_bloque_y_establecimiento(): void
     {
         $proceso = [
             'capacidad_reserva_no_normativa' => 8.0,
@@ -24,6 +25,7 @@ class DotacionReservaNoNormativaTest extends TestCase
         ];
 
         $elegibles = DotacionReservaNoNormativa::elegibles($proceso);
+        $this->assertSame(['111111111'], $elegibles->pluck('rut_normalizado')->all());
         $this->assertSame('titular', DotacionReservaNoNormativa::fase($elegibles));
         $this->assertSame(['111111111'], DotacionReservaNoNormativa::opciones($elegibles)->pluck('rut_normalizado')->all());
         $this->assertSame(4.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $elegibles->first(), 'titular'));
@@ -31,9 +33,31 @@ class DotacionReservaNoNormativaTest extends TestCase
         $proceso['docentes'][0]['horas_titulares_disponibles'] = 0.99;
         $proceso['docentes'][0]['horas_disponibles'] = 0.99;
         $elegibles = DotacionReservaNoNormativa::elegibles($proceso);
-        $this->assertSame('contrata', DotacionReservaNoNormativa::fase($elegibles));
-        $this->assertSame(['222222222', '333333333'], DotacionReservaNoNormativa::opciones($elegibles)->pluck('rut_normalizado')->all());
-        $this->assertSame(5.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $elegibles->first(), 'contrata'));
+        $this->assertTrue($elegibles->isEmpty());
+        $this->assertSame('titular', DotacionReservaNoNormativa::fase($elegibles));
+        $this->assertTrue(DotacionReservaNoNormativa::opciones($elegibles)->isEmpty());
+        $this->assertSame(0.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $proceso['docentes'][1], 'contrata'));
+    }
+
+    public function test_oculta_el_formulario_cuando_solo_quedan_horas_a_contrata(): void
+    {
+        $establecimiento = new Establecimiento(['nombre_establecimiento' => 'Establecimiento sintético']);
+        $establecimiento->id = 1;
+        $html = view('admin.dotacion-establecimiento.partials._reserva_no_normativa', [
+            'proceso2027Asignacion' => [
+                'capacidad_reserva_no_normativa' => 3.0,
+                'bloques' => ['bloque_1' => ['saldo_maximo' => 3.0]],
+                'docentes' => [$this->docente('111111111', 0, 3, 3)],
+            ],
+            'asignaciones' => collect(),
+            'necesidades' => ['funciones' => []],
+            'asignacion2027Habilitada' => true,
+            'establecimiento' => $establecimiento,
+            'fmt' => fn ($horas) => (string) $horas,
+        ])->render();
+
+        $this->assertStringContainsString('Las horas a contrata no se pueden reservar', $html);
+        $this->assertStringNotContainsString('name="docente_rut"', $html);
     }
 
     private function docente(string $rut, float $titular, float $contrata, float $total): array
