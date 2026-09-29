@@ -52,11 +52,11 @@
                                     </div>
                                     <div class="col-lg-6">
                                         <label class="form-label fw-semibold" for="subsector-docentes-{{ $asignatura['key'] }}">Docentes habilitados para {{ $asignatura['nombre'] }} <span class="text-danger">*</span></label>
-                                        <select id="subsector-docentes-{{ $asignatura['key'] }}" name="docentes[]" class="form-select js-subsector-docentes" multiple size="5" required>
+                                        <select id="subsector-docentes-{{ $asignatura['key'] }}" name="docentes[]" class="form-select js-subsector-docentes" multiple required>
                                             @foreach ($docentesSubsector as $docente)
                                                 @continue(! \App\Support\DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel']))
                                                 @php $rutDocente = \App\Support\DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')); @endphp
-                                                <option value="{{ $rutDocente }}" @selected(in_array($rutDocente, old('asignatura_key') === $asignatura['key'] ? old('docentes', []) : $asignatura['docentes'], true))>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · {{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }} · Disponible: {{ $fmtProceso($docente['horas_disponibles'] ?? 0) }} h</option>
+                                                <option value="{{ $rutDocente }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-prioridad-label="{{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }}" data-antiguedad="{{ $docente['fecha_antiguedad'] ?? '' }}" data-titular-disponible="{{ $fmtProceso($docente['horas_titulares_disponibles'] ?? 0) }}" data-contrata-disponible="{{ $fmtProceso($docente['horas_contrata_disponibles'] ?? 0) }}" @selected(in_array($rutDocente, old('asignatura_key') === $asignatura['key'] ? old('docentes', []) : $asignatura['docentes'], true))>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · {{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }} · Disponible: {{ $fmtProceso($docente['horas_disponibles'] ?? 0) }} h</option>
                                             @endforeach
                                         </select>
                                         <div class="form-text">Puede seleccionar varios docentes; la lista respeta la prelación y antigüedad vigentes.</div>
@@ -75,28 +75,54 @@
 </section>
 
 @if (($subsectores['disponible'] ?? false) && $gruposSubsector->isNotEmpty())
+    @include('admin.dotacion-establecimiento.partials._personal_select_assets')
     @push('styles')
-        @if (($tab ?? '') !== 'asignacion')
-            <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
-        @endif
         <style>
             #dotacion-docentes-subsector .select2-container { width: 100% !important; }
-            #dotacion-docentes-subsector .select2-container--default .select2-selection--multiple { min-height: 2.65rem; border: 1px solid #dbe4f0; border-radius: .75rem; }
+            #dotacion-docentes-subsector .select2-container--default .select2-selection--multiple { min-height: 2.65rem; border: 1px solid #dbe4f0; border-radius: .75rem; color: #0f172a; }
             #dotacion-docentes-subsector .select2-container--default.select2-container--focus .select2-selection--multiple { border-color: #0d6efd; box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .15); }
+            #dotacion-docentes-subsector .select2-selection__choice { max-width: 100%; }
+            #dotacion-docentes-subsector .select2-selection__choice__display { display: inline-block; max-width: min(32rem, 70vw); overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+            .dotacion-subsector-dropdown .select2-search--dropdown { padding: .6rem; background: #f7faff; border-bottom: 1px solid #dce7f5; }
+            .dotacion-subsector-dropdown .select2-search__field { min-height: 2.1rem; border: 1px solid #9db7dc; border-radius: .5rem; padding: .35rem .55rem; }
+            .dotacion-subsector-dropdown .select2-results__option { padding: .45rem .65rem; }
+            .dotacion-subsector-dropdown .select2-results__option--highlighted.select2-results__option--selectable { background: #eaf2ff; color: #122e58; }
+            .dotacion-subsector-option { display: grid; gap: .25rem; }
+            .dotacion-subsector-option__name { font-weight: 700; color: #172554; }
+            .dotacion-subsector-option__meta { display: flex; gap: .35rem; flex-wrap: wrap; color: #475569; font-size: .78rem; }
+            .dotacion-subsector-option__priority { color: #0b4aa2; font-weight: 700; }
+            .dotacion-subsector-option__availability { color: #0f766e; }
         </style>
     @endpush
     @push('scripts')
-        @if (($tab ?? '') !== 'asignacion')
-            <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-        @endif
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 if (!window.jQuery || !window.jQuery.fn.select2) return;
+                const $ = window.jQuery;
                 window.jQuery('#dotacion-docentes-subsector .js-subsector-docentes').select2({
                     width: '100%',
-                    placeholder: 'Busque docentes por nombre o RUT',
+                    placeholder: 'Buscar por nombre o RUT...',
                     closeOnSelect: false,
+                    minimumResultsForSearch: 0,
+                    dropdownCssClass: 'dotacion-subsector-dropdown',
+                    templateResult: function (item) {
+                        if (!item.id || !item.element) return item.text;
+                        const option = $(item.element);
+                        const result = $('<div>', { class: 'dotacion-subsector-option' });
+                        const name = $('<div>', { class: 'dotacion-subsector-option__name' })
+                            .text(option.data('nombre') + ' · ' + option.data('rut'));
+                        const meta = $('<div>', { class: 'dotacion-subsector-option__meta' });
+                        meta.append($('<span>', { class: 'dotacion-subsector-option__priority' }).text(option.data('prioridad-label')));
+                        if (option.data('antiguedad')) meta.append($('<span>').text('Antigüedad: ' + option.data('antiguedad')));
+                        meta.append($('<span>', { class: 'dotacion-subsector-option__availability' })
+                            .text('Disponible: ' + option.data('titular-disponible') + ' titular + ' + option.data('contrata-disponible') + ' contrata'));
+                        return result.append(name, meta);
+                    },
+                    templateSelection: function (item) {
+                        if (!item.id || !item.element) return item.text;
+                        const option = $(item.element);
+                        return option.data('nombre') + ' · ' + option.data('rut');
+                    },
                     language: { noResults: function () { return 'No se encontraron docentes.'; } }
                 });
             });
