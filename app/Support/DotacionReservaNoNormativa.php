@@ -24,14 +24,14 @@ class DotacionReservaNoNormativa
             $bloque = self::bloque($docente);
 
             return (float) data_get($proceso, 'bloques.'.$bloque.'.saldo_maximo', 0) >= 1.0
-                && (float) ($docente['horas_disponibles'] ?? 0) >= 1.0;
+                && DotacionPlanTitularPrimero::disponibles($docente, 'titular') >= 1.0;
         })->values();
     }
 
     /** @param Collection<int, array<string, mixed>> $docentes */
     public static function fase(Collection $docentes): string
     {
-        return DotacionPlanTitularPrimero::fase($docentes);
+        return 'titular';
     }
 
     /** @param Collection<int, array<string, mixed>> $docentes
@@ -39,11 +39,17 @@ class DotacionReservaNoNormativa
      */
     public static function opciones(Collection $docentes): Collection
     {
-        return DotacionPlanTitularPrimero::opciones($docentes);
+        return $docentes->filter(fn (array $docente) =>
+            DotacionPlanTitularPrimero::disponibles($docente, 'titular') >= 1.0
+        )->values();
     }
 
     public static function maximoParaDocente(array $proceso, array $docente, string $fase): float
     {
+        if ($fase !== 'titular') {
+            return 0.0;
+        }
+
         return max(0.0, round(min(
             (float) ($proceso['capacidad_reserva_no_normativa'] ?? 0),
             (float) data_get($proceso, 'bloques.'.self::bloque($docente).'.saldo_maximo', 0),

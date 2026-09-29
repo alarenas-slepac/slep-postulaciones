@@ -192,7 +192,7 @@ class DotacionAsignacionController extends Controller
             );
             if (! $seleccionado) {
                 throw ValidationException::withMessages([
-                    'docente_rut' => 'Seleccione un docente con al menos 1 h '.$fase.' disponible. Primero deben reservarse las horas titulares.',
+                    'docente_rut' => 'Seleccione un docente con al menos 1 h titular disponible. No se permite reservar horas a contrata.',
                 ]);
             }
 

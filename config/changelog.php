@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.29.548' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Reservas para otras funciones sólo con horas titulares',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionReservaNoNormativa.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_reserva_no_normativa.blade.php',
+            'tests/Unit/DotacionReservaNoNormativaTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El traspaso previo a otras funciones acepta exclusivamente saldos titulares de al menos una hora; las horas a contrata dejan de ser elegibles en la vista y en la validación del servidor.',
+            'Cuando no queda capacidad o ningún docente dispone de saldo titular suficiente, se oculta el formulario de traspaso y se informa la restricción.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.547' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
