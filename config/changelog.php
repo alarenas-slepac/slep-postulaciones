@@ -1,6 +1,21 @@
 <?php
 
 return [
+    '2026.9.29.551' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Corrección de migración de justificaciones en MySQL',
+        'files' => [
+            'database/migrations/2026_09_29_190000_create_dotacion_sobredotacion_justificaciones_table.php',
+            'tests/Feature/DotacionSobredotacionMigrationTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La clave foránea utiliza un identificador corto compatible con el límite de MySQL.',
+            'La migración completa el índice y la clave foránea si un intento anterior dejó la tabla creada, sin borrar registros.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento'],
+    ],
     '2026.9.29.550' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
