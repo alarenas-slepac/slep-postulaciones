@@ -51,7 +51,7 @@ class DotacionPlanTitularPrimeroTest extends TestCase
         $this->assertInvalidAssignment($elegibles, null, 1, true);
     }
 
-    public function test_un_saldo_titular_parcial_debe_asignarse_antes_de_dos_horas_a_contrata(): void
+    public function test_saldos_titulares_menores_a_una_hora_no_bloquean_la_contrata(): void
     {
         $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
             $this->docente('111111111', 10, 0, 9.63),
@@ -59,10 +59,36 @@ class DotacionPlanTitularPrimeroTest extends TestCase
         ]));
         $elegibles = DotacionPlanTitularPrimero::elegibles($docentes, ['111111111', '222222222'], []);
 
-        $this->assertSame('titular', DotacionPlanTitularPrimero::fase($elegibles));
+        $this->assertSame('contrata', DotacionPlanTitularPrimero::fase($elegibles));
         $this->assertSame(0.37, DotacionPlanTitularPrimero::disponibles($elegibles->first(), 'titular'));
-        $this->assertInvalidAssignment($elegibles, $elegibles->firstWhere('rut_normalizado', '222222222'), 2);
-        DotacionPlanTitularPrimero::validar($elegibles, $elegibles->firstWhere('rut_normalizado', '111111111'), 0.34, false);
+        $this->assertSame(['222222222'], DotacionPlanTitularPrimero::opciones($elegibles)->pluck('rut_normalizado')->all());
+        DotacionPlanTitularPrimero::validar($elegibles, $elegibles->firstWhere('rut_normalizado', '222222222'), 2, false);
+        DotacionPlanTitularPrimero::validar($elegibles, null, 2, true);
+        $this->assertInvalidAssignment($elegibles, $elegibles->firstWhere('rut_normalizado', '111111111'), 0.34);
+    }
+
+    public function test_una_hora_exacta_se_considera_y_saldos_a_contrata_menores_a_una_hora_se_omiten(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('111111111', 10, 0, 9),
+            $this->docente('222222222', 0, 0.99, 0),
+            $this->docente('333333333', 0, 1, 0),
+        ]));
+        $elegibles = DotacionPlanTitularPrimero::elegibles($docentes, ['111111111', '222222222', '333333333'], []);
+
+        $this->assertSame('titular', DotacionPlanTitularPrimero::fase($elegibles));
+        $this->assertSame(['111111111'], DotacionPlanTitularPrimero::opciones($elegibles)->pluck('rut_normalizado')->all());
+        DotacionPlanTitularPrimero::validar($elegibles, $elegibles->firstWhere('rut_normalizado', '111111111'), 1, false);
+
+        $sinTitular = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('111111111', 10, 0, 9.01),
+            $this->docente('222222222', 0, 0.99, 0),
+            $this->docente('333333333', 0, 1, 0),
+        ]));
+        $elegiblesSinTitular = DotacionPlanTitularPrimero::elegibles($sinTitular, ['111111111', '222222222', '333333333'], []);
+        $this->assertSame('contrata', DotacionPlanTitularPrimero::fase($elegiblesSinTitular));
+        $this->assertSame(['333333333'], DotacionPlanTitularPrimero::opciones($elegiblesSinTitular)->pluck('rut_normalizado')->all());
+        $this->assertInvalidAssignment($elegiblesSinTitular, $elegiblesSinTitular->firstWhere('rut_normalizado', '222222222'), 0.5);
     }
 
     private function docente(string $rut, float $planta, float $contrata, float $asignadas): array
