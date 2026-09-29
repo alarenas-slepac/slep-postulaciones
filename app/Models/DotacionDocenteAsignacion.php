@@ -77,6 +77,7 @@ class DotacionDocenteAsignacion extends Model
         'funcion_tecnico_pedagogica' => 'Función técnico-pedagógica',
         'plan_normativo' => 'Plan normativo',
         'otra_funcion' => 'Otra función',
+        'reserva_no_normativa' => 'Horas reservadas para otras funciones',
     ];
 
     public function establecimiento(): BelongsTo

@@ -698,6 +698,15 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.asignaciones.store');
+        Route::post('dotacion-establecimiento/{establecimiento}/asignaciones/reservas-no-normativas', [DotacionAsignacionController::class, 'storeReserva'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
+            ->whereNumber('establecimiento')
+            ->name('dotacion-establecimiento.asignaciones.reservas.store');
+        Route::post('dotacion-establecimiento/{establecimiento}/asignaciones/reservas-no-normativas/{asignacion}/vincular', [DotacionAsignacionController::class, 'vincularReserva'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
+            ->whereNumber('establecimiento')
+            ->whereNumber('asignacion')
+            ->name('dotacion-establecimiento.asignaciones.reservas.vincular');
         Route::put('dotacion-establecimiento/{establecimiento}/asignaciones/{asignacion}', [DotacionAsignacionController::class, 'update'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')

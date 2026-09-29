@@ -263,6 +263,67 @@ class DotacionProceso2027PlanConfigTest extends TestCase
         $this->assertTrue($proceso['funciones_no_normativas_habilitadas']);
     }
 
+    public function test_reserva_horas_sin_acreditar_cobertura_obligatoria_y_al_vincular_no_las_duplica(): void
+    {
+        DB::table('dotacion_proceso_2027_configuraciones')->insert([
+            'establecimiento_id' => 1,
+            'anio' => 2027,
+            'decision_combinacion' => 'sin_combinacion',
+            'max_horas_bloque_1' => 12,
+            'max_horas_bloque_2' => 0,
+            'max_horas_bloque_3' => 0,
+            'funciones_normativas' => json_encode([]),
+        ]);
+        $data = [
+            'resumen' => [
+                'contrato_plan_general_mas_trabajo_colaborativo_pie' => 10,
+                'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 0,
+            ],
+            'cursos' => [
+                'totales' => ['cursos' => 1, 'sin_horas_plan' => 0],
+                'configuracion_planes' => ['completo' => true, 'total' => 1, 'configurados' => 1],
+            ],
+            'asignacion' => [
+                'necesidades' => ['plan_estudio' => [[
+                    'key' => 'plan:general', 'horas_plan_requeridas' => 6, 'horas_plan_asignadas' => 0,
+                ]]],
+                'asignaciones' => [],
+            ],
+            'docentes' => [[
+                'rut_normalizado' => '111111111',
+                'nombre' => 'Docente de prueba',
+                'horas_contrato' => 12,
+                'horas_planta' => 12,
+                'horas_contrata' => 0,
+                'horas_asignadas_total' => 0,
+            ]],
+            'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
+        ];
+        $establecimiento = Establecimiento::findOrFail(1);
+        $inicial = DotacionProceso2027Calculator::resumen($establecimiento, 2027, $data);
+        $this->assertSame(2.0, $inicial['capacidad_reserva_no_normativa']);
+        $this->assertSame(10.0, $inicial['bloques']['bloque_1']['pendientes']);
+
+        $data['asignacion']['asignaciones'][] = [
+            'docente_rut_normalizado' => '111111111',
+            'tipo_asignacion' => 'reserva_no_normativa',
+            'horas_contrato' => 2,
+        ];
+        $data['docentes'][0]['horas_asignadas_total'] = 2;
+        $reservado = DotacionProceso2027Calculator::resumen($establecimiento, 2027, $data);
+        $this->assertSame(2.0, $reservado['bloques']['bloque_1']['reservadas_no_normativas']);
+        $this->assertSame(10.0, $reservado['bloques']['bloque_1']['pendientes']);
+        $this->assertSame(0.0, $reservado['capacidad_reserva_no_normativa']);
+        $this->assertSame(2.0, $reservado['bloques']['bloque_1']['titulares_asignadas']);
+
+        $data['asignacion']['asignaciones'][0]['tipo_asignacion'] = 'otra_funcion';
+        $data['asignacion']['asignaciones'][0]['dotacion_funcion_id'] = 7;
+        $vinculado = DotacionProceso2027Calculator::resumen($establecimiento, 2027, $data);
+        $this->assertSame(0.0, $vinculado['bloques']['bloque_1']['reservadas_no_normativas']);
+        $this->assertSame(2.0, $vinculado['bloques']['bloque_1']['asignadas_no_normativas']);
+        $this->assertSame(2.0, $vinculado['bloques']['bloque_1']['asignadas']);
+    }
+
     private function data(): array
     {
         return [

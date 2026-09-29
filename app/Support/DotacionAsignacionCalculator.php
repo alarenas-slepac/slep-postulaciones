@@ -74,7 +74,8 @@ class DotacionAsignacionCalculator
             ));
         $totalRequeridas = round($totalRequeridasPlan + (float) $totalRequeridasOtros, 2);
         $totalAsignadas = $asignaciones
-            ->reject(fn ($item) => self::esAsignacionPorAsumir($item))
+            ->reject(fn ($item) => self::esAsignacionPorAsumir($item)
+                || $item->tipo_asignacion === 'reserva_no_normativa')
             ->sum(fn ($item) => (float) $item->horas_contrato);
         $pendientes = max(0.0, round($totalRequeridas - $totalAsignadas, 2));
         $excedidas = max(0.0, round($totalAsignadas - $totalRequeridas, 2));
@@ -412,8 +413,9 @@ class DotacionAsignacionCalculator
                 $tecnicoPedagogicas = (float) $items->where('tipo_asignacion', 'funcion_tecnico_pedagogica')->sum(fn ($row) => (float) $row->horas_contrato);
                 $planes = (float) $items->where('tipo_asignacion', 'plan_normativo')->sum(fn ($row) => (float) $row->horas_contrato);
                 $otras = (float) $items->where('tipo_asignacion', 'otra_funcion')->sum(fn ($row) => (float) $row->horas_contrato);
+                $reservadas = (float) $items->where('tipo_asignacion', 'reserva_no_normativa')->sum(fn ($row) => (float) $row->horas_contrato);
                 $funcionesTotal = round($pie + $directivas + $tecnicoPedagogicas + $planes + $otras, 2);
-                $totalContratoCalculado = round($contrato65 + $contrato60 + $contratoEspecial + $funcionesTotal, 2);
+                $totalContratoCalculado = round($contrato65 + $contrato60 + $contratoEspecial + $funcionesTotal + $reservadas, 2);
 
                 return [
                     'items' => $items->values(),
@@ -426,6 +428,7 @@ class DotacionAsignacionCalculator
                     'contrato_60_40' => round($contrato60, 2),
                     'contrato_especial' => round($contratoEspecial, 2),
                     'funciones_total' => $funcionesTotal,
+                    'reservadas_no_normativas' => round($reservadas, 2),
                     'pie' => $pie,
                     'directivas' => $directivas,
                     'tecnico_pedagogicas' => $tecnicoPedagogicas,
@@ -466,7 +469,8 @@ class DotacionAsignacionCalculator
     public static function subvencionResumen(Collection $items): Collection
     {
         return $items
-            ->reject(fn ($item) => self::esAsignacionPorAsumir($item))
+            ->reject(fn ($item) => self::esAsignacionPorAsumir($item)
+                || $item->tipo_asignacion === 'reserva_no_normativa')
             ->groupBy(fn ($item) => $item->subvencion ?: 'Sin clasificar')
             ->map(fn ($rows, $subvencion) => [
                 'subvencion' => $subvencion,
