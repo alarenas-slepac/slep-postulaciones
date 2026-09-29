@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.9.29.541' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Asignación obligatoria de horas titulares antes de contrata en el plan',
+        'files' => [
+            'app/Support/DotacionPlanTitularPrimero.php',
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Unit/DotacionPlanTitularPrimeroTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Cada asignatura del plan 2027 muestra primero solo docentes asociados con saldo titular; al agotarlo muestra solo docentes con saldo a contrata.',
+            'La validación del servidor impide usar horas a contrata o cobertura AAEE mientras quede saldo titular de docentes asociados y exige dividir asignaciones que excedan el saldo de la fase.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.540' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',

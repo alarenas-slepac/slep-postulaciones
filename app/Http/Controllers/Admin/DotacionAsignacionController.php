@@ -19,6 +19,7 @@ use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionProfesionDocenteResolver;
 use App\Support\DotacionDocentesSubsector;
 use App\Support\DotacionProceso2027Calculator;
+use App\Support\DotacionPlanTitularPrimero;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -761,8 +762,7 @@ class DotacionAsignacionController extends Controller
         ?DotacionDocenteAsignacion $current = null
     ): void {
         $anio = (int) ($payload['anio'] ?? 0);
-        if (! DotacionProceso2027Calculator::aplica($anio)
-            || ($payload['estamento_cobertura'] ?? 'docente') !== 'docente') {
+        if (! DotacionProceso2027Calculator::aplica($anio)) {
             return;
         }
 
@@ -774,6 +774,7 @@ class DotacionAsignacionController extends Controller
         }
 
         $docentesPermitidosSubsector = null;
+        $necesidadPlan = null;
         if (in_array((string) ($payload['tipo_asignacion'] ?? ''), ['plan_estudio', 'acompanamiento_parvularia'], true)) {
             $necesidadPlan = DotacionAsignacionCalculator::planNeedForKey(
                 $establecimiento, $anio, (string) ($payload['necesidad_key'] ?? '')
@@ -787,11 +788,33 @@ class DotacionAsignacionController extends Controller
             $rutSeleccionado = DotacionEstablecimientoCalculator::normalizeRut(
                 (string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? '')
             );
-            if (! in_array($rutSeleccionado, $docentesPermitidosSubsector, true)) {
+            if (($payload['estamento_cobertura'] ?? 'docente') === 'docente'
+                && ! in_array($rutSeleccionado, $docentesPermitidosSubsector, true)) {
                 throw ValidationException::withMessages([
                     'docente_rut' => 'El docente no está asociado a esta asignatura. Asócielo primero en la etapa Docentes por asignatura.',
                 ]);
             }
+        }
+
+        if (($payload['tipo_asignacion'] ?? '') === 'plan_estudio' && $necesidadPlan !== null) {
+            $docentesPlan = DotacionPlanTitularPrimero::elegibles(
+                collect($proceso['docentes'] ?? []), $docentesPermitidosSubsector ?? [], $necesidadPlan, $current
+            );
+            $rutSeleccionado = DotacionEstablecimientoCalculator::normalizeRut(
+                (string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? '')
+            );
+            $seleccionadoPlan = $docentesPlan->first(fn (array $docente) =>
+                DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) === $rutSeleccionado
+            );
+            DotacionPlanTitularPrimero::validar(
+                $docentesPlan,
+                $seleccionadoPlan,
+                (float) ($payload['horas_contrato'] ?? 0),
+                ($payload['estamento_cobertura'] ?? 'docente') === 'asistente'
+            );
+        }
+        if (($payload['estamento_cobertura'] ?? 'docente') !== 'docente') {
+            return;
         }
 
         $bloqueNecesidad = data_get($proceso, 'need_blocks.'.($payload['necesidad_key'] ?? ''));
