@@ -8,6 +8,7 @@
     $subvenciones = $asignacion['subvenciones'] ?? collect();
     $docentesAsignacion = $asignacion['docentes'] ?? $docentes;
     $proceso2027Asignacion = $proceso2027 ?? ['aplica' => false];
+    $subsectoresAsignacion = collect($proceso2027Asignacion['docentes_subsector']['asignaturas'] ?? [])->keyBy('key');
     $asignacion2027Habilitada = !($proceso2027Asignacion['aplica'] ?? false) || ($proceso2027Asignacion['asignacion_habilitada'] ?? false);
     $asistentesAsignacion = collect($asignacion['asistentes'] ?? []);
     $subvencionesOptions = ['General', 'SEP', 'PIE', 'Libre disposición', 'Otra', 'Sin clasificar'];
@@ -144,7 +145,7 @@
             <div class="alert alert-success rounded-4">{{ session('success') }}</div>
         @endif
         @if (($proceso2027Asignacion['aplica'] ?? false) && !$asignacion2027Habilitada)
-            <div class="alert alert-warning rounded-4"><i class="bi bi-lock"></i> La asignación 2027 está bloqueada hasta completar planes, declarar combinación de cursos, definir las funciones normativas y configurar máximos suficientes. Revise el proceso guiado superior.</div>
+            <div class="alert alert-warning rounded-4"><i class="bi bi-lock"></i> La asignación 2027 está bloqueada hasta completar planes, asociar docentes a cada asignatura, declarar combinación de cursos, definir las funciones normativas y configurar máximos suficientes. Revise el proceso guiado superior.</div>
         @endif
         <div class="alert alert-info rounded-4 small">
             <strong>Regla NT1/NT2:</strong> la necesidad contractual del plan se distribuye proporcionalmente por asignatura. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. En nuevas asignaciones individuales de una Educadora con JEC, el contrato de aula se obtiene de la tabla CPEIP 65/35. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición impartida por otro docente con JEC se contabiliza en Plan General, una vez por grupo combinado.
@@ -290,6 +291,10 @@
                                             $soloParvularia = $cursoNt instanceof \App\Models\EstablecimientoCurso
                                                 && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)
                                                 && ! \App\Support\DotacionParvulariaCalculator::conJec($cursoNt, $item['proporcion_key'] ?? null);
+                                            $subsectorKey = \App\Support\DotacionDocentesSubsector::keyParaNecesidad($item);
+                                            $docentesPermitidosSubsector = $anio === 2027
+                                                ? ($subsectoresAsignacion->get($subsectorKey)['docentes'] ?? [])
+                                                : null;
                                         @endphp
                                         @if ($lastBloque !== $bloqueActual)
                                             <tr class="table-secondary">
@@ -346,16 +351,19 @@
                                                     <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                                     <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
                                                     @if ($proceso2027Asignacion['aplica'] ?? false)
-                                                        <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; cada grupo titular se ordena por antigüedad y muestra el saldo contractual disponible.</span></div>
+                                                        <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Docentes asociados a la asignatura.</strong> Busque por nombre o RUT; se muestran en orden de prelación y antigüedad con su saldo disponible.</span></div>
                                                     @endif
-                                                    <select name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
+                                                    <label class="form-label small mb-0" for="estamento-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Tipo de cobertura</label>
+                                                    <select id="estamento-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                                         <option value="docente">Cubierto por docente</option>
                                                         @unless ($soloParvularia)<option value="asistente">Cubierto por Asistente de la Educación</option>@endunless
                                                     </select>
-                                                    <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
+                                                    <label class="form-label small mb-0" for="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Docente asociado o asistente</label>
+                                                    <select id="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
                                                         <option value="">Seleccione persona...</option>
                                                         <optgroup label="Docentes vigentes y por contratar">
                                                             @foreach ($docenteOptions as $doc)
+                                                                @continue($docentesPermitidosSubsector !== null && !in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
                                                                 @continue($doc['virtual'] && ($doc['cupo_bloque'] !== 'parvularia' || ! (($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2')))
                                                                 @continue($soloParvularia && !$doc['es_parvularia'])
                                                                 <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
@@ -410,6 +418,7 @@
                                                             <select id="acompanamiento-docente-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar Educadora de Párvulos..." required>
                                                                 <option value="">Seleccione Educadora de Párvulos...</option>
                                                                 @foreach ($docenteOptions as $doc)
+                                                                    @continue($docentesPermitidosSubsector !== null && !in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
                                                                     @continue(! $doc['es_parvularia'] || ($doc['virtual'] && $doc['cupo_bloque'] !== 'parvularia'))
                                                                     <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                                 @endforeach

@@ -16,6 +16,7 @@ use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionProfesionDocenteResolver;
+use App\Support\DotacionDocentesSubsector;
 use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -707,8 +708,29 @@ class DotacionAsignacionController extends Controller
         $proceso = DotacionProceso2027Calculator::resumen($establecimiento, $anio);
         if (! ($proceso['asignacion_habilitada'] ?? false)) {
             throw ValidationException::withMessages([
-                'anio' => 'Para asignar horas en 2027 debe completar planes de estudio, declarar la combinación de cursos y configurar máximos suficientes para los tres bloques.',
+                'anio' => 'Para asignar horas en 2027 debe completar planes de estudio, asociar docentes a las asignaturas, declarar la combinación de cursos y configurar máximos suficientes para los tres bloques.',
             ]);
+        }
+
+        $docentesPermitidosSubsector = null;
+        if (in_array((string) ($payload['tipo_asignacion'] ?? ''), ['plan_estudio', 'acompanamiento_parvularia'], true)) {
+            $necesidadPlan = DotacionAsignacionCalculator::planNeedForKey(
+                $establecimiento, $anio, (string) ($payload['necesidad_key'] ?? '')
+            );
+            if (! $necesidadPlan) {
+                throw ValidationException::withMessages(['necesidad_key' => 'La asignatura del plan ya no está vigente. Actualice la página.']);
+            }
+            $subsectorKey = DotacionDocentesSubsector::keyParaNecesidad($necesidadPlan);
+            $docentesPermitidosSubsector = collect($proceso['docentes_subsector']['asignaturas'] ?? [])
+                ->firstWhere('key', $subsectorKey)['docentes'] ?? [];
+            $rutSeleccionado = DotacionEstablecimientoCalculator::normalizeRut(
+                (string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? '')
+            );
+            if (! in_array($rutSeleccionado, $docentesPermitidosSubsector, true)) {
+                throw ValidationException::withMessages([
+                    'docente_rut' => 'El docente no está asociado a esta asignatura. Asócielo primero en la etapa Docentes por asignatura.',
+                ]);
+            }
         }
 
         $bloqueNecesidad = data_get($proceso, 'need_blocks.'.($payload['necesidad_key'] ?? ''));
@@ -779,8 +801,15 @@ class DotacionAsignacionController extends Controller
         }
 
         $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? ''));
+        $docentesElegibles = collect($proceso['docentes'] ?? []);
+        if ($docentesPermitidosSubsector !== null) {
+            $docentesElegibles = $docentesElegibles->filter(fn (array $docente) => in_array(
+                DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')),
+                $docentesPermitidosSubsector, true
+            ));
+        }
         $docentesPrelacion = DotacionProceso2027Calculator::docentesPrelacionParaAsignacion(
-            collect($proceso['docentes'] ?? []), $persona, $payload, $bloque
+            $docentesElegibles, $persona, $payload, $bloque
         );
         $seleccionado = $docentesPrelacion->first(
             fn (array $docente) => ($docente['rut_normalizado'] ?? '') === $rut

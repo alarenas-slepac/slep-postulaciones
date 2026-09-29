@@ -313,6 +313,10 @@ class DotacionProceso2027Calculator
 
         $estadoPlanes = self::estadoPlanesEstudio($establecimiento, $anio, $data);
         $planesCompletos = $estadoPlanes['completo'];
+        $docentesSubsector = DotacionDocentesSubsector::resumen(
+            $establecimiento, $anio,
+            collect($necesidades->get('plan_estudio', [])), $docentes
+        );
         $gruposActivos = (int) data_get($data, 'cursos_combinados.resumen.grupos_activos', 0);
         $combinacionDeclarada = $config && in_array($config->decision_combinacion, array_keys(DotacionProceso2027Configuracion::COMBINACIONES), true)
             && ($config->decision_combinacion !== 'combinaciones_configuradas' || $gruposActivos > 0);
@@ -321,7 +325,8 @@ class DotacionProceso2027Calculator
         $funcionesNormativasDefinidas = $funcionesNormativas->every(fn ($funcion) => $funcion['definida']);
         $necesidadesCubiertas = collect($bloques)->every(fn ($bloque) => $bloque['pendientes'] <= 0.01);
         $topesSuficientes = collect($bloques)->every(fn ($bloque) => ! $bloque['maximo_insuficiente']);
-        $asignacionHabilitada = $planesCompletos && $combinacionDeclarada && $funcionesNormativasDefinidas && $maximosConfigurados && $topesSuficientes;
+        $asignacionHabilitada = $planesCompletos && $docentesSubsector['completo']
+            && $combinacionDeclarada && $funcionesNormativasDefinidas && $maximosConfigurados && $topesSuficientes;
         $horasDisponiblesDocentes = round((float) $docentes->sum('horas_disponibles'), 2);
         $capacidadNoNormativas = min(
             (float) collect($bloques)->sum(fn (array $bloque) => max(0.0, (float) ($bloque['saldo_maximo'] ?? 0))),
@@ -332,6 +337,7 @@ class DotacionProceso2027Calculator
             'aplica' => true,
             'configuracion' => $config,
             'estado_planes' => $estadoPlanes,
+            'docentes_subsector' => $docentesSubsector,
             'bloques' => $bloques,
             'need_blocks' => $needBlocks,
             'funciones_normativas' => $funcionesNormativas->values(),
@@ -341,6 +347,11 @@ class DotacionProceso2027Calculator
                     'label' => 'Planes de estudio',
                     'completo' => $planesCompletos,
                     'detalle' => $estadoPlanes['detalle'],
+                ],
+                'subsectores' => [
+                    'label' => 'Docentes por asignatura',
+                    'completo' => $docentesSubsector['completo'],
+                    'detalle' => $docentesSubsector['completas'].' de '.$docentesSubsector['total'].' asignatura(s) con docentes asociados.',
                 ],
                 'combinaciones' => ['label' => 'Combinación de cursos', 'completo' => $combinacionDeclarada],
                 'normativas' => ['label' => 'Definición de funciones normativas', 'completo' => $funcionesNormativasDefinidas],

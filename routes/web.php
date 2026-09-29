@@ -690,6 +690,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.proceso-2027.update');
+        Route::post('dotacion-establecimiento/{establecimiento}/docentes-subsector', [DotacionProceso2027Controller::class, 'syncDocentesSubsector'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
+            ->whereNumber('establecimiento')
+            ->name('dotacion-establecimiento.docentes-subsector.sync');
         Route::post('dotacion-establecimiento/{establecimiento}/asignaciones', [DotacionAsignacionController::class, 'store'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
