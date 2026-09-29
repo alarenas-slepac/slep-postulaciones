@@ -7,6 +7,7 @@
     $contratosProtegidos = collect($sobredotacion['protegidos'] ?? []);
     $sobredotacionResumen = $detalle['resumen'] ?? [];
     $vacantesPorBloque = $sobredotacion['vacantes_por_bloque'] ?? [];
+    $justificacionesSobredotacion = $justificacionesSobredotacion ?? collect();
     $declaradasAsignadas = $sobredotacionResumen['horas_declaradas_asignadas'] ?? $sobredotacionResumen['horas_declaradas_ajustables'] ?? 0;
     $sobredotacionPieEstructural = $sobredotacionResumen['horas_sobredotacion_estructural'] ?? $sobredotacionResumen['horas_sobredotacion_total'] ?? 0;
     $formula = $detalle['formula'] ?? [];
@@ -134,8 +135,18 @@
             </div>
             <span class="badge rounded-pill text-bg-danger">{{ collect($vacantesPorBloque)->sum(fn ($bloque) => collect($bloque['items'] ?? [])->count()) }} saldo(s)</span>
         </div>
+        @if (session('success'))
+            <div class="alert alert-success rounded-4 mx-3 mt-3 mb-0" role="status"><i class="bi bi-check-circle me-1"></i>{{ session('success') }}</div>
+        @endif
+        @if (! ($justificacionesSobredotacionTableReady ?? false))
+            <div class="alert alert-warning rounded-4 mx-3 mt-3 mb-0" role="alert">El registro de justificaciones estará disponible después de ejecutar la migración de esta actualización.</div>
+        @else
+            <div class="px-3 py-2 small text-muted">El establecimiento debe fundamentar por separado la supresión de horas titulares y la no renovación de horas a contrata de cada docente con saldo. Si el saldo cambia, actualice su justificación.</div>
+        @endif
         @foreach (['plan_estudio' => 'Plan de estudio', 'parvularia' => 'Educación Parvularia', 'pie' => 'PIE'] as $claveBloque => $tituloBloque)
-            @php($bloqueVacante = $vacantesPorBloque[$claveBloque] ?? [])
+            @php
+                $bloqueVacante = $vacantesPorBloque[$claveBloque] ?? [];
+            @endphp
             <section class="border-top" aria-labelledby="vacantes-{{ $claveBloque }}">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-3 bg-light">
                     <div><h3 id="vacantes-{{ $claveBloque }}" class="h6 fw-bold mb-0">{{ $tituloBloque }}</h3><div class="small text-muted">{{ collect($bloqueVacante['items'] ?? [])->count() }} docente(s) con saldo libre</div></div>
@@ -143,9 +154,23 @@
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
-                        <thead class="table-light"><tr><th scope="col">RUT</th><th scope="col">Docente</th><th scope="col">Función</th><th scope="col" class="text-end">Contrato del bloque</th><th scope="col" class="text-end">Sin asignación</th><th scope="col" class="text-end">Planta</th><th scope="col" class="text-end">Contrata</th></tr></thead>
+                        <thead class="table-light"><tr><th scope="col">RUT</th><th scope="col">Docente</th><th scope="col">Función</th><th scope="col" class="text-end">Contrato del bloque</th><th scope="col" class="text-end">Sin asignación</th><th scope="col" class="text-end">Planta</th><th scope="col" class="text-end">Contrata</th><th scope="col">Justificación</th></tr></thead>
                         <tbody>
                             @forelse (($bloqueVacante['items'] ?? collect()) as $docente)
+                                @php
+                                    $rutNormalizado = \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut']);
+                                    $idJustificacion = 'justificacion-'.$claveBloque.'-'.$rutNormalizado;
+                                    $tiposHoras = [
+                                        'titular' => ['horas' => (float) $docente['horas_sobredotacion_planta'], 'titulo' => 'Supresión de horas titulares'],
+                                        'contrata' => ['horas' => (float) $docente['horas_sobredotacion_contrata'], 'titulo' => 'No renovación de horas a contrata'],
+                                    ];
+                                    $pendientes = collect($tiposHoras)->filter(function ($tipo, $calidad) use ($justificacionesSobredotacion, $claveBloque, $docente) {
+                                        if ($tipo['horas'] <= 0.01) return false;
+                                        $registro = ($justificacionesSobredotacion ?? collect())->get(\App\Models\DotacionSobredotacionJustificacion::clave($claveBloque, $docente['rut'], $calidad));
+                                        return ! $registro || ! $registro->vigentePara($tipo['horas']);
+                                    })->count();
+                                    $mostrarErrores = old('bloque') === $claveBloque && \App\Support\DotacionEstablecimientoCalculator::normalizeRut(old('docente_rut')) === $rutNormalizado;
+                                @endphp
                                 <tr>
                                     <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
                                     <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
@@ -154,13 +179,75 @@
                                     <td class="text-end text-danger fw-bold">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
                                     <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td>
                                     <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td>
+                                    <td class="text-nowrap">
+                                        @if (($justificacionesSobredotacionTableReady ?? false))
+                                            <span class="badge rounded-pill {{ $pendientes ? 'text-bg-warning' : 'text-bg-success' }}">{{ $pendientes ? $pendientes.' pendiente(s)' : 'Completa' }}</span>
+                                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill ms-1" data-bs-toggle="collapse" data-bs-target="#{{ $idJustificacion }}" aria-expanded="{{ $mostrarErrores ? 'true' : 'false' }}" aria-controls="{{ $idJustificacion }}">{{ ($canManageJustificacionesSobredotacion ?? false) ? 'Justificar' : 'Ver motivos' }}</button>
+                                        @else
+                                            <span class="badge rounded-pill text-bg-secondary">No disponible</span>
+                                        @endif
+                                    </td>
                                 </tr>
+                                @if (($justificacionesSobredotacionTableReady ?? false))
+                                    <tr><td colspan="8" class="p-0 border-0">
+                                        <div id="{{ $idJustificacion }}" class="collapse {{ $mostrarErrores ? 'show' : '' }}">
+                                            <div class="p-3 bg-light border-top border-bottom">
+                                                <div class="row g-3">
+                                                    @foreach ($tiposHoras as $calidad => $tipo)
+                                                        @if ($tipo['horas'] > 0.01)
+                                                            @php
+                                                                $registro = ($justificacionesSobredotacion ?? collect())->get(\App\Models\DotacionSobredotacionJustificacion::clave($claveBloque, $docente['rut'], $calidad));
+                                                                $vigente = $registro?->vigentePara($tipo['horas']) ?? false;
+                                                                $idCampo = $idJustificacion.'-'.$calidad;
+                                                                $esFormularioActivo = $mostrarErrores && old('tipo_horas') === $calidad;
+                                                            @endphp
+                                                            <div class="col-lg-6">
+                                                                <div class="card h-100 border rounded-4 shadow-sm">
+                                                                    <div class="card-body">
+                                                                        <div class="d-flex justify-content-between gap-2 align-items-start mb-2">
+                                                                            <div><h4 class="h6 fw-bold mb-1">{{ $tipo['titulo'] }}</h4><div class="small text-muted">{{ $fmt($tipo['horas']) }} h sin asignación · {{ $tituloBloque }}</div></div>
+                                                                            <span class="badge rounded-pill {{ $vigente ? 'text-bg-success' : 'text-bg-warning' }}">{{ $vigente ? 'Registrada' : ($registro ? 'Actualizar' : 'Pendiente') }}</span>
+                                                                        </div>
+                                                                        @if ($registro && ! $vigente)
+                                                                            <div class="small text-warning-emphasis mb-2">La justificación anterior correspondía a {{ $fmt($registro->horas_detectadas) }} h. Revísela para el saldo actual.</div>
+                                                                        @endif
+                                                                        @if (($canManageJustificacionesSobredotacion ?? false))
+                                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.sobredotacion.justificaciones.store', $establecimiento) }}">
+                                                                                @csrf
+                                                                                <input type="hidden" name="anio" value="{{ $anio }}">
+                                                                                <input type="hidden" name="bloque" value="{{ $claveBloque }}">
+                                                                                <input type="hidden" name="tipo_horas" value="{{ $calidad }}">
+                                                                                <input type="hidden" name="docente_rut" value="{{ $docente['rut'] }}">
+                                                                                <label class="form-label fw-semibold" for="{{ $idCampo }}">Fundamento <span class="text-danger">*</span></label>
+                                                                                <textarea class="form-control rounded-3 {{ $esFormularioActivo && $errors->any() ? 'is-invalid' : '' }}" id="{{ $idCampo }}" name="justificacion" rows="3" minlength="10" maxlength="3000" required>{{ $esFormularioActivo ? old('justificacion') : $registro?->justificacion }}</textarea>
+                                                                                @if ($esFormularioActivo && $errors->any())
+                                                                                    <div class="invalid-feedback d-block">{{ $errors->first() }}</div>
+                                                                                @endif
+                                                                                <div class="d-flex justify-content-between align-items-center gap-2 mt-2">
+                                                                                    <span class="small text-muted">{{ $registro?->updated_at?->format('d-m-Y H:i') }}</span>
+                                                                                    <button type="submit" class="btn btn-primary rounded-pill px-3"><i class="bi bi-check-circle me-1"></i>Guardar</button>
+                                                                                </div>
+                                                                            </form>
+                                                                        @else
+                                                                            <p class="mb-0 text-break">{{ $registro?->justificacion ?? 'El establecimiento aún no registra el fundamento.' }}</p>
+                                                                            @if ($registro)<div class="small text-muted mt-2">Actualizada: {{ $registro->updated_at?->format('d-m-Y H:i') }}</div>@endif
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td></tr>
+                                @endif
                             @empty
-                                <tr><td colspan="7" class="text-center text-muted py-4">No hay horas contractuales sin asignación en este bloque.</td></tr>
+                                <tr><td colspan="8" class="text-center text-muted py-4">No hay horas contractuales sin asignación en este bloque.</td></tr>
                             @endforelse
                         </tbody>
                         @if (collect($bloqueVacante['items'] ?? [])->isNotEmpty())
-                            <tfoot class="table-light fw-bold"><tr><td colspan="4">Total {{ $tituloBloque }}</td><td class="text-end text-danger">{{ $fmt($bloqueVacante['horas_total']) }}</td><td class="text-end text-primary">{{ $fmt($bloqueVacante['horas_planta']) }}</td><td class="text-end text-info">{{ $fmt($bloqueVacante['horas_contrata']) }}</td></tr></tfoot>
+                            <tfoot class="table-light fw-bold"><tr><td colspan="4">Total {{ $tituloBloque }}</td><td class="text-end text-danger">{{ $fmt($bloqueVacante['horas_total']) }}</td><td class="text-end text-primary">{{ $fmt($bloqueVacante['horas_planta']) }}</td><td class="text-end text-info">{{ $fmt($bloqueVacante['horas_contrata']) }}</td><td></td></tr></tfoot>
                         @endif
                     </table>
                 </div>

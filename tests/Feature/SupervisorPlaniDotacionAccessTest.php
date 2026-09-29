@@ -41,6 +41,11 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
                 $checked[] = $routeName;
                 continue;
             }
+            if ($routeName === 'admin.dotacion-establecimiento.sobredotacion.justificaciones.store') {
+                $this->assertSame('ensure.role:funcionario_directivo_estab', $roleMiddleware);
+                $checked[] = $routeName;
+                continue;
+            }
             $this->assertStringContainsString(
                 'supervisor_plani',
                 $roleMiddleware,
@@ -90,11 +95,11 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
 
     public function test_detalle_sobredotacion_restringe_los_roles_autorizados(): void
     {
-        foreach (['admin', 'coordinador_gdp', 'supervisor_plani', 'coordinador_uatp'] as $role) {
+        foreach (['admin', 'coordinador_gdp', 'supervisor_plani', 'coordinador_uatp', 'funcionario_directivo_estab'] as $role) {
             $this->assertTrue(DotacionSobredotacionCalculator::canView($role));
         }
 
-        foreach (['funcionario_directivo_estab', 'funcionario_slep', 'coordinador_plani', null] as $role) {
+        foreach (['funcionario_slep', 'coordinador_plani', null] as $role) {
             $this->assertFalse(DotacionSobredotacionCalculator::canView($role));
         }
     }

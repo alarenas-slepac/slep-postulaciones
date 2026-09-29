@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.9.29.549' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Justificaciones de horas titulares y a contrata sin asignación',
+        'files' => [
+            'database/migrations/2026_09_29_190000_create_dotacion_sobredotacion_justificaciones_table.php',
+            'app/Models/DotacionSobredotacionJustificacion.php',
+            'app/Http/Controllers/Admin/DotacionSobredotacionJustificacionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'routes/web.php',
+            'tests/Feature/SupervisorPlaniDotacionAccessTest.php',
+            'tests/Feature/DotacionSobredotacionJustificacionTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El establecimiento fundamenta por docente y bloque la supresión de horas titulares y la no renovación de horas a contrata sin asignación.',
+            'Las justificaciones registran las horas detectadas y solicitan actualización cuando el saldo cambia; los demás roles autorizados pueden consultar los motivos.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.548' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
