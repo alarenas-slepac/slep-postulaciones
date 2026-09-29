@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.9.29.546' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Selector de docentes para reservar horas',
+        'files' => [
+            'resources/views/admin/dotacion-establecimiento/partials/_reserva_no_normativa.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El selector de reserva permite buscar por nombre, RUT o título y presenta la prioridad, el saldo titular o a contrata y el máximo a traspasar en cada opción.',
+            'El docente seleccionado muestra su saldo y máximo en el control; las horas ingresadas se limitan al máximo individual, conservando el selector nativo como respaldo.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.545' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
