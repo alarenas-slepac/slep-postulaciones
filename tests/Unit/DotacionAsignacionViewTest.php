@@ -9,9 +9,11 @@ class DotacionAsignacionViewTest extends TestCase
     public function test_el_selector_de_personal_tiene_buscador_y_muestra_la_prelacion(): void
     {
         $source = file_get_contents(resource_path('views/admin/dotacion-establecimiento/partials/_asignacion.blade.php'));
+        $assets = file_get_contents(resource_path('views/admin/dotacion-establecimiento/partials/_personal_select_assets.blade.php'));
 
         $this->assertIsString($source);
-        $this->assertStringContainsString('https://code.jquery.com/jquery-3.7.1.min.js', $source);
+        $this->assertIsString($assets);
+        $this->assertStringContainsString('https://code.jquery.com/jquery-3.7.1.min.js', $assets);
         $this->assertStringContainsString('minimumResultsForSearch: 0', $source);
         $this->assertStringContainsString('templateResult: templateResult', $source);
         $this->assertStringContainsString('Buscar por nombre o RUT...', $source);

@@ -384,7 +384,7 @@ class DotacionProceso2027Calculator
             $label = match ($prioridad) {
                 1 => '1. Fuero: gremiales o lactancia',
                 2 => '2. Titular · Avanzado / Experto 1 / Experto 2',
-                3 => '3. Resto titular',
+                3 => '3. Titular Acceso, Inicial, Temprano',
                 default => '4. Horas a contrata',
             };
 

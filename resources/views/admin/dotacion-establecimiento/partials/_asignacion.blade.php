@@ -56,9 +56,10 @@
     $asistenteOptions = $buildPersonalOptions($asistentesAsignacion, 'asistente');
 @endphp
 
+@include('admin.dotacion-establecimiento.partials._personal_select_assets')
+
 @once
     @push('styles')
-        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
         <style>
             .select2-container { width: 100% !important; }
             .dotacion-assignment-form {
@@ -81,9 +82,9 @@
             }
             .dotacion-selector-guide .bi { margin-top: .05rem; }
             .select2-container--default .select2-selection--single {
-                min-height: calc(1.5em + .5rem + 2px);
-                border-color: #b9cbe4;
-                border-radius: .55rem;
+                min-height: 2.65rem;
+                border-color: #dbe4f0;
+                border-radius: .75rem;
                 background: #fff;
                 box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
             }
@@ -587,11 +588,13 @@
                                         @if ($proceso2027Asignacion['aplica'] ?? false)
                                             <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; cada grupo titular se ordena por antigüedad y muestra el saldo contractual disponible.</span></div>
                                         @endif
-                                        <select name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
+                                        <label class="form-label small mb-0" for="estamento-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Tipo de cobertura</label>
+                                        <select id="estamento-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                             <option value="docente">Cubierto por docente</option>
                                             <option value="asistente">Cubierto por Asistente de la Educación</option>
                                         </select>
-                                        <select name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
+                                        <label class="form-label small mb-0" for="personal-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Docente o asistente</label>
+                                        <select id="personal-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
                                             <option value="">Seleccione persona...</option>
                                             <optgroup label="Docentes vigentes y por contratar">
                                                 @foreach ($docenteOptions as $doc)
@@ -672,10 +675,9 @@
 
 
 @push('scripts')
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    let initPersonalSelect = function () {};
     if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
         const $ = window.jQuery;
         const optionData = function (item) {
@@ -730,19 +732,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 .text(data.nombre + (data.rut ? ' · ' + data.rut : ''));
         };
 
-        $('.js-dotacion-docente-select').select2({
-            width: '100%',
-            placeholder: 'Buscar por nombre o RUT...',
-            allowClear: true,
-            minimumResultsForSearch: 0,
-            dropdownCssClass: 'dotacion-personal-dropdown',
-            language: {
-                noResults: function () { return 'No se encontraron personas con ese nombre o RUT.'; },
-                searching: function () { return 'Buscando personas…'; },
-            },
-            templateResult: templateResult,
-            templateSelection: templateSelection,
-        });
+        initPersonalSelect = function (element) {
+            $(element).select2({
+                width: '100%',
+                placeholder: element.dataset.placeholder || 'Buscar por nombre o RUT...',
+                allowClear: true,
+                minimumResultsForSearch: 0,
+                dropdownCssClass: 'dotacion-personal-dropdown',
+                language: {
+                    noResults: function () { return 'No se encontraron personas con ese nombre o RUT.'; },
+                    searching: function () { return 'Buscando personas…'; },
+                },
+                templateResult: templateResult,
+                templateSelection: templateSelection,
+            });
+        };
+        document.querySelectorAll('.js-dotacion-docente-select:not(.js-personal-cobertura)').forEach(initPersonalSelect);
     }
     document.querySelectorAll('[data-dotacion-asignacion-form]').forEach(function (form) {
         const estamento = form.querySelector('.js-estamento-cobertura');
@@ -754,25 +759,29 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        const personalOptions = Array.from(personal.querySelectorAll('option[data-estamento]'), function (option) {
+            return option.cloneNode(true);
+        });
         const sync = function () {
             const selectedEstamento = estamento.value || 'docente';
-            Array.from(personal.options).forEach(function (option) {
-                const optionEstamento = option.dataset.estamento;
-                if (!optionEstamento) {
-                    option.disabled = false;
-                    return;
-                }
-                option.disabled = optionEstamento !== selectedEstamento;
-            });
-
             const selectedOption = personal.options[personal.selectedIndex];
-            if (selectedOption && selectedOption.dataset.estamento && selectedOption.dataset.estamento !== selectedEstamento) {
-                personal.value = '';
-            }
-
+            const selectedValue = selectedOption && selectedOption.dataset.estamento === selectedEstamento
+                ? selectedOption.value
+                : '';
             if (window.jQuery && window.jQuery(personal).hasClass('select2-hidden-accessible')) {
-                window.jQuery(personal).trigger('change.select2');
+                window.jQuery(personal).select2('destroy');
             }
+            const placeholder = new Option('Seleccione persona...', '');
+            const group = document.createElement('optgroup');
+            group.label = selectedEstamento === 'asistente' ? 'Asistentes de la Educación' : 'Docentes vigentes y por contratar';
+            personal.replaceChildren(placeholder, group);
+            personalOptions.forEach(function (option) {
+                if (option.dataset.estamento === selectedEstamento) {
+                    group.appendChild(option.cloneNode(true));
+                }
+            });
+            personal.value = selectedValue;
+            initPersonalSelect(personal);
 
             if (contratoAaee) {
                 const isAaee = selectedEstamento === 'asistente';

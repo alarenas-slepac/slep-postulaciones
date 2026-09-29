@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.9.29.538' => [
+        'date' => '2026-09-29',
+        'module' => 'Dotación docente',
+        'title' => 'Prelación y selectores de personal por cobertura',
+        'files' => [
+            'app/Support/DotacionProceso2027Calculator.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes_subsector.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_personal_select_assets.blade.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+            'tests/Unit/DotacionAsignacionViewTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La tercera categoría de prelación se muestra como Titular Acceso, Inicial, Temprano.',
+            'Los selectores de asignación muestran únicamente docentes o asistentes según el tipo de cobertura elegido.',
+            'La selección múltiple de docentes por asignatura incorpora el buscador y detalle de prelación y saldo del selector de asignación de horas.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.537' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',
