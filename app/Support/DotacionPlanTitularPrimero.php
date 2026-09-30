@@ -34,7 +34,8 @@ class DotacionPlanTitularPrimero
         })->map(function (array $docente) use ($current, $rutActual): array {
             $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? ''));
             if ($rutActual !== null && $rut === $rutActual) {
-                $asignadas = max(0.0, (float) ($docente['horas_asignadas_total'] ?? 0) - (float) $current->horas_contrato);
+                $liberadas = DotacionContratoPlanCalculator::horasLiberadas(collect($docente['asignaciones'] ?? []), $current);
+                $asignadas = max(0.0, (float) ($docente['horas_asignadas_total'] ?? 0) - $liberadas);
                 $planta = max(0.0, (float) ($docente['horas_planta'] ?? 0));
                 $contrata = max(0.0, (float) ($docente['horas_contrata'] ?? 0));
                 $docente['horas_disponibles'] = max(0.0, round((float) ($docente['horas_contrato'] ?? 0) - $asignadas, 2));
