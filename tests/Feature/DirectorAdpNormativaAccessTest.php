@@ -68,7 +68,7 @@ class DirectorAdpNormativaAccessTest extends TestCase
 
         $this->assertStringContainsString('Asignar docente directivo', $vista);
         $this->assertStringContainsString('name="estamento_cobertura" value="docente"', $vista);
-        $this->assertStringContainsString('name="horas_contrato" value="44"', $vista);
+        $this->assertStringContainsString('name="horas_contrato" value="{{ $item[\'horas_contrato_requeridas\'] ?? 44 }}"', $vista);
         $this->assertStringContainsString('name="dotacion_funcion_regla_id"', $vista);
     }
 

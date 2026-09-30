@@ -42,6 +42,13 @@ class DotacionFuncionRegla extends Model
         'vigente' => 'boolean',
     ];
 
+    public function getNombreAttribute(?string $nombre): ?string
+    {
+        return $this->codigo === 'encargado_convivencia'
+            ? 'Coordinador(a) de Convivencia Educativa'
+            : $nombre;
+    }
+
     public function registros(): HasMany
     {
         return $this->hasMany(DotacionFuncionEstablecimiento::class, 'regla_id');

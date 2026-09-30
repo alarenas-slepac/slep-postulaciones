@@ -481,7 +481,7 @@ class DotacionFuncionesController extends Controller
         $consolidado = $this->initConsolidado();
 
         foreach ($sugerencias as $item) {
-            $horas = (int) $item['horas_sugeridas'];
+            $horas = $item['horas_sugeridas'];
             $totalesPorCategoria[$item['categoria']] = ($totalesPorCategoria[$item['categoria']] ?? 0) + $horas;
 
             $grupo = $this->grupoConsolidadoFor($item['categoria'] ?? null, $item['codigo'] ?? null);

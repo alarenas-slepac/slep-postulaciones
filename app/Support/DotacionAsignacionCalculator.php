@@ -960,6 +960,18 @@ class DotacionAsignacionCalculator
         ], $asignaciones)]);
     }
 
+    public static function funcionNormativaParaAsignacion(Establecimiento $establecimiento, int $anio, array $datos): ?array
+    {
+        return self::necesidadesFunciones(
+            DotacionEstablecimientoCalculator::bloquesDotacion($establecimiento, $anio),
+            self::assignmentsFor($establecimiento, $anio)
+        )->first(fn (array $item) => (int) ($item['dotacion_funcion_id'] ?? 0) <= 0
+            && in_array($item['subtipo_asignacion'], ['directiva', 'tecnico_pedagogica', 'planes_programas'], true)
+            && ((int) ($datos['dotacion_funcion_regla_id'] ?? 0) > 0
+                ? (int) ($item['dotacion_funcion_regla_id'] ?? 0) === (int) $datos['dotacion_funcion_regla_id']
+                : $item['key'] === ($datos['necesidad_key'] ?? '')));
+    }
+
     private static function necesidadesFunciones(array $bloques, Collection $asignaciones): Collection
     {
         $items = collect();
@@ -970,7 +982,7 @@ class DotacionAsignacionCalculator
                     continue;
                 }
                 $horas = (float) ($item['horas'] ?? 0);
-                if ($horas <= 0) {
+                if ($horas <= 0 && (float) ($item['horas_potenciales'] ?? 0) <= 0) {
                     continue;
                 }
                 $tipo = match ($keyBloque) {
@@ -982,12 +994,17 @@ class DotacionAsignacionCalculator
                     default => 'otra_funcion',
                 };
                 $subtipo = $keyBloque;
-                $needKey = self::key('funcion', [$keyBloque, $index, $nombre]);
+                // El cambio de etiqueta de Convivencia conserva la identidad
+                // de las definiciones y asignaciones históricas.
+                $nombreKey = ($item['codigo'] ?? null) === 'encargado_convivencia'
+                    ? 'Encargado(a) de Convivencia Escolar' : $nombre;
+                $needKey = self::key('funcion', [$keyBloque, $index, $nombreKey]);
                 $items->push(self::needRow($needKey, $tipo, $subtipo, [
                     'codigo' => $item['codigo'] ?? null,
                     'titulo' => $nombre,
                     'curso_label' => $bloque['label'] ?? 'Bloque',
                     'horas_contrato' => $horas,
+                    'horas_potenciales' => (float) ($item['horas_potenciales'] ?? $horas),
                     'subvencion' => $keyBloque === 'pie' ? 'PIE' : 'General',
                     'asignatura_nombre' => $nombre,
                     'fuente' => ($item['origen'] ?? 'Dotación funciones').' · '.($item['detalle'] ?? ''),

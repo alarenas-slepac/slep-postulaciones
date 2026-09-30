@@ -43,6 +43,7 @@ class DotacionFuncionesCalculator
         $contexto = self::contexto($establecimiento, $anio);
         $rules = DotacionFuncionRegla::query()->where('vigente', true)->orderBy('categoria')->orderBy('id')->get();
         $items = collect();
+        $horasConfiguradas = DotacionFuncionesNormativas2027::horasConfiguradas($establecimiento, $anio);
 
         foreach ($rules as $rule) {
             if ($rule->declarable || ! self::reglaAplica($rule)) {
@@ -59,7 +60,10 @@ class DotacionFuncionesCalculator
                 'codigo' => $rule->codigo,
                 'categoria' => $rule->categoria,
                 'nombre_funcion' => $rule->nombre,
-                'horas_sugeridas' => $horas,
+                'horas_potenciales' => $horas,
+                'horas_sugeridas' => array_key_exists($rule->codigo, $horasConfiguradas)
+                    ? DotacionFuncionesNormativas2027::horasDefinidas($rule->codigo, $horas, $horasConfiguradas)
+                    : $horas,
                 'estado' => 'calculado',
                 'detalle' => self::detalleRegla($rule, $contexto, $horas),
             ]);

@@ -7,6 +7,7 @@ use App\Models\DotacionProceso2027Configuracion;
 use App\Models\Establecimiento;
 use App\Support\DotacionDocentesSubsector;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionFuncionesNormativas2027;
 use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -88,6 +89,7 @@ class DotacionProceso2027Controller extends Controller
             'funciones_normativas' => ['nullable', 'array'],
             'funciones_normativas.*.key' => ['nullable', 'string', 'max:500'],
             'funciones_normativas.*.usar' => ['nullable', 'boolean'],
+            'funciones_normativas.*.horas' => ['sometimes', 'required', 'numeric', 'min:0', 'decimal:0,2'],
         ]);
 
         $config = DotacionProceso2027Configuracion::firstOrNew([
@@ -117,13 +119,9 @@ class DotacionProceso2027Controller extends Controller
             abort_unless(in_array($role, $this->funcionesNormativasRoles, true), 403);
             $potenciales = collect(DotacionProceso2027Calculator::resumen($establecimiento, 2027)['funciones_normativas'] ?? [])
                 ->keyBy('key');
-            $seleccionadas = collect($data['funciones_normativas'] ?? [])
-                ->filter(fn ($funcion) => ! empty($funcion['key']) && $potenciales->has($funcion['key']))
-                ->mapWithKeys(fn ($funcion) => [(string) $funcion['key'] => (bool) ($funcion['usar'] ?? false)])
-                ->all();
-            $config->funciones_normativas = $potenciales
-                ->mapWithKeys(fn ($funcion, $key) => [$key => (bool) ($seleccionadas[$key] ?? false)])
-                ->all();
+            $config->funciones_normativas = DotacionFuncionesNormativas2027::definicion(
+                $potenciales, $data['funciones_normativas'] ?? []
+            );
             $config->funciones_normativas_configuradas_by = $request->user()?->id;
             $config->funciones_normativas_configuradas_at = now();
         }

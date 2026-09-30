@@ -17,6 +17,7 @@ use App\Support\DotacionContratoPlanCalculator;
 use App\Support\DotacionAsignacionPorCursoBloque;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionFuncionesNormativas2027;
 use App\Support\DotacionProfesionDocenteResolver;
 use App\Support\DotacionDocentesSubsector;
 use App\Support\DotacionProceso2027Calculator;
@@ -990,6 +991,16 @@ class DotacionAsignacionController extends Controller
             return;
         }
 
+        if ((int) ($payload['dotacion_funcion_id'] ?? 0) <= 0
+            && in_array($payload['tipo_asignacion'] ?? '', ['funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo'], true)
+            && ($payload['subtipo_asignacion'] ?? '') !== 'pie') {
+            $necesidadFuncion = DotacionAsignacionCalculator::funcionNormativaParaAsignacion($establecimiento, $anio, $payload);
+            if (! $necesidadFuncion) {
+                throw ValidationException::withMessages(['necesidad_key' => 'La función normativa ya no está disponible. Actualice la página.']);
+            }
+            DotacionFuncionesNormativas2027::validarAsignacion($necesidadFuncion, (float) ($payload['horas_contrato'] ?? 0), $current?->id);
+        }
+
         $proceso = DotacionProceso2027Calculator::resumen($establecimiento, $anio);
         if (! ($proceso['asignacion_habilitada'] ?? false)) {
             throw ValidationException::withMessages([
@@ -1163,9 +1174,12 @@ class DotacionAsignacionController extends Controller
             ]);
         }
 
-        if (abs((float) ($data['horas_contrato'] ?? 0) - 44.0) > 0.01) {
+        $horasDefinidas = DotacionFuncionesNormativas2027::horasDefinidas('director_adp', 44,
+            DotacionFuncionesNormativas2027::horasConfiguradas($establecimiento, $anio));
+        if (abs((float) ($data['horas_contrato'] ?? 0) - $horasDefinidas) > 0.01) {
             throw ValidationException::withMessages([
-                'horas_contrato' => 'La asignación de Director(a) ADP debe registrar exactamente 44 horas de contrato.',
+                'horas_contrato' => 'La asignación de Director(a) ADP debe registrar exactamente '
+                    .DotacionEstablecimientoCalculator::formatHoras($horasDefinidas).' horas de contrato.',
             ]);
         }
 

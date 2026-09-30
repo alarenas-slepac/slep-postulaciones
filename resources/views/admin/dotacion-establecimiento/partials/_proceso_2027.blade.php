@@ -80,7 +80,7 @@
                     <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
                         <div>
                             <div class="fw-semibold">Definición de funciones normativas</div>
-                            <div class="small text-muted">Seleccione las funciones que el establecimiento utilizará. Sólo esas horas se sumarán como necesidad obligatoria en el componente correspondiente.</div>
+                            <div class="small text-muted">Seleccione las funciones que utilizará y sus horas de contrato. Por defecto se aplica el cálculo del sistema; puede reducirlo sin superar las horas calculadas. Las horas definidas se suman como necesidad obligatoria.</div>
                         </div>
                         <span class="badge {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'text-bg-success' : 'text-bg-warning' }}">Bolsa potencial: {{ $fmtProceso(collect($proceso['bloques'] ?? [])->sum('horas_normativas_potenciales')) }} h</span>
                     </div>
@@ -92,18 +92,44 @@
                             <div class="row g-2">
                                 @foreach ($funcionesNormativas as $funcion)
                                     <div class="col-lg-6">
-                                        <label class="border rounded-3 bg-white px-3 py-2 d-flex gap-2 align-items-start h-100">
+                                        @php
+                                            $indiceFuncion = $loop->index;
+                                            $campoHoras = 'funciones_normativas.'.$indiceFuncion.'.horas';
+                                        @endphp
+                                        <div class="border rounded-4 bg-white p-3 h-100">
                                             <input type="hidden" name="funciones_normativas[{{ $loop->index }}][key]" value="{{ $funcion['key'] }}">
-                                            <input class="form-check-input mt-1" type="checkbox" name="funciones_normativas[{{ $loop->index }}][usar]" value="1" @checked($funcion['se_utilizara'])>
-                                            <span><span class="fw-semibold d-block">{{ $funcion['titulo'] }}</span><span class="small text-muted">{{ $fmtProceso($funcion['horas']) }} horas{{ $funcion['asignacion_existente'] ? ' · Ya tiene asignación y se mantiene activa' : '' }}</span></span>
-                                        </label>
+                                            <input type="hidden" name="funciones_normativas[{{ $loop->index }}][usar]" value="0">
+                                            <div class="form-check mb-2">
+                                                <input id="normativa-uso-{{ $indiceFuncion }}" class="form-check-input" type="checkbox" name="funciones_normativas[{{ $indiceFuncion }}][usar]" value="1" @checked(old('funciones_normativas.'.$indiceFuncion.'.usar', $funcion['se_utilizara']))>
+                                                <label class="form-check-label fw-semibold" for="normativa-uso-{{ $indiceFuncion }}">{{ $funcion['titulo'] }}</label>
+                                            </div>
+                                            <div class="row g-2 align-items-start">
+                                                <div class="col-sm-5">
+                                                    <label class="form-label small fw-semibold mb-1" for="normativa-horas-{{ $indiceFuncion }}">Horas de contrato <span class="text-danger">*</span></label>
+                                                    <input id="normativa-horas-{{ $indiceFuncion }}" type="number" name="funciones_normativas[{{ $indiceFuncion }}][horas]" min="0" max="{{ $funcion['horas_potenciales'] }}" step="0.01" value="{{ old($campoHoras, $funcion['horas']) }}" class="form-control rounded-3 @error($campoHoras) is-invalid @enderror" aria-describedby="normativa-ayuda-{{ $indiceFuncion }}" required>
+                                                    @error($campoHoras)<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                </div>
+                                                <div id="normativa-ayuda-{{ $indiceFuncion }}" class="col-sm-7 small text-muted pt-sm-4">
+                                                    <div>Calculadas: <strong>{{ $fmtProceso($funcion['horas_potenciales']) }} h</strong> (máximo).</div>
+                                                    <div>Asignadas: {{ $fmtProceso($funcion['horas_asignadas']) }} h{{ $funcion['asignacion_existente'] ? ' · La función se mantiene activa.' : '' }}</div>
+                                                </div>
+                                            </div>
+                                            @if ($funcion['exceso_asignado'] > 0.01)
+                                                <div class="alert alert-warning small rounded-3 mt-3 mb-0" role="status"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Las asignaciones exceden la definición en {{ $fmtProceso($funcion['exceso_asignado']) }} h. Ajuste las asignaciones; no se modifican automáticamente.</div>
+                                            @endif
+                                        </div>
                                     </div>
                                 @endforeach
                             </div>
-                            <button class="btn btn-outline-primary btn-sm rounded-pill mt-3" type="submit"><i class="bi bi-check2-circle"></i> Guardar definición</button>
+                            <button class="btn btn-primary rounded-pill mt-3" type="submit"><i class="bi bi-check2-circle" aria-hidden="true"></i> Guardar definición</button>
                         </form>
                     @else
                         <div class="small text-muted">La definición puede realizarla el funcionario directivo del establecimiento, Administración o Coordinación UATP.</div>
+                        <div class="row g-2 mt-2">
+                            @foreach ($funcionesNormativas as $funcion)
+                                <div class="col-lg-6"><div class="border rounded-4 bg-white p-3 h-100"><div class="fw-semibold">{{ $funcion['titulo'] }}</div><div class="small text-muted">{{ $funcion['se_utilizara'] ? 'En uso' : 'Sin utilizar' }} · Definidas: {{ $fmtProceso($funcion['horas']) }} h · Calculadas: {{ $fmtProceso($funcion['horas_potenciales']) }} h · Asignadas: {{ $fmtProceso($funcion['horas_asignadas']) }} h</div>@if ($funcion['exceso_asignado'] > 0.01)<div class="small text-warning-emphasis mt-2">Exceso sobre la definición: {{ $fmtProceso($funcion['exceso_asignado']) }} h.</div>@endif</div></div>
+                            @endforeach
+                        </div>
                     @endif
                 </div>
             @endif
