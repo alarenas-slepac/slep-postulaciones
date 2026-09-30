@@ -48,6 +48,8 @@
     </div>
 </div>
 
+@include('admin.dotacion-establecimiento.partials._conciliacion_general')
+
 @if ($contratosProtegidos->isNotEmpty())
     <section class="card dotacion-section mb-4" aria-labelledby="contratos-protegidos-titulo">
         <div class="dotacion-section-header">

@@ -1,6 +1,46 @@
 <?php
 
 return [
+    '2026.9.30.555' => [
+        'date' => '2026-09-30',
+        'module' => 'Dotación docente',
+        'title' => 'Contrato del plan calculado sobre el total aula por docente',
+        'files' => [
+            'app/Support/DotacionContratoPlanCalculator.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'app/Support/DotacionPlanTitularPrimero.php',
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'tests/Feature/DotacionContratoPlanConsolidadoTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Los informes, el proceso guiado y el detalle individual convierten el total aula del plan por docente y proporción 65/35 o 60/40, incluida libre disposición, sin sumar conversiones independientes por asignatura.',
+            'Funciones, trabajo colaborativo PIE, reservas y cobertura AAEE mantienen sus horas contractuales directas; se conservan las reglas especiales NT y los registros históricos de la base.',
+            'Al editar se restituye el contrato que realmente libera el aula retirada; los cupos provisionales también validan su saldo sobre el aula consolidada.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
+    '2026.9.30.554' => [
+        'date' => '2026-09-30',
+        'module' => 'Dotación docente',
+        'title' => 'Conciliación contractual y explicación de cobertura AAEE',
+        'files' => [
+            'app/Support/DotacionConciliacionGeneral.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_conciliacion_general.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+            'tests/Unit/DotacionConciliacionGeneralTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El proceso guiado 2027 y el detalle de sobredotación muestran la cuadratura del bloque general: contratos docentes, asignaciones consolidadas por docente, reservas y saldo neto.',
+            'Se compara el contrato vigente con el máximo autorizado y se explican las diferencias por cobertura AAEE y cálculo del plan por docente frente a su necesidad por curso.',
+            'Las horas AAEE cubren necesidades obligatorias sin consumir contrato docente. La conciliación conserva las asignaciones históricas, las reservas y los máximos autorizados.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.29.553' => [
         'date' => '2026-09-29',
         'module' => 'Dotación docente',

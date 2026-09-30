@@ -13,6 +13,7 @@ use App\Models\EstablecimientoCurso;
 use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
+use App\Support\DotacionContratoPlanCalculator;
 use App\Support\DotacionAsignacionPorCursoBloque;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
@@ -1068,7 +1069,8 @@ class DotacionAsignacionController extends Controller
                 ?: DotacionProceso2027Calculator::bloqueParaAsignacion($current);
             if ($bloqueActual === $bloque) {
                 $asignadasMaximo = max(0.0, $asignadasMaximo - DotacionProceso2027Calculator::horasImputablesAlMaximo(
-                    (string) $current->tipo_asignacion, (float) $current->horas_contrato
+                    (string) $current->tipo_asignacion,
+                    DotacionContratoPlanCalculator::horasLiberadas(collect($personaActual['asignaciones'] ?? []), $current)
                 ));
                 if ((int) ($current->dotacion_funcion_id ?? 0) > 0
                     || in_array((string) $current->tipo_asignacion, ['otra_funcion', 'reserva_no_normativa'], true)) {
@@ -1098,7 +1100,9 @@ class DotacionAsignacionController extends Controller
         $asignadasPersona = max(0.0, (float) ($persona['horas_asignadas_total'] ?? 0));
         if ($current && DotacionEstablecimientoCalculator::normalizeRut((string) $current->docente_rut_normalizado)
             === DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? ''))) {
-            $asignadasPersona = max(0.0, $asignadasPersona - (float) $current->horas_contrato);
+            $asignadasPersona = max(0.0, $asignadasPersona - DotacionContratoPlanCalculator::horasLiberadas(
+                collect($persona['asignaciones'] ?? []), $current
+            ));
         }
         $disponibles = max(0.0, (float) ($persona['horas_contrato'] ?? 0) - $asignadasPersona);
         if ($horas > $disponibles + 0.01) {
@@ -1248,13 +1252,13 @@ class DotacionAsignacionController extends Controller
         }
 
         $rutNormalizado = DotacionEstablecimientoCalculator::normalizeRut((string) $persona['rut']);
-        $asignadas = (float) DotacionDocenteAsignacion::query()
+        $asignadas = (float) DotacionContratoPlanCalculator::consolidar(DotacionDocenteAsignacion::query()
             ->where('establecimiento_id', $establecimiento->id)
             ->where('anio', (int) $payload['anio'])
             ->where('docente_rut_normalizado', $rutNormalizado)
             ->where('estado', 'activa')
             ->when($current, fn ($query) => $query->whereKeyNot($current->id))
-            ->sum('horas_contrato');
+            ->get())->sum('horas_contrato');
         if ($asignadas + (float) ($payload['horas_contrato'] ?? 0) > (float) $cupo->horas + 0.01) {
             throw ValidationException::withMessages([
                 'horas_contrato' => 'Las horas asignadas al docente por contratar superan el cupo de '.$cupo->horas.' horas.',

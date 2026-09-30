@@ -61,9 +61,8 @@ class DotacionAsignacionCalculator
         $necesidades = self::necesidades($establecimiento, $anio, $cursos, $bloques, $asignaciones);
         $asignacionesHuerfanas = self::asignacionesHuerfanas($asignaciones, $necesidades);
 
-        // Se mantienen los totales contractuales históricos para reportes globales,
-        // pero el bloque de plan de estudios dispone además de totales exclusivos
-        // de horas aula pedagógicas para evitar mezclar unidades en la interfaz.
+        // Los contratos asignados de plan usan el aula consolidada por docente;
+        // los totales aula se muestran aparte para no mezclar ambas unidades.
         $totalRequeridasPlan = DotacionCursoCombinadoCalculator::adjustedContractRequired(
             $necesidades['plan_estudio'] ?? []
         );
@@ -152,7 +151,7 @@ class DotacionAsignacionCalculator
             return collect();
         }
 
-        return DotacionDocenteAsignacion::query()
+        return DotacionContratoPlanCalculator::consolidar(DotacionDocenteAsignacion::query()
             ->when(
                 self::schemaHasTable('establecimiento_cursos') && self::schemaHasTable('cursos'),
                 fn ($query) => $query->with('establecimientoCurso.curso')
@@ -167,7 +166,7 @@ class DotacionAsignacionCalculator
             ->orderBy('tipo_asignacion')
             ->orderBy('asignatura_nombre')
             ->orderBy('docente_nombre')
-            ->get();
+            ->get());
     }
 
     private static function asignacionesConDirectorAdpPorAsumir(
@@ -404,8 +403,8 @@ class DotacionAsignacionCalculator
                 // consolidado del docente para cada proporción, evitando redondear cada
                 // asignatura por separado. Las reglas especiales (por ejemplo NT1/NT2)
                 // conservan la conversión específica almacenada en cada asignación.
-                $contrato65 = self::contratoDesdeAula(DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL, $aula65);
-                $contrato60 = self::contratoDesdeAula(DocenteHorasNoLectivasCalculator::PROPORCION_PRIORITARIOS, $aula60);
+                $contrato65 = (float) $plan65->sum('horas_contrato');
+                $contrato60 = (float) $plan60->sum('horas_contrato');
                 $contratoEspecial = (float) $planEspecial->sum(fn ($row) => (float) $row->horas_contrato);
 
                 $pie = (float) $items->filter(fn ($row) => in_array($row->tipo_asignacion, ['pie_colaborativo', 'pie_educadora_diferencial'], true))->sum(fn ($row) => (float) $row->horas_contrato);
@@ -1502,18 +1501,6 @@ class DotacionAsignacionCalculator
         }
         return ['key' => 'cubierta', 'label' => 'Cubierta', 'class' => 'text-bg-success'];
     }
-
-    private static function contratoDesdeAula(string $proporcion, float $horasAula): float
-    {
-        if ($horasAula <= 0) {
-            return 0.0;
-        }
-
-        $conversion = DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula($proporcion, $horasAula);
-
-        return (float) ($conversion['horas_contrato'] ?? 0);
-    }
-
 
     public static function coverageEstamento(object|array $row): string
     {

@@ -110,7 +110,7 @@
 
             <div class="table-responsive mt-4">
                 <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light"><tr><th>Componente</th><th class="text-end">Normativas potenciales</th><th class="text-end">Máximo</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Sin padrón vigente</th><th class="text-end">Contrato registrado</th><th class="text-end">Cobertura obligatoria</th><th class="text-end">Pendiente obligatorio</th><th class="text-end">Saldo no normativas</th></tr></thead>
+                    <thead class="table-light"><tr><th>Componente</th><th class="text-end">Normativas potenciales</th><th class="text-end">Máximo</th><th class="text-end">Titulares</th><th class="text-end">Contrata</th><th class="text-end">Sin padrón vigente</th><th class="text-end">Contrato asignado y reservado</th><th class="text-end">Cobertura obligatoria</th><th class="text-end">Pendiente obligatorio</th><th class="text-end">Saldo no normativas</th></tr></thead>
                     <tbody>
                         @foreach (($proceso['bloques'] ?? []) as $bloque)
                             <tr>
@@ -150,6 +150,7 @@
                 </table>
             </div>
             <div class="small text-muted mt-2">Titulares y contrata provienen de las jornadas del padrón vigente; «Sin padrón vigente» identifica asignaciones que requieren revisión de su origen. La cobertura del plan se confirma con las horas aula de cada asignatura y su contrato necesario se calcula consolidado por curso. La libre disposición NT1/NT2 impartida por otros docentes se cuenta en Plan general; el acompañamiento simultáneo de Parvularia cuenta en el contrato de la Educadora, sin ocupar un segundo cupo del máximo del bloque. El redondeo individual de Parvularia sólo ajusta las cifras mostradas; no modifica asignaciones guardadas ni máximos. La cobertura AAEE de otras necesidades obligatorias se muestra por separado del contrato docente.</div>
+            <div class="alert alert-info small rounded-4 mt-3 mb-0" role="note"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>El contrato asignado del plan se calcula sumando primero las horas aula de cada docente y convirtiendo ese total según 65/35 o 60/40. Incluye libre disposición. Las funciones, el trabajo colaborativo PIE y las reservas ya son horas de contrato y se suman directamente. La cobertura por AAEE se informa aparte y no consume contrato docente.</div>
             @if (!($proceso['funciones_no_normativas_habilitadas'] ?? false))
                 @php
                     $etapasPendientes = collect($proceso['pasos'] ?? [])->filter(fn ($paso) => ! $paso['completo'])->pluck('label');
@@ -170,4 +171,7 @@
             @endif
         </div>
     </div>
+    @if (($tab ?? '') !== 'sobredotacion')
+        @include('admin.dotacion-establecimiento.partials._conciliacion_general')
+    @endif
 @endif

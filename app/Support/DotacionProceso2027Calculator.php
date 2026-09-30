@@ -205,7 +205,7 @@ class DotacionProceso2027Calculator
                 return $docente;
             });
         $docentesPorRut = $docentes->keyBy('rut_normalizado');
-        $asignaciones = collect(data_get($data, 'asignacion.asignaciones', []))
+        $asignaciones = DotacionContratoPlanCalculator::consolidar(collect(data_get($data, 'asignacion.asignaciones', [])))
             ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row))
             ->sortBy(fn ($row) => (string) data_get($row, 'tipo_asignacion') === 'reserva_no_normativa' ? 0 : 1);
         $horasClasificadasPorRut = [];
@@ -303,9 +303,9 @@ class DotacionProceso2027Calculator
                     >= (float) data_get($item, 'horas_plan_requeridas', 0));
             if ($planCompleto) {
                 // El plan se cubre en horas aula. Su contrato necesario se
-                // consolida por curso, mientras cada asignatura conserva el
-                // valor contractual guardado al asignarla. Al completar todas
-                // las filas se acredita la base consolidada sin reescribirlas.
+                // consolida por curso. El contrato asignado se convierte por
+                // docente; este ajuste acredita la necesidad institucional
+                // sin alterar su contrato asignado ni reescribir las filas.
                 // El desglose también traslada a Plan General la libre
                 // disposición NT1/NT2 impartida por otro docente.
                 foreach (['bloque_1' => 'contrato_plan_general', 'bloque_2' => 'contrato_plan_parvularia'] as $bloqueKey => $campo) {
