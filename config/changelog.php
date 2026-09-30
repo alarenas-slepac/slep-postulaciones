@@ -1,6 +1,41 @@
 <?php
 
 return [
+    '2026.9.30.557' => [
+        'date' => '2026-09-30',
+        'module' => 'Dotación docente',
+        'title' => 'Cargas masivas anuales de Convivencia Educativa y máximos por bloque',
+        'files' => [
+            'database/migrations/2026_09_30_180000_create_dotacion_convivencia_horas_table.php',
+            'app/Support/DotacionConvivenciaAnual.php',
+            'app/Support/DotacionHorasCargaMasiva.php',
+            'app/Support/DotacionFuncionesCalculator.php',
+            'app/Exports/DotacionConvivenciaHorasExport.php',
+            'app/Exports/DotacionMaximosBloqueExport.php',
+            'app/Imports/DotacionConvivenciaHorasImport.php',
+            'app/Imports/DotacionMaximosBloqueImport.php',
+            'app/Http/Controllers/Admin/DotacionConvivenciaHorasController.php',
+            'app/Http/Controllers/Admin/DotacionMaximosBloqueController.php',
+            'app/Http/Controllers/Admin/DotacionProceso2027Controller.php',
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'resources/views/admin/dotacion-funciones/index.blade.php',
+            'resources/views/admin/dotacion-funciones/convivencia-carga.blade.php',
+            'resources/views/admin/dotacion-funciones/maximos-carga.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'routes/web.php',
+            'tests/Feature/DotacionHorasCargaMasivaTest.php',
+            'tests/Feature/DotacionFuncionesNormativasHorasTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Administración, Coordinación UATP, Coordinación GDP y Supervisión de Planificación pueden descargar y cargar plantillas XLSX por año para definir las horas de Convivencia Educativa y los máximos de los tres bloques.',
+            'Las plantillas incluyen todos los RBD, nombre y matrícula de cursos activos del año. Convivencia precarga la definición anual vigente, las asignaciones activas o la definición previa; máximos precarga los valores guardados de cada bloque.',
+            'La definición anual de Convivencia prevalece sobre las horas locales, se aplica a necesidades y límites de asignación y conserva las asignaciones existentes. Los establecimientos no pueden modificar sus horas.',
+            'La carga de máximos actualiza la configuración existente por establecimiento y año, conservando decisiones de combinación, definición de funciones, asignaciones y reservas.',
+            'Los archivos se validan completos antes de guardar: año y tipo de plantilla, RBD, duplicados, rangos y hasta dos decimales. Las celdas vacías conservan valores y cero define cero horas.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.30.556' => [
         'date' => '2026-09-30',
         'module' => 'Dotación docente',
@@ -5833,8 +5868,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.15.538',
+    'current_version' => '2026.9.30.557',
     'entries' => [
+        [
+            'version' => '2026.9.30.557',
+            'title' => 'Dotación: cargas anuales de Convivencia Educativa y máximos por bloque',
+            'summary' => 'Define por carga masiva las horas del cargo y los máximos autorizados de los tres bloques, por establecimiento y año.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Plantillas XLSX con todos los RBD, nombre, matrícula del año y valores vigentes precargados.',
+                'La carga anual de Convivencia se aplica a las necesidades y límites de asignación. Sus horas no pueden ser modificadas por el establecimiento.',
+                'Los máximos se guardan en la configuración vigente del año, conservando funciones, combinaciones, asignaciones y reservas.',
+                'Validación completa antes de guardar; las celdas vacías conservan valores y cero establece cero horas.',
+            ],
+            'published_at' => '2026-09-30',
+        ],
         [
             'version' => '2026.9.15.538',
             'title' => 'Situación docente: horas de cátedra del artículo 69',

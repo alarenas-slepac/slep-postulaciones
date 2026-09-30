@@ -44,6 +44,7 @@ class DotacionFuncionesCalculator
         $rules = DotacionFuncionRegla::query()->where('vigente', true)->orderBy('categoria')->orderBy('id')->get();
         $items = collect();
         $horasConfiguradas = DotacionFuncionesNormativas2027::horasConfiguradas($establecimiento, $anio);
+        $horasConvivencia = DotacionConvivenciaAnual::horas($establecimiento->id, $anio);
 
         foreach ($rules as $rule) {
             if ($rule->declarable || ! self::reglaAplica($rule)) {
@@ -54,6 +55,9 @@ class DotacionFuncionesCalculator
             if ($horas === null) {
                 continue;
             }
+            $usaCargaConvivencia = $rule->codigo === DotacionConvivenciaAnual::CODIGO && $horasConvivencia !== null;
+            $horasDefinidas = array_key_exists($rule->codigo, $horasConfiguradas)
+                ? DotacionFuncionesNormativas2027::horasDefinidas($rule->codigo, $horas, $horasConfiguradas) : $horas;
 
             $items->push([
                 'regla' => $rule,
@@ -61,11 +65,10 @@ class DotacionFuncionesCalculator
                 'categoria' => $rule->categoria,
                 'nombre_funcion' => $rule->nombre,
                 'horas_potenciales' => $horas,
-                'horas_sugeridas' => array_key_exists($rule->codigo, $horasConfiguradas)
-                    ? DotacionFuncionesNormativas2027::horasDefinidas($rule->codigo, $horas, $horasConfiguradas)
-                    : $horas,
+                'horas_sugeridas' => $usaCargaConvivencia ? $horasConvivencia : $horasDefinidas,
                 'estado' => 'calculado',
-                'detalle' => self::detalleRegla($rule, $contexto, $horas),
+                'detalle' => $usaCargaConvivencia
+                    ? 'Horas definidas mediante carga masiva para el año '.$anio.'.' : self::detalleRegla($rule, $contexto, $horas),
             ]);
         }
 

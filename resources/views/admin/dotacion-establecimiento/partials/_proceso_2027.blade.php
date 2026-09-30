@@ -2,6 +2,8 @@
     $proceso = $proceso2027 ?? ['aplica' => false];
     $configProceso = $proceso['configuracion'] ?? null;
     $fmtProceso = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
+    $canConfigureConvivencia = \App\Support\DotacionConvivenciaAnual::puedeConfigurar(auth()->user()?->activeRoleName());
+    $convivenciaCentralizada = \App\Support\DotacionConvivenciaAnual::horas($establecimiento->id, $anio) !== null;
 @endphp
 
 @if ($proceso['aplica'] ?? false)
@@ -54,11 +56,12 @@
                             @csrf
                             <input type="hidden" name="anio" value="2027">
                             <div class="fw-semibold mb-2">Máximos autorizados para asignar por componente</div>
+                            <a class="btn btn-outline-primary btn-sm rounded-pill mb-3" href="{{ route('admin.dotacion-funciones.maximos.index', ['anio' => $anio]) }}"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Carga masiva de máximos</a>
                             <div class="row g-2">
                                 @foreach (($proceso['bloques'] ?? []) as $key => $bloque)
                                     <div class="col-md-4">
-                                        <label class="form-label small fw-semibold">{{ $bloque['label'] }}</label>
-                                        <input type="number" name="max_horas_{{ $key }}" min="0" step="0.25" class="form-control" value="{{ old('max_horas_'.$key, $bloque['maximo']) }}" required>
+                                        <label for="proceso-maximo-{{ $key }}" class="form-label small fw-semibold">{{ $bloque['label'] }}</label>
+                                        <input id="proceso-maximo-{{ $key }}" type="number" name="max_horas_{{ $key }}" min="0" step="0.01" class="form-control rounded-3" value="{{ old('max_horas_'.$key, $bloque['maximo']) }}" required>
                                         <div class="form-text">Horas necesarias: {{ $fmtProceso($bloque['requeridas']) }} h</div>
                                     </div>
                                 @endforeach
@@ -82,7 +85,12 @@
                             <div class="fw-semibold">Definición de funciones normativas</div>
                             <div class="small text-muted">Seleccione las funciones que utilizará y sus horas de contrato. Por defecto se aplica el cálculo del sistema; puede reducirlo sin superar las horas calculadas. Las horas definidas se suman como necesidad obligatoria.</div>
                         </div>
-                        <span class="badge {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'text-bg-success' : 'text-bg-warning' }}">Bolsa potencial: {{ $fmtProceso(collect($proceso['bloques'] ?? [])->sum('horas_normativas_potenciales')) }} h</span>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="badge rounded-pill {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'text-bg-success' : 'text-bg-warning' }}">Bolsa potencial: {{ $fmtProceso(collect($proceso['bloques'] ?? [])->sum('horas_normativas_potenciales')) }} h</span>
+                            @if ($canConfigureConvivencia)
+                                <a class="btn btn-outline-primary btn-sm rounded-pill" href="{{ route('admin.dotacion-funciones.convivencia.index', ['anio' => $anio]) }}"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Carga de horas de Convivencia</a>
+                            @endif
+                        </div>
                     </div>
                     @if ($canManageProceso2027Normativas ?? false)
                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}">
@@ -95,6 +103,7 @@
                                         @php
                                             $indiceFuncion = $loop->index;
                                             $campoHoras = 'funciones_normativas.'.$indiceFuncion.'.horas';
+                                            $soloLecturaConvivencia = ($funcion['codigo'] ?? '') === \App\Support\DotacionConvivenciaAnual::CODIGO && ($convivenciaCentralizada || ! $canConfigureConvivencia);
                                         @endphp
                                         <div class="border rounded-4 bg-white p-3 h-100">
                                             <input type="hidden" name="funciones_normativas[{{ $loop->index }}][key]" value="{{ $funcion['key'] }}">
@@ -106,7 +115,8 @@
                                             <div class="row g-2 align-items-start">
                                                 <div class="col-sm-5">
                                                     <label class="form-label small fw-semibold mb-1" for="normativa-horas-{{ $indiceFuncion }}">Horas de contrato <span class="text-danger">*</span></label>
-                                                    <input id="normativa-horas-{{ $indiceFuncion }}" type="number" name="funciones_normativas[{{ $indiceFuncion }}][horas]" min="0" max="{{ $funcion['horas_potenciales'] }}" step="0.01" value="{{ old($campoHoras, $funcion['horas']) }}" class="form-control rounded-3 @error($campoHoras) is-invalid @enderror" aria-describedby="normativa-ayuda-{{ $indiceFuncion }}" required>
+                                                    <input id="normativa-horas-{{ $indiceFuncion }}" type="number" name="funciones_normativas[{{ $indiceFuncion }}][horas]" min="0" max="{{ $funcion['horas_potenciales'] }}" step="0.01" value="{{ $soloLecturaConvivencia ? $funcion['horas'] : old($campoHoras, $funcion['horas']) }}" class="form-control rounded-3 {{ $soloLecturaConvivencia ? 'bg-light' : '' }} @error($campoHoras) is-invalid @enderror" aria-describedby="normativa-ayuda-{{ $indiceFuncion }}" @readonly($soloLecturaConvivencia) required>
+                                                    @if ($soloLecturaConvivencia)<div class="form-text">Las horas de este cargo se administran mediante la carga masiva anual.</div>@endif
                                                     @error($campoHoras)<div class="invalid-feedback">{{ $message }}</div>@enderror
                                                 </div>
                                                 <div id="normativa-ayuda-{{ $indiceFuncion }}" class="col-sm-7 small text-muted pt-sm-4">
