@@ -1,6 +1,25 @@
 <?php
 
 return [
+    '2026.9.30.559' => [
+        'date' => '2026-09-30',
+        'module' => 'Dotación docente',
+        'title' => 'Eliminar horas fantasmas por establecimiento y año',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignaciones_huerfanas.blade.php',
+            'routes/web.php',
+            'tests/Feature/DotacionHorasFantasmaDeleteTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El bloque Horas fantasmas incorpora un botón para eliminar todas las asignaciones mostradas del establecimiento y año consultados, con confirmación explícita.',
+            'La eliminación vuelve a validar la detección vigente de planes, asignaturas, acompañamientos y funciones inexistentes. Si una fila se restauró, cambió o pertenece a otro ámbito, se cancela todo el lote.',
+            'La carga contractual de los docentes afectados se recalcula con las reglas actuales. Se conservan las asignaciones vigentes, reservas y registros de otros establecimientos o años.',
+            'Se aplican los permisos existentes de asignación; el directivo sólo puede gestionar su establecimiento. El bloque utiliza componentes compartidos y oculta acciones a usuarios sin permiso.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.30.558' => [
         'date' => '2026-09-30',
         'module' => 'Dotación docente',
@@ -5891,8 +5910,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.30.558',
+    'current_version' => '2026.9.30.559',
     'entries' => [
+        [
+            'version' => '2026.9.30.559',
+            'title' => 'Dotación: eliminación de horas fantasmas',
+            'summary' => 'Permite eliminar las horas fantasmas del establecimiento y año consultados y recalcula la carga de los docentes afectados.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Botón Eliminar todas las horas fantasmas con confirmación de la eliminación definitiva.',
+                'Revalidación completa antes de borrar: se conservan las asignaciones vigentes, las reservas y otros establecimientos o años.',
+                'Recálculo contractual por docente y permisos existentes de asignación.',
+            ],
+            'published_at' => '2026-09-30',
+        ],
         [
             'version' => '2026.9.30.558',
             'title' => 'Dotación: contrato vigente en la plantilla de máximos',
