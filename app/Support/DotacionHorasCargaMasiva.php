@@ -10,7 +10,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class DotacionHorasCargaMasiva
 {
     /** Valida todo el archivo antes de permitir guardar una sola fila. */
-    public static function leer(string $path, int $anio, string $titulo, array $headers, array $columnas, float $maximo): array
+    public static function leer(string $path, int $anio, string $titulo, array $headers, array $columnas, float $maximo, array $formatosAnteriores = []): array
     {
         try {
             $book = IOFactory::createReader('Xlsx')->load($path);
@@ -23,10 +23,23 @@ class DotacionHorasCargaMasiva
             if (! $sheet || ! $instructions || (string) $instructions->getCell('B1')->getValue() !== (string) $anio) {
                 throw ValidationException::withMessages(['archivo' => 'El año o tipo de la plantilla no coincide con la carga seleccionada. Descargue la plantilla correspondiente al año '.$anio.'.']);
             }
-            foreach ($headers as $i => $header) {
-                if (trim((string) $sheet->getCell([$i + 1, 1])->getValue()) !== $header) {
-                    throw ValidationException::withMessages(['archivo' => 'Conserve las columnas y los encabezados de la plantilla.']);
+            $formatoEncontrado = false;
+            foreach ([['headers' => $headers, 'columnas' => $columnas], ...$formatosAnteriores] as $formato) {
+                $coincide = true;
+                foreach ($formato['headers'] as $i => $header) {
+                    if (trim((string) $sheet->getCell([$i + 1, 1])->getValue()) !== $header) {
+                        $coincide = false;
+                        break;
+                    }
                 }
+                if ($coincide) {
+                    $columnas = $formato['columnas'];
+                    $formatoEncontrado = true;
+                    break;
+                }
+            }
+            if (! $formatoEncontrado) {
+                throw ValidationException::withMessages(['archivo' => 'Conserve las columnas y los encabezados de la plantilla.']);
             }
             $last = $sheet->getHighestDataRow();
             if ($last > 10001) {

@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\DotacionMaximosBloqueController;
 use App\Imports\DotacionConvivenciaHorasImport;
 use App\Imports\DotacionMaximosBloqueImport;
 use App\Support\DotacionConvivenciaAnual;
+use App\Support\DotacionContratoVigentePorBloque;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -29,8 +30,16 @@ class DotacionHorasCargaMasivaTest extends TestCase
     {
         parent::setUp();
         $this->assertSame(':memory:', DB::connection()->getDatabaseName());
+        $this->mock(DotacionContratoVigentePorBloque::class, function ($mock): void {
+            $mock->shouldReceive('paraEstablecimiento')->andReturnUsing(fn ($establecimiento, $anio) => [
+                'contrato_vigente_bloque_1' => $establecimiento->id === 1 ? 643.0 : 0.0,
+                'contrato_vigente_bloque_2' => $establecimiento->id === 1 ? 86.0 : 0.0,
+                'contrato_vigente_bloque_3' => $establecimiento->id === 1 ? 251.0 : 0.0,
+                'periodo_contractual' => $anio === 2027 ? '08/2026' : '08/'.$anio,
+            ]);
+        });
         Schema::create('establecimientos', function (Blueprint $t): void {
-            $t->id(); $t->integer('rbd'); $t->string('nombre_establecimiento');
+            $t->id(); $t->integer('rbd'); $t->string('nombre_establecimiento'); $t->boolean('sala_cuna')->nullable();
         });
         Schema::create('establecimiento_cursos', function (Blueprint $t): void {
             $t->id(); $t->integer('establecimiento_id'); $t->integer('anio');
@@ -63,6 +72,7 @@ class DotacionHorasCargaMasivaTest extends TestCase
             ['establecimiento_id' => 1, 'anio' => 2027, 'activo' => true, 'matricula' => 7],
             ['establecimiento_id' => 1, 'anio' => 2027, 'activo' => false, 'matricula' => 50],
             ['establecimiento_id' => 1, 'anio' => 2026, 'activo' => true, 'matricula' => 60],
+            ['establecimiento_id' => 2, 'anio' => 2027, 'activo' => true, 'matricula' => 0],
         ]);
     }
 
@@ -188,9 +198,10 @@ class DotacionHorasCargaMasivaTest extends TestCase
         ]);
         $book = $this->maximos();
         $sheet = $book->getActiveSheet();
-        $this->assertSame(611.0, $sheet->getCell('D2')->getValue());
+        $this->assertSame(611.0, $sheet->getCell('E2')->getValue());
         $this->assertSame(40, $sheet->getCell('C2')->getValue());
-        $sheet->setCellValue('D2', 620.5)->setCellValue('E2', null)->setCellValue('F2', 0);
+        $sheet->setCellValue('E2', 620.5)->setCellValue('G2', null)->setCellValue('I2', 0);
+        $sheet->setCellValue('D2', 9999)->setCellValue('F2', 9999)->setCellValue('H2', 9999); // Referencias, no máximos.
         $resultado = (new DotacionMaximosBloqueImport)->import($this->excel($book), 2027, 7);
         $this->assertSame(['cargadas' => 1, 'omitidas' => 1], $resultado);
         $this->assertDatabaseHas('dotacion_proceso_2027_configuraciones', ['establecimiento_id' => 1, 'anio' => 2027,
@@ -202,12 +213,12 @@ class DotacionHorasCargaMasivaTest extends TestCase
     public function test_maximos_no_se_guardan_si_otro_bloque_es_invalido(): void
     {
         $book = $this->maximos();
-        $book->getActiveSheet()->setCellValue('D2', 611)->setCellValue('E2', 116)->setCellValue('F2', -1);
+        $book->getActiveSheet()->setCellValue('E2', 611)->setCellValue('G2', 116)->setCellValue('I2', -1);
         try {
             (new DotacionMaximosBloqueImport)->import($this->excel($book), 2027, 7);
             $this->fail('Todos los bloques deben validarse antes de guardar.');
         } catch (ValidationException $e) {
-            $this->assertStringContainsString('columna F', $e->errors()['archivo'][0]);
+            $this->assertStringContainsString('columna I', $e->errors()['archivo'][0]);
             $this->assertSame(0, DB::table('dotacion_proceso_2027_configuraciones')->count());
         }
     }
@@ -253,7 +264,7 @@ class DotacionHorasCargaMasivaTest extends TestCase
         $this->assertStringContainsString('anio=2027', $respuesta->getTargetUrl());
         $this->assertSame(22.0, DotacionConvivenciaAnual::horas(1, 2027));
         $maximos = $this->maximos();
-        $maximos->getActiveSheet()->setCellValue('D2', 611)->setCellValue('E2', 116)->setCellValue('F2', 224);
+        $maximos->getActiveSheet()->setCellValue('E2', 611)->setCellValue('G2', 116)->setCellValue('I2', 224);
         $respuesta = app(DotacionMaximosBloqueController::class)->store($this->request('supervisor_plani', 2027, $this->excel($maximos)));
         $this->assertStringContainsString('anio=2027', $respuesta->getTargetUrl());
         $this->assertDatabaseHas('dotacion_proceso_2027_configuraciones', ['establecimiento_id' => 1, 'anio' => 2027, 'max_horas_bloque_1' => 611, 'max_horas_bloque_2' => 116, 'max_horas_bloque_3' => 224]);
@@ -269,5 +280,64 @@ class DotacionHorasCargaMasivaTest extends TestCase
         }
         (require database_path('migrations/2026_09_30_180000_create_dotacion_convivencia_horas_table.php'))->up();
         $this->assertTrue(Schema::hasIndex('dotacion_convivencia_horas', 'dch_est_anio_unique'));
+    }
+
+    public function test_plantilla_intercala_contratos_vigentes_antes_de_maximos_e_indica_periodo_origen(): void
+    {
+        $book = $this->maximos();
+        $sheet = $book->getActiveSheet();
+        $this->assertSame('I', $sheet->getHighestDataColumn());
+        foreach (['D' => 643.0, 'F' => 86.0, 'H' => 251.0] as $col => $valor) {
+            $this->assertSame($valor, $sheet->getCell($col.'2')->getValue());
+            $this->assertStringContainsString('contrato vigente', $sheet->getCell($col.'1')->getValue());
+            $this->assertStringContainsString('08/2026', $sheet->getComment($col.'2')->getText()->getPlainText());
+        }
+        foreach (['E', 'G', 'I'] as $col) {
+            $this->assertStringStartsWith('Máximo', $sheet->getCell($col.'1')->getValue());
+        }
+        $this->assertSame('A1:I3', $sheet->getAutoFilter()->getRange());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_plantilla_anterior_de_seis_columnas_sigue_importando_maximos(): void
+    {
+        $book = new Spreadsheet;
+        $sheet = $book->getActiveSheet()->setTitle('Máximos 2027');
+        $sheet->fromArray(DotacionMaximosBloqueExport::HEADERS_ANTERIORES, null, 'A1');
+        $sheet->fromArray(['99998', 'Establecimiento sintético A', 40, 611, 116, 224], null, 'A2');
+        $book->createSheet()->setTitle('Instrucciones')->setCellValue('B1', 2027);
+        (new DotacionMaximosBloqueImport)->import($this->excel($book), 2027, 7);
+        $this->assertDatabaseHas('dotacion_proceso_2027_configuraciones', [
+            'establecimiento_id' => 1, 'anio' => 2027,
+            'max_horas_bloque_1' => 611, 'max_horas_bloque_2' => 116, 'max_horas_bloque_3' => 224,
+        ]);
+    }
+
+    public function test_maximos_excluye_rbd_sin_cursos_activos_del_anio_y_salas_cuna(): void
+    {
+        DB::table('establecimientos')->insert([
+            ['id' => 3, 'rbd' => 99993, 'nombre_establecimiento' => 'Sin cursos', 'sala_cuna' => false],
+            ['id' => 4, 'rbd' => 99994, 'nombre_establecimiento' => 'Sólo curso inactivo', 'sala_cuna' => false],
+            ['id' => 5, 'rbd' => 99995, 'nombre_establecimiento' => 'Sólo otro año', 'sala_cuna' => false],
+            ['id' => 6, 'rbd' => 99996, 'nombre_establecimiento' => 'Sala cuna', 'sala_cuna' => true],
+        ]);
+        DB::table('establecimiento_cursos')->insert([
+            ['establecimiento_id' => 4, 'anio' => 2027, 'activo' => false, 'matricula' => 12],
+            ['establecimiento_id' => 5, 'anio' => 2026, 'activo' => true, 'matricula' => 12],
+            ['establecimiento_id' => 6, 'anio' => 2027, 'activo' => true, 'matricula' => 12],
+        ]);
+        // Una configuración histórica no basta para incluir un RBD en la plantilla.
+        DB::table('dotacion_proceso_2027_configuraciones')->insert([
+            'establecimiento_id' => 3, 'anio' => 2027, 'max_horas_bloque_1' => 100,
+        ]);
+        $controller = app(DotacionMaximosBloqueController::class);
+        $this->assertSame([99998, 99999], $controller->filas(2027)->pluck('rbd')->all());
+        $this->assertSame([99995, 99998], $controller->filas(2026)->pluck('rbd')->all());
+        $this->assertCount(0, $controller->filas(2028));
+        $book = $this->maximos();
+        $this->assertSame(3, $book->getActiveSheet()->getHighestDataRow());
+        $this->assertSame('99998', $book->getActiveSheet()->getCell('A2')->getValue());
+        $this->assertSame('99999', $book->getActiveSheet()->getCell('A3')->getValue());
+        $book->disconnectWorksheets();
     }
 }

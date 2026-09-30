@@ -12,7 +12,9 @@ class DotacionMaximosBloqueImport
 {
     public function import(string $path, int $anio, ?int $userId): array
     {
-        $datos = DotacionHorasCargaMasiva::leer($path, $anio, 'Máximos', DotacionMaximosBloqueExport::HEADERS, DotacionMaximosBloqueExport::COLUMNAS, 9999);
+        $datos = DotacionHorasCargaMasiva::leer($path, $anio, 'Máximos', DotacionMaximosBloqueExport::HEADERS, DotacionMaximosBloqueExport::COLUMNAS, 9999, [
+            ['headers' => DotacionMaximosBloqueExport::HEADERS_ANTERIORES, 'columnas' => DotacionMaximosBloqueExport::COLUMNAS_ANTERIORES],
+        ]);
         DB::transaction(function () use ($anio, $userId, $datos): void {
             Establecimiento::query()->whereIn('id', array_keys($datos['cambios']))->orderBy('id')->lockForUpdate()->get();
             foreach ($datos['cambios'] as $id => $maximos) {

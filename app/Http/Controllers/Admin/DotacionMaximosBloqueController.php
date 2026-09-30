@@ -8,6 +8,7 @@ use App\Imports\DotacionMaximosBloqueImport;
 use App\Models\DotacionProceso2027Configuracion;
 use App\Models\Establecimiento;
 use App\Support\DotacionConvivenciaAnual;
+use App\Support\DotacionContratoVigentePorBloque;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -59,12 +60,17 @@ class DotacionMaximosBloqueController extends Controller
         $matriculas = DB::table('establecimiento_cursos')->where('anio', $anio)->where('activo', true)
             ->groupBy('establecimiento_id')->selectRaw('establecimiento_id, SUM(matricula) as total')->pluck('total', 'establecimiento_id');
 
-        return Establecimiento::query()->orderBy('rbd')->orderBy('id')->get()->map(function ($establecimiento) use ($configs, $matriculas): array {
+        $contratos = app(DotacionContratoVigentePorBloque::class);
+        return Establecimiento::query()
+            ->where(fn ($query) => $query->whereNull('sala_cuna')->orWhere('sala_cuna', false))
+            ->whereIn('id', $matriculas->keys())
+            ->orderBy('rbd')->orderBy('id')->get()->map(function ($establecimiento) use ($configs, $matriculas, $contratos, $anio): array {
             $config = $configs->get($establecimiento->id);
             $fila = ['rbd' => $establecimiento->rbd, 'nombre' => $establecimiento->nombre_establecimiento, 'matricula' => (int) $matriculas->get($establecimiento->id, 0)];
             foreach (DotacionMaximosBloqueExport::COLUMNAS as $campo) {
                 $fila[$campo] = $config?->{$campo} === null ? null : (float) $config->{$campo};
             }
+            $fila += $contratos->paraEstablecimiento($establecimiento, $anio);
 
             return $fila;
         });

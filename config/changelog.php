@@ -1,6 +1,29 @@
 <?php
 
 return [
+    '2026.9.30.558' => [
+        'date' => '2026-09-30',
+        'module' => 'Dotación docente',
+        'title' => 'Contrato vigente y establecimientos del período en la plantilla de máximos',
+        'files' => [
+            'app/Support/DotacionContratoVigentePorBloque.php',
+            'app/Support/DotacionHorasCargaMasiva.php',
+            'app/Exports/DotacionMaximosBloqueExport.php',
+            'app/Imports/DotacionMaximosBloqueImport.php',
+            'app/Http/Controllers/Admin/DotacionMaximosBloqueController.php',
+            'resources/views/admin/dotacion-funciones/maximos-carga.blade.php',
+            'tests/Feature/DotacionHorasCargaMasivaTest.php',
+            'tests/Unit/DotacionContratoVigentePorBloqueTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La plantilla intercala una columna de contrato docente vigente antes del máximo de cada uno de los tres bloques, usando la misma base y distribución contractual de la vista de dotación.',
+            'Cada referencia indica en su comentario el período de origen; para años de proyección se utiliza el último padrón disponible hasta el año seleccionado. Las reservas no reducen el contrato vigente.',
+            'Incluye sólo establecimientos con cursos activos en el año seleccionado, excluyendo salas cuna y RBD sin cursos o con cursos únicamente inactivos o de otros años.',
+            'Sólo se importan los máximos de E, G e I. Se mantiene la compatibilidad con plantillas anteriores de seis columnas y la validación completa antes de guardar.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.30.557' => [
         'date' => '2026-09-30',
         'module' => 'Dotación docente',
@@ -5868,8 +5891,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.30.557',
+    'current_version' => '2026.9.30.558',
     'entries' => [
+        [
+            'version' => '2026.9.30.558',
+            'title' => 'Dotación: contrato vigente en la plantilla de máximos',
+            'summary' => 'Compara el contrato vigente con el máximo de cada bloque e incluye sólo los establecimientos del período de dotación.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Horas de contrato vigente antes de cada máximo, con el período contractual de origen indicado en comentarios.',
+                'Plantilla limitada a establecimientos con cursos activos del año seleccionado, excluyendo salas cuna.',
+                'Referencias contractuales no importables y compatibilidad con plantillas anteriores de seis columnas.',
+            ],
+            'published_at' => '2026-09-30',
+        ],
         [
             'version' => '2026.9.30.557',
             'title' => 'Dotación: cargas anuales de Convivencia Educativa y máximos por bloque',
