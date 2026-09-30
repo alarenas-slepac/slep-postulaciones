@@ -1,5 +1,6 @@
 @if ($asignacionesHuerfanas->isNotEmpty())
     @php
+        $puedeEliminarFantasmas = in_array($activeRole ?? null, ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true);
         $horasFantasma = (float) ($resumenAsignacion['horas_fantasma'] ?? $asignacionesHuerfanas->sum(fn ($row) => (float) ($row->horas_contrato ?? 0)));
         $docentesAfectados = (int) ($resumenAsignacion['docentes_horas_fantasma'] ?? $asignacionesHuerfanas
             ->pluck('docente_rut_normalizado')
@@ -17,10 +18,10 @@
         $horasContratoPlanesEstudioFantasma = (float) ($resumenAsignacion['horas_contrato_plan_estudio_fantasma'] ?? $planesEstudioFantasma->sum(fn ($row) => (float) ($row->horas_contrato ?? 0)));
     @endphp
 
-    <div class="card dotacion-section mb-4 border-danger" id="horas-fantasma">
-        <div class="dotacion-section-header d-flex justify-content-between align-items-start flex-wrap gap-3" style="background:#fff7f7;">
+    <div class="slep-card mb-4 border-danger overflow-hidden" id="horas-fantasma">
+        <div class="p-4 border-bottom bg-danger-subtle d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div class="d-flex align-items-start gap-3">
-                <span class="dotacion-icon" style="width:40px;height:40px;background:#dc3545;"><i class="bi bi-exclamation-octagon"></i></span>
+                <span class="text-danger fs-4"><i class="bi bi-exclamation-octagon" aria-hidden="true"></i></span>
                 <div>
                     <div class="dotacion-eyebrow text-danger">Revisión manual requerida</div>
                     <h2 class="h5 fw-bold mb-1 text-danger">Horas fantasmas</h2>
@@ -49,15 +50,26 @@
                 @endif
 
                 <span class="badge rounded-pill text-bg-light border">{{ $docentesAfectados }} docente(s)</span>
+                @if ($puedeEliminarFantasmas)
+                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.fantasmas.destroy', $establecimiento) }}" onsubmit="return confirm('¿Eliminar definitivamente todas las asignaciones de horas fantasmas mostradas para este establecimiento en {{ $anio }}? Se recalculará la carga de los docentes afectados. Esta acción no se puede deshacer.');">
+                        @csrf
+                        @method('DELETE')
+                        <input type="hidden" name="anio" value="{{ $anio }}">
+                        @foreach ($asignacionesHuerfanas as $fantasma)
+                            <input type="hidden" name="asignaciones[]" value="{{ $fantasma->id }}">
+                        @endforeach
+                        <button type="submit" class="btn btn-outline-danger rounded-pill"><i class="bi bi-trash me-1" aria-hidden="true"></i> Eliminar todas las horas fantasmas</button>
+                    </form>
+                @endif
             </div>
         </div>
 
-        <div class="card-body">
-            <div class="alert alert-danger rounded-4 d-flex gap-2 align-items-start">
-                <i class="bi bi-info-circle mt-1"></i>
+        <div class="p-4">
+            <div class="alert alert-danger rounded-4 d-flex gap-2 align-items-start" role="note">
+                <i class="bi bi-info-circle mt-1" aria-hidden="true"></i>
                 <div>
                     <strong>Estas horas no se eliminan automáticamente.</strong>
-                    El bloque detecta cualquier registro con <code>tipo_asignacion = plan_estudio</code>, sin limitar el subtipo. Esto incluye <code>plan_comun_formacion_general</code> y los demás subtipos curriculares. Revisa cada fila antes de eliminarla.
+                    Revise las asignaciones del detalle. Puede eliminar una fila o todas las horas fantasmas mostradas para {{ $anio }}; al confirmar se recalcula la carga de los docentes afectados. Las asignaciones vigentes y las reservas para otras funciones se conservan.
                 </div>
             </div>
 
@@ -131,6 +143,7 @@
                                 <td class="text-end fw-bold text-danger">{{ $fmt($asig->horas_contrato) }}</td>
                                 <td class="small text-danger">{{ $asig->motivo_huerfana }}</td>
                                 <td class="text-end">
+                                    @if ($puedeEliminarFantasmas)
                                     <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" onsubmit="return confirm('¿Eliminar definitivamente esta asignación fantasma? Las horas se descontarán de la carga del docente.');">
                                         @csrf
                                         @method('DELETE')
@@ -138,6 +151,9 @@
                                             <i class="bi bi-trash"></i> Eliminar horas
                                         </button>
                                     </form>
+                                    @else
+                                        <span class="small text-muted">Sólo lectura</span>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

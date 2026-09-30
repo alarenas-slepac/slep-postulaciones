@@ -314,6 +314,45 @@ class DotacionAsignacionController extends Controller
         return back()->with('success', 'Asignación de horas eliminada correctamente.');
     }
 
+    public function destroyGhostAssignments(Request $request, Establecimiento $establecimiento): RedirectResponse
+    {
+        $this->authorizeScope($request, $establecimiento);
+        $data = $request->validate([
+            'anio' => ['required', 'integer', 'between:2020,2100'],
+            'asignaciones' => ['required', 'array', 'min:1', 'max:10000'],
+            'asignaciones.*' => ['required', 'integer', 'min:1', 'distinct'],
+        ]);
+        $anio = (int) $data['anio'];
+        $ids = collect($data['asignaciones'])->map(fn ($id) => (int) $id);
+        $cantidad = DB::transaction(function () use ($establecimiento, $anio, $ids): int {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            $rows = DotacionDocenteAsignacion::query()
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
+                ->where('estado', 'activa')->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            $fantasmas = $this->ghostAssignments($establecimiento, $anio)->pluck('id');
+            if ($rows->count() !== $ids->count() || $ids->diff($fantasmas)->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'asignaciones' => 'Las horas fantasmas cambiaron o alguna asignación ya está vigente. Actualice la página y revise el detalle antes de eliminar.',
+                ]);
+            }
+
+            return $this->deleteCourseBlockAssignments($establecimiento, $anio, $rows);
+        });
+
+        return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion'])
+            ->with('success', 'Se eliminaron '.$cantidad.' asignación(es) de horas fantasmas y se recalculó la carga de los docentes afectados.');
+    }
+
+    /** Utiliza la misma detección vigente que el bloque visible del establecimiento. */
+    protected function ghostAssignments(Establecimiento $establecimiento, int $anio): Collection
+    {
+        $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio, false);
+
+        return collect(data_get($data, 'asignacion.asignaciones_huerfanas', []))
+            ->filter(fn ($row) => $row instanceof DotacionDocenteAsignacion && (int) $row->id > 0
+                && ! (bool) data_get($row, 'asignacion_automatica', false));
+    }
+
     public function destroyCourseBlock(Request $request, Establecimiento $establecimiento): RedirectResponse
     {
         $this->authorizeScope($request, $establecimiento);
