@@ -34,7 +34,8 @@
     <div class="slep-card p-4 mb-4">
         <h2 class="h5 fw-bold mb-3"><i class="bi bi-upload me-1" aria-hidden="true"></i> Cargar máximos para {{ $anio }}</h2>
         <div class="alert alert-info rounded-4 mb-3" role="note">
-            <p class="mb-2">Descargue la plantilla con todos los RBD, nombres, matrícula y máximos guardados en {{ $anio }}. Edite las columnas de máximos de <strong>Plan general</strong>, <strong>Educación Parvularia</strong> y <strong>PIE especializado</strong>.</p>
+            <p class="mb-2">La plantilla incluye los RBD con cursos activos en {{ $anio }}, excluyendo salas cuna, junto con sus nombres, matrícula y máximos guardados. Antes del máximo de cada bloque se muestran sus <strong>horas de contrato vigente</strong>. Edite únicamente los máximos de las columnas <strong>E, G e I</strong>.</p>
+            <p class="mb-2">Los contratos vigentes utilizan la misma base de la vista de dotación. Si aún no hay padrón del año seleccionado, se utiliza el último disponible hasta ese año. El comentario de cada celda indica el período de origen; estos valores son de referencia y no se importan.</p>
             <p class="mb-0">Cada celda vacía conserva el valor actual de ese bloque; 0 establece un máximo de cero. Admite entre 0 y 9999 horas y hasta dos decimales. Las asignaciones, reservas y otras configuraciones se conservan.</p>
         </div>
         <a class="btn btn-outline-primary rounded-pill mb-4" href="{{ route('admin.dotacion-funciones.maximos.plantilla', ['anio' => $anio]) }}"><i class="bi bi-download me-1" aria-hidden="true"></i> Descargar plantilla {{ $anio }}</a>
@@ -56,7 +57,7 @@
                 @forelse ($filas as $fila)
                     <tr><td>{{ $fila['rbd'] }}</td><td class="fw-semibold">{{ $fila['nombre'] }}</td><td class="text-end">{{ $fila['matricula'] }}</td>@foreach (\App\Exports\DotacionMaximosBloqueExport::COLUMNAS as $campo)<td class="text-end {{ $fila[$campo] === null ? 'text-muted' : 'fw-semibold' }}">{{ $fmt($fila[$campo]) }}</td>@endforeach</tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted p-4">No hay establecimientos registrados para generar la plantilla.</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted p-4">No hay establecimientos con cursos activos en {{ $anio }} para generar la plantilla.</td></tr>
                 @endforelse
             </tbody>
         </table></div>
