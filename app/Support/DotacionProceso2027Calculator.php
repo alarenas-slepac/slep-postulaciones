@@ -111,16 +111,22 @@ class DotacionProceso2027Calculator
                 }
                 $esNormativaDefinible = self::esFuncionNormativaDefinible($groupKey, $item);
                 if ($esNormativaDefinible) {
-                    $horasPotenciales = max(0.0, (float) data_get($item, 'horas_contrato_requeridas', 0));
+                    $horasDefinidas = max(0.0, (float) data_get($item, 'horas_contrato_requeridas', 0));
+                    $horasPotenciales = max(0.0, (float) data_get($item, 'horas_potenciales', $horasDefinidas));
+                    $horasAsignadas = (float) data_get($item, 'horas_contrato_asignadas', 0);
                     $tieneAsignacion = (float) data_get($item, 'horas_contrato_asignadas', 0) > 0.01
                         || (bool) data_get($item, 'asignacion_automatica', false);
                     $definida = array_key_exists($key, $seleccionNormativas) || $tieneAsignacion;
                     $seUtilizara = $tieneAsignacion || (bool) ($seleccionNormativas[$key] ?? false);
                     $funcionesNormativas->push([
                         'key' => $key,
+                        'codigo' => data_get($item, 'codigo') ?: $key,
                         'titulo' => (string) data_get($item, 'titulo', 'Función normativa'),
                         'subtipo' => (string) data_get($item, 'subtipo_asignacion', ''),
-                        'horas' => round($horasPotenciales, 2),
+                        'horas' => round($horasDefinidas, 2),
+                        'horas_potenciales' => round($horasPotenciales, 2),
+                        'horas_asignadas' => round($horasAsignadas, 2),
+                        'exceso_asignado' => round(max(0.0, $horasAsignadas - $horasDefinidas), 2),
                         'definida' => $definida,
                         'se_utilizara' => $seUtilizara,
                         'asignacion_existente' => $tieneAsignacion,
@@ -129,7 +135,7 @@ class DotacionProceso2027Calculator
                     if (! $seUtilizara) {
                         continue;
                     }
-                    $bloques[$bloque]['horas_normativas_definidas'] += $horasPotenciales;
+                    $bloques[$bloque]['horas_normativas_definidas'] += $horasDefinidas;
                 }
                 if (! self::esNecesidadObligatoria($groupKey, $item)) {
                     continue;

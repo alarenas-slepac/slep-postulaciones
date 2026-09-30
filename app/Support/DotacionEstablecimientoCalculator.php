@@ -678,6 +678,7 @@ class DotacionEstablecimientoCalculator
                 'origen' => 'Automática',
                 'horas' => $horas,
                 'detalle' => $item['detalle'] ?? null,
+                'horas_potenciales' => $item['horas_potenciales'] ?? $horas,
                 'dotacion_funcion_id' => null,
                 'dotacion_funcion_regla_id' => $item['regla']?->id,
                 'tipo_contrato_pie_necesario' => $tipoContratoPieNecesario,

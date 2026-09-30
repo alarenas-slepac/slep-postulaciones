@@ -563,6 +563,8 @@
                                 $pendingContrato = $item['horas_contrato_pendientes'] ?? $item['horas_contrato_requeridas'] ?? 0;
                                 $asignadoContrato = $item['horas_contrato_asignadas_calculo'] ?? $item['horas_contrato_asignadas'] ?? 0;
                                 $asignacionAutomatica = (bool) ($item['asignacion_automatica'] ?? false);
+                                $esNormativa2027 = ($proceso2027Asignacion['aplica'] ?? false)
+                                    && ($item['necesidad_condicionada_por_asignacion_docente'] ?? false);
                                 $cursoItem = $item['curso'] ?? null;
                                 $cuposPermitidos = match (true) {
                                     $groupKey === 'pie_educadora_diferencial' => ['pie'],
@@ -613,7 +615,7 @@
                                         <div class="alert alert-primary small mb-0">
                                             <div class="fw-semibold">Asignación automática</div>
                                             <div>Docente Directivo por asumir · {{ $fmt($item['horas_contrato_asignadas'] ?? 0) }} hrs contrato.</div>
-                                            <div class="mt-1">La plaza activa 44 horas como necesidad hasta asignar al docente directivo.</div>
+                                            <div class="mt-1">La plaza activa {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas definidas como necesidad hasta asignar al docente directivo.</div>
                                         </div>
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 mt-2 dotacion-assignment-form">
                                             @csrf
@@ -625,7 +627,7 @@
                                             <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] }}">
                                             <input type="hidden" name="estamento_cobertura" value="docente">
                                             <input type="hidden" name="subvencion" value="General">
-                                            <input type="hidden" name="horas_contrato" value="44">
+                                            <input type="hidden" name="horas_contrato" value="{{ $item['horas_contrato_requeridas'] ?? 44 }}">
                                             <label class="form-label small mb-0" for="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}">Docente directivo</label>
                                             <div class="dotacion-selector-guide"><i class="bi bi-search"></i><span>Busque por nombre o RUT. La lista muestra la prelación 2027 y las horas disponibles antes de confirmar la asignación.</span></div>
                                             <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar docente por nombre o RUT..." required>
@@ -635,7 +637,7 @@
                                                     <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </select>
-                                            <div class="small text-muted">Contrato fijo: 44 horas.</div>
+                                            <div class="small text-muted">Contrato definido: {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas.</div>
                                             <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
                                         </form>
                                     @else
@@ -679,10 +681,12 @@
                                         </select>
                                         <div class="row g-2">
                                             <div class="col">
-                                                <input type="number" name="horas_contrato" step="0.25" min="0.25" class="form-control form-control-sm" value="{{ $pendingContrato > 0 ? $pendingContrato : ($item['horas_contrato_requeridas'] ?? 0) }}" placeholder="Horas contrato">
+                                                <label class="form-label small mb-1" for="contrato-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Horas de contrato</label>
+                                                <input id="contrato-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" type="number" name="horas_contrato" step="{{ $esNormativa2027 ? '0.01' : '0.25' }}" min="{{ $esNormativa2027 ? '0.01' : '0.25' }}" @if ($esNormativa2027) max="{{ $pendingContrato }}" @endif class="form-control form-control-sm" value="{{ $pendingContrato > 0 || $esNormativa2027 ? $pendingContrato : ($item['horas_contrato_requeridas'] ?? 0) }}" placeholder="Horas contrato" @disabled($esNormativa2027 && $pendingContrato <= 0)>
                                             </div>
                                             <div class="col">
-                                                <select name="subvencion" class="form-select form-select-sm">
+                                                <label class="form-label small mb-1" for="subvencion-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Subvención</label>
+                                                <select id="subvencion-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="subvencion" class="form-select form-select-sm">
                                                     @foreach ($subvencionesOptions as $subvencion)
                                                         <option value="{{ $subvencion }}" @selected(($item['subvencion'] ?? 'General') === $subvencion)>{{ $subvencion }}</option>
                                                     @endforeach
@@ -690,7 +694,10 @@
                                             </div>
                                         </div>
                                         <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
-                                        <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
+                                        @if ($esNormativa2027 && $pendingContrato <= 0)
+                                            <div class="form-text">No quedan horas de la definición por asignar. Revise las asignaciones registradas para realizar cambios.</div>
+                                        @endif
+                                        <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada || ($esNormativa2027 && $pendingContrato <= 0))><i class="bi bi-plus-circle"></i> Asignar</button>
                                         </form>
                                     @endif
                                 </td>

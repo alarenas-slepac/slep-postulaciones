@@ -1,6 +1,34 @@
 <?php
 
 return [
+    '2026.9.30.556' => [
+        'date' => '2026-09-30',
+        'module' => 'Dotación docente',
+        'title' => 'Horas definibles por función normativa y Convivencia Educativa',
+        'files' => [
+            'app/Support/DotacionFuncionesNormativas2027.php',
+            'app/Support/DotacionFuncionesCalculator.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionAsignacionCalculator.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'app/Models/DotacionFuncionRegla.php',
+            'app/Http/Controllers/Admin/DotacionProceso2027Controller.php',
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Http/Controllers/Admin/DotacionFuncionesController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Feature/DotacionFuncionesNormativasHorasTest.php',
+            'tests/Feature/DirectorAdpNormativaAccessTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Cada función normativa del proceso 2027 permite definir horas de contrato iguales o inferiores al cálculo original; los valores iniciales conservan el cálculo vigente.',
+            'Las horas definidas se aplican a las necesidades, al proceso guiado y al límite de asignación de la función, incluyendo cobertura por asistentes. Las asignaciones existentes se conservan y sus excesos se muestran para corrección manual.',
+            'Coordinador(a) de Convivencia Educativa reemplaza la etiqueta Encargado(a) de Convivencia Escolar, manteniendo códigos, claves y registros históricos.',
+            'La plaza automática de Director(a) ADP utiliza las horas definidas para 2027; los cálculos de otros años mantienen sus cantidades originales.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP'],
+    ],
     '2026.9.30.555' => [
         'date' => '2026-09-30',
         'module' => 'Dotación docente',
