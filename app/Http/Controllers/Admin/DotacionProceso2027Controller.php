@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DotacionProceso2027Configuracion;
 use App\Models\Establecimiento;
 use App\Support\DotacionDocentesSubsector;
+use App\Support\DotacionConvivenciaAnual;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionFuncionesNormativas2027;
 use App\Support\DotacionProceso2027Calculator;
@@ -119,6 +120,19 @@ class DotacionProceso2027Controller extends Controller
             abort_unless(in_array($role, $this->funcionesNormativasRoles, true), 403);
             $potenciales = collect(DotacionProceso2027Calculator::resumen($establecimiento, 2027)['funciones_normativas'] ?? [])
                 ->keyBy('key');
+            foreach ($data['funciones_normativas'] ?? [] as $index => $solicitada) {
+                $funcion = $potenciales->get($solicitada['key'] ?? '');
+                if (($funcion['codigo'] ?? '') !== DotacionConvivenciaAnual::CODIGO) {
+                    continue;
+                }
+                $centralizada = DotacionConvivenciaAnual::horas($establecimiento->id, 2027) !== null;
+                if (($centralizada || ! DotacionConvivenciaAnual::puedeConfigurar($role))
+                    && abs((float) ($solicitada['horas'] ?? $funcion['horas']) - (float) $funcion['horas']) > 0.001) {
+                    throw ValidationException::withMessages([
+                        "funciones_normativas.$index.horas" => 'Las horas de Convivencia Educativa sólo pueden definirse por los roles autorizados; utilice la carga masiva anual.',
+                    ]);
+                }
+            }
             $config->funciones_normativas = DotacionFuncionesNormativas2027::definicion(
                 $potenciales, $data['funciones_normativas'] ?? []
             );

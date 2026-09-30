@@ -47,6 +47,8 @@ use App\Http\Controllers\Admin\AsignaturaController;
 use App\Http\Controllers\Admin\EstablecimientoCursoController;
 use App\Http\Controllers\Admin\EstablecimientoCursoPieController;
 use App\Http\Controllers\Admin\DotacionFuncionesController;
+use App\Http\Controllers\Admin\DotacionConvivenciaHorasController;
+use App\Http\Controllers\Admin\DotacionMaximosBloqueController;
 use App\Http\Controllers\Admin\DotacionCursoCombinadoController;
 use App\Http\Controllers\Admin\DotacionContrataHabilitacionController;
 use App\Http\Controllers\Admin\DotacionDocenteExclusionController;
@@ -767,6 +769,18 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.show');
 
+        Route::prefix('dotacion-funciones/convivencia/carga-masiva')->name('dotacion-funciones.convivencia.')
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|supervisor_plani')->group(function () {
+                Route::get('/', [DotacionConvivenciaHorasController::class, 'index'])->name('index');
+                Route::get('/plantilla', [DotacionConvivenciaHorasController::class, 'plantilla'])->name('plantilla');
+                Route::post('/', [DotacionConvivenciaHorasController::class, 'store'])->name('store');
+            });
+        Route::prefix('dotacion-funciones/maximos/carga-masiva')->name('dotacion-funciones.maximos.')
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|supervisor_plani')->group(function () {
+                Route::get('/', [DotacionMaximosBloqueController::class, 'index'])->name('index');
+                Route::get('/plantilla', [DotacionMaximosBloqueController::class, 'plantilla'])->name('plantilla');
+                Route::post('/', [DotacionMaximosBloqueController::class, 'store'])->name('store');
+            });
         Route::get('dotacion-funciones', [DotacionFuncionesController::class, 'index'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->name('dotacion-funciones.index');

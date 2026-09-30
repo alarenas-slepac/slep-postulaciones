@@ -1,30 +1,37 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
+    <div class="slep-card p-4 d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
         <div>
-            <h1 class="h4 mb-1">Dotación funciones y planes</h1>
+            <div class="small text-muted text-uppercase mb-2"><i class="bi bi-people me-1" aria-hidden="true"></i> Planificación de dotación</div>
+            <h1 class="h2 fw-bold mb-1">Dotación funciones y planes</h1>
             <div class="text-muted small">Consolidado de funciones directivas, técnico-pedagógicas normativas, PIE, planes normativos y otras funciones declaradas y/o no normativas.</div>
         </div>
+        @if (\App\Support\DotacionConvivenciaAnual::puedeConfigurar($activeRole))
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('admin.dotacion-funciones.convivencia.index', ['anio' => $anio]) }}" class="btn btn-primary rounded-pill"><i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i> Carga de horas de Convivencia</a>
+                <a href="{{ route('admin.dotacion-funciones.maximos.index', ['anio' => $anio]) }}" class="btn btn-outline-primary rounded-pill"><i class="bi bi-upload me-1" aria-hidden="true"></i> Carga de máximos por bloque</a>
+            </div>
+        @endif
     </div>
 
     @if (session('status'))
         <div class="alert alert-success">{{ session('status') }}</div>
     @endif
 
-    <form method="GET" class="card card-body shadow-sm mb-3">
+    <form method="GET" class="slep-card p-4 mb-4">
         <div class="row g-3 align-items-end">
             <div class="col-lg-4 col-md-6">
-                <label class="form-label">Buscar</label>
-                <input type="text" class="form-control" name="q" value="{{ $q }}" placeholder="RBD, establecimiento o comuna">
+                <label for="dotacion-q" class="form-label">Buscar</label>
+                <input id="dotacion-q" type="text" class="form-control rounded-3" name="q" value="{{ $q }}" placeholder="RBD, establecimiento o comuna">
             </div>
             <div class="col-lg-2 col-md-3">
-                <label class="form-label">Año</label>
-                <input type="number" class="form-control" name="anio" value="{{ $anio }}" min="2020" max="2100">
+                <label for="dotacion-anio" class="form-label">Año</label>
+                <input id="dotacion-anio" type="number" class="form-control rounded-3" name="anio" value="{{ $anio }}" min="2020" max="2100">
             </div>
             <div class="col-lg-3 col-md-4">
-                <label class="form-label">Comuna</label>
-                <select class="form-select" name="comuna" @disabled($activeRole === 'funcionario_directivo_estab')>
+                <label for="dotacion-comuna" class="form-label">Comuna</label>
+                <select id="dotacion-comuna" class="form-select rounded-3" name="comuna" @disabled($activeRole === 'funcionario_directivo_estab')>
                     <option value="">Todas</option>
                     @foreach ($comunas as $comunaOpcion)
                         <option value="{{ $comunaOpcion }}" @selected($comuna === $comunaOpcion)>{{ $comunaOpcion }}</option>
@@ -32,21 +39,21 @@
                 </select>
             </div>
             <div class="col-lg-3 col-md-5 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-outline-primary"><i class="bi bi-funnel"></i> Filtrar</button>
-                <a href="{{ route('admin.dotacion-funciones.index') }}" class="btn btn-outline-danger">Limpiar</a>
+                <button type="submit" class="btn btn-outline-primary rounded-pill"><i class="bi bi-funnel"></i> Filtrar</button>
+                <a href="{{ route('admin.dotacion-funciones.index') }}" class="btn btn-outline-secondary rounded-pill">Limpiar</a>
             </div>
         </div>
     </form>
 
-    <div class="alert alert-info shadow-sm small mb-3">
+    <div class="alert alert-info rounded-4 small mb-4" role="note">
         <div class="fw-semibold"><i class="bi bi-grid-3x3-gap"></i> Consolidado por establecimiento</div>
         <div>Las horas se separan en <strong>Directivos</strong>, <strong>Técnico-pedagógicas normativas</strong>, <strong>PIE</strong>, <strong>Planes</strong> y <strong>Otras funciones declaradas y/o no normativas</strong>. Los establecimientos marcados como sala cuna no participan en este proceso.</div>
     </div>
 
-    <div class="card shadow-sm">
+    <div class="slep-card overflow-hidden">
         <div class="table-responsive">
             <table class="table table-striped align-middle mb-0">
-                <thead>
+                <thead class="table-light">
                     <tr>
                         <th>RBD</th>
                         <th>Establecimiento</th>

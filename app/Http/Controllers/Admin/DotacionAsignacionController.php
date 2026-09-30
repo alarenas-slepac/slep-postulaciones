@@ -988,6 +988,13 @@ class DotacionAsignacionController extends Controller
     ): void {
         $anio = (int) ($payload['anio'] ?? 0);
         if (! DotacionProceso2027Calculator::aplica($anio)) {
+            if (($payload['tipo_asignacion'] ?? '') === 'funcion_tecnico_pedagogica'
+                && \App\Support\DotacionConvivenciaAnual::horas($establecimiento->id, $anio) !== null) {
+                $necesidad = DotacionAsignacionCalculator::funcionNormativaParaAsignacion($establecimiento, $anio, $payload);
+                if (($necesidad['codigo'] ?? '') === \App\Support\DotacionConvivenciaAnual::CODIGO) {
+                    DotacionFuncionesNormativas2027::validarAsignacion($necesidad, (float) ($payload['horas_contrato'] ?? 0), $current?->id);
+                }
+            }
             return;
         }
 

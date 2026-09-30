@@ -141,7 +141,7 @@ class DotacionFuncionesNormativasHorasTest extends TestCase
         ]);
     }
 
-    private function solicitud(array $funciones, string $role = 'funcionario_directivo_estab', int $establecimientoId = 1): Request
+    private function solicitud(array $funciones, string $role = 'admin', int $establecimientoId = 1): Request
     {
         $request = Request::create('/configurar-normativas', 'POST', [
             'anio' => 2027, 'funciones_normativas_configuradas' => 1, 'funciones_normativas' => $funciones,
@@ -173,7 +173,7 @@ class DotacionFuncionesNormativasHorasTest extends TestCase
         $this->assertSame(44.0, $this->necesidad()['horas_contrato_requeridas']);
     }
 
-    public function test_establecimiento_guarda_reduccion_y_se_aplica_a_necesidades_y_proceso_sin_afectar_2026(): void
+    public function test_administrador_guarda_reduccion_y_se_aplica_a_necesidades_y_proceso_sin_afectar_2026(): void
     {
         $key = $this->necesidad()['key'];
         app(DotacionProceso2027Controller::class)->update($this->solicitud([['key' => $key, 'usar' => 1, 'horas' => 22.5]]), $this->establecimiento());
@@ -238,6 +238,48 @@ class DotacionFuncionesNormativasHorasTest extends TestCase
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             $this->assertSame(403, $e->getStatusCode());
         }
+    }
+
+    public function test_directivo_no_puede_cambiar_horas_de_convivencia_incluso_sin_carga_anual(): void
+    {
+        $key = $this->necesidad()['key'];
+        $this->expectException(ValidationException::class);
+        app(DotacionProceso2027Controller::class)->update($this->solicitud([['key' => $key, 'usar' => 1, 'horas' => 22]], 'funcionario_directivo_estab'), $this->establecimiento());
+    }
+
+    public function test_carga_anual_prevalece_sobre_json_local_y_aplica_en_necesidades_y_proceso(): void
+    {
+        (require database_path('migrations/2026_09_30_180000_create_dotacion_convivencia_horas_table.php'))->up();
+        $this->configurar(44);
+        DB::table('dotacion_convivencia_horas')->insert(['establecimiento_id' => 1, 'anio' => 2027, 'horas' => 18.5]);
+        $this->asignar(22);
+        $this->assertSame(18.5, $this->necesidad()['horas_contrato_requeridas']);
+        $proceso = DotacionProceso2027Calculator::resumen($this->establecimiento(), 2027);
+        $this->assertSame(18.5, $proceso['bloques']['bloque_1']['horas_normativas_definidas']);
+        $this->assertSame(3.5, $proceso['funciones_normativas']->sole()['exceso_asignado']);
+        $this->assertSame(44, DotacionFuncionesCalculator::sugerencias($this->establecimiento(), 2026)->sole()['horas_sugeridas']);
+        DB::table('dotacion_convivencia_horas')->where('anio', 2027)->update(['horas' => 0]);
+        $this->assertSame(0.0, $this->necesidad()['horas_contrato_requeridas']);
+    }
+
+    public function test_configuracion_individual_no_puede_sobrescribir_horas_de_carga_anual(): void
+    {
+        (require database_path('migrations/2026_09_30_180000_create_dotacion_convivencia_horas_table.php'))->up();
+        DB::table('dotacion_convivencia_horas')->insert(['establecimiento_id' => 1, 'anio' => 2027, 'horas' => 18.5]);
+        $key = $this->necesidad()['key'];
+        $this->expectException(ValidationException::class);
+        app(DotacionProceso2027Controller::class)->update($this->solicitud([['key' => $key, 'usar' => 1, 'horas' => 44]], 'admin'), $this->establecimiento());
+    }
+
+    public function test_carga_anual_limita_asignaciones_de_convivencia_fuera_de_2027(): void
+    {
+        (require database_path('migrations/2026_09_30_180000_create_dotacion_convivencia_horas_table.php'))->up();
+        DB::table('dotacion_convivencia_horas')->insert(['establecimiento_id' => 1, 'anio' => 2026, 'horas' => 18]);
+        $payload = ['anio' => 2026, 'tipo_asignacion' => 'funcion_tecnico_pedagogica',
+            'subtipo_asignacion' => 'tecnico_pedagogica', 'dotacion_funcion_regla_id' => 1, 'horas_contrato' => 19];
+        $this->expectException(ValidationException::class);
+        (new \ReflectionMethod(DotacionAsignacionController::class, 'validateProceso2027Assignment'))
+            ->invoke(app(DotacionAsignacionController::class), $this->establecimiento(), [], $payload);
     }
 
     public function test_servidor_rechaza_nueva_asignacion_que_excede_definicion_incluyendo_cobertura_aaee(): void
