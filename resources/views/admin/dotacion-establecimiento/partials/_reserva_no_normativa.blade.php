@@ -10,8 +10,8 @@
         ->values();
 @endphp
 
-<div class="card dotacion-section mb-4">
-    <div class="dotacion-section-header d-flex align-items-start gap-3">
+<div class="card dotacion-section mb-4 overflow-visible">
+    <div class="dotacion-section-header rounded-top-4 d-flex align-items-start gap-3">
         <span class="dotacion-icon" style="width:38px;height:38px;background:#0d6efd;"><i class="bi bi-arrow-left-right"></i></span>
         <div>
             <div class="dotacion-eyebrow">Antes de asignar el plan de estudios</div>
