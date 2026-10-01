@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.10.1.560' => [
+        'date' => '2026-10-01',
+        'module' => 'Dotación docente',
+        'title' => 'Selector de traspaso de horas sin recorte',
+        'files' => [
+            'resources/views/admin/dotacion-establecimiento/partials/_reserva_no_normativa.blade.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La tarjeta de traspaso permite que el selector desplegado sobresalga de sus límites y muestre todas las opciones con su desplazamiento interno.',
+            'Se conserva el orden de capas existente, el borde redondeado de la cabecera, la búsqueda y las reglas de reserva de horas titulares.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.9.30.559' => [
         'date' => '2026-09-30',
         'module' => 'Dotación docente',
@@ -5910,8 +5924,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.9.30.559',
+    'current_version' => '2026.10.1.560',
     'entries' => [
+        [
+            'version' => '2026.10.1.560',
+            'title' => 'Dotación: selector de traspaso sin recorte',
+            'summary' => 'Corrige el recorte del desplegable de docentes en Traspaso de horas a otras funciones.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'El desplegable puede sobresalir de la tarjeta y conserva su desplazamiento interno.',
+                'Mantiene búsqueda, saldo titular, máximo a traspasar y reglas actuales de reserva.',
+            ],
+            'published_at' => '2026-10-01',
+        ],
         [
             'version' => '2026.9.30.559',
             'title' => 'Dotación: eliminación de horas fantasmas',
