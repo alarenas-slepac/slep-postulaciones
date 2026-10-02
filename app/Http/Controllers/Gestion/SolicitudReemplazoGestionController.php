@@ -3541,9 +3541,9 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $relacionesFiniquitosBase = $this->relacionesFiniquitos(false);
 
         $cutoff = Carbon::today()->subDays(6);
-        $estadoFiniquito = (string) $request->query('estado_finiquito', 'pendientes');
+        $estadoFiniquito = (string) $request->query('estado_finiquito', 'todos');
         if (!in_array($estadoFiniquito, ['pendientes', 'generados', 'completados', 'todos'], true)) {
-            $estadoFiniquito = 'pendientes';
+            $estadoFiniquito = 'todos';
         }
 
         $baseQuery = SolicitudReemplazo::query()
@@ -3664,14 +3664,8 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
             return $this->esSolicitudFinalCadenaFiniquito($solicitud, $relacionadasPorRut, $cutoff);
         })->values();
 
-        $filtradas = $filtradas->map(function ($s) use ($relacionadasPorRut) {
-            $continuidad = $this->continuidadFiniquito($s, $relacionadasPorRut);
+        $filtradas = $filtradas->map(function ($s) {
             $s->categoria_finiquito = $this->categoriaFiniquito($s);
-            $s->finiquito_periodo_inicio = $continuidad['inicio'];
-            $s->finiquito_periodo_termino = $continuidad['termino'];
-            $s->finiquito_cadena_ids = $continuidad['cadena']->pluck('id')->values()->all();
-            $s->finiquito_cadena_numeros = $continuidad['cadena']->map(fn ($item) => $item->numero_solicitud ?: ('ID ' . $item->id))->values()->all();
-            $s->finiquito_cadena_count = $continuidad['cadena']->count();
             return $s;
         });
 
@@ -3698,12 +3692,18 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         $perPage = 25;
         $items = $filtradas->slice(($page - 1) * $perPage, $perPage)->values();
 
-        // Cargar las relaciones de firma sólo para las filas visibles. Se
-        // hace sobre cada modelo para no depender del tipo concreto de la
-        // colección después de aplicar filtros y slice.
-        foreach ($items as $item) {
-            $item->load($this->relacionesFirmantesFiniquito());
-        }
+        // La elegibilidad se evalúa con todo el historial, pero el detalle de
+        // la cadena y los firmantes sólo se necesitan para la página visible.
+        $items = (new \Illuminate\Database\Eloquent\Collection($items->all()))
+            ->load($this->relacionesFirmantesFiniquito());
+        $items->each(function ($s) use ($relacionadasPorRut) {
+            $continuidad = $this->continuidadFiniquito($s, $relacionadasPorRut);
+            $s->finiquito_periodo_inicio = $continuidad['inicio'];
+            $s->finiquito_periodo_termino = $continuidad['termino'];
+            $s->finiquito_cadena_ids = $continuidad['cadena']->pluck('id')->values()->all();
+            $s->finiquito_cadena_numeros = $continuidad['cadena']->map(fn ($item) => $item->numero_solicitud ?: ('ID ' . $item->id))->values()->all();
+            $s->finiquito_cadena_count = $continuidad['cadena']->count();
+        });
 
         $finiquitos = new \Illuminate\Pagination\LengthAwarePaginator(
             $items,
@@ -3747,9 +3747,9 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         abort_unless(method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'coordinador_gdp', 'funcionario_slep']), 403);
 
         $cutoff = Carbon::today()->subDays(6);
-        $estadoFiniquito = (string) $request->query('estado_finiquito', 'pendientes');
+        $estadoFiniquito = (string) $request->query('estado_finiquito', 'todos');
         if (!in_array($estadoFiniquito, ['pendientes', 'generados', 'completados', 'todos'], true)) {
-            $estadoFiniquito = 'pendientes';
+            $estadoFiniquito = 'todos';
         }
 
         $baseQuery = SolicitudReemplazo::query()
@@ -4280,7 +4280,7 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
 
     private function columnasFiniquitosListado(): array
     {
-        return [
+        return $this->columnasHistoricasFiniquitos([
             'id', 'establecimiento_id', 'reemplazo_personal_id',
             'postulant_profile_id', 'contrato_trabajo_postulant_profile_id',
             'solicitud_anterior_id', 'numero_solicitud', 'estado',
@@ -4292,17 +4292,29 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
             'finiquito_firmado_pdf_path', 'finiquito_firmado_observacion',
             'finiquito_firmado_cargado_por_user_id', 'finiquito_firmado_cargado_at',
             'horas_aula_cronologicas_reemplazo', 'horas_aula_pedagogicas_reemplazo',
-        ];
+        ]);
     }
 
     private function columnasContinuidadFiniquitos(): array
     {
-        return [
+        return $this->columnasHistoricasFiniquitos([
             'id', 'reemplazo_personal_id', 'postulant_profile_id',
             'contrato_trabajo_postulant_profile_id', 'solicitud_anterior_id',
             'numero_solicitud', 'fecha_inicio_trabajo', 'fecha_termino',
             'rut_titular_normalizado', 'rut_reemplazo_normalizado',
-        ];
+        ]);
+    }
+
+    private function columnasHistoricasFiniquitos(array $columnas): array
+    {
+        // El modelo consulta el snapshot al acceder al titular. Seleccionarlo
+        // en lote evita una consulta adicional en cada comparación de cadena,
+        // incluso cuando el snapshot es NULL. Mantiene despliegues anteriores.
+        if (Schema::hasColumn('solicitudes_reemplazo', 'padron_personal_snapshot')) {
+            $columnas[] = 'padron_personal_snapshot';
+        }
+
+        return $columnas;
     }
 
     private function relacionesContinuidadFiniquitos(): array
@@ -4511,9 +4523,10 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
 
         $termino = Carbon::parse($fechaTerminoAnterior)->startOfDay();
         $inicio = Carbon::parse($fechaInicioActual)->startOfDay();
-        $diferencia = $termino->diffInDays($inicio, false);
 
-        return $diferencia >= 0 && $diferencia <= 1;
+        // La continuidad admite el mismo día o el día calendario siguiente.
+        // Evita calcular intervalos completos en cada comparación del historial.
+        return $inicio->isSameDay($termino) || $inicio->isSameDay($termino->addDay());
     }
 
 

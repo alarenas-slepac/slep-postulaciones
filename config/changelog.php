@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.10.2.562' => [
+        'date' => '2026-10-02',
+        'module' => 'Finiquitos de reemplazos',
+        'title' => 'Optimizar las consultas históricas y la carga de la bandeja',
+        'files' => [
+            'app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php',
+            'tests/Feature/FiniquitosRendimientoTest.php',
+            'docs/performance/finiquitos-2026-10-02.json',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La bandeja y la exportación muestran todos los estados por defecto; se conserva el filtro explícito de pendientes, generados y completados.',
+            'Las consultas de la bandeja y del exportador incluyen el historial contractual del titular para evitar consultas individuales durante las comparaciones de continuidad.',
+            'La bandeja resuelve el detalle de las cadenas sólo para las filas de la página visible y carga los firmantes en lote.',
+            'Optimiza la comparación de fechas de continuidad para la bandeja, la exportación y las acciones de documentos; conserva conexiones en el mismo día o al día calendario siguiente.',
+            'Incluye mediciones locales de generación PDF, carga y descarga de documentos firmados de hasta 20 MB y exportación, con límites PHP de 128 y 256 MB.',
+            'Mantiene filtros, categorías, paginación, períodos laborales y validación de continuidades posteriores, con compatibilidad para registros y esquemas anteriores.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP', 'Funcionario SLEP'],
+    ],
     '2026.10.2.561' => [
         'date' => '2026-10-02',
         'module' => 'Declaración de Sostenedores',
@@ -5938,8 +5958,23 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.2.561',
+    'current_version' => '2026.10.2.562',
     'entries' => [
+        [
+            'version' => '2026.10.2.562',
+            'title' => 'Finiquitos: carga de la bandeja optimizada',
+            'summary' => 'Evita consultas repetidas del historial contractual al abrir y exportar la bandeja de finiquitos.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'items' => [
+                'Todos los estados seleccionados al abrir la bandeja y al exportar sin filtros.',
+                'Historial contractual incluido en las consultas por lote.',
+                'Detalle de continuidad sólo para la página visible y firmantes cargados en lote.',
+                'Comparaciones de continuidad optimizadas y pruebas del ciclo de documentos generados y firmados.',
+                'Reporte local de tiempos y memoria de bandeja, PDF, documentos firmados y exportación Excel.',
+                'Conserva las reglas de continuidad, los filtros y los datos históricos.',
+            ],
+            'published_at' => '2026-10-02',
+        ],
         [
             'version' => '2026.10.2.561',
             'title' => 'Declaración de Sostenedores: acceso al módulo',
