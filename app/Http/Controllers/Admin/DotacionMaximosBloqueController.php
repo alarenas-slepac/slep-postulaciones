@@ -70,7 +70,7 @@ class DotacionMaximosBloqueController extends Controller
             foreach (DotacionMaximosBloqueExport::COLUMNAS as $campo) {
                 $fila[$campo] = $config?->{$campo} === null ? null : (float) $config->{$campo};
             }
-            $fila += $contratos->paraEstablecimiento($establecimiento, $anio);
+            $fila += $contratos->paraEstablecimiento($establecimiento, $anio - 1);
 
             return $fila;
         });

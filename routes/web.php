@@ -606,70 +606,70 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->parameters(['alumnos-prioritarios' => 'alumnos_prioritario']);
 
         Route::resource('cursos', CursoController::class)
-            ->middleware('ensure.role:admin|coordinador_uatp');
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani');
 
 
         Route::get('planes-estudio/import', [PlanEstudioController::class, 'importForm'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('planes-estudio.import');
         Route::get('planes-estudio/template', [PlanEstudioController::class, 'downloadTemplate'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('planes-estudio.template');
         Route::post('planes-estudio/import', [PlanEstudioController::class, 'importStore'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('planes-estudio.import.store');
 
         Route::resource('planes-estudio', PlanEstudioController::class)
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->parameters(['planes-estudio' => 'planes_estudio']);
 
 
         Route::get('asignaturas/import', [AsignaturaController::class, 'importForm'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('asignaturas.import');
         Route::get('asignaturas/template', [AsignaturaController::class, 'downloadTemplate'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('asignaturas.template');
         Route::post('asignaturas/import', [AsignaturaController::class, 'importStore'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('asignaturas.import.store');
 
         Route::resource('asignaturas', AsignaturaController::class)
-            ->middleware('ensure.role:admin|coordinador_uatp');
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani');
 
         Route::get('asignaturas-personalizadas', [AsignaturaPersonalizadaController::class, 'index'])
-            ->middleware('ensure.role:admin,coordinador_gdp,coordinador_uatp')
+            ->middleware('ensure.role:admin,coordinador_gdp,coordinador_uatp,supervisor_plani')
             ->name('asignaturas-personalizadas.index');
 
         Route::get('establecimiento-cursos/import', [EstablecimientoCursoController::class, 'importForm'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('establecimiento-cursos.import');
         Route::get('establecimiento-cursos/template', [EstablecimientoCursoController::class, 'downloadTemplate'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('establecimiento-cursos.template');
         Route::post('establecimiento-cursos/import', [EstablecimientoCursoController::class, 'importStore'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('establecimiento-cursos.import.store');
 
         Route::resource('establecimiento-cursos', EstablecimientoCursoController::class)
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->parameters(['establecimiento-cursos' => 'establecimiento_curso']);
 
         Route::get('establecimiento-curso-pie/import', [EstablecimientoCursoPieController::class, 'importForm'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('establecimiento-curso-pie.import');
         Route::get('establecimiento-curso-pie/template', [EstablecimientoCursoPieController::class, 'downloadTemplate'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('establecimiento-curso-pie.template');
         Route::post('establecimiento-curso-pie/import', [EstablecimientoCursoPieController::class, 'importStore'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('establecimiento-curso-pie.import.store');
         Route::post('establecimiento-curso-pie/transfer-2026-to-2027', [EstablecimientoCursoPieController::class, 'transfer2026To2027'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('establecimiento-curso-pie.transfer-2026-to-2027');
 
         Route::resource('establecimiento-curso-pie', EstablecimientoCursoPieController::class)
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->parameters(['establecimiento-curso-pie' => 'establecimiento_curso_pie']);
 
 
@@ -677,15 +677,15 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->name('dotacion-establecimiento.index');
         Route::post('dotacion-establecimiento/{establecimiento}/sobredotacion/justificaciones', [DotacionSobredotacionJustificacionController::class, 'store'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.sobredotacion.justificaciones.store');
         Route::post('dotacion-establecimiento/{establecimiento}/contrata-habilitaciones', [DotacionContrataHabilitacionController::class, 'store'])
-            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.contrata-habilitaciones.store');
         Route::delete('dotacion-establecimiento/{establecimiento}/contrata-habilitaciones/{habilitacion}', [DotacionContrataHabilitacionController::class, 'destroy'])
-            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp')
+            ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->whereNumber('habilitacion')
             ->name('dotacion-establecimiento.contrata-habilitaciones.destroy');
@@ -795,29 +795,29 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('dotacion-funciones.config');
         Route::post('dotacion-funciones/{establecimiento}/manual', [DotacionFuncionesController::class, 'storeManual'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('dotacion-funciones.manual.store');
         Route::put('dotacion-funciones/{establecimiento}/manual/{funcion}', [DotacionFuncionesController::class, 'updateManual'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('dotacion-funciones.manual.update');
         Route::delete('dotacion-funciones/{establecimiento}/manual/{funcion}', [DotacionFuncionesController::class, 'destroyManual'])
-            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp')
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani')
             ->name('dotacion-funciones.manual.destroy');
         Route::post('dotacion-funciones/{establecimiento}/manual/{funcion}/validar', [DotacionFuncionesController::class, 'validarManual'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('dotacion-funciones.manual.validar');
         Route::post('dotacion-funciones/{establecimiento}/manual/{funcion}/observar', [DotacionFuncionesController::class, 'observarManual'])
-            ->middleware('ensure.role:admin|coordinador_uatp')
+            ->middleware('ensure.role:admin|coordinador_uatp|supervisor_plani')
             ->name('dotacion-funciones.manual.observar');
 
 
         Route::get('establecimiento-planes/{establecimiento_curso}/configurar', [EstablecimientoPlanEstudioController::class, 'configure'])
-            ->middleware(['ensure.role:admin|funcionario_directivo_estab|coordinador_uatp', \App\Http\Middleware\RestrictPlanesEeDirectivoEstablecimiento::class])
+            ->middleware(['ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani', \App\Http\Middleware\RestrictPlanesEeDirectivoEstablecimiento::class])
             ->name('establecimiento-planes.configure');
 
         Route::resource('establecimiento-planes', EstablecimientoPlanEstudioController::class)
             ->only(['index', 'show', 'edit', 'update', 'destroy'])
-            ->middleware(['ensure.role:admin|funcionario_directivo_estab|coordinador_uatp', \App\Http\Middleware\RestrictPlanesEeDirectivoEstablecimiento::class])
+            ->middleware(['ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|supervisor_plani', \App\Http\Middleware\RestrictPlanesEeDirectivoEstablecimiento::class])
             ->parameters(['establecimiento-planes' => 'establecimiento_plan']);
 
 

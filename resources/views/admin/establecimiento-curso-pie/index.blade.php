@@ -357,7 +357,7 @@
                                         @if ($canEditPie)
                                             <a class="btn btn-sm btn-outline-primary" href="{{ route('admin.establecimiento-curso-pie.edit', $item->pie_id) }}">Editar</a>
                                         @endif
-                                        @if ($activeRole === 'admin')
+                                        @if (in_array($activeRole, ['admin', 'supervisor_plani'], true))
                                             <form method="POST" action="{{ route('admin.establecimiento-curso-pie.destroy', $item->pie_id) }}" onsubmit="return confirm('¿Eliminar este registro PIE?');">
                                                 @csrf
                                                 @method('DELETE')

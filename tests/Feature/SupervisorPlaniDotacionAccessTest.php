@@ -18,13 +18,20 @@ use Tests\TestCase;
 
 class SupervisorPlaniDotacionAccessTest extends TestCase
 {
-    public function test_rutas_generales_permiten_supervisor_plani_y_cupos_contrata_quedan_restringidos(): void
+    private const MODULE_KEYS = [
+        'admin.cursos', 'admin.planes-estudio', 'admin.establecimiento-cursos',
+        'admin.establecimiento-curso-pie', 'admin.establecimiento-planes',
+        'admin.asignaturas', 'admin.asignaturas-personalizadas',
+        'admin.dotacion-funciones', 'admin.dotacion-establecimiento',
+    ];
+
+    public function test_todas_las_rutas_de_dotacion_permiten_supervisor_plani(): void
     {
         $checked = [];
 
         foreach (app('router')->getRoutes() as $route) {
             $routeName = $route->getName();
-            if (! $routeName || ModuleRegistry::moduleKeyFromRouteName($routeName) !== 'admin.dotacion-establecimiento') {
+            if (! $routeName || ! in_array(ModuleRegistry::moduleKeyFromRouteName($routeName), self::MODULE_KEYS, true)) {
                 continue;
             }
 
@@ -32,20 +39,6 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
                 ->first(fn (string $middleware) => str_starts_with($middleware, 'ensure.role:'));
 
             $this->assertNotNull($roleMiddleware, "La ruta {$routeName} no tiene middleware de rol.");
-            if (str_contains($routeName, '.contrata-habilitaciones.')) {
-                $this->assertSame(
-                    'ensure.role:admin|coordinador_uatp|coordinador_gdp',
-                    $roleMiddleware,
-                    "La ruta {$routeName} debe reservar la gestión de cupos a los tres roles autorizados."
-                );
-                $checked[] = $routeName;
-                continue;
-            }
-            if ($routeName === 'admin.dotacion-establecimiento.sobredotacion.justificaciones.store') {
-                $this->assertSame('ensure.role:admin|funcionario_directivo_estab', $roleMiddleware);
-                $checked[] = $routeName;
-                continue;
-            }
             $this->assertStringContainsString(
                 'supervisor_plani',
                 $roleMiddleware,
@@ -54,7 +47,7 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
             $checked[] = $routeName;
         }
 
-        $this->assertGreaterThanOrEqual(14, count($checked));
+        $this->assertGreaterThanOrEqual(70, count($checked));
     }
 
     public function test_navegacion_expone_dotacion_establecimiento_a_supervisor_plani(): void
@@ -75,6 +68,14 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
 
         $this->assertContains('Dotación establecimiento', $menuLabels);
         $this->assertContains('Dotación establecimiento', $quickLabels);
+        foreach (['Cursos', 'Planes de estudio', 'Cursos por establecimiento',
+            'Estudiantes PIE por curso', 'Configurar planes EE', 'Asignaturas',
+            'Asignaturas personalizadas', 'Dotación funciones y planes'] as $label) {
+            $this->assertContains($label, $menuLabels);
+            $this->assertContains($label, $quickLabels);
+        }
+
+        $this->assertNotContains('Establecimientos', $menuLabels);
     }
 
     public function test_controladores_de_dotacion_establecimiento_autorizan_supervisor_plani(): void
@@ -172,5 +173,22 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    public function test_migracion_completa_es_compatible_con_pivot_historico_sin_timestamps(): void
+    {
+        $this->createPrerequisites();
+        $migration = require database_path('migrations/2026_10_02_180000_grant_dotacion_full_access_to_supervisor_plani.php');
+        try {
+            $migration->up();
+            $migration->up();
+            $roleId = DB::table('roles')->where('name', 'supervisor_plani')->value('id');
+            $this->assertSame(9, DB::table('module_role')->where('role_id', $roleId)->count());
+            $this->assertCount(9, DB::table('modules')->pluck('id'));
+        } finally {
+            Schema::dropIfExists('module_role');
+            Schema::dropIfExists('roles');
+            Schema::dropIfExists('modules');
+        }
     }
 }

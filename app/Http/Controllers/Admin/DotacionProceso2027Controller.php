@@ -22,7 +22,7 @@ class DotacionProceso2027Controller extends Controller
 
     private array $maximosRoles = ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
 
-    private array $funcionesNormativasRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp'];
+    private array $funcionesNormativasRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'supervisor_plani'];
 
     public function syncDocentesSubsector(Request $request, Establecimiento $establecimiento): RedirectResponse
     {

@@ -77,7 +77,7 @@ class DotacionSobredotacionJustificacionTest extends TestCase
         $establecimiento->id = 10;
         $controller = app(DotacionSobredotacionJustificacionController::class);
 
-        foreach ([['supervisor_plani', 10], ['funcionario_directivo_estab', 11]] as [$rol, $idEstablecimiento]) {
+        foreach ([['coordinador_gdp', 10], ['funcionario_directivo_estab', 11]] as [$rol, $idEstablecimiento]) {
             $usuario = new class($rol, $idEstablecimiento)
             {
                 public function __construct(private string $rol, public int $establecimiento_id) {}

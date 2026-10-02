@@ -361,7 +361,7 @@ class DotacionEstablecimientoController extends Controller
             'canViewSobredotacion' => $canViewSobredotacion,
             'justificacionesSobredotacion' => $justificacionesSobredotacion,
             'justificacionesSobredotacionTableReady' => $justificacionesSobredotacionTableReady,
-            'canManageJustificacionesSobredotacion' => in_array($activeRole, ['admin', 'funcionario_directivo_estab'], true),
+            'canManageJustificacionesSobredotacion' => in_array($activeRole, ['admin', 'funcionario_directivo_estab', 'supervisor_plani'], true),
             'asignacion' => $data['asignacion'] ?? [],
             'asignaturas' => $asignaturas,
             'asignaturasFiltros' => $asignaturasFiltros,
@@ -374,7 +374,7 @@ class DotacionEstablecimientoController extends Controller
             'contrataHabilitacionesTableReady' => $contrataHabilitacionesTableReady,
             'contrataHabilitaciones' => $contrataHabilitaciones,
             'docentesVirtualesPorCupo' => $docentesVirtualesPorCupo,
-            'canManageContrataHabilitaciones' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp'], true),
+            'canManageContrataHabilitaciones' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true),
             'canManageDocenteExclusiones' => in_array($activeRole, $this->allowedRoles, true),
             'continuidadDisponible' => $continuidadDisponible,
             'continuidadPorRut' => $continuidadPorRut,
@@ -385,7 +385,7 @@ class DotacionEstablecimientoController extends Controller
             'alertas' => $data['alertas'],
             'proceso2027' => $proceso2027,
             'canManageProceso2027Maximos' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true),
-            'canManageProceso2027Normativas' => in_array($activeRole, ['admin', 'funcionario_directivo_estab', 'coordinador_uatp'], true),
+            'canManageProceso2027Normativas' => in_array($activeRole, ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'supervisor_plani'], true),
         ]);
     }
 

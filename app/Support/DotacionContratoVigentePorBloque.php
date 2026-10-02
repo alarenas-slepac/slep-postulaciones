@@ -9,10 +9,12 @@ class DotacionContratoVigentePorBloque
 {
     public function paraEstablecimiento(Establecimiento $establecimiento, int $anio): array
     {
-        // Misma nómina y último período contractual que la vista de dotación.
-        // docentes() aplica historial, exclusiones y año base de la proyección;
-        // no incorpora cupos ficticios ni contratos de asistentes.
-        $docentes = DotacionEstablecimientoCalculator::docentes($establecimiento, $anio);
+        // Último período del año contractual solicitado, conservando historial,
+        // exclusiones y distribución por bloque. El cálculo de proyección puede
+        // recurrir a otro año; esta referencia no debe incorporar esas filas.
+        $docentes = DotacionEstablecimientoCalculator::docentes($establecimiento, $anio)
+            ->filter(fn (array $docente) => (int) ($docente['anio'] ?? 0) === $anio)
+            ->values();
         $asignaciones = $docentes->isEmpty() ? collect() : DotacionAsignacionCalculator::assignmentsFor($establecimiento, $anio);
 
         return $this->desdeDocentes($docentes, $asignaciones, (bool) $establecimiento->especial);

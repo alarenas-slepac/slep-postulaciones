@@ -25,18 +25,23 @@ use Tests\TestCase;
 class DotacionHorasCargaMasivaTest extends TestCase
 {
     private array $archivos = [];
+    private array $aniosContractualesConsultados = [];
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->assertSame(':memory:', DB::connection()->getDatabaseName());
         $this->mock(DotacionContratoVigentePorBloque::class, function ($mock): void {
-            $mock->shouldReceive('paraEstablecimiento')->andReturnUsing(fn ($establecimiento, $anio) => [
-                'contrato_vigente_bloque_1' => $establecimiento->id === 1 ? 643.0 : 0.0,
-                'contrato_vigente_bloque_2' => $establecimiento->id === 1 ? 86.0 : 0.0,
-                'contrato_vigente_bloque_3' => $establecimiento->id === 1 ? 251.0 : 0.0,
-                'periodo_contractual' => $anio === 2027 ? '08/2026' : '08/'.$anio,
-            ]);
+            $mock->shouldReceive('paraEstablecimiento')->andReturnUsing(function ($establecimiento, $anio): array {
+                $this->aniosContractualesConsultados[] = $anio;
+                $factor = $anio === 2026 ? 1 : 2;
+                return [
+                    'contrato_vigente_bloque_1' => $establecimiento->id === 1 ? 643.0 * $factor : 0.0,
+                    'contrato_vigente_bloque_2' => $establecimiento->id === 1 ? 86.0 * $factor : 0.0,
+                    'contrato_vigente_bloque_3' => $establecimiento->id === 1 ? 251.0 * $factor : 0.0,
+                    'periodo_contractual' => '08/'.$anio,
+                ];
+            });
         });
         Schema::create('establecimientos', function (Blueprint $t): void {
             $t->id(); $t->integer('rbd'); $t->string('nombre_establecimiento'); $t->boolean('sala_cuna')->nullable();
@@ -296,6 +301,34 @@ class DotacionHorasCargaMasivaTest extends TestCase
             $this->assertStringStartsWith('Máximo', $sheet->getCell($col.'1')->getValue());
         }
         $this->assertSame('A1:I3', $sheet->getAutoFilter()->getRange());
+        $this->assertSame([2026, 2026], $this->aniosContractualesConsultados);
+        $this->assertSame(2026, $book->getSheetByName('Instrucciones')->getCell('B2')->getValue());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_maximos_y_matricula_conservan_anio_seleccionado_y_contratos_usan_anio_anterior(): void
+    {
+        DB::table('establecimiento_cursos')->insert([
+            'establecimiento_id' => 1, 'anio' => 2028, 'activo' => true, 'matricula' => 50,
+        ]);
+        DB::table('dotacion_proceso_2027_configuraciones')->insert([
+            'establecimiento_id' => 1, 'anio' => 2028, 'max_horas_bloque_1' => 700,
+            'max_horas_bloque_2' => 120, 'max_horas_bloque_3' => 230,
+        ]);
+        $book = (new DotacionMaximosBloqueExport)->workbook(app(DotacionMaximosBloqueController::class)->filas(2028), 2028);
+        $sheet = $book->getActiveSheet();
+        $this->assertSame([2027], $this->aniosContractualesConsultados);
+        $this->assertSame(50, $sheet->getCell('C2')->getValue());
+        foreach (['D' => 1286.0, 'F' => 172.0, 'H' => 502.0] as $col => $horas) {
+            $this->assertSame($horas, $sheet->getCell($col.'2')->getValue());
+            $this->assertStringContainsString('08/2027', $sheet->getComment($col.'2')->getText()->getPlainText());
+            $this->assertStringContainsString('Año contractual de referencia: 2027', $sheet->getComment($col.'2')->getText()->getPlainText());
+        }
+        foreach (['E' => 700.0, 'G' => 120.0, 'I' => 230.0] as $col => $horas) {
+            $this->assertSame($horas, $sheet->getCell($col.'2')->getValue());
+        }
+        $this->assertSame(2028, $book->getSheetByName('Instrucciones')->getCell('B1')->getValue());
+        $this->assertSame(2027, $book->getSheetByName('Instrucciones')->getCell('B2')->getValue());
         $book->disconnectWorksheets();
     }
 

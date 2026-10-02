@@ -1,7 +1,7 @@
 @php
     $selectedCurso = old('establecimiento_curso_id', $pie->establecimiento_curso_id);
     $selectedEstado = old('estado', $pie->estado ?: 'borrador');
-    $canChangeEstado = in_array($activeRole, ['admin', 'coordinador_uatp'], true);
+    $canChangeEstado = in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true);
     $cursoSeleccionadoLabel = $cursoSeleccionado
         ? trim(($cursoSeleccionado->establecimiento?->rbd ?: $cursoSeleccionado->rbd).' — '.($cursoSeleccionado->establecimiento?->nombre_establecimiento ?: 'Sin establecimiento').' · '.($cursoSeleccionado->nombre_seccion ?: trim(($cursoSeleccionado->curso?->nombre ?? '').' '.($cursoSeleccionado->letra ?? ''))).' · '.$cursoSeleccionado->anio.' · Matrícula '.$cursoSeleccionado->matricula)
         : null;
