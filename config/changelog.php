@@ -1,6 +1,20 @@
 <?php
 
 return [
+    '2026.10.2.561' => [
+        'date' => '2026-10-02',
+        'module' => 'Declaración de Sostenedores',
+        'title' => 'Restaurar acceso en el menú lateral',
+        'files' => [
+            'app/Support/SlepUiRegistry.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Se incorpora Declaración de Sostenedores en Trámites y operación del menú lateral y en los accesos rápidos del panel.',
+            'El acceso respeta el perfil activo y el permiso del módulo declaracion para administradores y funcionarios de establecimiento.',
+        ],
+        'roles' => ['Administrador', 'Funcionario de establecimiento'],
+    ],
     '2026.10.1.560' => [
         'date' => '2026-10-01',
         'module' => 'Dotación docente',
@@ -5924,8 +5938,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.1.560',
+    'current_version' => '2026.10.2.561',
     'entries' => [
+        [
+            'version' => '2026.10.2.561',
+            'title' => 'Declaración de Sostenedores: acceso al módulo',
+            'summary' => 'Restaura el acceso al módulo en el menú lateral y los accesos rápidos del panel.',
+            'roles' => ['admin', 'funcionario_estab'],
+            'items' => [
+                'Disponible en Trámites y operación para los perfiles autorizados.',
+                'Respeta los permisos del módulo y utiliza las rutas existentes.',
+            ],
+            'published_at' => '2026-10-02',
+        ],
         [
             'version' => '2026.10.1.560',
             'title' => 'Dotación: selector de traspaso sin recorte',
