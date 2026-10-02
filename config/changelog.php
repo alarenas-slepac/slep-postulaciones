@@ -1,6 +1,31 @@
 <?php
 
 return [
+    '2026.10.2.563' => [
+        'date' => '2026-10-02',
+        'module' => 'Autenticación y documentos de postulantes',
+        'title' => 'Limitar intentos de acceso y reemplazar documentos sin perder antecedentes',
+        'files' => [
+            'app/Http/Controllers/Auth/AuthenticatedSessionController.php',
+            'app/Http/Requests/Auth/LoginRequest.php',
+            'config/auth.php',
+            'app/Http/Controllers/PostulantDocumentsController.php',
+            'app/Services/UserDocumentReplacement.php',
+            'tests/Support/IsolatedSecurityTestCase.php',
+            'tests/Feature/LoginRateLimitingTest.php',
+            'tests/Feature/UserDocumentReplacementTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El login limita los fallos a 5 por identificador normalizado e IP y 30 por IP durante 60 segundos, con valores configurables y claves HMAC sin credenciales legibles.',
+            'El formulario informa el tiempo restante sin revelar la existencia de cuentas; un acceso válido limpia sólo el contador específico y conserva sesión, rol, recordarme y redirecciones.',
+            'Los documentos PDF se guardan en directorios únicos antes de actualizar sus metadatos en una transacción. El anterior sólo se elimina tras confirmar el reemplazo.',
+            'Las cargas simultáneas se serializan con bloqueo de caché y de la fila del usuario, conservando la restricción única por usuario y tipo; los fallos retiran el nuevo archivo y preservan los antecedentes.',
+            'La limpieza fallida se registra mediante una referencia hash, sin invalidar el documento nuevo. Se conservan archivos históricos compartidos, disco público y nombres descriptivos de descarga.',
+            'Las pruebas usan SQLite en memoria, almacenamiento simulado y una configuración independiente de la caché del entorno.',
+        ],
+        'roles' => ['Todos los usuarios de acceso', 'Postulante', 'Funcionario'],
+    ],
     '2026.10.2.562' => [
         'date' => '2026-10-02',
         'module' => 'Finiquitos de reemplazos',
@@ -5958,8 +5983,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.2.562',
+    'current_version' => '2026.10.2.563',
     'entries' => [
+        [
+            'version' => '2026.10.2.563',
+            'title' => 'Acceso protegido y reemplazo seguro de documentos',
+            'summary' => 'Limita los intentos fallidos de login y conserva los antecedentes documentales cuando una carga no puede completarse.',
+            'roles' => [],
+            'items' => [
+                'Bloqueo temporal por identificador e IP y por IP, con segundos restantes y valores configurables.',
+                'Conserva el acceso por RUT/email, el rol solicitado, recordarme y las redirecciones.',
+                'Guarda el nuevo PDF antes de confirmar sus metadatos y eliminar el anterior; controla cargas simultáneas y registra fallos de limpieza.',
+                'Mantiene el disco actual, las descargas históricas y los nombres descriptivos de archivos.',
+            ],
+            'published_at' => '2026-10-02',
+        ],
         [
             'version' => '2026.10.2.562',
             'title' => 'Finiquitos: carga de la bandeja optimizada',

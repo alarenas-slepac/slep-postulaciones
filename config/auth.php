@@ -112,4 +112,12 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    // Ventana de intentos fallidos; no cuenta accesos válidos ni renueva
+    // el bloqueo cuando una petición ya está limitada.
+    'login_limits' => [
+        'identifier_ip' => (int) env('AUTH_LOGIN_IDENTIFIER_ATTEMPTS', 5),
+        'ip' => (int) env('AUTH_LOGIN_IP_ATTEMPTS', 30),
+        'decay_seconds' => (int) env('AUTH_LOGIN_DECAY_SECONDS', 60),
+    ],
+
 ];

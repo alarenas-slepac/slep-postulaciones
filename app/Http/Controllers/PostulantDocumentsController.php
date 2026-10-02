@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DocumentType;
 use App\Models\UserDocument;
+use App\Services\UserDocumentReplacement;
 use App\Support\DocumentRules;
 use App\Support\ProfileChecklist;
 use Illuminate\Http\Request;
@@ -120,35 +121,7 @@ class PostulantDocumentsController extends Controller
 
         // 5) Nombre final
         $filename = "{$rutPart}_{$namePart}_{$labelPart}.pdf";
-        $dir      = "documents/{$user->id}/{$type->slug}";
-
-        // ====== Cambios clave: BORRAR ANTES y luego GUARDAR ======
-
-        // upsert (único por user+type) ANTES de guardar para poder borrar el anterior
-        $doc = UserDocument::firstOrNew([
-            'user_id'          => $user->id,
-            'document_type_id' => $type->id,
-        ]);
-
-        // Si existe archivo anterior, BÓRRALO ANTES (evita borrar el nuevo si el nombre coincide)
-        if ($doc->exists && $doc->path && Storage::disk('public')->exists($doc->path)) {
-            Storage::disk('public')->delete($doc->path);
-        }
-
-        // Ahora sí, guardar el nuevo archivo
-        $path = $f->storeAs($dir, $filename, 'public');
-
-        // Metadatos/estado
-        $doc->fill([
-            'path'             => $path,
-            'original_name'    => $f->getClientOriginalName(),
-            'mime'             => 'application/pdf',
-            'size'             => $f->getSize(),
-            'status'           => 'pending',
-            'reviewer_comment' => null,
-            'reviewed_by'      => null,
-            'reviewed_at'      => null,
-        ])->save();
+        app(UserDocumentReplacement::class)->replace($user, $type, $f, $filename);
 
         return back()->with('status', 'Documento subido correctamente. Queda pendiente de revisión.');
     }
