@@ -42,7 +42,7 @@ class DotacionMaximosBloqueExport
             foreach (self::CONTRATOS as $col => $campo) {
                 $sheet->setCellValue($col.$row, $fila[$campo]);
                 $sheet->getComment($col.$row)->getText()->createTextRun(
-                    'Período contractual: '.$fila['periodo_contractual'].'. Año de dotación a cargar: '.$anio.'. Valor de referencia; no se importa.'
+                    'Período contractual: '.$fila['periodo_contractual'].'. Año contractual de referencia: '.($anio - 1).'. Año de dotación a cargar: '.$anio.'. Valor de referencia; no se importa.'
                 );
             }
             foreach (self::COLUMNAS as $col => $campo) {
@@ -75,12 +75,13 @@ class DotacionMaximosBloqueExport
         $sheet->freezePane('D2')->setAutoFilter('A1:I'.$last)->setShowGridlines(false);
         $instructions = $book->createSheet()->setTitle('Instrucciones');
         $instructions->setCellValue('A1', 'Año')->setCellValue('B1', $anio);
+        $instructions->setCellValue('A2', 'Año de contratos vigentes de referencia')->setCellValue('B2', $anio - 1);
         $instructions->setCellValue('A3', 'Edite sólo los máximos de las columnas E, G e I (azul claro). Nombre, matrícula y contratos vigentes en D, F y H son referencias y no se importan.');
         $instructions->setCellValue('A4', 'Incluye sólo establecimientos con cursos activos en el año seleccionado, excluyendo salas cuna. Los máximos guardados se precargan y los no configurados aparecen vacíos.');
         $instructions->setCellValue('A5', 'Cada celda vacía conserva el máximo actual de ese bloque. Use entre 0 y 9999 horas y hasta dos decimales; cero establece un máximo de cero.');
         $instructions->setCellValue('A6', 'La carga se guarda sólo para el año seleccionado, sin modificar las asignaciones, reservas ni otras configuraciones.');
         $instructions->setCellValue('A7', 'Un máximo inferior a la necesidad obligatoria mantiene el bloqueo de asignación del proceso guiado. Revise la necesidad antes de reducir los máximos.');
-        $instructions->setCellValue('A8', 'Contrato vigente: misma base y distribución de la vista de dotación. Si el año a cargar aún no tiene padrón, utiliza el último año disponible hasta el seleccionado.');
+        $instructions->setCellValue('A8', 'Contrato vigente: último período contractual del año anterior al seleccionado ('.($anio - 1).'), distribuido por bloque. Si no hay contratos de ese año, se muestra cero; no se utilizan contratos de otros años.');
         $instructions->setCellValue('A9', 'El comentario de cada celda de contrato indica el mes/año de origen. Excluye asistentes y cupos por contratar; no descuenta reservas como si fueran reducción del contrato vigente.');
         $instructions->getColumnDimension('A')->setWidth(110);
         $instructions->getColumnDimension('B')->setWidth(15);

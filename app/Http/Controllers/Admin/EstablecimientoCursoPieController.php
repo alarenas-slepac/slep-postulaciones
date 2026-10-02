@@ -19,8 +19,8 @@ use ZipArchive;
 
 class EstablecimientoCursoPieController extends Controller
 {
-    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp'];
-    private array $editableRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp'];
+    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
+    private array $editableRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'supervisor_plani'];
 
     public function index(Request $request)
     {
@@ -264,7 +264,7 @@ class EstablecimientoCursoPieController extends Controller
     public function destroy(Request $request, EstablecimientoCursoPie $establecimiento_curso_pie)
     {
         $activeRole = $this->authorizePieAccess($request, true);
-        abort_unless($activeRole === 'admin', 403);
+        abort_unless(in_array($activeRole, ['admin', 'supervisor_plani'], true), 403);
         $anio = $establecimiento_curso_pie->anio;
         $establecimiento_curso_pie->delete();
 
@@ -494,7 +494,7 @@ class EstablecimientoCursoPieController extends Controller
             'observacion' => ['nullable', 'string', 'max:2000'],
         ];
 
-        if (in_array($activeRole, ['admin', 'coordinador_uatp'], true)) {
+        if (in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true)) {
             $rules['estado'] = ['required', Rule::in(array_keys(EstablecimientoCursoPie::ESTADOS))];
         }
 

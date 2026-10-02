@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Exports\DotacionResumenSobredotacionExport;
 use App\Models\Establecimiento;
 use App\Support\DotacionAsignacionCalculator;
+use App\Support\DotacionContratoVigentePorBloque;
 use App\Support\DotacionEstablecimientoCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -322,6 +323,44 @@ class DotacionContratoPadronTest extends TestCase
             'tipocontrato' => 'PLANTA', 'financiamiento' => 'SUB.GENERAL',
             'estatuto' => 'DOCENTE', 'escalafon' => 'DOCENTE', 'row_hash' => 'sintetico-'.$id,
         ], $changes));
+    }
+
+    public function test_referencia_contractual_usa_solo_ultimo_periodo_del_anio_explicito_en_los_tres_bloques(): void
+    {
+        foreach ([
+            ['111111111', 'Pedagogía en Educación Básica', 44],
+            ['222222222', 'Pedagogía en Educación de Párvulos', 43],
+            ['333333333', 'Pedagogía en Educación Diferencial', 38],
+        ] as $index => [$rut, $titulo, $horas]) {
+            $this->personal(101 + $index, ['rut' => $rut, 'jornada' => $horas, 'anio' => 2026, 'mes' => 9]);
+            $this->personal(111 + $index, ['rut' => $rut, 'jornada' => 10, 'anio' => 2027]);
+            $this->personal(121 + $index, ['rut' => $rut, 'jornada' => 20, 'anio' => 2025]);
+            $this->personal(131 + $index, ['rut' => $rut, 'jornada' => 30, 'anio' => 2026, 'mes' => 8]);
+            $this->declaracion(201 + $index, ['rut' => $rut, 'nombre_titulo' => $titulo]);
+        }
+        $before = $this->snapshot();
+        $resultado = (new DotacionContratoVigentePorBloque)->paraEstablecimiento(Establecimiento::findOrFail(1), 2026);
+
+        $this->assertSame(44.0, $resultado['contrato_vigente_bloque_1']);
+        $this->assertSame(43.0, $resultado['contrato_vigente_bloque_2']);
+        $this->assertSame(38.0, $resultado['contrato_vigente_bloque_3']);
+        $this->assertSame('09/2026', $resultado['periodo_contractual']);
+        $this->assertSame($before, $this->snapshot());
+    }
+
+    public function test_referencia_sin_contratos_del_anio_solicitado_no_recurre_a_otro_anio(): void
+    {
+        $this->personal(101, ['anio' => 2025]);
+        $this->personal(102, ['anio' => 2027]);
+        $this->declaracion();
+
+        $resultado = (new DotacionContratoVigentePorBloque)->paraEstablecimiento(Establecimiento::findOrFail(1), 2026);
+        $this->assertSame(0.0, $resultado['contrato_vigente_bloque_1']);
+        $this->assertSame(0.0, $resultado['contrato_vigente_bloque_2']);
+        $this->assertSame(0.0, $resultado['contrato_vigente_bloque_3']);
+        $this->assertSame('Sin contratos docentes vigentes', $resultado['periodo_contractual']);
+        // La proyección general conserva su comportamiento de respaldo histórico.
+        $this->assertSame(2025, DotacionEstablecimientoCalculator::docentes(Establecimiento::findOrFail(1), 2026)->sole()['anio']);
     }
 
     private function declaracion(int $id = 201, array $changes = []): void

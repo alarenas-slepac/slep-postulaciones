@@ -207,6 +207,21 @@ class DotacionFuncionesNormativasHorasTest extends TestCase
         $this->assertSame(44.0, $this->necesidad()['horas_contrato_requeridas']);
     }
 
+    public function test_supervisor_plani_guarda_definicion_normativa_en_cualquier_establecimiento(): void
+    {
+        $key = $this->necesidad()['key'];
+        app(DotacionProceso2027Controller::class)->update(
+            $this->solicitud([['key' => $key, 'usar' => 1, 'horas' => 22]], 'supervisor_plani', 2),
+            $this->establecimiento()
+        );
+
+        $config = DotacionProceso2027Configuracion::firstOrFail();
+        $this->assertTrue($config->funciones_normativas[$key]);
+        $this->assertSame(22, $config->funciones_normativas['_horas']['encargado_convivencia']);
+        $this->assertSame(1, $config->funciones_normativas_configuradas_by);
+        $this->assertSame(22.0, $this->necesidad()['horas_contrato_requeridas']);
+    }
+
     public function test_definicion_en_cero_sigue_visible_y_puede_activarse_de_nuevo(): void
     {
         $this->configurar(0);

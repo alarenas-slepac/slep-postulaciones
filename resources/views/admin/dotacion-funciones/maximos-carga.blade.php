@@ -35,7 +35,7 @@
         <h2 class="h5 fw-bold mb-3"><i class="bi bi-upload me-1" aria-hidden="true"></i> Cargar máximos para {{ $anio }}</h2>
         <div class="alert alert-info rounded-4 mb-3" role="note">
             <p class="mb-2">La plantilla incluye los RBD con cursos activos en {{ $anio }}, excluyendo salas cuna, junto con sus nombres, matrícula y máximos guardados. Antes del máximo de cada bloque se muestran sus <strong>horas de contrato vigente</strong>. Edite únicamente los máximos de las columnas <strong>E, G e I</strong>.</p>
-            <p class="mb-2">Los contratos vigentes utilizan la misma base de la vista de dotación. Si aún no hay padrón del año seleccionado, se utiliza el último disponible hasta ese año. El comentario de cada celda indica el período de origen; estos valores son de referencia y no se importan.</p>
+            <p class="mb-2">Los contratos vigentes corresponden al <strong>año anterior: {{ $anio - 1 }}</strong>, tomando el último período contractual de ese año. Si no hay contratos de ese año, se muestra cero. El comentario de cada celda indica el período de origen; estos valores son de referencia y no se importan.</p>
             <p class="mb-0">Cada celda vacía conserva el valor actual de ese bloque; 0 establece un máximo de cero. Admite entre 0 y 9999 horas y hasta dos decimales. Las asignaciones, reservas y otras configuraciones se conservan.</p>
         </div>
         <a class="btn btn-outline-primary rounded-pill mb-4" href="{{ route('admin.dotacion-funciones.maximos.plantilla', ['anio' => $anio]) }}"><i class="bi bi-download me-1" aria-hidden="true"></i> Descargar plantilla {{ $anio }}</a>

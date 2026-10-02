@@ -20,8 +20,8 @@ use Illuminate\Validation\ValidationException;
 class DotacionFuncionesController extends Controller
 {
     private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
-    private array $editableRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp'];
-    private array $validatorRoles = ['admin', 'coordinador_uatp'];
+    private array $editableRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'supervisor_plani'];
+    private array $validatorRoles = ['admin', 'coordinador_uatp', 'supervisor_plani'];
     private array $directorAdpRoles = ['admin', 'coordinador_uatp', 'supervisor_plani'];
 
     public function index(Request $request)

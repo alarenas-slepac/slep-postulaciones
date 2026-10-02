@@ -45,7 +45,7 @@ class DotacionContrataHabilitacionController extends Controller
     {
         $user = $request->user();
         $role = $user && method_exists($user, 'activeRoleName') ? $user->activeRoleName() : null;
-        abort_unless(in_array($role, ['admin', 'coordinador_uatp', 'coordinador_gdp'], true), 403);
+        abort_unless(in_array($role, ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true), 403);
         abort_if((bool) ($establecimiento->sala_cuna ?? false), 404);
     }
 }

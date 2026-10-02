@@ -20,7 +20,7 @@ class DotacionSobredotacionJustificacionController extends Controller
     {
         $usuario = $request->user();
         $rol = $usuario?->activeRoleName();
-        abort_unless($rol === 'admin'
+        abort_unless(in_array($rol, ['admin', 'supervisor_plani'], true)
             || ($rol === 'funcionario_directivo_estab'
                 && (int) $usuario->establecimiento_id === (int) $establecimiento->id), 403);
         abort_if((bool) $establecimiento->sala_cuna, 404);
