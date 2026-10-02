@@ -1,0 +1,507 @@
+{
+  "date": "2026-10-02",
+  "php_version": "8.3.30",
+  "patch": "2026.10.2.562",
+  "environment": "Local Windows, PHP CLI and isolated file-backed SQLite database. Not cPanel or production MySQL.",
+  "scope": "Controller calculation and complete HTML rendering, including the shared layout. Export measurement includes Excel HTML response generation. Fixture preparation occurs in a separate process.",
+  "dataset": {
+    "requests": 3864,
+    "accepted_or_closed_with_working_dates": 3238,
+    "requests_with_snapshot": 2498,
+    "personnel_rows": 22148,
+    "profiles": 3376,
+    "users": 4355,
+    "establishments": 95,
+    "snapshot_original_bytes": 1324177,
+    "snapshot_anonymized_bytes": 1316801
+  },
+  "privacy": "Names and RUTs anonymized; historical snapshot keys, field lengths and associations preserved. No source rows included in this report.",
+  "default_filter": "todos (all settlement states); category remains asistentes",
+  "existing_candidate_limits": {
+    "listing": 1500,
+    "export": 5000
+  },
+  "memory_metric": "Peak PHP allocation from memory_get_peak_usage(true), measured under the stated memory_limit. Not total server RAM or MySQL memory.",
+  "functional_validation": {
+    "tests": 16,
+    "assertions": 102,
+    "php_memory_limit": "128M",
+    "phpunit_peak_mb": 58
+  },
+  "limits": "Local measurements demonstrate behavior with this dataset. cPanel response times and memory consumption must be confirmed after deployment; this report does not measure web middleware, network latency or production MySQL.",
+  "before_calendar_optimization": {
+    "listing_128M": {
+      "runs": [
+        {
+          "seconds": 6.139,
+          "queries": 23,
+          "snapshot_reads": 0,
+          "schema_queries": 7,
+          "database_ms": 92.2,
+          "memory_limit": "128M",
+          "baseline_mb": 28,
+          "request_peak_mb": 108,
+          "whole_process_peak_mb": 108,
+          "mode": "render",
+          "html_bytes": 502924,
+          "visible_records": 25,
+          "summary": {
+            "total": 280,
+            "pendientes": 205,
+            "generados": 53,
+            "completados": 22,
+            "asistentes": 280,
+            "junji": 0,
+            "docentes": 0
+          }
+        },
+        {
+          "seconds": 6.204,
+          "queries": 23,
+          "snapshot_reads": 0,
+          "schema_queries": 7,
+          "database_ms": 92.8,
+          "memory_limit": "128M",
+          "baseline_mb": 28,
+          "request_peak_mb": 108,
+          "whole_process_peak_mb": 108,
+          "mode": "render",
+          "html_bytes": 502924,
+          "visible_records": 25,
+          "summary": {
+            "total": 280,
+            "pendientes": 205,
+            "generados": 53,
+            "completados": 22,
+            "asistentes": 280,
+            "junji": 0,
+            "docentes": 0
+          }
+        },
+        {
+          "seconds": 6.206,
+          "queries": 23,
+          "snapshot_reads": 0,
+          "schema_queries": 7,
+          "database_ms": 94,
+          "memory_limit": "128M",
+          "baseline_mb": 28,
+          "request_peak_mb": 108,
+          "whole_process_peak_mb": 108,
+          "mode": "render",
+          "html_bytes": 502924,
+          "visible_records": 25,
+          "summary": {
+            "total": 280,
+            "pendientes": 205,
+            "generados": 53,
+            "completados": 22,
+            "asistentes": 280,
+            "junji": 0,
+            "docentes": 0
+          }
+        }
+      ],
+      "median_seconds": 6.204,
+      "peak_mb": 108
+    },
+    "listing_256M": {
+      "runs": [
+        {
+          "seconds": 6.127,
+          "queries": 23,
+          "snapshot_reads": 0,
+          "schema_queries": 7,
+          "database_ms": 93,
+          "memory_limit": "256M",
+          "baseline_mb": 28,
+          "request_peak_mb": 108,
+          "whole_process_peak_mb": 108,
+          "mode": "render",
+          "html_bytes": 502924,
+          "visible_records": 25,
+          "summary": {
+            "total": 280,
+            "pendientes": 205,
+            "generados": 53,
+            "completados": 22,
+            "asistentes": 280,
+            "junji": 0,
+            "docentes": 0
+          }
+        },
+        {
+          "seconds": 6.216,
+          "queries": 23,
+          "snapshot_reads": 0,
+          "schema_queries": 7,
+          "database_ms": 92.3,
+          "memory_limit": "256M",
+          "baseline_mb": 28,
+          "request_peak_mb": 108,
+          "whole_process_peak_mb": 108,
+          "mode": "render",
+          "html_bytes": 502924,
+          "visible_records": 25,
+          "summary": {
+            "total": 280,
+            "pendientes": 205,
+            "generados": 53,
+            "completados": 22,
+            "asistentes": 280,
+            "junji": 0,
+            "docentes": 0
+          }
+        },
+        {
+          "seconds": 6.191,
+          "queries": 23,
+          "snapshot_reads": 0,
+          "schema_queries": 7,
+          "database_ms": 92.8,
+          "memory_limit": "256M",
+          "baseline_mb": 28,
+          "request_peak_mb": 108,
+          "whole_process_peak_mb": 108,
+          "mode": "render",
+          "html_bytes": 502924,
+          "visible_records": 25,
+          "summary": {
+            "total": 280,
+            "pendientes": 205,
+            "generados": 53,
+            "completados": 22,
+            "asistentes": 280,
+            "junji": 0,
+            "docentes": 0
+          }
+        }
+      ],
+      "median_seconds": 6.191,
+      "peak_mb": 108
+    },
+    "all_categories_256M": {
+      "seconds": 6.221,
+      "queries": 22,
+      "snapshot_reads": 0,
+      "schema_queries": 7,
+      "database_ms": 91,
+      "memory_limit": "256M",
+      "baseline_mb": 28,
+      "request_peak_mb": 106,
+      "whole_process_peak_mb": 106,
+      "mode": "render",
+      "html_bytes": 290107,
+      "visible_records": 25,
+      "summary": {
+        "total": 810,
+        "pendientes": 682,
+        "generados": 96,
+        "completados": 32,
+        "asistentes": 280,
+        "junji": 90,
+        "docentes": 440
+      }
+    },
+    "second_page_256M": {
+      "seconds": 6.164,
+      "queries": 23,
+      "snapshot_reads": 0,
+      "schema_queries": 7,
+      "database_ms": 91.5,
+      "memory_limit": "256M",
+      "baseline_mb": 28,
+      "request_peak_mb": 106,
+      "whole_process_peak_mb": 106,
+      "mode": "render",
+      "html_bytes": 502667,
+      "visible_records": 25,
+      "summary": {
+        "total": 280,
+        "pendientes": 205,
+        "generados": 53,
+        "completados": 22,
+        "asistentes": 280,
+        "junji": 0,
+        "docentes": 0
+      }
+    },
+    "excel_all_categories_256M": {
+      "seconds": 19.356,
+      "queries": 26,
+      "snapshot_reads": 0,
+      "schema_queries": 4,
+      "database_ms": 122.5,
+      "memory_limit": "256M",
+      "baseline_mb": 28,
+      "request_peak_mb": 156,
+      "whole_process_peak_mb": 156,
+      "mode": "export",
+      "html_bytes": 1350165,
+      "visible_records": 1567,
+      "summary": {
+        "total": 1567
+      }
+    }
+  },
+  "final_listing_128M": [
+    {
+      "seconds": 4.588,
+      "queries": 26,
+      "snapshot_reads": 0,
+      "schema_queries": 8,
+      "database_ms": 91.9,
+      "memory_limit": "128M",
+      "baseline_mb": 28,
+      "request_peak_mb": 108,
+      "whole_process_peak_mb": 108,
+      "mode": "render",
+      "html_bytes": 502969,
+      "visible_records": 25,
+      "summary": {
+        "total": 280,
+        "pendientes": 205,
+        "generados": 53,
+        "completados": 22,
+        "asistentes": 280,
+        "junji": 0,
+        "docentes": 0
+      }
+    },
+    {
+      "seconds": 4.548,
+      "queries": 26,
+      "snapshot_reads": 0,
+      "schema_queries": 8,
+      "database_ms": 91.3,
+      "memory_limit": "128M",
+      "baseline_mb": 28,
+      "request_peak_mb": 108,
+      "whole_process_peak_mb": 108,
+      "mode": "render",
+      "html_bytes": 502969,
+      "visible_records": 25,
+      "summary": {
+        "total": 280,
+        "pendientes": 205,
+        "generados": 53,
+        "completados": 22,
+        "asistentes": 280,
+        "junji": 0,
+        "docentes": 0
+      }
+    }
+  ],
+  "final_listing_256M": [
+    {
+      "seconds": 4.795,
+      "queries": 26,
+      "snapshot_reads": 0,
+      "schema_queries": 8,
+      "database_ms": 91.1,
+      "memory_limit": "256M",
+      "baseline_mb": 28,
+      "request_peak_mb": 108,
+      "whole_process_peak_mb": 108,
+      "mode": "render",
+      "html_bytes": 502969,
+      "visible_records": 25,
+      "summary": {
+        "total": 280,
+        "pendientes": 205,
+        "generados": 53,
+        "completados": 22,
+        "asistentes": 280,
+        "junji": 0,
+        "docentes": 0
+      }
+    },
+    {
+      "seconds": 4.642,
+      "queries": 26,
+      "snapshot_reads": 0,
+      "schema_queries": 8,
+      "database_ms": 93.1,
+      "memory_limit": "256M",
+      "baseline_mb": 28,
+      "request_peak_mb": 108,
+      "whole_process_peak_mb": 108,
+      "mode": "render",
+      "html_bytes": 502969,
+      "visible_records": 25,
+      "summary": {
+        "total": 280,
+        "pendientes": 205,
+        "generados": 53,
+        "completados": 22,
+        "asistentes": 280,
+        "junji": 0,
+        "docentes": 0
+      }
+    }
+  ],
+  "final_excel_all_categories_256M": {
+    "seconds": 13.099,
+    "queries": 26,
+    "snapshot_reads": 0,
+    "schema_queries": 4,
+    "database_ms": 119.4,
+    "memory_limit": "256M",
+    "baseline_mb": 28,
+    "request_peak_mb": 156,
+    "whole_process_peak_mb": 156,
+    "mode": "export",
+    "html_bytes": 1350190,
+    "visible_records": 1567,
+    "summary": {
+      "total": 1567
+    }
+  },
+  "final_listing_fixture_note": "Document measurements added a synthetic director and signer tables to the isolated fixture. This adds 3 listing queries versus the earlier listing runs. The two settlement rows modified for document testing were restored before the final listing/export measurements.",
+  "documents": {
+    "scope": "Controller operations, including model retrieval, file validation/storage and database update; excludes browser upload/download network time and the subsequent redirected listing request.",
+    "first_observed_pdf_execution": {
+      "mode": "generate",
+      "category": "asistentes",
+      "chain_periods": 7,
+      "seconds": 5.315,
+      "peak_mb": 46,
+      "memory_limit": "256M",
+      "queries": 22,
+      "database_ms": 35.2,
+      "bytes": 42675,
+      "http_status": 302,
+      "pdf": {
+        "html_seconds": 0.7725219,
+        "render_seconds": 2.3786185,
+        "pages": 2,
+        "serialize_seconds": 0.0012503000000001485
+      }
+    },
+    "subsequent_pdf_executions": [
+      {
+        "mode": "generate",
+        "category": "asistentes",
+        "chain_periods": 7,
+        "seconds": 0.5947,
+        "peak_mb": 46,
+        "memory_limit": "256M",
+        "queries": 23,
+        "database_ms": 28,
+        "bytes": 42675,
+        "http_status": 302,
+        "pdf": {
+          "html_seconds": 0.0350323,
+          "render_seconds": 0.3539243,
+          "pages": 2,
+          "serialize_seconds": 0.001564999999999983
+        }
+      },
+      {
+        "mode": "generate",
+        "category": "asistentes",
+        "chain_periods": 7,
+        "seconds": 0.5716,
+        "peak_mb": 46,
+        "memory_limit": "256M",
+        "queries": 24,
+        "database_ms": 31,
+        "bytes": 41845,
+        "http_status": 302,
+        "pdf": {
+          "html_seconds": 0.034551,
+          "render_seconds": 0.3269081,
+          "pages": 2,
+          "serialize_seconds": 0.0013182000000000471
+        }
+      },
+      {
+        "mode": "generate",
+        "category": "junji",
+        "chain_periods": 6,
+        "seconds": 0.5876,
+        "peak_mb": 46,
+        "memory_limit": "128M",
+        "queries": 24,
+        "database_ms": 31,
+        "bytes": 42676,
+        "http_status": 302,
+        "pdf": {
+          "html_seconds": 0.035394,
+          "render_seconds": 0.340835,
+          "pages": 2,
+          "serialize_seconds": 0.0015319999999999778
+        }
+      }
+    ],
+    "pdf_note": "First execution was slower; subsequent executions reuse runtime caches. Both zero amount and nonzero amount, assistants and JUNJI, were exercised. The original application DomPDF renderer and template were used without layout or legal text changes.",
+    "signed_upload_small": {
+      "mode": "upload",
+      "category": "asistentes",
+      "chain_periods": 7,
+      "seconds": 0.3057,
+      "peak_mb": 36,
+      "memory_limit": "256M",
+      "queries": 19,
+      "database_ms": 30,
+      "bytes": 41845,
+      "http_status": 302,
+      "pdf": []
+    },
+    "pdf_download": {
+      "mode": "download",
+      "category": "asistentes",
+      "chain_periods": 7,
+      "seconds": 0.0977,
+      "peak_mb": 32,
+      "memory_limit": "256M",
+      "queries": 1,
+      "database_ms": 0.4,
+      "bytes": 41845,
+      "http_status": 200,
+      "pdf": []
+    },
+    "signed_upload_20MB": {
+      "mode": "upload",
+      "category": "asistentes",
+      "chain_periods": 7,
+      "seconds": 0.1686,
+      "peak_mb": 36,
+      "memory_limit": "256M",
+      "queries": 21,
+      "database_ms": 31.6,
+      "bytes": 20971520,
+      "http_status": 302,
+      "pdf": []
+    },
+    "signed_download_20MB": {
+      "mode": "download-signed",
+      "category": "asistentes",
+      "chain_periods": 7,
+      "seconds": 0.0863,
+      "peak_mb": 74,
+      "memory_limit": "256M",
+      "queries": 1,
+      "database_ms": 0.4,
+      "bytes": 20971520,
+      "http_status": 200,
+      "pdf": []
+    },
+    "remove_signed_file": {
+      "mode": "delete-signed",
+      "category": "asistentes",
+      "chain_periods": 7,
+      "seconds": 0.0663,
+      "peak_mb": 32,
+      "memory_limit": "256M",
+      "queries": 4,
+      "database_ms": 6.1,
+      "bytes": 0,
+      "http_status": 302,
+      "pdf": []
+    },
+    "signed_file_note": "The 20 MB sample contains the generated test PDF padded to the actual supported maximum file size. It exercises validation and file I/O, without claiming signature verification.",
+    "visual_validation": "Generated PDFs contain 2 pages. Both pages of the zero amount JUNJI and nonzero amount assistant examples were rendered to PNG and inspected; text, logos and signature areas are legible without clipping."
+  },
+  "calendar_equivalence_check": "All 1567 exported record IDs, categories, continuity chains, period start and end dates match the previous export measurement. Record-level data remains private and is not included in this report."
+}
