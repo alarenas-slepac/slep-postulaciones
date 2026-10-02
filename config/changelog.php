@@ -1,6 +1,22 @@
 <?php
 
 return [
+    '2026.10.2.566' => [
+        'date' => '2026-10-02',
+        'module' => 'Gestión de solicitudes de reemplazo',
+        'title' => 'Incluir Fecha Inicio Trabajo en la descarga para Excel',
+        'files' => [
+            'app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php',
+            'tests/Feature/SolicitudReemplazoFechaInicioTrabajoExportTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El botón Descargar incluye la columna Fecha Inicio Trabajo, correspondiente a fecha_inicio_trabajo, junto a Fecha inicio.',
+            'Aplica a las exportaciones de Gestión GDP, UATP y Validación, con formato dd-mm-aaaa y celda vacía cuando no se ha registrado el inicio de trabajo.',
+            'Conserva filtros, permisos, formato CSV compatible con Excel y alineación de las demás columnas.',
+        ],
+        'roles' => ['Administrador', 'Coordinador GDP'],
+    ],
     '2026.10.2.565' => [
         'date' => '2026-10-02',
         'module' => 'Dotación · Máximos por bloque',
