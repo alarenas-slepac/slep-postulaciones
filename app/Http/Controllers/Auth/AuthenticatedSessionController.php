@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -19,48 +20,9 @@ class AuthenticatedSessionController extends Controller
     /**
      * Login aceptando RUT o email en el campo "login".
      */
-    public function store(Request $request): RedirectResponse
+    public function store(LoginRequest $request): RedirectResponse
     {
-        $request->validate([
-            'login' => ['required', 'string'],
-            'password' => ['required', 'string'],
-            'active_role' => ['nullable', 'string'],
-        ], [
-            'login.required' => 'Este campo es obligatorio.',
-            'password.required' => 'Este campo es obligatorio.',
-        ]);
-
-        $login = trim((string) $request->input('login'));
-        $password = (string) $request->input('password');
-        $remember = (bool) $request->boolean('remember');
-
-        // Detectar si es email o RUT
-        $isEmail = filter_var($login, FILTER_VALIDATE_EMAIL);
-        if (!$isEmail) {
-            // Normalizar RUT: quitar puntos y guión, mayúsculas
-            $login = strtoupper(preg_replace('/[^0-9Kk]/', '', $login));
-        }
-
-        // Buscar usuario por email o por rut
-        $userModel = \App\Models\User::query()
-            ->when($isEmail, fn($q) => $q->where('email', strtolower($login)))
-            ->when(!$isEmail, fn($q) => $q->where('rut', $login))
-            ->first();
-
-        if (!$userModel) {
-            throw ValidationException::withMessages([
-                'login' => 'Credenciales inválidas.',
-            ]);
-        }
-
-        // Intento de login usando email (credencial real)
-        $credentials = ['email' => $userModel->email, 'password' => $password];
-
-        if (!Auth::attempt($credentials, $remember)) {
-            throw ValidationException::withMessages([
-                'login' => 'Credenciales inválidas.',
-            ]);
-        }
+        $userModel = $request->authenticate();
 
         $request->session()->regenerate();
         $request->session()->put('show_changelog_modal', true);
@@ -79,10 +41,11 @@ class AuthenticatedSessionController extends Controller
             }
 
             $request->session()->put('active_role', $requestedRole);
+        }
 
-            if ($requestedRole === 'funcionario_ac') {
-                return redirect()->intended(route('tramites.cargas-familiares.index'));
-            }
+        $request->clearLoginAttempts();
+        if ($requestedRole === 'funcionario_ac') {
+            return redirect()->intended(route('tramites.cargas-familiares.index'));
         }
 
         // Redirige al dashboard (intended si venía de ruta protegida)
