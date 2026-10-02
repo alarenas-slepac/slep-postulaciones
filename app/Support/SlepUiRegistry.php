@@ -100,6 +100,7 @@ class SlepUiRegistry
                 self::entry('Vista temporal de usuarios', 'gestion.postulante-tutorial.index', 'bi-person-video2', ['admin', 'coordinador_gdp', 'funcionario_slep']),
                 self::entry('Trámites generales', 'tramites.index', 'bi-folder-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'postulante', 'funcionario'], 'tramites'),
                 self::entry('Incumplimiento laboral', 'incumplimientos.index', 'bi-exclamation-octagon', ['admin', 'funcionario_estab'], 'incumplimientos'),
+                self::entry('Declaración de Sostenedores', 'declaracion.index', 'bi-file-earmark-text', ['admin', 'funcionario_estab'], 'declaracion'),
             ],
             'Postulación y funcionarios' => [
                 self::entry('Mi perfil', 'postulant.profile.edit', 'bi-person-badge', ['postulante', 'funcionario'], 'postulant.profile'),
@@ -188,6 +189,7 @@ class SlepUiRegistry
             self::entry('Buscador postulantes', 'reemplazos.buscador-postulantes.index', 'bi-search', ['admin', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_slep', 'funcionario_estab']),
             self::entry('Bolsa de Trabajo', 'gestion.bolsa-trabajo.index', 'bi-briefcase', ['admin', 'funcionario_slep'], 'gestion.bolsa-trabajo'),
             self::entry('Solicitudes establecimiento', 'funcionario.solicitudes-reemplazo.index', 'bi-clipboard-check', ['funcionario_estab'], 'funcionario.solicitudes-reemplazo'),
+            self::entry('Declaración de Sostenedores', 'declaracion.index', 'bi-file-earmark-text', ['admin', 'funcionario_estab'], 'declaracion'),
             self::entry('Viáticos y reembolsos', 'admin.viaticos-reembolsos.index', 'bi-cash-coin', ['admin', 'supervisor_plani', 'coordinador_plani'], 'admin.viaticos-reembolsos'),
             self::entry('Funcionarios viático por anexo', 'admin.funcionarios-viatico-anexo.index', 'bi-person-check', ['admin', 'supervisor_plani', 'coordinador_plani'], 'admin.funcionarios-viatico-anexo'),
             self::entry('Valores hora AAEE', 'admin.aaee-valores-hora.index', 'bi-currency-dollar', ['admin']),
