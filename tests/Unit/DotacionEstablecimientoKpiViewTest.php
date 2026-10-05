@@ -122,7 +122,8 @@ class DotacionEstablecimientoKpiViewTest extends TestCase
 
         $this->assertIsString($source);
         $this->assertStringContainsString('Desglose de horas de contrato de funciones directivas, técnico pedagógicas, planes y Otras funciones', $source);
-        $this->assertSame(2, substr_count($source, 'data-bs-toggle="collapse"'));
+        // Los dos desgloses permanecen; configuración e indicadores también son plegables.
+        $this->assertSame(4, substr_count($source, 'data-bs-toggle="collapse"'));
         $this->assertSame(2, substr_count($source, 'dotacion-collapse-toggle collapsed'));
         $this->assertStringContainsString('data-bs-target="#dotacion-funciones-collapse"', $source);
         $this->assertStringContainsString('aria-controls="dotacion-funciones-collapse"', $source);

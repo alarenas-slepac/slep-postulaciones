@@ -1,4 +1,5 @@
 @php
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
     $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
     $totalContratoBase = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0));
     $totalExcluidas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_excluidas'] ?? 0));
@@ -13,10 +14,11 @@
     $totalAsignadas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_asignadas_total'] ?? 0));
     $totalRedondeoParvularia = round((float) $docentes->sum(fn ($docente) => (float) ($docente['redondeo_parvularia'] ?? 0)), 2);
     $totalAsignadasVisibles = round($totalAsignadas + $totalRedondeoParvularia, 2);
+    $totalReservadas = (float) $docentes->sum('horas_reservadas_no_normativas');
     $totalDiferencia = round($totalContrato - $totalAsignadasVisibles, 2);
     $mostrarEspecial = $totalContratoEspecial > 0.01;
     $proceso2027Docentes = $proceso2027 ?? ['aplica' => false];
-    $tableColspan = ($mostrarEspecial ? 13 : 12) + (($proceso2027Docentes['aplica'] ?? false) ? 1 : 0);
+    $tableColspan = 9 + (($proceso2027Docentes['aplica'] ?? false) ? 1 : 0);
     $cuadraPorRedondeo = fn ($docente) => (float) ($docente['redondeo_parvularia'] ?? 0) > 0.01
         && ($docente['diferencia'] ?? null) !== null
         && abs((float) $docente['diferencia'] - (float) $docente['redondeo_parvularia']) <= 0.01;
@@ -31,6 +33,8 @@
     $vacanciasPorNoContinuidad = $vacanciasPorNoContinuidad ?? null;
     $horasVacantesPorNoContinuidad = (float) data_get($vacanciasPorNoContinuidad, 'horas_vacantes_por_cubrir', 0);
 @endphp
+
+@include('admin.dotacion-establecimiento.partials._resumen_contractual_bloques')
 
 @if ($vacanciasPorNoContinuidad && $horasVacantesPorNoContinuidad > 0.01)
     <div class="alert alert-warning border-warning-subtle mb-4" role="status">
@@ -77,7 +81,7 @@
             <span class="badge text-bg-warning">Sin info: {{ $countSinInfo }}</span>
         </div>
         @if ($proceso2027Docentes['aplica'] ?? false)
-            <div class="alert alert-primary small mt-3 mb-0"><i class="bi bi-sort-numeric-down"></i> La nómina está ordenada por prelación 2027: fuero; titulares Avanzado, Experto 1 y Experto 2 en un mismo grupo; resto titular; y contrata. Cada grupo titular se ordena por antigüedad, con las fechas no informadas al final. También se reconocen las formas Experto I y Experto II. Las horas disponibles se muestran en la ficha de cada docente.</div>
+            <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-sort-numeric-down" aria-hidden="true"></i> La nómina conserva la prelación 2027: fuero; titulares Avanzado, Experto 1 y Experto 2; Titular Acceso, Inicial, Temprano; y contrata. Cada grupo titular se ordena por antigüedad, con las fechas no informadas al final. Los filtros conservan ese orden.</div>
         @endif
     </div>
 </div>
@@ -134,17 +138,20 @@
                 <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Contrato regla especial</div><div class="h5 fw-bold mb-0">{{ $fmt($totalContratoEspecial) }}</div></div></div>
             @endif
             <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Funciones contrato</div><div class="h5 fw-bold mb-0">{{ $fmt($totalFunciones) }}</div></div></div>
-            <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Total contrato calculado</div><div class="h5 fw-bold text-success mb-0">{{ $fmt($totalAsignadasVisibles) }}</div>@if ($totalRedondeoParvularia > 0.01)<div class="small text-muted">Registrado: {{ $fmt($totalAsignadas) }} · redondeo NT: +{{ $fmt($totalRedondeoParvularia) }}</div>@endif</div></div>
+            <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Contrato asignado</div><div class="h5 fw-bold text-success mb-0">{{ $fmt($totalAsignadasVisibles - $totalReservadas) }} h</div>@if ($totalRedondeoParvularia > 0.01)<div class="small text-muted">Incluye +{{ $fmt($totalRedondeoParvularia) }} h de redondeo NT</div>@endif</div></div>
+            <div class="col-md"><div class="p-3 rounded-4 border h-100"><div class="small text-muted">Reservado sin función</div><div class="h5 fw-bold mb-0">{{ $fmt($totalReservadas) }} h</div><div class="small text-muted">Ya descontado del saldo</div></div></div>
         </div>
     </div>
 </div>
 
+<div data-dotacion-revision="docentes">
+@include('admin.dotacion-establecimiento.partials._revision_filtros', ['revisionId' => 'revision-docentes', 'revisionTitulo' => 'Revisar contrato por docente'])
 <div class="card dotacion-section">
     <div class="dotacion-section-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
             <div class="dotacion-eyebrow">Listado docente</div>
             <h2 class="h5 fw-bold mb-1">Base contractual y cálculo por proporción</h2>
-            <div class="text-muted small">Muestra primero las horas aula realmente asignadas y luego su equivalencia contractual 65/35 o 60/40.</div>
+            <div class="text-muted small">Asignadas y reservadas están separadas. Abra «Ver detalle» para consultar la conversión, las funciones y la situación docente.</div>
         </div>
         <span class="badge rounded-pill text-bg-light border">{{ $docentes->count() }} registro(s)</span>
     </div>
@@ -152,19 +159,15 @@
         <table class="table align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th style="width: 44px;">#</th>
-                    <th>RUT</th>
+                    <th>Detalle</th>
                     <th>Docente</th>
                     @if ($proceso2027Docentes['aplica'] ?? false)<th>Prelación 2027</th>@endif
                     <th>Título / función</th>
                     <th class="text-end">Contrato considerado</th>
                     <th class="text-end">Aula asignada</th>
-                    <th class="text-end">Hrs. contrato 65/35</th>
-                    <th class="text-end">Hrs. contrato 60/40</th>
-                    @if ($mostrarEspecial)<th class="text-end">Regla especial</th>@endif
-                    <th class="text-end">Funciones</th>
-                    <th class="text-end">Total contrato calc.</th>
-                    <th class="text-end">Dif.</th>
+                    <th class="text-end">Contrato asignado</th>
+                    <th class="text-end">Reservado</th>
+                    <th class="text-end">Saldo contrato</th>
                     <th>Estado</th>
                 </tr>
             </thead>
@@ -186,7 +189,8 @@
                         $horasContrata = (float) ($docente['horas_contrata'] ?? 0);
                         $horasContratoBaseDocente = (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0);
                         $exclusionDocente = $docente['exclusion_docente'] ?? null;
-                        $formConErrores = old('docente_rut') === ($docente['rut'] ?? null);
+                        $formConErrores = $errors->any() && (int) old('anio') === (int) ($anio ?? $docente['anio'])
+                            && old('docente_rut') === ($docente['rut'] ?? null) && old('motivo') !== null;
                         $motivoSeleccionado = $formConErrores ? old('motivo') : ($exclusionDocente['motivo'] ?? '');
                         $horasSeleccionadas = $formConErrores ? old('horas') : ($exclusionDocente['horas'] ?? 0);
                         $horasNecesariasSeleccionadas = $formConErrores ? old('horas_necesarias') : ($docente['horas_contrato'] ?? $horasContratoBaseDocente);
@@ -197,11 +201,22 @@
                         $conservacionSeleccionada = $formConErrores ? old('conservar_horas_necesarias', $conservarHoras) : $conservarHoras;
                         $funcionesTecnicoPedagogicasDetalle = collect($docente['funciones_tecnico_pedagogicas_detalle'] ?? []);
                         $otrasFuncionesDetalle = collect($docente['otras_funciones_detalle'] ?? []);
+                        $reservadasDocente = (float) ($docente['horas_reservadas_no_normativas'] ?? 0);
+                        $perfilRevision = \App\Support\DotacionProfesionDocenteResolver::perfilTitulo($docente);
+                        $contratoPieRevision = ($resumen['establecimiento_especial'] ?? false) ? 0 : (float) ($docente['horas_contrato_pie'] ?? \App\Support\DotacionAsignacionCalculator::contratoPiePorDocente($docente));
+                        $bloquesRevision = [];
+                        if ((float) ($docente['horas_contrato'] ?? 0) - $contratoPieRevision > 0.01) $bloquesRevision[] = $perfilRevision['es_educacion_parvulos'] ? 'parvularia' : 'plan_estudio';
+                        if ($contratoPieRevision > 0.01) $bloquesRevision[] = 'pie';
+                        $estadosRevision = [];
+                        if ($diferencia > 0.01) $estadosRevision[] = 'saldo';
+                        if ($diferencia < -0.01) $estadosRevision[] = 'sobrecarga';
+                        if ($diferencia !== null && abs($diferencia) <= 0.01) $estadosRevision[] = 'cuadra';
+                        if ($reservadasDocente > 0.01) $estadosRevision[] = 'reserva';
+                        $revisionKey = sha1((string) $docente['rut']);
                     @endphp
-                    <tr>
-                        <td><button class="btn btn-sm btn-outline-primary rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $formConErrores ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down"></i></button></td>
-                        <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
-                        <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="text-muted small">{{ $docente['niveles_declarados'] }}</div></td>
+                    <tr data-revision-row="{{ $revisionKey }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['titulo'] }} {{ $docente['funcion'] }}" data-revision-block="{{ implode(' ', $bloquesRevision) }}" data-revision-state="{{ implode(' ', $estadosRevision) }}" data-revision-error="{{ $formConErrores ? '1' : '0' }}">
+                        <td><button class="btn btn-sm btn-outline-primary rounded-pill text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $formConErrores ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down" aria-hidden="true"></i> Ver detalle<span class="visually-hidden"> de {{ $docente['nombre'] }}</span></button></td>
+                        <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="text-muted small">{{ $docente['rut'] }} · {{ $docente['niveles_declarados'] }}</div></td>
                         @if ($proceso2027Docentes['aplica'] ?? false)
                             <td><span class="badge rounded-pill text-bg-primary">{{ $docente['prioridad_2027_label'] ?? 'Sin prioridad' }}</span><div class="small text-muted mt-1">{{ $docente['tramo'] ?: 'Sin tramo' }} · {{ $docente['fecha_antiguedad'] ?: 'Sin antigüedad' }}</div><div class="small text-success">Disp.: {{ $fmt(max(0, (float) ($docente['horas_titulares_disponibles'] ?? 0) - $redondeoTitular)) }} titular + {{ $fmt(max(0, (float) ($docente['horas_contrata_disponibles'] ?? 0) - $redondeoContrata)) }} contrata</div>@if ($redondeoParvularia > 0.01)<div class="small text-muted">Neteo Parvularia: {{ $fmt($redondeoParvularia) }} h</div>@endif</td>
                         @endif
@@ -226,11 +241,8 @@
                             @endif
                         </td>
                         <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_aula']) }}</td>
-                        <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_contrato_65_35'] ?? 0) }}</td>
-                        <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_contrato_60_40'] ?? 0) }}</td>
-                        @if ($mostrarEspecial)<td class="text-end">{{ $fmt($docente['horas_contrato_especial'] ?? 0) }}</td>@endif
-                        <td class="text-end">{{ $fmt($funcionesDocente) }}</td>
-                        <td class="text-end fw-bold text-success">{{ $fmt($horasAsignadasVisibles) }}@if ($redondeoParvularia > 0.01)<div class="small text-muted fw-normal">{{ $fmt($docente['horas_asignadas_total']) }} + {{ $fmt($redondeoParvularia) }} redondeo NT</div>@endif</td>
+                        <td class="text-end fw-bold text-success" data-docente-value="asignadas">{{ $fmt($horasAsignadasVisibles - $reservadasDocente) }}@if ($redondeoParvularia > 0.01)<div class="small text-muted fw-normal">Incluye +{{ $fmt($redondeoParvularia) }} h de redondeo NT</div>@endif</td>
+                        <td class="text-end" data-docente-value="reservadas">{{ $fmt($reservadasDocente) }}</td>
                         <td class="text-end">@if ($diferencia === null)—@elseif ($diferencia < -0.01)<span class="text-danger fw-semibold">-{{ $fmt(abs($diferencia)) }}</span>@elseif ($diferencia > 0.01)<span class="text-warning fw-semibold">{{ $fmt($diferencia) }}</span>@else<span class="text-success fw-semibold">0</span>@endif</td>
                         <td>
                             <span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Sin estado' }}</span>
@@ -246,9 +258,17 @@
                             @endif
                         </td>
                     </tr>
-                    <tr class="collapse{{ $formConErrores ? ' show' : '' }}" id="{{ $collapseId }}">
+                    <tr class="collapse{{ $formConErrores ? ' show' : '' }}" id="{{ $collapseId }}" data-revision-related="{{ $revisionKey }}">
                         <td colspan="{{ $tableColspan }}" class="bg-light">
                             <div class="p-3">
+                                @if (isset($establecimiento, $anio))
+                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                    <a class="btn btn-sm btn-outline-primary rounded-pill" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion', 'asig_buscar' => $docente['rut']]) }}">Revisar asignaciones</a>
+                                    @if (($canViewSobredotacion ?? false) && $diferencia > 0.01)
+                                        <a class="btn btn-sm btn-outline-secondary rounded-pill" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion', 'revision_sobredotacion_q' => $docente['rut'], 'revision_sobredotacion_state' => 'saldo']) }}">Revisar y justificar saldo</a>
+                                    @endif
+                                </div>
+                                @endif
                                 <div class="row g-3">
                                     <div class="col-lg-4">
                                         <div class="card border-0 shadow-sm h-100">
@@ -304,8 +324,11 @@
                                                     <div class="d-flex justify-content-between"><span>Contrato regla especial</span><strong>{{ $fmt($docente['horas_contrato_especial']) }}</strong></div>
                                                 @endif
                                                 <div class="d-flex justify-content-between"><span>Funciones asignadas</span><strong>{{ $fmt($funcionesDocente) }}</strong></div>
+                                                <div class="d-flex justify-content-between"><span>Contrato asignado sin reservas</span><strong>{{ $fmt($horasAsignadasVisibles - $reservadasDocente) }}</strong></div>
+                                                <div class="d-flex justify-content-between"><span>Reservado sin función</span><strong>{{ $fmt($reservadasDocente) }}</strong></div>
+                                                <div class="small text-muted mt-1">Las reservas ya consumen contrato y se descuentan una sola vez del saldo. Al vincularlas a una función no se duplican.</div>
                                                 <hr class="my-2">
-                                                <div class="d-flex justify-content-between"><span>Total contrato calculado</span><strong class="text-success">{{ $fmt($horasAsignadasVisibles) }}</strong></div>
+                                                <div class="d-flex justify-content-between"><span>Contrato ocupado, incluye reservas</span><strong class="text-success">{{ $fmt($horasAsignadasVisibles) }}</strong></div>
                                                 @if ($redondeoParvularia > 0.01)<div class="small text-muted">Registrado: {{ $fmt($docente['horas_asignadas_total']) }} h · redondeo individual NT: +{{ $fmt($redondeoParvularia) }} h</div>@endif
                                                 <div class="d-flex justify-content-between"><span>Diferencia</span><strong>{{ $diferencia === null ? '—' : $fmt($diferencia) }}</strong></div>
                                             </div>
@@ -419,7 +442,7 @@
                                                         @endif
                                                     </div>
                                                     <div class="col-12 d-flex flex-wrap gap-2">
-                                                        <button type="submit" class="btn btn-warning"><i class="bi bi-check2-circle"></i> {{ $exclusionDocente ? 'Actualizar situación' : 'Guardar situación' }}</button>
+                                                        <button type="submit" class="btn btn-primary rounded-pill"><i class="bi bi-check2-circle" aria-hidden="true"></i> {{ $exclusionDocente ? 'Actualizar situación' : 'Guardar situación' }}</button>
                                                     </div>
                                                 </form>
                                             @else
@@ -446,4 +469,5 @@
             </tbody>
         </table>
     </div>
+</div>
 </div>

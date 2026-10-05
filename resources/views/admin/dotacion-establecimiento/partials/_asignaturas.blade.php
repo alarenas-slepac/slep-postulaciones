@@ -118,9 +118,9 @@
                     </select>
                 </div>
                 <div class="col-xl-2 col-md-6 d-flex gap-2">
-                    <button class="btn btn-primary flex-grow-1" type="submit"><i class="bi bi-funnel"></i> Filtrar</button>
+                    <button class="btn btn-primary rounded-pill flex-grow-1" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i> Filtrar</button>
                     @if ($filtrosActivos)
-                        <a class="btn btn-outline-secondary" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignaturas']) }}" title="Limpiar filtros"><i class="bi bi-x-lg"></i></a>
+                        <a class="btn btn-outline-secondary rounded-pill" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignaturas']) }}"><i class="bi bi-x-lg" aria-hidden="true"></i> Limpiar</a>
                     @endif
                 </div>
             </div>

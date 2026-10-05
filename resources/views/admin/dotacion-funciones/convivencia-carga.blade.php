@@ -1,6 +1,11 @@
 @extends('layouts.app')
 
+@push('styles')
+    @vite(['resources/css/dotacion-establecimiento.css', 'resources/js/dotacion-asignacion.js'])
+@endpush
+
 @section('content')
+<div class="dotacion-workspace">
     @php $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value); @endphp
     <div class="slep-card p-4 mb-4 d-flex flex-column flex-lg-row justify-content-between gap-3">
         <div>
@@ -46,7 +51,7 @@
             <p class="mb-0">Admite de 0 a 44 horas y hasta dos decimales. Dejar horas vacías conserva el valor actual; escribir 0 define cero horas. La carga se aplica sólo al año seleccionado.</p>
         </div>
         <a class="btn btn-outline-primary rounded-pill mb-4" href="{{ route('admin.dotacion-funciones.convivencia.plantilla', ['anio' => $anio]) }}"><i class="bi bi-download me-1" aria-hidden="true"></i> Descargar plantilla {{ $anio }}</a>
-        <form method="POST" enctype="multipart/form-data" action="{{ route('admin.dotacion-funciones.convivencia.store') }}">
+        <form method="POST" enctype="multipart/form-data" action="{{ route('admin.dotacion-funciones.convivencia.store') }}" data-dotacion-save>
             @csrf
             <input type="hidden" name="anio" value="{{ $anio }}">
             <label for="convivencia-archivo" class="form-label fw-semibold">Plantilla completada <span class="text-danger">*</span></label>
@@ -57,6 +62,8 @@
         </form>
     </div>
 
+    <div data-dotacion-catalog="convivencia">
+    @include('admin.dotacion-establecimiento.partials._catalogo_filtros', ['catalogoId' => 'convivencia-filtro', 'catalogoTitulo' => 'Buscar horas de Convivencia', 'catalogoBusqueda' => 'RBD o establecimiento', 'catalogoEstados' => ['cargado' => 'Con carga anual aplicada', 'precargado' => 'Valores precargados', 'exceso' => 'Con asignaciones sobre lo definido']])
     <div class="slep-card overflow-hidden">
         <div class="p-4 border-bottom"><h2 class="h5 fw-bold mb-1">Valores vigentes por establecimiento</h2><p class="small text-muted mb-0">Las horas definidas se aplican a la necesidad de la función. Las asignaciones previas se conservan y sus excesos se muestran para revisión.</p></div>
         <div class="table-responsive">
@@ -64,7 +71,7 @@
                 <thead class="table-light"><tr><th scope="col">RBD</th><th scope="col">Establecimiento</th><th scope="col" class="text-end">Matrícula {{ $anio }}</th><th scope="col" class="text-end">Horas definidas</th><th scope="col" class="text-end">Horas asignadas</th><th scope="col">Estado</th></tr></thead>
                 <tbody>
                     @forelse ($filas as $fila)
-                        <tr><td>{{ $fila['rbd'] }}</td><td class="fw-semibold">{{ $fila['nombre'] }}</td><td class="text-end">{{ $fila['matricula'] }}</td><td class="text-end fw-semibold">{{ $fmt($fila['horas']) }} h</td><td class="text-end">{{ $fmt($fila['asignadas']) }} h</td><td>
+                        <tr data-catalog-row data-catalog-search="{{ $fila['rbd'] }} {{ $fila['nombre'] }}" data-catalog-state="{{ $fila['carga_anual'] ? 'cargado' : 'precargado' }} {{ $fila['asignadas'] > $fila['horas'] + 0.001 ? 'exceso' : '' }}"><td>{{ $fila['rbd'] }}</td><td class="fw-semibold">{{ $fila['nombre'] }}</td><td class="text-end">{{ $fila['matricula'] }}</td><td class="text-end fw-semibold">{{ $fmt($fila['horas']) }} h</td><td class="text-end">{{ $fmt($fila['asignadas']) }} h</td><td>
                             <span class="badge rounded-pill {{ $fila['carga_anual'] ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $fila['carga_anual'] ? 'Carga anual aplicada' : 'Valor precargado' }}</span>
                             @if ($fila['asignadas'] > $fila['horas'] + 0.001)<div class="small text-warning-emphasis mt-1">Exceso asignado: {{ $fmt($fila['asignadas'] - $fila['horas']) }} h. Revise las asignaciones.</div>@endif
                         </td></tr>
@@ -75,4 +82,6 @@
             </table>
         </div>
     </div>
+</div>
+</div>
 @endsection

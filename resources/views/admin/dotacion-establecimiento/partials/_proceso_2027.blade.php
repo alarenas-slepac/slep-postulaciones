@@ -2,6 +2,7 @@
     $proceso = $proceso2027 ?? ['aplica' => false];
     $configProceso = $proceso['configuracion'] ?? null;
     $fmtProceso = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
     $canConfigureConvivencia = \App\Support\DotacionConvivenciaAnual::puedeConfigurar(auth()->user()?->activeRoleName());
     $convivenciaCentralizada = \App\Support\DotacionConvivenciaAnual::horas($establecimiento->id, $anio) !== null;
 @endphp
@@ -17,42 +18,32 @@
             <span class="badge rounded-pill text-bg-primary">Año 2027</span>
         </div>
         <div class="card-body">
-            <div class="row g-3 mb-4">
-                @foreach (($proceso['pasos'] ?? []) as $paso)
-                    <div class="col-lg col-md-4">
-                        <div class="border rounded-4 p-3 h-100 {{ $paso['completo'] ? 'border-success bg-success-subtle' : 'border-warning bg-warning-subtle' }}">
-                            <div class="small text-muted">{{ $loop->iteration }}. Etapa</div>
-                            <div class="fw-semibold">{{ $paso['label'] }}</div>
-                            @if (!empty($paso['detalle']))
-                                <div class="small text-muted mt-1">{{ $paso['detalle'] }}</div>
-                            @endif
-                            <span class="badge rounded-pill {{ $paso['completo'] ? 'text-bg-success' : 'text-bg-warning' }} mt-2">{{ $paso['completo'] ? 'Completada' : 'Pendiente' }}</span>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-
             @include('admin.dotacion-establecimiento.partials._docentes_subsector')
 
             <div class="row g-3">
                 <div class="col-lg-5">
-                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}" class="border rounded-4 p-3 h-100">
+                    <form id="dotacion-decision-combinacion" method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}" class="border rounded-4 p-3 h-100" data-dotacion-save>
                         @csrf
                         <input type="hidden" name="anio" value="2027">
-                        <label class="form-label fw-semibold">Decisión sobre combinación de cursos</label>
-                        <select name="decision_combinacion" class="form-select mb-2" required>
+                        <label for="proceso-decision-combinacion" class="form-label fw-semibold">Decisión sobre combinación de cursos</label>
+                        <select id="proceso-decision-combinacion" name="decision_combinacion" class="form-select mb-2 @error('decision_combinacion') is-invalid @enderror" required>
                             <option value="">Seleccione una decisión...</option>
                             @foreach (\App\Models\DotacionProceso2027Configuracion::COMBINACIONES as $key => $label)
                                 <option value="{{ $key }}" @selected(old('decision_combinacion', $configProceso?->decision_combinacion) === $key)>{{ $label }}</option>
                             @endforeach
                         </select>
-                        <textarea name="observacion_combinacion" class="form-control mb-2" rows="2" maxlength="2000" placeholder="Fundamento o antecedente">{{ old('observacion_combinacion', $configProceso?->observacion_combinacion) }}</textarea>
+                        @error('decision_combinacion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                        <label for="proceso-observacion-combinacion" class="form-label small">Fundamento o antecedente (opcional)</label>
+                        <textarea id="proceso-observacion-combinacion" name="observacion_combinacion" class="form-control mb-2 @error('observacion_combinacion') is-invalid @enderror" rows="2" maxlength="2000">{{ old('observacion_combinacion', $configProceso?->observacion_combinacion) }}</textarea>
+                        @error('observacion_combinacion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                        <a class="d-block small mb-3" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'cursos-combinados']) }}">Revisar cursos combinados</a>
                         <button class="btn btn-outline-primary btn-sm rounded-pill" type="submit"><i class="bi bi-check2-circle"></i> Guardar decisión</button>
                     </form>
                 </div>
                 <div class="col-lg-7">
+                    <div id="dotacion-maximos">
                     @if ($canManageProceso2027Maximos ?? false)
-                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}" class="border rounded-4 p-3 h-100">
+                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}" class="border rounded-4 p-3" data-dotacion-save>
                             @csrf
                             <input type="hidden" name="anio" value="2027">
                             <div class="fw-semibold mb-2">Máximos autorizados para asignar por componente</div>
@@ -61,8 +52,10 @@
                                 @foreach (($proceso['bloques'] ?? []) as $key => $bloque)
                                     <div class="col-md-4">
                                         <label for="proceso-maximo-{{ $key }}" class="form-label small fw-semibold">{{ $bloque['label'] }}</label>
-                                        <input id="proceso-maximo-{{ $key }}" type="number" name="max_horas_{{ $key }}" min="0" step="0.01" class="form-control rounded-3" value="{{ old('max_horas_'.$key, $bloque['maximo']) }}" required>
+                                        <input id="proceso-maximo-{{ $key }}" type="number" name="max_horas_{{ $key }}" min="0" max="9999" step="0.01" class="form-control @error('max_horas_'.$key) is-invalid @enderror" value="{{ old('max_horas_'.$key, $bloque['maximo']) }}" required>
+                                        @error('max_horas_'.$key)<div class="invalid-feedback">{{ $message }}</div>@enderror
                                         <div class="form-text">Horas necesarias: {{ $fmtProceso($bloque['requeridas']) }} h</div>
+                                        @if ($bloque['maximo_insuficiente'] ?? false)<div class="small text-danger mt-1">El máximo autorizado es inferior a la necesidad en {{ $fmtProceso($bloque['requeridas'] - $bloque['maximo']) }} h. Requiere revisión por un rol autorizado.</div>@endif
                                     </div>
                                 @endforeach
                             </div>
@@ -71,15 +64,16 @@
                     @else
                         <div class="border rounded-4 p-3 h-100 bg-light">
                             <div class="fw-semibold">Máximos autorizados por componente</div>
-                            <div class="small text-muted">La configuración de máximos corresponde a Administración, UATP o Supervisión de Planificación.</div>
+                            <div class="small text-muted">La configuración de máximos corresponde a Administración, Coordinación UATP, Coordinación GDP o Supervisión de Planificación. Consulte los valores en la tabla de cobertura.</div>
                         </div>
                     @endif
+                    </div>
                 </div>
             </div>
 
             @php $funcionesNormativas = collect($proceso['funciones_normativas'] ?? []); @endphp
             @if ($funcionesNormativas->isNotEmpty())
-                <div class="border rounded-4 p-3 mt-3 {{ ($proceso['pasos']['normativas']['completo'] ?? false) ? 'border-success' : 'border-warning bg-warning-subtle' }}">
+                <div id="dotacion-definicion-normativas" class="border rounded-4 p-3 mt-3">
                     <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
                         <div>
                             <div class="fw-semibold">Definición de funciones normativas</div>
@@ -93,7 +87,7 @@
                         </div>
                     </div>
                     @if ($canManageProceso2027Normativas ?? false)
-                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}">
+                        <form method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}" data-dotacion-save>
                             @csrf
                             <input type="hidden" name="anio" value="2027">
                             <input type="hidden" name="funciones_normativas_configuradas" value="1">
@@ -142,6 +136,8 @@
                         </div>
                     @endif
                 </div>
+            @else
+                <div id="dotacion-definicion-normativas" class="alert alert-info mt-3 mb-0" role="status">No hay funciones normativas calculadas para este establecimiento y año.</div>
             @endif
 
             <div class="table-responsive mt-4">
@@ -199,7 +195,16 @@
                     @endif
                     @if ($bloquesPendientes->isNotEmpty())
                         <div class="mt-1">Horas obligatorias por asignar: {{ $bloquesPendientes->map(fn ($bloque) => $bloque['label'].' ('.$fmtProceso($bloque['pendientes']).' h)')->implode('; ') }}.</div>
+                        <a class="d-inline-block mt-2 fw-semibold" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion', 'asig_pendientes' => 1]).'#dotacion-asignacion' }}">Ver necesidades pendientes</a>
                     @endif
+                    @foreach (($proceso['bloques'] ?? []) as $bloque)
+                        @if ($bloque['maximo'] === null)
+                            <div class="mt-2">{{ $bloque['label'] }}: falta definir el máximo autorizado.</div>
+                        @elseif ($bloque['maximo_insuficiente'] ?? false)
+                            <div class="mt-2">{{ $bloque['label'] }}: el máximo autorizado de {{ $fmtProceso($bloque['maximo']) }} h es inferior a las {{ $fmtProceso($bloque['requeridas']) }} h necesarias.</div>
+                        @endif
+                    @endforeach
+                    <a class="d-inline-block mt-2 fw-semibold" href="#dotacion-etapas-titulo">Revisar etapas y siguiente acción</a>
                     <div class="mt-1">Revise las etapas indicadas y el saldo disponible del bloque contractual de cada docente.</div>
                 </div>
             @else

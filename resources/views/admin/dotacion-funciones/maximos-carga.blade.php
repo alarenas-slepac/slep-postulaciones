@@ -1,6 +1,11 @@
 @extends('layouts.app')
 
+@push('styles')
+    @vite(['resources/css/dotacion-establecimiento.css', 'resources/js/dotacion-asignacion.js'])
+@endpush
+
 @section('content')
+<div class="dotacion-workspace">
     @php $fmt = fn ($value) => $value === null ? 'Sin configurar' : \App\Support\DotacionEstablecimientoCalculator::formatHoras($value).' h'; @endphp
     <div class="slep-card p-4 mb-4 d-flex flex-column flex-lg-row justify-content-between gap-3">
         <div>
@@ -39,7 +44,7 @@
             <p class="mb-0">Cada celda vacía conserva el valor actual de ese bloque; 0 establece un máximo de cero. Admite entre 0 y 9999 horas y hasta dos decimales. Las asignaciones, reservas y otras configuraciones se conservan.</p>
         </div>
         <a class="btn btn-outline-primary rounded-pill mb-4" href="{{ route('admin.dotacion-funciones.maximos.plantilla', ['anio' => $anio]) }}"><i class="bi bi-download me-1" aria-hidden="true"></i> Descargar plantilla {{ $anio }}</a>
-        <form method="POST" enctype="multipart/form-data" action="{{ route('admin.dotacion-funciones.maximos.store') }}">
+        <form method="POST" enctype="multipart/form-data" action="{{ route('admin.dotacion-funciones.maximos.store') }}" data-dotacion-save>
             @csrf
             <input type="hidden" name="anio" value="{{ $anio }}">
             <label for="maximos-archivo" class="form-label fw-semibold">Plantilla completada <span class="text-danger">*</span></label>
@@ -49,17 +54,21 @@
             <div class="d-flex justify-content-end mt-3"><button type="submit" class="btn btn-primary rounded-pill"><i class="bi bi-upload me-1" aria-hidden="true"></i> Aplicar máximos de {{ $anio }}</button></div>
         </form>
     </div>
+    <div data-dotacion-catalog="maximos">
+    @include('admin.dotacion-establecimiento.partials._catalogo_filtros', ['catalogoId' => 'maximos-filtro', 'catalogoTitulo' => 'Buscar máximos guardados', 'catalogoBusqueda' => 'RBD o establecimiento', 'catalogoEstados' => ['pendiente' => 'Con bloques sin configurar', 'completo' => 'Tres máximos configurados']])
     <div class="slep-card overflow-hidden">
         <div class="p-4 border-bottom"><h2 class="h5 fw-bold mb-1">Máximos vigentes por establecimiento</h2><p class="small text-muted mb-0">Un máximo inferior a la necesidad obligatoria mantiene el bloqueo del proceso guiado. Los bloques sin máximo quedan pendientes de configuración.</p></div>
         <div class="table-responsive"><table class="table align-middle mb-0">
             <thead class="table-light"><tr><th scope="col">RBD</th><th scope="col">Establecimiento</th><th scope="col" class="text-end">Matrícula {{ $anio }}</th><th scope="col" class="text-end">Plan general + PIE y funciones normativas</th><th scope="col" class="text-end">Parvularia + PIE NT1/NT2</th><th scope="col" class="text-end">PIE especializado</th></tr></thead>
             <tbody>
                 @forelse ($filas as $fila)
-                    <tr><td>{{ $fila['rbd'] }}</td><td class="fw-semibold">{{ $fila['nombre'] }}</td><td class="text-end">{{ $fila['matricula'] }}</td>@foreach (\App\Exports\DotacionMaximosBloqueExport::COLUMNAS as $campo)<td class="text-end {{ $fila[$campo] === null ? 'text-muted' : 'fw-semibold' }}">{{ $fmt($fila[$campo]) }}</td>@endforeach</tr>
+                    <tr data-catalog-row data-catalog-search="{{ $fila['rbd'] }} {{ $fila['nombre'] }}" data-catalog-state="{{ collect(\App\Exports\DotacionMaximosBloqueExport::COLUMNAS)->contains(fn ($campo) => $fila[$campo] === null) ? 'pendiente' : 'completo' }}"><td>{{ $fila['rbd'] }}</td><td class="fw-semibold">{{ $fila['nombre'] }}</td><td class="text-end">{{ $fila['matricula'] }}</td>@foreach (\App\Exports\DotacionMaximosBloqueExport::COLUMNAS as $campo)<td class="text-end {{ $fila[$campo] === null ? 'text-muted' : 'fw-semibold' }}">{{ $fmt($fila[$campo]) }}</td>@endforeach</tr>
                 @empty
                     <tr><td colspan="6" class="text-center text-muted p-4">No hay establecimientos con cursos activos en {{ $anio }} para generar la plantilla.</td></tr>
                 @endforelse
             </tbody>
         </table></div>
     </div>
+</div>
+</div>
 @endsection

@@ -10,13 +10,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const key = 'dotacion-contexto:' + url.pathname + ':' + (url.searchParams.get('anio') || '') + ':' + (url.searchParams.get('tab') || 'resumen');
 
     const saveContext = function (element) {
-        const anchor = element.closest('.collapse[id], tr[id], .card[id]');
+        const anchor = element.closest('.collapse[id], tr[id], .card[id], details[data-dotacion-editor][id]');
         const state = {
             savedAt: Date.now(),
             scrollY: window.scrollY,
             anchorId: anchor ? anchor.id : null,
             anchorOffset: anchor ? -anchor.getBoundingClientRect().top : 0,
             openIds: Array.from(page.querySelectorAll('.collapse.show[id]'), function (item) { return item.id; }),
+            openEditorIds: Array.from(page.querySelectorAll('details[data-dotacion-editor][open]'), function (item) { return item.id; }),
         };
         try { storage.setItem(key, JSON.stringify(state)); } catch (error) {}
     };
@@ -42,6 +43,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!state || Date.now() - state.savedAt > 1800000) return;
 
     const openIds = new Set(state.openIds || []);
+    const openEditorIds = new Set(state.openEditorIds || []);
+    page.querySelectorAll('details[data-dotacion-editor]').forEach(function (editor) {
+        // El servidor mantiene abierto un formulario con errores; datos antiguos no lo cierran.
+        editor.open = editor.open || openEditorIds.has(editor.id);
+    });
     page.querySelectorAll('.collapse[id]').forEach(function (collapse) {
         const open = openIds.has(collapse.id);
         collapse.classList.toggle('show', open);
