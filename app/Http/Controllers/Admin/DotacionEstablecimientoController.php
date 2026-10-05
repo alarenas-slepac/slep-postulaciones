@@ -13,6 +13,7 @@ use App\Models\Establecimiento;
 use App\Support\DotacionAsignaturaResumenCalculator;
 use App\Support\DotacionEstablecimientoAvanceCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionLecturaCache;
 use App\Support\DotacionProyeccionCalculator;
 use App\Support\DotacionProceso2027Calculator;
 use App\Support\DotacionSobredotacionCalculator;
@@ -27,6 +28,11 @@ class DotacionEstablecimientoController extends Controller
     private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
 
     public function index(Request $request)
+    {
+        return DotacionLecturaCache::ejecutar(fn () => $this->listado($request));
+    }
+
+    private function listado(Request $request)
     {
         $activeRole = $this->authorizeDotacionAccess($request);
         $user = $request->user();
@@ -80,7 +86,7 @@ class DotacionEstablecimientoController extends Controller
             ->withQueryString();
 
         $establecimientos->getCollection()->transform(function ($establecimiento) use ($anio) {
-            $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio, false);
+            $data = DotacionEstablecimientoCalculator::resumenListado($establecimiento, $anio);
             $establecimiento->dotacion_establecimiento_resumen = $data['resumen'];
             $establecimiento->dotacion_establecimiento_bloques = $data['bloques'];
             return $establecimiento;
@@ -245,6 +251,11 @@ class DotacionEstablecimientoController extends Controller
     }
 
     public function show(Request $request, Establecimiento $establecimiento)
+    {
+        return DotacionLecturaCache::ejecutar(fn () => $this->detalle($request, $establecimiento));
+    }
+
+    private function detalle(Request $request, Establecimiento $establecimiento)
     {
         $activeRole = $this->authorizeDotacionAccess($request);
         $this->authorizeEstablecimientoScope($request, $establecimiento);

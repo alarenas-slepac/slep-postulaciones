@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-05",
+  "patch": "2026.10.5.567",
+  "php_version": "8.3.30",
+  "mysql_version": "8.4.3",
+  "environment": "Windows local, PHP CLI, copia MySQL aislada del respaldo suministrado. Sin acceso a producción ni cambios en .env.",
+  "dataset": "41 tablas relacionadas importadas en una instancia temporal independiente; usuarios y asignaciones de roles de autenticación sintéticos. El informe no contiene registros personales ni SQL con valores.",
+  "scope": "Cálculo del controlador y renderizado completo de HTML con layout. Tres ejecuciones alternadas por variante, con Blade previamente compilado y procesos PHP independientes. No incluye middleware web, transferencia de HTML, ejecución de JavaScript ni condiciones de cPanel.",
+  "memory_limit": "128M",
+  "memory_metric": "Pico de asignación PHP según memory_get_peak_usage(true), reiniciado después del bootstrap. No representa la RAM total del servidor ni la memoria de MySQL.",
+  "baseline_commit": "701d8664a9f8d56cc28616ecb1f0f80b4dfc6b5e",
+  "listing_2027_page_1": {
+    "visible_establishments": 20,
+    "before": {
+      "seconds": [14.659, 13.957, 13.933],
+      "median_seconds": 13.957,
+      "queries": 5210,
+      "peak_mb": 42
+    },
+    "after": {
+      "seconds": [4.052, 3.856, 3.530],
+      "median_seconds": 3.856,
+      "queries": 1116,
+      "peak_mb": 36
+    },
+    "indicators_equal": true,
+    "html_bytes_before_and_after": 89779
+  },
+  "detail_2027_summary": {
+    "before": {
+      "seconds": [4.958, 4.776, 4.806],
+      "median_seconds": 4.806,
+      "queries": 670,
+      "peak_mb": 48
+    },
+    "after": {
+      "seconds": [4.410, 4.322, 4.314],
+      "median_seconds": 4.322,
+      "queries": 342,
+      "peak_mb": 48
+    },
+    "summary_and_process_indicators_equal": true,
+    "html_bytes_before_and_after": 766589
+  },
+  "additional_single_run_checks": {
+    "listing_2027_page_2": {
+      "before_seconds": 18.160,
+      "after_seconds": 4.388,
+      "before_queries": 6530,
+      "after_queries": 1165,
+      "before_peak_mb": 44,
+      "after_peak_mb": 38,
+      "indicators_equal": true
+    },
+    "listing_2026": {
+      "before_seconds": 35.394,
+      "after_seconds": 10.464,
+      "before_queries": 6039,
+      "after_queries": 1381,
+      "before_peak_mb": 48,
+      "after_peak_mb": 44,
+      "indicators_equal": true,
+      "note": "La medición original puede incluir compilación inicial de Blade; no se usa para calcular la reducción porcentual principal."
+    },
+    "detail_docentes": {"after_seconds": 5.432, "queries": 342, "peak_mb": 52},
+    "detail_asignacion": {"after_seconds": 6.803, "queries": 342, "peak_mb": 60},
+    "detail_sobredotacion": {"after_seconds": 5.040, "queries": 342, "peak_mb": 48},
+    "note": "Las primeras cargas de estas pestañas pueden incluir compilación Blade."
+  },
+  "validation": {
+    "existing_and_new_related_suite": {"tests": 352, "assertions": 4016, "result": "passed"},
+    "final_new_tests_including_nt_regression": {"tests": 11, "assertions": 164, "memory_limit": "128M", "peak_mb": 68, "result": "passed"},
+    "test_isolation": "SQLite :memory:, discos public/local simulados, caché y sesión array; APP_CONFIG_CACHE apunta a un archivo temporal inexistente antes del bootstrap.",
+    "php_l": "8 archivos PHP modificados o nuevos sin errores de sintaxis.",
+    "optimize_clear": "Ejecutado correctamente bajo configuración aislada.",
+    "routes_and_assets": "Sin modificaciones en rutas ni assets compilados."
+  },
+  "remaining_verification": "Medir el tiempo de respuesta y consumo real en cPanel después del despliegue autorizado. La pestaña Asignación continúa generando una cantidad considerable de HTML; esta corrección reduce el cálculo y las consultas sin cambiar sus formularios."
+}

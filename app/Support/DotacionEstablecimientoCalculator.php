@@ -48,6 +48,38 @@ class DotacionEstablecimientoCalculator
         return self::$schemaColumnCache[$key];
     }
 
+    /** Los únicos indicadores consumidos por la bandeja, sin construir necesidades ni cuadraturas. */
+    public static function resumenListado(Establecimiento $establecimiento, int $anio): array
+    {
+        // La combinación puede cambiar el total de horas del plan: conservar el
+        // cálculo completo en estos casos evita aproximar sus reglas por asignatura.
+        if (DotacionCursoCombinadoCalculator::tablesReady()
+            && \App\Models\DotacionCursoCombinado::query()
+                ->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)
+                ->where('activo', true)
+                ->exists()) {
+            $data = self::build($establecimiento, $anio, false);
+
+            return ['resumen' => $data['resumen'], 'bloques' => $data['bloques']];
+        }
+
+        $cursos = self::cursosPorNivel($establecimiento, $anio);
+        $bloques = self::bloquesDotacion($establecimiento, $anio);
+        $docentes = self::docentes($establecimiento, $anio, false);
+
+        return [
+            'resumen' => [
+                'matricula_total' => (int) ($cursos['totales']['matricula'] ?? 0),
+                'cursos_total' => (int) ($cursos['totales']['cursos'] ?? 0),
+                'docentes_total' => $docentes->count(),
+                'horas_plan_total' => (float) ($cursos['totales']['horas'] ?? 0),
+                'horas_contrato_docentes' => $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0)),
+            ],
+            'bloques' => $bloques,
+        ];
+    }
+
     public static function build(Establecimiento $establecimiento, int $anio, bool $incluirResumenAsignaturas = true): array
     {
         $anioPadron = app(PadronPeriodoService::class)->anioDisponibleParaDotacion($anio) ?? $anio;
@@ -877,7 +909,7 @@ class DotacionEstablecimientoCalculator
         ];
     }
 
-    public static function docentes(Establecimiento $establecimiento, int $anio): Collection
+    public static function docentes(Establecimiento $establecimiento, int $anio, bool $incluirAsignaciones = true): Collection
     {
         if (! self::schemaHasTable('reemplazos_personal')) {
             return collect();
@@ -936,7 +968,9 @@ class DotacionEstablecimientoCalculator
 
             return self::isDocentePersonal($row);
         })->values();
-        $asignacionesPorRut = DotacionAsignacionCalculator::assignmentsByRut($establecimiento, $anio);
+        $asignacionesPorRut = $incluirAsignaciones
+            ? DotacionAsignacionCalculator::assignmentsByRut($establecimiento, $anio)
+            : [];
 
         return $personalConsolidado->map(function (array $grupo) use ($declaraciones, $asignacionesPorRut, $exclusionesPorRut) {
             /** @var ReemplazoPersonal $row */

@@ -15,7 +15,19 @@ class DotacionPlanEstudioResolver
      */
     public static function resolve(EstablecimientoCurso $curso): ?PlanEstudio
     {
-        if (! Schema::hasTable('planes_estudio')) {
+        $planId = $curso->relationLoaded('planEstudio')
+            ? $curso->getRelation('planEstudio')?->id
+            : $curso->plan_estudio_id;
+        // Un identificador histórico sin plan puede usar un respaldo diferente
+        // según el curso, año y régimen; esos datos también forman parte de la clave.
+        $clave = 'plan:'.($planId ?? 0).':'.$curso->curso_id.':'.$curso->anio.':'.self::normalizeRegimen($curso->regimen_jec);
+
+        return DotacionLecturaCache::recordar($clave, fn () => self::consultar($curso));
+    }
+
+    private static function consultar(EstablecimientoCurso $curso): ?PlanEstudio
+    {
+        if (! DotacionLecturaCache::recordar('tabla:planes_estudio', fn () => Schema::hasTable('planes_estudio'))) {
             return null;
         }
 
