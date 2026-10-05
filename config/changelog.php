@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.10.5.572' => [
+        'date' => '2026-10-05',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Incluir fuero maternal en prelación y traspasar situaciones al año siguiente',
+        'files' => [
+            'app/Support/DotacionProceso2027Calculator.php',
+            'app/Support/DotacionSituacionesAnuales.php',
+            'app/Models/DotacionDocenteExclusion.php',
+            'app/Http/Controllers/Admin/DotacionDocenteExclusionController.php',
+            'database/migrations/2026_10_05_210000_create_dotacion_situacion_traspasos_table.php',
+            'tests/Feature/DotacionSituacionesAnualesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Agrupa fuero maternal, horas gremiales y lactancia en la primera prioridad; conserva tramo, antigüedad y saldos de los demás docentes.',
+            'Al guardar una situación, copia al año inmediatamente siguiente las situaciones de quienes continúan, con sus horas y decisiones, sin sobrescribir registros del destino.',
+            'Completa las situaciones de 2026 pendientes de copiar a 2027 mediante una migración y registra el traspaso para evitar duplicados y la reaparición de situaciones eliminadas en destino.',
+            'Guarda la situación y su traspaso en una transacción, conservando el padrón y las asignaciones de cada año.',
+        ],
+        'roles' => ['Administrador', 'Directivo', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.5.571' => [
         'date' => '2026-10-05',
         'module' => 'Dotación establecimiento',

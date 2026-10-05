@@ -8,6 +8,7 @@ use App\Models\Establecimiento;
 use App\Support\DotacionEstablecimientoCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -96,13 +97,13 @@ class DotacionDocenteExclusionController extends Controller
         // Conserva el campo histórico: "horas" son las no necesarias.
         // Las necesarias se obtienen como contrato vigente menos estas horas,
         // manteniendo la suma incluso cuando se actualiza el padrón.
-        $exclusion->fill([
+        DB::transaction(fn () => $exclusion->fill([
             'docente_rut' => (string) ($docente['rut'] ?? $data['docente_rut']),
             'docente_nombre' => (string) ($docente['nombre'] ?? 'Docente'),
             'motivo' => (string) $data['motivo'],
             'horas' => $horasExcluidas,
             'updated_by' => $request->user()?->id,
-        ])->save();
+        ])->save());
 
         return redirect()->route('admin.dotacion-establecimiento.show', [
             $establecimiento,
