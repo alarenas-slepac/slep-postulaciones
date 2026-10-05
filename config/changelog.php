@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.10.5.567' => [
+        'date' => '2026-10-05',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Optimizar la carga del listado y las referencias de cálculo',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DocenteHorasNoLectivasCalculator.php',
+            'app/Support/DotacionPlanEstudioResolver.php',
+            'app/Support/DotacionLecturaCache.php',
+            'tests/Feature/DotacionListadoRendimientoTest.php',
+            'tests/Unit/DotacionLecturaCacheTest.php',
+            'docs/performance/dotacion-establecimiento-2026-10-05.json',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El listado calcula sólo los indicadores visibles y evita construir asignaciones y cuadraturas innecesarias. Los cursos combinados conservan el cálculo completo.',
+            'Reutiliza planes de estudio y referencias de conversión durante cada carga del listado o detalle, sin conservar datos entre peticiones.',
+            'Mantiene los cálculos, las asociaciones históricas, los filtros y los permisos. Incorpora pruebas de equivalencia, consultas y renovación de referencias.',
+        ],
+        'roles' => ['Administrador', 'Directivo', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.2.566' => [
         'date' => '2026-10-02',
         'module' => 'Gestión de solicitudes de reemplazo',

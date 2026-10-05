@@ -52,11 +52,11 @@ class DocenteHorasNoLectivasCalculator
             $motivo = self::motivo($aplicaPrimerCiclo, $porcentaje, $proporcion);
         }
 
-        $regla = DocenteHorasProporcion::query()
+        $regla = DotacionLecturaCache::recordar('referencia_docente:'.$proporcion.':'.$horasContrato, fn () => DocenteHorasProporcion::query()
             ->where('proporcion', $proporcion)
             ->where('horas_contrato', $horasContrato)
             ->where('vigente', true)
-            ->first();
+            ->first());
 
         return [
             'porcentaje_prioritarios' => $porcentaje,
