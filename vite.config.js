@@ -21,6 +21,8 @@ export default defineConfig({
                 'resources/css/votaciones-admin.css',
                 'resources/js/votaciones-admin.js',
                 'resources/js/votaciones-admin-rutas.js',
+                'resources/css/dotacion-establecimiento.css',
+                'resources/js/dotacion-asignacion.js',
             ],
             refresh: true,
         }),

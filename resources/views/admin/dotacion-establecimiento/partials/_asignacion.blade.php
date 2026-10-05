@@ -52,6 +52,13 @@
             ];
         })->filter(fn ($persona) => $estamento !== 'docente' || $persona['saldo'] > 0.01)->values();
     };
+    // Un mismo nombre de campo se repite por necesidad. Restaurar solo el formulario fallido.
+    $esFormularioFallido = fn (array $item, ?string $tipo = null): bool => $errors->any()
+        && (int) old('anio') === (int) $anio
+        && old('necesidad_key') === ($item['key'] ?? null)
+        && old('tipo_asignacion') === ($tipo ?? $item['tipo_asignacion'] ?? null);
+    $valorFormulario = fn (array $item, string $campo, $defecto = null, ?string $tipo = null) =>
+        $esFormularioFallido($item, $tipo) ? old($campo, $defecto) : $defecto;
     $docenteOptions = $buildPersonalOptions($docentesAsignacion, 'docente');
     $asistenteOptions = $buildPersonalOptions($asistentesAsignacion, 'asistente');
 @endphp
@@ -120,6 +127,7 @@
     @endpush
 @endonce
 
+<div id="dotacion-asignacion" data-dotacion-asignacion data-process-blocked="{{ $asignacion2027Habilitada ? '0' : '1' }}">
 <div class="card dotacion-section mb-4">
     <div class="dotacion-section-header">
         <div class="d-flex align-items-start gap-3">
@@ -151,11 +159,14 @@
         @if (($proceso2027Asignacion['aplica'] ?? false) && !$asignacion2027Habilitada)
             <div class="alert alert-warning rounded-4"><i class="bi bi-lock"></i> La asignación 2027 está bloqueada hasta completar planes, asociar docentes a cada asignatura, declarar combinación de cursos, definir las funciones normativas y configurar máximos suficientes. Revise el proceso guiado superior.</div>
         @endif
-        <div class="alert alert-info rounded-4 small">
+        <details class="border rounded-4 p-3 mb-3">
+            <summary class="fw-semibold text-primary">Reglas de cálculo y antecedentes NT1/NT2</summary>
+            <div class="small text-muted mt-2">
             <strong>Regla NT1/NT2:</strong> la necesidad contractual del plan se distribuye proporcionalmente por asignatura. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. En nuevas asignaciones individuales de una Educadora con JEC, el contrato de aula se obtiene de la tabla CPEIP 65/35. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición impartida por otro docente con JEC se contabiliza en Plan General, una vez por grupo combinado.
             <span class="d-block mt-1">Para asignaciones nuevas de una Educadora en NT1/NT2 con JEC se aplica la tabla CPEIP 65/35: como máximo 35 h pedagógicas de aula (26 h 15 min cronológicas) equivalen a 41 h de contrato de aula. En una jornada de 44 h, las otras 3 h corresponden a trabajo colaborativo PIE. La necesidad contractual del curso o grupo permanece en 55 h más 3 h PIE cuando corresponda.</span>
             <span class="d-block mt-1">Las asignaciones históricas conservan sus valores guardados hasta que se revisen y actualicen o se ejecute un recálculo explícito. La nueva necesidad no modifica contratos del padrón.</span>
-        </div>
+            </div>
+        </details>
         <div class="row g-3">
             <div class="col-xl-2 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Horas aula plan</div><div class="h4 fw-bold mb-0">{{ $fmt($resumenAsignacion['horas_aula_requeridas'] ?? 0) }}</div><div class="small text-muted">Asignaturas</div></div></div>
             <div class="col-xl-2 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Aula asignada</div><div class="h4 fw-bold text-primary mb-0">{{ $fmt($resumenAsignacion['horas_aula_asignadas'] ?? 0) }}</div><div class="small text-muted">Valor real asignado</div></div></div>
@@ -218,6 +229,8 @@
     @include('admin.dotacion-establecimiento.partials._reserva_no_normativa')
 @endif
 
+@include('admin.dotacion-establecimiento.partials._asignacion_filtros')
+
 @foreach ($groups as $groupKey => $meta)
     @php
         $items = collect($necesidades[$groupKey] ?? []);
@@ -227,7 +240,7 @@
         $groupUnit = $isPlanGroup ? ' aula' : ' contrato';
         $groupCollapseId = 'dotacion-asignacion-bloque-'.$groupKey;
     @endphp
-    <div class="card dotacion-section mb-4">
+    <div class="card dotacion-section mb-4" data-dotacion-group="{{ $groupKey }}">
         <div class="dotacion-section-header d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div class="d-flex align-items-start gap-3">
                 <span class="dotacion-icon" style="width:38px;height:38px;background:#0d6efd;"><i class="bi {{ $meta['icon'] }}"></i></span>
@@ -256,15 +269,27 @@
                         $cursoAula = $cursoItems->sum(fn ($item) => (float) ($item['horas_plan_requeridas'] ?? 0));
                         $cursoAsig = $cursoItems->sum(fn ($item) => (float) ($item['horas_plan_asignadas'] ?? 0));
                         $cursoSaldo = max(0, round($cursoAula - $cursoAsig, 2));
+                        $cursoPendientes = $cursoItems->filter(fn ($fila) => (float) ($fila['horas_plan_pendientes'] ?? $fila['horas_plan_requeridas'] ?? 0) > 0.01)->count();
+                        // La sobreasignación de una asignatura no cubre el pendiente de otra.
+                        $cursoCubierto = $cursoItems->sum(fn ($fila) => min(max(0, (float) ($fila['horas_plan_requeridas'] ?? 0)), max(0, (float) ($fila['horas_plan_asignadas'] ?? 0))));
+                        $cursoAvance = $cursoAula > 0 ? min(100, round($cursoCubierto / $cursoAula * 100, 1)) : 0;
+                        $cursoTieneErrores = $cursoItems->contains(fn ($fila) => $esFormularioFallido($fila) || $esFormularioFallido($fila, 'acompanamiento_parvularia'));
                         $cursoCollapseId = $groupCollapseId.'-curso-'.$loop->iteration;
                         $asignacionesCurso = \App\Support\DotacionAsignacionPorCursoBloque::asignaciones($cursoItems);
                     @endphp
-                    <div class="border rounded-4 mb-3 overflow-hidden">
+                    <div class="border rounded-4 mb-3 overflow-hidden" data-dotacion-course>
                         <div class="bg-light px-3 py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
-                            <div>
+                            <div class="dotacion-course-heading">
                                 <div class="dotacion-eyebrow">Curso / sección</div>
                                 <div class="fw-bold fs-6">{{ $cursoLabel }}</div>
                                 <div class="small text-muted">Asignaturas del tiempo mínimo obligatorio y libre disposición configurada del curso.</div>
+                                <div class="d-flex justify-content-between gap-2 small mt-2">
+                                    <span>{{ $cursoPendientes }} de {{ $cursoItems->count() }} asignatura(s) pendientes</span>
+                                    <strong>{{ $fmt($cursoAvance) }}% cubierto</strong>
+                                </div>
+                                <div class="progress dotacion-course-progress mt-1" role="progressbar" aria-label="Cobertura aula de {{ $cursoLabel }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $cursoAvance }}">
+                                    <div class="progress-bar" style="width: {{ $cursoAvance }}%"></div>
+                                </div>
                             </div>
                             <div class="d-flex gap-2 flex-wrap small align-items-center">
                                 <span class="badge rounded-pill text-bg-light border">Horas aula: {{ $fmt($cursoAula) }}</span>
@@ -280,14 +305,14 @@
                                         <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Eliminar todas del curso ({{ $asignacionesCurso->count() }})</button>
                                     </form>
                                 @endif
-                                <button class="btn btn-sm btn-outline-primary rounded-pill" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $cursoCollapseId }}" aria-expanded="false" aria-controls="{{ $cursoCollapseId }}">
+                                <button class="btn btn-sm btn-outline-primary rounded-pill" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $cursoCollapseId }}" aria-expanded="{{ $cursoTieneErrores ? 'true' : 'false' }}" aria-controls="{{ $cursoCollapseId }}">
                                     <i class="bi bi-chevron-down"></i> Ver asignaturas
                                 </button>
                             </div>
                         </div>
-                        <div class="collapse" id="{{ $cursoCollapseId }}">
+                        <div class="collapse{{ $cursoTieneErrores ? ' show' : '' }}" id="{{ $cursoCollapseId }}">
                         <div class="table-responsive">
-                            <table class="table align-middle mb-0">
+                            <table class="table align-middle mb-0 dotacion-needs-table" role="table">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Asignatura</th>
@@ -296,7 +321,7 @@
                                         <th class="text-end">Aula asignada</th>
                                         <th class="text-end">Saldo aula</th>
                                         <th>Estado</th>
-                                        <th style="min-width:320px;">Asignar</th>
+                                        <th class="dotacion-actions-heading" scope="col">Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -336,7 +361,7 @@
                                                     $cursoItems->filter(fn ($fila) => ($fila['bloque'] ?? 'Sin bloque') === $bloqueActual)
                                                 );
                                             @endphp
-                                            <tr class="table-secondary">
+                                            <tr class="table-secondary" data-dotacion-block-heading>
                                                 <td colspan="7">
                                                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                                                         <span class="fw-semibold small text-uppercase">{{ $bloqueActual }}</span>
@@ -356,8 +381,8 @@
                                             </tr>
                                             @php $lastBloque = $bloqueActual; @endphp
                                         @endif
-                                        <tr>
-                                            <td>
+                                        <tr role="row" data-dotacion-need="{{ sha1($item['key']) }}" data-section="{{ $groupKey }}" data-course="{{ $cursoLabel }}" data-search="{{ $cursoLabel }} {{ $item['titulo'] ?? '' }} {{ $bloqueActual }} {{ collect($item['asignaciones'] ?? [])->concat($item['acompanamientos'] ?? [])->map(fn ($fila) => data_get($fila, 'docente_nombre').' '.data_get($fila, 'docente_rut'))->implode(' ') }}" data-pending="{{ (float) $pendingPlan > 0.01 ? '1' : '0' }}">
+                                            <td role="cell" data-label="Asignatura">
                                                 <div class="fw-semibold">{{ $item['titulo'] ?? 'Asignatura' }}</div>
                                                 @if (!empty($item['curso_combinado']))
                                                     <span class="badge rounded-pill text-bg-primary">Curso combinado</span>
@@ -376,7 +401,7 @@
                                                     <div class="small text-muted">Asignatura oficial: {{ $item['asignatura_oficial'] }}</div>
                                                 @endif
                                             </td>
-                                            <td>
+                                            <td role="cell" data-label="Bloque / origen">
                                                 <div class="small text-muted">{{ $item['fuente'] ?? '' }}</div>
                                                 @if (!empty($item['proporcion']))<span class="badge rounded-pill text-bg-light border">{{ $item['proporcion'] }}</span>@endif
                                                 @if (!empty($item['origen_proporcion_label']))<div class="small text-muted mt-1">{{ $item['origen_proporcion_label'] }}</div>@endif
@@ -384,13 +409,15 @@
                                                     <div class="small text-muted">Contrato de referencia: {{ $fmt($item['horas_contrato_requeridas'] ?? 0) }} h para cubrir esta parte del plan.</div>
                                                 @endif
                                             </td>
-                                            <td class="text-end fw-bold">{{ $item['horas_plan_requeridas'] !== null ? $fmt($item['horas_plan_requeridas']) : '—' }}</td>
-                                            <td class="text-end text-primary fw-semibold">{{ $fmt($item['horas_plan_asignadas'] ?? 0) }}</td>
-                                            <td class="text-end {{ ($pendingPlan ?? 0) > 0.01 ? 'text-warning' : 'text-success' }} fw-semibold">{{ $fmt($pendingPlan) }}</td>
-                                            <td><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
-                                            <td>
+                                            <td role="cell" data-label="Horas aula" class="text-end fw-bold">{{ $item['horas_plan_requeridas'] !== null ? $fmt($item['horas_plan_requeridas']) : '—' }}</td>
+                                            <td role="cell" data-label="Aula asignada" class="text-end text-primary fw-semibold">{{ $fmt($item['horas_plan_asignadas'] ?? 0) }}</td>
+                                            <td role="cell" data-label="Saldo aula" class="text-end {{ ($pendingPlan ?? 0) > 0.01 ? 'text-warning' : 'text-success' }} fw-semibold">{{ $fmt($pendingPlan) }}</td>
+                                            <td role="cell" data-label="Estado"><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
+                                            <td role="cell" data-label="Acción">
+                                                @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['editorId' => 'dotacion-editor-'.sha1($item['key'].$item['tipo_asignacion']), 'abierto' => $esFormularioFallido($item, $item['tipo_asignacion']), 'accion' => 'Asignar horas', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
                                                 <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form" data-dotacion-asignacion-form>
                                                     @csrf
+                                                    @include('admin.dotacion-establecimiento.partials._asignacion_errores', ['tipoFormulario' => null])
                                                     <input type="hidden" name="anio" value="{{ $anio }}">
                                                     <input type="hidden" name="tipo_asignacion" value="{{ $item['tipo_asignacion'] }}">
                                                     <input type="hidden" name="subtipo_asignacion" value="{{ $item['subtipo_asignacion'] }}">
@@ -411,8 +438,8 @@
                                                     @endif
                                                     <label class="form-label small mb-0" for="estamento-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Tipo de cobertura</label>
                                                     <select id="estamento-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
-                                                        <option value="docente">Cubierto por docente</option>
-                                                        @unless ($soloParvularia || $fasePlan === 'titular')<option value="asistente">Cubierto por Asistente de la Educación</option>@endunless
+                                                        <option value="docente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'docente')>Cubierto por docente</option>
+                                                        @unless ($soloParvularia || $fasePlan === 'titular')<option value="asistente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'asistente')>Cubierto por Asistente de la Educación</option>@endunless
                                                     </select>
                                                     <label class="form-label small mb-0" for="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Docente asociado o asistente</label>
                                                     <select id="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre, RUT o título..." data-fase-plan="{{ $fasePlan }}" required>
@@ -424,14 +451,14 @@
                                                                 @continue($fasePlan !== null && !in_array($doc['rut_normalizado'], $rutsFasePlan, true))
                                                                 @continue($doc['virtual'] && ($doc['cupo_bloque'] !== 'parvularia' || ! (($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2')))
                                                                 @continue($soloParvularia && !$doc['es_parvularia'])
-                                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-fase-plan="{{ $fasePlan }}" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $fasePlan === null ? $doc['label'] : $doc['nombre'].' · '.$doc['rut'].' · Título: '.$doc['titulo'].' · '.$doc['prioridad_label'].' · Disponible '.($fasePlan === 'titular' ? 'titular: '.$fmt($doc['titular_disponible']) : 'a contrata: '.$fmt($doc['contrata_disponible'])).' h' }}</option>
+                                                                <option value="{{ $doc['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $doc['rut']) data-estamento="docente" data-fase-plan="{{ $fasePlan }}" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $fasePlan === null ? $doc['label'] : $doc['nombre'].' · '.$doc['rut'].' · Título: '.$doc['titulo'].' · '.$doc['prioridad_label'].' · Disponible '.($fasePlan === 'titular' ? 'titular: '.$fmt($doc['titular_disponible']) : 'a contrata: '.$fmt($doc['contrata_disponible'])).' h' }}</option>
                                                             @endforeach
                                                         </optgroup>
                                                         @unless ($fasePlan === 'titular')
                                                             <optgroup label="Asistentes de la Educación">
                                                                 @foreach ($asistenteOptions as $asistente)
                                                                     @continue($soloParvularia)
-                                                                    <option value="{{ $asistente['rut'] }}" data-estamento="asistente" data-nombre="{{ $asistente['nombre'] }}" data-rut="{{ $asistente['rut'] }}" data-funcion="{{ $asistente['funcion'] }}" data-titular-disponible="{{ $fmt($asistente['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($asistente['contrata_disponible']) }}">{{ $asistente['label'] }}</option>
+                                                                    <option value="{{ $asistente['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $asistente['rut']) data-estamento="asistente" data-nombre="{{ $asistente['nombre'] }}" data-rut="{{ $asistente['rut'] }}" data-funcion="{{ $asistente['funcion'] }}" data-titular-disponible="{{ $fmt($asistente['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($asistente['contrata_disponible']) }}">{{ $asistente['label'] }}</option>
                                                                 @endforeach
                                                             </optgroup>
                                                         @endunless
@@ -441,23 +468,25 @@
                                                     @endif
                                                     <div class="row g-2">
                                                         <div class="col-md-4">
-                                                            <input type="number" name="horas_plan_pedagogicas" step="{{ $fasePlan !== null ? '0.01' : '0.25' }}" min="{{ $fasePlan !== null ? '0.01' : '0.25' }}" class="form-control form-control-sm js-horas-aula" value="{{ $pendingPlan !== null && $pendingPlan > 0 ? $pendingPlan : ($item['horas_plan_requeridas'] ?? 0) }}" placeholder="Horas aula">
+                                                            <label class="form-label small mb-1" for="aula-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Horas aula</label>
+                                                            <input id="aula-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" type="number" name="horas_plan_pedagogicas" step="{{ $fasePlan !== null ? '0.01' : '0.25' }}" min="{{ $fasePlan !== null ? '0.01' : '0.25' }}" class="form-control form-control-sm js-horas-aula" value="{{ $valorFormulario($item, 'horas_plan_pedagogicas', $pendingPlan !== null && $pendingPlan > 0 ? $pendingPlan : ($item['horas_plan_requeridas'] ?? 0)) }}" placeholder="Horas aula">
+                                                        </div>
+                                                        <div class="col-md-4" data-aaee-field>
+                                                            <label class="form-label small mb-1" for="contrato-aaee-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Contrato AAEE</label>
+                                                            <input id="contrato-aaee-{{ $cursoCollapseId }}-{{ $loop->iteration }}" type="number" name="horas_contrato" step="0.25" min="0.25" value="{{ $valorFormulario($item, 'horas_contrato', '') }}" class="form-control form-control-sm js-horas-contrato-aaee" placeholder="Contrato AAEE" @disabled($valorFormulario($item, 'estamento_cobertura', 'docente') !== 'asistente')>
                                                         </div>
                                                         <div class="col-md-4">
-                                                            <input type="number" name="horas_contrato" step="0.25" min="0.25" class="form-control form-control-sm js-horas-contrato-aaee" placeholder="Contrato AAEE" disabled>
-                                                        </div>
-                                                        <div class="col-md-4">
-                                                            <label class="visually-hidden" for="subvencion-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Subvención del plan de estudio</label>
-                                                            <select id="subvencion-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" class="form-select form-select-sm" disabled>
-                                                                <option value="General" selected>General</option>
-                                                            </select>
+                                                            <div class="form-label small mb-1">Subvención fija</div>
+                                                            <span class="badge rounded-pill text-bg-light border p-2">General</span>
                                                             <input type="hidden" name="subvencion" value="General">
                                                         </div>
                                                     </div>
                                                     <div class="form-text js-ayuda-aaee d-none">Para asistentes, ingrese las horas aula cubiertas y las horas de contrato AAEE. No se aplica conversión 65/35 ni 60/40.</div>
-                                                    <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
+                                                    <label class="form-label small mb-0" for="observacion-{{ sha1($item['key'].null) }}">Observación opcional</label>
+                                                    <input id="observacion-{{ sha1($item['key'].null) }}" type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional" value="{{ $valorFormulario($item, 'observacion', '', null) }}">
                                                     <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
                                                 </form>
+                                                @endcomponent
                                             </td>
                                         </tr>
                                         @if (($cursoNt instanceof \App\Models\EstablecimientoCurso)
@@ -465,13 +494,15 @@
                                             && \App\Support\DotacionParvulariaCalculator::conJec($cursoNt, $item['proporcion_key'] ?? null)
                                             && (($item['subtipo_asignacion'] ?? '') === 'libre_disposicion' || ($item['curso_combinado_libre_disposicion'] ?? false))
                                             && ($item['horas_externas_libre_disposicion'] ?? 0) > 0)
-                                            <tr>
+                                            <tr data-dotacion-related="{{ sha1($item['key']) }}">
                                                 <td colspan="7" class="bg-light">
                                                     <div class="fw-semibold small mb-1">Acompañamiento de Educadora de Párvulos</div>
                                                     <div class="small text-muted mb-2">Otro docente imparte {{ $fmt($item['horas_externas_libre_disposicion']) }} h de libre disposición. Puede asignar hasta {{ $fmt($item['horas_acompanamiento_disponibles'] ?? 0) }} h adicionales a la Educadora que permanece en aula. Estas horas cuentan en su contrato, sin duplicar la cobertura del plan.</div>
                                                     @if (($item['horas_acompanamiento_disponibles'] ?? 0) > 0.01)
+                                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['editorId' => 'dotacion-editor-'.sha1($item['key'].'acompanamiento_parvularia'), 'abierto' => $esFormularioFallido($item, 'acompanamiento_parvularia'), 'accion' => 'Asignar acompañamiento', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
                                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form">
                                                             @csrf
+                                                            @include('admin.dotacion-establecimiento.partials._asignacion_errores', ['tipoFormulario' => 'acompanamiento_parvularia'])
                                                             <input type="hidden" name="anio" value="{{ $anio }}">
                                                             <input type="hidden" name="tipo_asignacion" value="acompanamiento_parvularia">
                                                             <input type="hidden" name="estamento_cobertura" value="docente">
@@ -482,26 +513,28 @@
                                                                 @foreach ($docenteOptions as $doc)
                                                                     @continue($docentesPermitidosSubsector !== null && !in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
                                                                     @continue(! $doc['es_parvularia'] || ($doc['virtual'] && $doc['cupo_bloque'] !== 'parvularia'))
-                                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
+                                                                    <option value="{{ $doc['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '', 'acompanamiento_parvularia') === $doc['rut']) data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                                 @endforeach
                                                             </select>
                                                             <div class="row g-2 align-items-end">
                                                                 <div class="col-md-4">
                                                                     <label class="form-label small mb-1" for="acompanamiento-horas-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Horas aula de acompañamiento</label>
-                                                                    <input id="acompanamiento-horas-{{ $cursoCollapseId }}-{{ $loop->iteration }}" type="number" name="horas_plan_pedagogicas" step="0.25" min="0.25" max="{{ $item['horas_acompanamiento_disponibles'] }}" value="{{ $item['horas_acompanamiento_disponibles'] }}" class="form-control form-control-sm" required>
+                                                                    <input id="acompanamiento-horas-{{ $cursoCollapseId }}-{{ $loop->iteration }}" type="number" name="horas_plan_pedagogicas" step="0.25" min="0.25" max="{{ $item['horas_acompanamiento_disponibles'] }}" value="{{ $valorFormulario($item, 'horas_plan_pedagogicas', $item['horas_acompanamiento_disponibles'], 'acompanamiento_parvularia') }}" class="form-control form-control-sm" required>
                                                                 </div>
                                                                 <div class="col-md-8">
                                                                     <button class="btn btn-sm btn-outline-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar acompañamiento</button>
                                                                 </div>
                                                             </div>
-                                                            <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
+                                                            <label class="form-label small mb-0" for="observacion-{{ sha1($item['key'].'acompanamiento_parvularia') }}">Observación opcional</label>
+                                                            <input id="observacion-{{ sha1($item['key'].'acompanamiento_parvularia') }}" type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional" value="{{ $valorFormulario($item, 'observacion', '', 'acompanamiento_parvularia') }}">
                                                         </form>
+                                                        @endcomponent
                                                     @endif
                                                 </td>
                                             </tr>
                                         @endif
                                         @if (count($item['asignaciones'] ?? []) + count($item['acompanamientos'] ?? []) > 0)
-                                            <tr>
+                                            <tr data-dotacion-related="{{ sha1($item['key']) }}">
                                                 <td colspan="7" class="bg-light">
                                                     <div class="small fw-semibold mb-2">Asignaciones registradas para esta asignatura</div>
                                                     <div class="table-responsive">
@@ -517,10 +550,10 @@
                                                                         <td class="text-end">{{ $fmt($asig->horas_contrato) }}</td>
                                                                         <td>{{ $asig->observacion }}</td>
                                                                         <td class="text-end">
-                                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" onsubmit="return confirm('¿Eliminar esta asignación?');">
+                                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" data-confirm="¿Eliminar la asignación de {{ $asig->docente_nombre }}: {{ $asig->asignatura_nombre }} ({{ $fmt($asig->horas_contrato) }} h de contrato)?" onsubmit="return confirm(this.dataset.confirm);">
                                                                                 @csrf
                                                                                 @method('DELETE')
-                                                                                <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash"></i></button>
+                                                                                <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" aria-label="Eliminar asignación de {{ $asig->docente_nombre }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                                                             </form>
                                                                         </td>
                                                                     </tr>
@@ -532,11 +565,11 @@
                                             </tr>
                                         @endif
                                     @endforeach
-                                    <tr class="table-primary">
+                                    <tr class="table-primary" data-dotacion-course-total>
                                         <td colspan="2" class="fw-bold">Total curso asignable</td>
-                                        <td class="text-end fw-bold">{{ $fmt($cursoAula) }}</td>
-                                        <td class="text-end fw-bold text-primary">{{ $fmt($cursoAsig) }}</td>
-                                        <td class="text-end fw-bold {{ $cursoSaldo > 0.01 ? 'text-warning' : 'text-success' }}">{{ $fmt($cursoSaldo) }}</td>
+                                        <td data-label="Horas aula" class="text-end fw-bold">{{ $fmt($cursoAula) }}</td>
+                                        <td data-label="Aula asignada" class="text-end fw-bold text-primary">{{ $fmt($cursoAsig) }}</td>
+                                        <td data-label="Saldo aula" class="text-end fw-bold {{ $cursoSaldo > 0.01 ? 'text-warning' : 'text-success' }}">{{ $fmt($cursoSaldo) }}</td>
                                         <td colspan="2" class="small text-muted">Las horas de contrato se calculan consolidadas por docente y proporción en la pestaña Docentes.</td>
                                     </tr>
                                 </tbody>
@@ -550,7 +583,7 @@
             </div>
         @else
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle mb-0 dotacion-needs-table" role="table">
                     <thead class="table-light">
                         <tr>
                             <th>Necesidad</th>
@@ -560,7 +593,7 @@
                             <th class="text-end">Asignado</th>
                             <th class="text-end">Saldo</th>
                             <th>Estado</th>
-                            <th style="min-width:320px;">Asignar</th>
+                            <th class="dotacion-actions-heading" scope="col">Acción</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -581,15 +614,15 @@
                                     default => [],
                                 };
                             @endphp
-                            <tr>
-                                <td>
+                            <tr role="row" data-dotacion-need="{{ sha1($item['key']) }}" data-section="{{ $groupKey }}" data-course="{{ $item['curso_label'] ?? 'Establecimiento' }}" data-search="{{ $item['curso_label'] ?? 'Establecimiento' }} {{ $item['titulo'] ?? '' }} {{ collect($item['asignaciones'] ?? [])->map(fn ($fila) => data_get($fila, 'docente_nombre').' '.data_get($fila, 'docente_rut'))->implode(' ') }}" data-pending="{{ (float) $pendingContrato > 0.01 || $asignacionAutomatica ? '1' : '0' }}">
+                                <td role="cell" data-label="Necesidad">
                                     <div class="fw-semibold">{{ $item['titulo'] ?? 'Necesidad' }}</div>
                                     <div class="small text-muted">{{ $item['fuente'] ?? '' }}</div>
                                     @if (($item['necesidad_condicionada_por_asignacion_docente'] ?? false) && ! ($item['necesidad_activada_por_docente'] ?? false))
                                         <div class="small text-warning-emphasis mt-1">No se contabiliza como necesidad hasta asignar un docente.</div>
                                     @endif
                                 </td>
-                                <td>
+                                <td role="cell" data-label="Curso / bloque">
                                     <div>{{ $item['curso_label'] ?? 'Establecimiento' }}</div>
                                     @if (!empty($item['bloque']))<div class="small text-muted">{{ $item['bloque'] }}</div>@endif
                                     @if (!empty($item['proporcion']))<span class="badge rounded-pill text-bg-light border">{{ $item['proporcion'] }}</span>@endif
@@ -612,20 +645,22 @@
                                         @endif
                                     @endif
                                 </td>
-                                <td class="text-end">{{ $item['horas_plan_requeridas'] !== null ? $fmt($item['horas_plan_requeridas']) : '—' }}</td>
-                                <td class="text-end fw-bold">{{ $fmt($item['horas_contrato_requeridas'] ?? 0) }}</td>
-                                <td class="text-end text-primary fw-semibold">{{ $fmt($asignadoContrato) }}</td>
-                                <td class="text-end {{ ($pendingContrato ?? 0) > 0.01 ? 'text-warning' : 'text-success' }} fw-semibold">{{ $fmt($pendingContrato) }}</td>
-                                <td><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
-                                <td>
+                                <td role="cell" data-label="Horas plan" class="text-end">{{ $item['horas_plan_requeridas'] !== null ? $fmt($item['horas_plan_requeridas']) : '—' }}</td>
+                                <td role="cell" data-label="Contrato requerido" class="text-end fw-bold">{{ $fmt($item['horas_contrato_requeridas'] ?? 0) }}</td>
+                                <td role="cell" data-label="Contrato asignado" class="text-end text-primary fw-semibold">{{ $fmt($asignadoContrato) }}</td>
+                                <td role="cell" data-label="Saldo contrato" class="text-end {{ ($pendingContrato ?? 0) > 0.01 ? 'text-warning' : 'text-success' }} fw-semibold">{{ $fmt($pendingContrato) }}</td>
+                                <td role="cell" data-label="Estado"><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
+                                <td role="cell" data-label="Acción">
                                     @if ($asignacionAutomatica)
                                         <div class="alert alert-primary small mb-0">
                                             <div class="fw-semibold">Asignación automática</div>
                                             <div>Docente Directivo por asumir · {{ $fmt($item['horas_contrato_asignadas'] ?? 0) }} hrs contrato.</div>
                                             <div class="mt-1">La plaza activa {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas definidas como necesidad hasta asignar al docente directivo.</div>
                                         </div>
+                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['editorId' => 'dotacion-editor-'.sha1($item['key'].'funcion_directiva'), 'abierto' => $esFormularioFallido($item, 'funcion_directiva'), 'accion' => 'Asignar docente directivo', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 mt-2 dotacion-assignment-form">
                                             @csrf
+                                            @include('admin.dotacion-establecimiento.partials._asignacion_errores', ['tipoFormulario' => 'funcion_directiva'])
                                             <input type="hidden" name="anio" value="{{ $anio }}">
                                             <input type="hidden" name="tipo_asignacion" value="funcion_directiva">
                                             <input type="hidden" name="subtipo_asignacion" value="directiva">
@@ -641,15 +676,18 @@
                                                 <option value="">Seleccione docente...</option>
                                                 @foreach ($docenteOptions as $doc)
                                                     @continue($doc['virtual'])
-                                                    <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
+                                                    <option value="{{ $doc['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '', 'funcion_directiva') === $doc['rut']) data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </select>
                                             <div class="small text-muted">Contrato definido: {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas.</div>
                                             <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
                                         </form>
+                                        @endcomponent
                                     @else
+                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['editorId' => 'dotacion-editor-'.sha1($item['key'].$item['tipo_asignacion']), 'abierto' => $esFormularioFallido($item, $item['tipo_asignacion']), 'accion' => 'Asignar horas', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form" data-dotacion-asignacion-form>
                                         @csrf
+                                        @include('admin.dotacion-establecimiento.partials._asignacion_errores', ['tipoFormulario' => null])
                                         <input type="hidden" name="anio" value="{{ $anio }}">
                                         <input type="hidden" name="tipo_asignacion" value="{{ $item['tipo_asignacion'] }}">
                                         <input type="hidden" name="subtipo_asignacion" value="{{ $item['subtipo_asignacion'] }}">
@@ -668,8 +706,8 @@
                                         @endif
                                         <label class="form-label small mb-0" for="estamento-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Tipo de cobertura</label>
                                         <select id="estamento-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
-                                            <option value="docente">Cubierto por docente</option>
-                                            <option value="asistente">Cubierto por Asistente de la Educación</option>
+                                            <option value="docente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'docente')>Cubierto por docente</option>
+                                            <option value="asistente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'asistente')>Cubierto por Asistente de la Educación</option>
                                         </select>
                                         <label class="form-label small mb-0" for="personal-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Docente o asistente</label>
                                         <select id="personal-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
@@ -677,40 +715,42 @@
                                             <optgroup label="Docentes vigentes y por contratar">
                                                 @foreach ($docenteOptions as $doc)
                                                 @continue($doc['virtual'] && ! in_array($doc['cupo_bloque'], $cuposPermitidos, true))
-                                                <option value="{{ $doc['rut'] }}" data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
+                                                <option value="{{ $doc['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $doc['rut']) data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </optgroup>
                                             <optgroup label="Asistentes de la Educación">
                                                 @foreach ($asistenteOptions as $asistente)
-                                                <option value="{{ $asistente['rut'] }}" data-estamento="asistente" data-nombre="{{ $asistente['nombre'] }}" data-rut="{{ $asistente['rut'] }}" data-funcion="{{ $asistente['funcion'] }}" data-titular-disponible="{{ $fmt($asistente['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($asistente['contrata_disponible']) }}">{{ $asistente['label'] }}</option>
+                                                <option value="{{ $asistente['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $asistente['rut']) data-estamento="asistente" data-nombre="{{ $asistente['nombre'] }}" data-rut="{{ $asistente['rut'] }}" data-funcion="{{ $asistente['funcion'] }}" data-titular-disponible="{{ $fmt($asistente['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($asistente['contrata_disponible']) }}">{{ $asistente['label'] }}</option>
                                                 @endforeach
                                             </optgroup>
                                         </select>
                                         <div class="row g-2">
                                             <div class="col">
                                                 <label class="form-label small mb-1" for="contrato-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Horas de contrato</label>
-                                                <input id="contrato-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" type="number" name="horas_contrato" step="{{ $esNormativa2027 ? '0.01' : '0.25' }}" min="{{ $esNormativa2027 ? '0.01' : '0.25' }}" @if ($esNormativa2027) max="{{ $pendingContrato }}" @endif class="form-control form-control-sm" value="{{ $pendingContrato > 0 || $esNormativa2027 ? $pendingContrato : ($item['horas_contrato_requeridas'] ?? 0) }}" placeholder="Horas contrato" @disabled($esNormativa2027 && $pendingContrato <= 0)>
+                                                <input id="contrato-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" type="number" name="horas_contrato" step="{{ $esNormativa2027 ? '0.01' : '0.25' }}" min="{{ $esNormativa2027 ? '0.01' : '0.25' }}" @if ($esNormativa2027) max="{{ $pendingContrato }}" @endif class="form-control form-control-sm" value="{{ $valorFormulario($item, 'horas_contrato', $pendingContrato > 0 || $esNormativa2027 ? $pendingContrato : ($item['horas_contrato_requeridas'] ?? 0)) }}" placeholder="Horas contrato" @disabled($esNormativa2027 && $pendingContrato <= 0)>
                                             </div>
                                             <div class="col">
                                                 <label class="form-label small mb-1" for="subvencion-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Subvención</label>
                                                 <select id="subvencion-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="subvencion" class="form-select form-select-sm">
                                                     @foreach ($subvencionesOptions as $subvencion)
-                                                        <option value="{{ $subvencion }}" @selected(($item['subvencion'] ?? 'General') === $subvencion)>{{ $subvencion }}</option>
+                                                        <option value="{{ $subvencion }}" @selected($valorFormulario($item, 'subvencion', $item['subvencion'] ?? 'General') === $subvencion)>{{ $subvencion }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
                                         </div>
-                                        <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional">
+                                        <label class="form-label small mb-0" for="observacion-{{ sha1($item['key'].null) }}">Observación opcional</label>
+                                        <input id="observacion-{{ sha1($item['key'].null) }}" type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional" value="{{ $valorFormulario($item, 'observacion', '', null) }}">
                                         @if ($esNormativa2027 && $pendingContrato <= 0)
                                             <div class="form-text">No quedan horas de la definición por asignar. Revise las asignaciones registradas para realizar cambios.</div>
                                         @endif
                                         <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada || ($esNormativa2027 && $pendingContrato <= 0))><i class="bi bi-plus-circle"></i> Asignar</button>
                                         </form>
+                                        @endcomponent
                                     @endif
                                 </td>
                             </tr>
                             @if (count($item['asignaciones'] ?? []) > 0)
-                                <tr>
+                                <tr data-dotacion-related="{{ sha1($item['key']) }}">
                                     <td colspan="8" class="bg-light">
                                         <div class="small fw-semibold mb-2">Asignaciones registradas</div>
                                         <div class="table-responsive">
@@ -729,10 +769,10 @@
                                                                 @if (data_get($asig, 'asignacion_automatica', false))
                                                                     <span class="badge rounded-pill text-bg-primary">Automática</span>
                                                                 @else
-                                                                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" onsubmit="return confirm('¿Eliminar esta asignación?');">
+                                                                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" data-confirm="¿Eliminar la asignación de {{ $asig->docente_nombre }}: {{ $asig->asignatura_nombre }} ({{ $fmt($asig->horas_contrato) }} h de contrato)?" onsubmit="return confirm(this.dataset.confirm);">
                                                                         @csrf
                                                                         @method('DELETE')
-                                                                        <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash"></i></button>
+                                                                        <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" aria-label="Eliminar asignación de {{ $asig->docente_nombre }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                                                     </form>
                                                                 @endif
                                                             </td>
@@ -755,6 +795,8 @@
     </div>
 @endforeach
 
+
+</div>
 
 @push('scripts')
 <script>
@@ -820,7 +862,9 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         initPersonalSelect = function (element) {
+            if (element.closest('.collapse:not(.show), [hidden], details:not([open])') || $(element).hasClass('select2-hidden-accessible')) return;
             $(element).select2({
+                theme: 'bootstrap-5',
                 width: '100%',
                 placeholder: element.dataset.placeholder || 'Buscar por nombre o RUT...',
                 allowClear: true,
@@ -833,8 +877,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 templateResult: templateResult,
                 templateSelection: templateSelection,
             });
+            const label = element.labels[0]?.textContent.trim() || 'Docente o asistente';
+            $(element).next('.select2-container').find('.select2-selection').attr('aria-label', label);
+            $(element).off('select2:open.dotacionLabels').on('select2:open.dotacionLabels', function () {
+                $('.dotacion-personal-dropdown .select2-search__field').attr('aria-label', 'Buscar: ' + label);
+            });
         };
         document.querySelectorAll('.js-dotacion-docente-select:not(.js-personal-cobertura)').forEach(initPersonalSelect);
+        document.addEventListener('shown.bs.collapse', function (event) {
+            event.target.querySelectorAll('.js-dotacion-docente-select').forEach(initPersonalSelect);
+        });
+        document.addEventListener('dotacion:visibility', function (event) {
+            event.target.querySelectorAll('.js-dotacion-docente-select').forEach(initPersonalSelect);
+        });
+        document.addEventListener('toggle', function (event) {
+            if (event.target.matches('[data-dotacion-editor]') && event.target.open) {
+                event.target.querySelectorAll('.js-dotacion-docente-select').forEach(initPersonalSelect);
+            }
+        }, true);
     }
     document.querySelectorAll('[data-dotacion-asignacion-form]').forEach(function (form) {
         const estamento = form.querySelector('.js-estamento-cobertura');

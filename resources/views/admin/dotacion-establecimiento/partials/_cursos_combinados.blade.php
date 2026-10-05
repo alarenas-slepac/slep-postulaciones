@@ -11,7 +11,7 @@
     <div class="dotacion-section-header">
         <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-start gap-3">
-                <span class="dotacion-icon" style="width:40px;height:40px;background:#6f42c1;"><i class="bi bi-intersect"></i></span>
+                <span class="dotacion-icon" style="width:40px;height:40px;"><i class="bi bi-intersect" aria-hidden="true"></i></span>
                 <div>
                     <div class="dotacion-eyebrow">Configuración curricular</div>
                     <h2 class="h5 fw-bold mb-1">Cursos combinados</h2>
@@ -63,16 +63,16 @@
             <div class="text-muted small">Seleccione al menos dos cursos que se impartan simultáneamente.</div>
         </div>
         <div class="card-body">
-            <form method="POST" action="{{ route('admin.dotacion-establecimiento.cursos-combinados.store', $establecimiento) }}" class="row g-3">
+            <form method="POST" action="{{ route('admin.dotacion-establecimiento.cursos-combinados.store', $establecimiento) }}" class="row g-3" data-dotacion-save>
                 @csrf
                 <input type="hidden" name="anio" value="{{ $anio }}">
                 <div class="col-lg-5">
-                    <label class="form-label fw-semibold">Nombre del grupo</label>
-                    <input type="text" name="nombre" class="form-control" maxlength="180" value="{{ old('nombre') }}" placeholder="Ej.: NT1 y NT2 A" required>
+                    <label for="combinado-nuevo-nombre" class="form-label fw-semibold">Nombre del grupo <span class="text-danger">*</span></label>
+                    <input id="combinado-nuevo-nombre" type="text" name="nombre" class="form-control" maxlength="180" value="{{ old('nombre') }}" placeholder="Ej.: NT1 y NT2 A" required>
                 </div>
                 <div class="col-lg-3">
-                    <label class="form-label fw-semibold">Proporción contractual</label>
-                    <select name="proporcion" class="form-select" required>
+                    <label for="combinado-nuevo-proporcion" class="form-label fw-semibold">Proporción contractual <span class="text-danger">*</span></label>
+                    <select id="combinado-nuevo-proporcion" name="proporcion" class="form-select" required>
                         <option value="auto" @selected(old('proporcion', 'auto') === 'auto')>Automática si todos coinciden</option>
                         <option value="65_35" @selected(old('proporcion') === '65_35')>65/35</option>
                         <option value="60_40" @selected(old('proporcion') === '60_40')>60/40</option>
@@ -82,16 +82,16 @@
                     <div class="form-text">Para NT1 y NT2 puede usar Automática cuando ambos cursos comparten el mismo régimen.</div>
                 </div>
                 <div class="col-lg-4">
-                    <label class="form-label fw-semibold">Observación</label>
-                    <input type="text" name="observacion" class="form-control" maxlength="2000" value="{{ old('observacion') }}" placeholder="Justificación o antecedente">
+                    <label for="combinado-nuevo-observacion" class="form-label fw-semibold">Observación</label>
+                    <input id="combinado-nuevo-observacion" type="text" name="observacion" class="form-control" maxlength="2000" value="{{ old('observacion') }}" placeholder="Justificación o antecedente">
                 </div>
                 <div class="col-12">
-                    <label class="form-label fw-semibold">Cursos disponibles</label>
+                    <div class="form-label fw-semibold">Cursos disponibles (seleccione al menos dos)</div>
                     <div class="row g-2">
                         @forelse ($availableCourses->where('disponible', true) as $course)
                             <div class="col-xl-3 col-md-4 col-sm-6">
-                                <label class="border rounded-3 p-2 d-flex gap-2 align-items-start h-100">
-                                    <input class="form-check-input mt-1" type="checkbox" name="curso_ids[]" value="{{ $course['id'] }}" @checked(in_array((string) $course['id'], array_map('strval', old('curso_ids', [])), true))>
+                                <label for="combinado-nuevo-curso-{{ $course['id'] }}" class="border rounded-3 p-2 d-flex gap-2 align-items-start h-100">
+                                    <input id="combinado-nuevo-curso-{{ $course['id'] }}" class="form-check-input mt-1" type="checkbox" name="curso_ids[]" value="{{ $course['id'] }}" @checked(in_array((string) $course['id'], array_map('strval', old('curso_ids', [])), true))>
                                     <span><span class="fw-semibold">{{ $course['label'] }}</span><br><span class="small text-muted">Matrícula {{ $course['matricula'] }}</span></span>
                                 </label>
                             </div>
@@ -139,18 +139,18 @@
 
             <div class="card-body">
                 @if ($canManageCursosCombinados)
-                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.cursos-combinados.update', [$establecimiento, $group['id']]) }}">
+                    <form method="POST" action="{{ route('admin.dotacion-establecimiento.cursos-combinados.update', [$establecimiento, $group['id']]) }}" data-dotacion-save>
                         @csrf
                         @method('PUT')
                         <input type="hidden" name="anio" value="{{ $anio }}">
                         <div class="row g-3 mb-4">
                             <div class="col-lg-5">
-                                <label class="form-label fw-semibold">Nombre</label>
-                                <input class="form-control" name="nombre" value="{{ $group['nombre'] }}" required maxlength="180">
+                                <label for="combinado-{{ $group['id'] }}-nombre" class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
+                                <input id="combinado-{{ $group['id'] }}-nombre" class="form-control" name="nombre" value="{{ $group['nombre'] }}" required maxlength="180">
                             </div>
                             <div class="col-lg-3">
-                                <label class="form-label fw-semibold">Proporción</label>
-                                <select class="form-select" name="proporcion" required>
+                                <label for="combinado-{{ $group['id'] }}-proporcion" class="form-label fw-semibold">Proporción <span class="text-danger">*</span></label>
+                                <select id="combinado-{{ $group['id'] }}-proporcion" class="form-select" name="proporcion" required>
                                     <option value="auto" @selected($group['proporcion'] === 'auto')>Automática</option>
                                     <option value="65_35" @selected($group['proporcion'] === '65_35')>65/35</option>
                                     <option value="60_40" @selected($group['proporcion'] === '60_40')>60/40</option>
@@ -159,23 +159,23 @@
                                 </select>
                             </div>
                             <div class="col-lg-2">
-                                <label class="form-label fw-semibold">Estado</label>
-                                <select class="form-select" name="activo">
+                                <label for="combinado-{{ $group['id'] }}-activo" class="form-label fw-semibold">Estado</label>
+                                <select id="combinado-{{ $group['id'] }}-activo" class="form-select" name="activo">
                                     <option value="1" @selected($group['activo'])>Activo</option>
                                     <option value="0" @selected(!$group['activo'])>Inactivo</option>
                                 </select>
                             </div>
                             <div class="col-lg-2">
-                                <label class="form-label fw-semibold">Contrato requerido</label>
+                                <div class="form-label fw-semibold">Contrato requerido (horas)</div>
                                 <div class="form-control bg-light fw-bold">{{ $fmt($totals['horas_contrato'] ?? 0) }}</div>
                             </div>
                             <div class="col-12">
-                                <label class="form-label fw-semibold">Cursos integrantes</label>
+                                <div class="form-label fw-semibold">Cursos integrantes (seleccione al menos dos)</div>
                                 <div class="row g-2">
                                     @foreach ($candidateCourses as $course)
                                         <div class="col-xl-3 col-md-4 col-sm-6">
-                                            <label class="border rounded-3 p-2 d-flex gap-2 align-items-start h-100">
-                                                <input class="form-check-input mt-1" type="checkbox" name="curso_ids[]" value="{{ $course['id'] }}" @checked($memberIds->contains((int) $course['id']))>
+                                            <label for="combinado-{{ $group['id'] }}-curso-{{ $course['id'] }}" class="border rounded-3 p-2 d-flex gap-2 align-items-start h-100">
+                                                <input id="combinado-{{ $group['id'] }}-curso-{{ $course['id'] }}" class="form-check-input mt-1" type="checkbox" name="curso_ids[]" value="{{ $course['id'] }}" @checked($memberIds->contains((int) $course['id']))>
                                                 <span><span class="fw-semibold">{{ $course['label'] }}</span><br><span class="small text-muted">Matrícula {{ $course['matricula'] }}</span></span>
                                             </label>
                                         </div>
@@ -183,8 +183,8 @@
                                 </div>
                             </div>
                             <div class="col-12">
-                                <label class="form-label fw-semibold">Observación</label>
-                                <textarea class="form-control" name="observacion" rows="2" maxlength="2000">{{ $group['observacion'] }}</textarea>
+                                <label for="combinado-{{ $group['id'] }}-observacion" class="form-label fw-semibold">Observación</label>
+                                <textarea id="combinado-{{ $group['id'] }}-observacion" class="form-control" name="observacion" rows="2" maxlength="2000">{{ $group['observacion'] }}</textarea>
                             </div>
                         </div>
 
@@ -221,19 +221,20 @@
                                                     @endforeach
                                                 </td>
                                                 <td>
-                                                    <select class="form-select form-select-sm" name="asignaturas[{{ $index }}][modalidad]">
+                                                    <label class="visually-hidden" for="combinado-{{ $group['id'] }}-{{ $index }}-modalidad">Modalidad de {{ $subject['titulo'] }}</label>
+                                                    <select id="combinado-{{ $group['id'] }}-{{ $index }}-modalidad" class="form-select form-select-sm" name="asignaturas[{{ $index }}][modalidad]">
                                                         @foreach (\App\Models\DotacionCursoCombinadoAsignatura::MODALIDADES as $key => $label)
                                                             <option value="{{ $key }}" @selected($mode === $key)>{{ $label }}</option>
                                                         @endforeach
                                                     </select>
                                                 </td>
-                                                <td><input type="number" class="form-control form-control-sm" name="asignaturas[{{ $index }}][horas_conjuntas]" step="0.25" min="0" value="{{ $subject['horas_conjuntas'] ?? '' }}" placeholder="Máximo por curso"></td>
-                                                <td><input type="number" class="form-control form-control-sm" name="asignaturas[{{ $index }}][horas_personalizadas]" step="0.25" min="0.25" value="{{ $subject['horas_personalizadas'] ?? '' }}" placeholder="Total requerido"></td>
+                                                <td><label class="visually-hidden" for="combinado-{{ $group['id'] }}-{{ $index }}-conjuntas">Horas aula conjuntas de {{ $subject['titulo'] }}</label><input id="combinado-{{ $group['id'] }}-{{ $index }}-conjuntas" type="number" class="form-control form-control-sm" name="asignaturas[{{ $index }}][horas_conjuntas]" step="0.25" min="0" value="{{ $subject['horas_conjuntas'] ?? '' }}" placeholder="Máximo por curso"></td>
+                                                <td><label class="visually-hidden" for="combinado-{{ $group['id'] }}-{{ $index }}-personalizadas">Horas aula personalizadas de {{ $subject['titulo'] }}</label><input id="combinado-{{ $group['id'] }}-{{ $index }}-personalizadas" type="number" class="form-control form-control-sm" name="asignaturas[{{ $index }}][horas_personalizadas]" step="0.25" min="0.25" value="{{ $subject['horas_personalizadas'] ?? '' }}" placeholder="Total requerido"></td>
                                                 <td>
                                                     @foreach (($group['miembros'] ?? []) as $member)
                                                         <div class="input-group input-group-sm mb-1">
-                                                            <span class="input-group-text" style="min-width:105px;">{{ $member['label'] }}</span>
-                                                            <input type="number" class="form-control" name="asignaturas[{{ $index }}][horas_exclusivas][{{ $member['id'] }}]" step="0.25" min="0" value="{{ $exclusiveValues->get((string) $member['id'], $exclusiveValues->get($member['id'], '')) }}">
+                                                            <label for="combinado-{{ $group['id'] }}-{{ $index }}-exclusivas-{{ $member['id'] }}" class="input-group-text" style="min-width:105px;">{{ $member['label'] }}<span class="visually-hidden">: horas aula exclusivas de {{ $subject['titulo'] }}</span></label>
+                                                            <input id="combinado-{{ $group['id'] }}-{{ $index }}-exclusivas-{{ $member['id'] }}" type="number" class="form-control" name="asignaturas[{{ $index }}][horas_exclusivas][{{ $member['id'] }}]" step="0.25" min="0" value="{{ $exclusiveValues->get((string) $member['id'], $exclusiveValues->get($member['id'], '')) }}">
                                                         </div>
                                                     @endforeach
                                                 </td>

@@ -1,4 +1,5 @@
 @php
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
     $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
     $detalle = $sobredotacion['aula'] ?? [];
     $ajusteItems = collect($detalle['ajustes'] ?? []);
@@ -6,6 +7,7 @@
     $sobredotacionResumen = $detalle['resumen'] ?? [];
     $vacantesPorBloque = $sobredotacion['vacantes_por_bloque'] ?? [];
     $justificacionesSobredotacion = $justificacionesSobredotacion ?? collect();
+    $docentesRevisionPorRut = collect($docentes ?? [])->keyBy('rut');
     $declaradasAsignadas = $sobredotacionResumen['horas_declaradas_asignadas'] ?? $sobredotacionResumen['horas_declaradas_ajustables'] ?? 0;
     $formula = $detalle['formula'] ?? [];
     $brechaEstructural = (float) ($sobredotacionResumen['brecha_estructural'] ?? 0);
@@ -15,6 +17,8 @@
             ? ['label' => 'Horas estructuralmente necesarias', 'value' => '+'.$fmt($brechaEstructural), 'class' => 'alert-success']
             : ['label' => 'Dotación estructural cuadrada', 'value' => '0', 'class' => 'alert-primary']);
 @endphp
+
+@include('admin.dotacion-establecimiento.partials._resumen_contractual_bloques')
 
 <div class="card dotacion-section mb-4">
     <div class="dotacion-section-header">
@@ -31,7 +35,7 @@
         <p class="small text-muted">Los contratos con Fuero maternal u Horas gremiales quedan protegidos en su totalidad y se excluyen de las nóminas de posible reducción y del universo sujeto a revisión. Las horas no necesarias siguen fuera del contrato contabilizado.</p>
 
         <div class="alert {{ $resultadoEstructural['class'] }} border-0 rounded-4">
-            <div class="fw-bold mb-1">Sobredotación estructural</div>
+            <div class="fw-bold mb-1">{{ $resultadoEstructural['label'] }}</div>
             <div class="fs-4 fw-bold">{{ $resultadoEstructural['value'] }}</div>
         </div>
 
@@ -81,6 +85,9 @@
         </div>
     @endif
 
+    <div data-dotacion-revision="sobredotacion">
+    @include('admin.dotacion-establecimiento.partials._revision_filtros', ['revisionId' => 'revision-sobredotacion', 'revisionTitulo' => 'Revisar saldos y funciones declaradas'])
+    @include('admin.dotacion-establecimiento.partials._revision_sobrecargas')
     <div class="card dotacion-section mb-4">
         <div class="dotacion-section-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
@@ -103,7 +110,7 @@
             @php
                 $bloqueVacante = $vacantesPorBloque[$claveBloque] ?? [];
             @endphp
-            <section class="border-top" aria-labelledby="vacantes-{{ $claveBloque }}">
+            <section class="border-top" aria-labelledby="vacantes-{{ $claveBloque }}" data-revision-group>
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-3 bg-light">
                     <div><h3 id="vacantes-{{ $claveBloque }}" class="h6 fw-bold mb-0">{{ $tituloBloque }}</h3><div class="small text-muted">{{ collect($bloqueVacante['items'] ?? [])->count() }} docente(s) con saldo libre</div></div>
                     <span class="badge rounded-pill text-bg-danger">{{ $fmt($bloqueVacante['horas_total'] ?? 0) }} h sin asignación</span>
@@ -125,9 +132,10 @@
                                         $registro = ($justificacionesSobredotacion ?? collect())->get(\App\Models\DotacionSobredotacionJustificacion::clave($claveBloque, $docente['rut'], $calidad));
                                         return ! $registro || ! $registro->vigentePara($tipo['horas']);
                                     })->count();
-                                    $mostrarErrores = old('bloque') === $claveBloque && \App\Support\DotacionEstablecimientoCalculator::normalizeRut(old('docente_rut')) === $rutNormalizado;
+                                    $mostrarErrores = $errors->any() && (int) old('anio') === (int) $anio
+                                        && old('bloque') === $claveBloque && \App\Support\DotacionEstablecimientoCalculator::normalizeRut(old('docente_rut')) === $rutNormalizado;
                                 @endphp
-                                <tr>
+                                <tr data-revision-row="{{ sha1($claveBloque.$rutNormalizado) }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['funcion'] }} {{ data_get($docentesRevisionPorRut->get($docente['rut']), 'titulo', '') }}" data-revision-block="{{ $claveBloque }}" data-revision-state="saldo {{ $pendientes && ($justificacionesSobredotacionTableReady ?? false) ? 'justificacion' : '' }}" data-revision-error="{{ $mostrarErrores && $errors->any() ? '1' : '0' }}">
                                     <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
                                     <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
                                     <td>{{ $docente['funcion'] }}</td>
@@ -136,6 +144,7 @@
                                     <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td>
                                     <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td>
                                     <td class="text-nowrap">
+                                        <a class="btn btn-sm btn-outline-secondary rounded-pill mb-1" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'docentes', 'revision_docentes_q' => $docente['rut']]) }}">Ver contrato<span class="visually-hidden"> de {{ $docente['nombre'] }}</span></a>
                                         @if (($justificacionesSobredotacionTableReady ?? false))
                                             <span class="badge rounded-pill {{ $pendientes ? 'text-bg-warning' : 'text-bg-success' }}">{{ $pendientes ? $pendientes.' pendiente(s)' : 'Completa' }}</span>
                                             <button type="button" class="btn btn-sm btn-outline-primary rounded-pill ms-1" data-bs-toggle="collapse" data-bs-target="#{{ $idJustificacion }}" aria-expanded="{{ $mostrarErrores ? 'true' : 'false' }}" aria-controls="{{ $idJustificacion }}">{{ ($canManageJustificacionesSobredotacion ?? false) ? 'Justificar' : 'Ver motivos' }}</button>
@@ -145,7 +154,7 @@
                                     </td>
                                 </tr>
                                 @if (($justificacionesSobredotacionTableReady ?? false))
-                                    <tr><td colspan="8" class="p-0 border-0">
+                                    <tr data-revision-related="{{ sha1($claveBloque.$rutNormalizado) }}"><td colspan="8" class="p-0 border-0">
                                         <div id="{{ $idJustificacion }}" class="collapse {{ $mostrarErrores ? 'show' : '' }}">
                                             <div class="p-3 bg-light border-top border-bottom">
                                                 <div class="row g-3">
@@ -211,7 +220,7 @@
         @endforeach
     </div>
 
-    <div class="card dotacion-section">
+    <div class="card dotacion-section" data-revision-group>
         <div class="dotacion-section-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <div class="dotacion-eyebrow">Funciones no normativas asignadas</div>
@@ -235,7 +244,7 @@
                 <tbody>
                     @forelse ($ajusteItems as $docente)
                         @php($detalleId = 'detalle-ajuste-docente-'.$loop->index)
-                        <tr>
+                        <tr data-revision-row="{{ sha1('ajuste'.$docente['rut']) }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['funcion'] }} {{ data_get($docentesRevisionPorRut->get($docente['rut']), 'titulo', '') }}" data-revision-block="plan_estudio" data-revision-state="ajuste {{ $docente['horas_sobredotacion_total'] > 0.01 ? 'saldo' : '' }} {{ $docente['horas_sobreasignadas'] > 0.01 ? 'sobrecarga' : '' }}">
                             <td><button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" data-bs-toggle="collapse" data-bs-target="#{{ $detalleId }}" aria-expanded="false" aria-controls="{{ $detalleId }}" title="Ver desglose de horas"><i class="bi bi-chevron-down"></i><span class="visually-hidden">Ver detalle de {{ $docente['nombre'] }}</span></button></td>
                             <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['rut'] }} · {{ $docente['tipo_contrato'] }}</div></td>
                             <td>{{ $docente['funcion'] }}</td>
@@ -248,7 +257,7 @@
                             <td class="text-end text-danger">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
                             <td class="text-end {{ $docente['horas_sobreasignadas'] > 0 ? 'text-danger fw-bold' : 'text-muted' }}">{{ $fmt($docente['horas_sobreasignadas']) }}</td>
                         </tr>
-                        <tr>
+                        <tr data-revision-related="{{ sha1('ajuste'.$docente['rut']) }}">
                             <td colspan="11" class="p-0 border-0">
                                 <div class="collapse" id="{{ $detalleId }}">
                                     <div class="p-3 bg-light border-top border-bottom">
@@ -279,4 +288,5 @@
                 @endif
             </table>
         </div>
+    </div>
     </div>

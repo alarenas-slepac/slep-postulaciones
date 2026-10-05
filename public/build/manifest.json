@@ -2204,6 +2204,15 @@
       "centro-operaciones.css"
     ]
   },
+  "resources/css/dotacion-establecimiento.css": {
+    "file": "assets/dotacion-establecimiento-DRFTKcYj.css",
+    "src": "resources/css/dotacion-establecimiento.css",
+    "isEntry": true,
+    "name": "dotacion-establecimiento",
+    "names": [
+      "dotacion-establecimiento.css"
+    ]
+  },
   "resources/css/votaciones-admin.css": {
     "file": "assets/votaciones-admin-Bufya2o9.css",
     "src": "resources/css/votaciones-admin.css",
@@ -2255,6 +2264,12 @@
     "css": [
       "assets/centro-operaciones-BKK0pH8C.css"
     ]
+  },
+  "resources/js/dotacion-asignacion.js": {
+    "file": "assets/dotacion-asignacion-Bo9GicbL.js",
+    "name": "dotacion-asignacion",
+    "src": "resources/js/dotacion-asignacion.js",
+    "isEntry": true
   },
   "resources/js/votaciones-admin-rutas.js": {
     "file": "assets/votaciones-admin-rutas-CUaCZcHF.js",

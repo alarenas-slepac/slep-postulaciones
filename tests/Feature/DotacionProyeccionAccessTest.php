@@ -28,7 +28,8 @@ class DotacionProyeccionAccessTest extends TestCase
         $this->assertSame($permitido, DotacionProyeccionCalculator::canView($role));
         $source = file_get_contents(resource_path('views/admin/dotacion-establecimiento/show.blade.php'));
         $start = strpos($source, '<div class="dotacion-hero');
-        $end = strpos($source, '@if (!empty($alertas))', $start);
+        // La navegación ahora sigue al encabezado; estas pruebas renderizan solo sus acciones.
+        $end = strpos($source, '<nav class="dotacion-pill-tabs', $start);
         $this->assertNotFalse($start);
         $this->assertNotFalse($end);
         $html = Blade::render(substr($source, $start, $end - $start), [
@@ -63,7 +64,9 @@ class DotacionProyeccionAccessTest extends TestCase
     {
         $source = file_get_contents(resource_path('views/admin/dotacion-establecimiento/show.blade.php'));
         $start = strpos($source, '<div class="dotacion-hero');
-        $end = strpos($source, '@if (!empty($alertas))', $start);
+        $end = strpos($source, '<nav class="dotacion-pill-tabs', $start);
+        $this->assertNotFalse($start);
+        $this->assertNotFalse($end);
         $html = Blade::render(substr($source, $start, $end - $start), [
             'activeRole' => 'admin', 'anio' => 2027, 'tab' => 'asignacion',
             'establecimiento' => $this->establecimiento(),

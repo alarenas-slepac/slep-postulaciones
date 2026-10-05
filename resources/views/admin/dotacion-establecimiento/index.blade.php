@@ -1,6 +1,11 @@
 @extends('layouts.app')
 
+@push('styles')
+    @vite(['resources/css/dotacion-establecimiento.css', 'resources/js/dotacion-asignacion.js'])
+@endpush
+
 @section('content')
+<div class="dotacion-workspace">
     @php
         $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
         $itemsPagina = collect(method_exists($establecimientos, 'items') ? $establecimientos->items() : $establecimientos);
@@ -81,16 +86,16 @@
         <div class="card-body">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-4 col-md-6">
-                    <label class="form-label fw-semibold">Buscar</label>
-                    <input type="text" class="form-control" name="q" value="{{ $q }}" placeholder="RBD, establecimiento o comuna">
+                    <label class="form-label fw-semibold" for="dotacion-listado-q">Buscar</label>
+                    <input type="text" class="form-control" id="dotacion-listado-q" name="q" value="{{ $q }}" placeholder="RBD, establecimiento o comuna">
                 </div>
                 <div class="col-lg-2 col-md-3">
-                    <label class="form-label fw-semibold">Año</label>
-                    <input type="number" class="form-control" name="anio" value="{{ $anio }}" min="2020" max="2100">
+                    <label class="form-label fw-semibold" for="dotacion-listado-anio">Año</label>
+                    <input type="number" class="form-control" id="dotacion-listado-anio" name="anio" value="{{ $anio }}" min="2020" max="2100">
                 </div>
                 <div class="col-lg-3 col-md-4">
-                    <label class="form-label fw-semibold">Comuna</label>
-                    <select class="form-select" name="comuna" @disabled($activeRole === 'funcionario_directivo_estab')>
+                    <label class="form-label fw-semibold" for="dotacion-listado-comuna">Comuna</label>
+                    <select class="form-select" id="dotacion-listado-comuna" name="comuna" @disabled($activeRole === 'funcionario_directivo_estab')>
                         <option value="">Todas</option>
                         @foreach ($comunas as $comunaOpcion)
                             <option value="{{ $comunaOpcion }}" @selected($comuna === $comunaOpcion)>{{ $comunaOpcion }}</option>
@@ -99,7 +104,7 @@
                 </div>
                 <div class="col-lg-3 col-md-5 d-flex flex-wrap gap-2">
                     <button type="submit" class="btn btn-outline-primary rounded-pill px-4"><i class="bi bi-funnel"></i> Filtrar</button>
-                    <a href="{{ route('admin.dotacion-establecimiento.index') }}" class="btn btn-outline-danger rounded-pill px-4">Limpiar</a>
+                    <a href="{{ route('admin.dotacion-establecimiento.index', ['anio' => $anio]) }}" class="btn btn-outline-secondary rounded-pill px-4">Limpiar</a>
                 </div>
             </div>
         </div>
@@ -159,4 +164,5 @@
             <div class="card-footer bg-white">{{ $establecimientos->links() }}</div>
         @endif
     </div>
+</div>
 @endsection

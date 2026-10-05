@@ -1,10 +1,13 @@
 @php
+    $fmtProceso = $fmtProceso ?? fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
     $subsectores = $proceso['docentes_subsector'] ?? [];
     $gruposSubsector = collect($subsectores['grupos'] ?? []);
     $docentesSubsector = collect($subsectores['docentes'] ?? []);
+    $docentesSubsectorPorRut = $docentesSubsector->keyBy(fn ($d) => \App\Support\DotacionEstablecimientoCalculator::normalizeRut((string) ($d['rut_normalizado'] ?? $d['rut'] ?? '')));
 @endphp
 
-<section id="dotacion-docentes-subsector" class="border rounded-4 p-3 mt-3" aria-labelledby="dotacion-docentes-subsector-titulo">
+<section id="dotacion-docentes-subsector" class="border rounded-4 p-3 mb-4" aria-labelledby="dotacion-docentes-subsector-titulo" data-dotacion-catalog="subsectores">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <div>
             <h3 id="dotacion-docentes-subsector-titulo" class="h6 fw-bold mb-1">Docentes por asignatura del plan de estudio</h3>
@@ -25,22 +28,31 @@
     @elseif ($gruposSubsector->isEmpty())
         <div class="alert alert-info mb-0">No hay asignaturas del plan para asociar en este establecimiento.</div>
     @else
+        @include('admin.dotacion-establecimiento.partials._catalogo_filtros', ['catalogoId' => 'subsectores-filtro', 'catalogoTitulo' => 'Buscar asignaturas y docentes asociados', 'catalogoBusqueda' => 'Asignatura, curso, docente, RUT o título', 'catalogoEstados' => ['pendiente' => 'Sin docentes asociados', 'completo' => 'Con docentes asociados']])
         @if ($errors->has('asignatura_key') || $errors->has('docentes') || $errors->has('docentes.*'))
             <div class="alert alert-danger" role="alert">{{ $errors->first('asignatura_key') ?: $errors->first('docentes') ?: $errors->first('docentes.*') }}</div>
         @endif
         @foreach ($gruposSubsector as $nivel => $grupo)
-            @php $collapseId = 'dotacion-subsector-'.$nivel; @endphp
-            <div class="border rounded-4 mb-2 overflow-hidden">
+            @php
+                $collapseId = 'dotacion-subsector-'.$nivel;
+                $errorNivel = $errors->any() && (int) old('anio') === (int) $anio && collect($grupo['asignaturas'])->contains('key', old('asignatura_key'));
+            @endphp
+            <div class="border rounded-4 mb-2" data-catalog-group>
                 <div class="bg-light p-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
                     <div class="fw-semibold">{{ $grupo['label'] }} <span class="badge rounded-pill text-bg-light border ms-1">{{ $grupo['asignaturas']->count() }} asignaturas</span></div>
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill collapsed" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="false" aria-controls="{{ $collapseId }}">
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill {{ $errorNivel ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $errorNivel ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}">
                         <i class="bi bi-chevron-down" aria-hidden="true"></i> Ver asignaturas
                     </button>
                 </div>
-                <div id="{{ $collapseId }}" class="collapse">
+                <div id="{{ $collapseId }}" class="collapse{{ $errorNivel ? ' show' : '' }}">
                     <div class="vstack gap-3 p-3">
                         @foreach ($grupo['asignaturas'] as $asignatura)
-                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.docentes-subsector.sync', $establecimiento) }}" class="border rounded-3 p-3 bg-white">
+                            @php
+                                $errorAsignatura = $errors->any() && (int) old('anio') === (int) $anio && old('asignatura_key') === $asignatura['key'];
+                                $rutsAsociados = collect($asignatura['docentes']);
+                                $personalAsociado = $rutsAsociados->map(fn ($rut) => $docentesSubsectorPorRut->get($rut))->filter();
+                            @endphp
+                            <form id="subsector-form-{{ $asignatura['key'] }}" method="POST" action="{{ route('admin.dotacion-establecimiento.docentes-subsector.sync', $establecimiento) }}" class="border rounded-3 p-3 bg-white" data-dotacion-save data-catalog-row data-catalog-search="{{ $asignatura['nombre'] }} {{ implode(' ', $asignatura['cursos']) }} {{ $personalAsociado->map(fn ($d) => ($d['nombre'] ?? '').' '.($d['rut'] ?? '').' '.($d['titulo'] ?? ''))->implode(' ') }}" data-catalog-state="{{ $asignatura['completo'] ? 'completo' : 'pendiente' }}" data-catalog-error="{{ $errorAsignatura ? '1' : '0' }}">
                                 @csrf
                                 <input type="hidden" name="anio" value="2027">
                                 <input type="hidden" name="asignatura_key" value="{{ $asignatura['key'] }}">
@@ -55,14 +67,15 @@
                                     </div>
                                     <div class="col-lg-6">
                                         <label class="form-label fw-semibold" for="subsector-docentes-{{ $asignatura['key'] }}">Docentes habilitados para {{ $asignatura['nombre'] }} <span class="text-danger">*</span></label>
-                                        <select id="subsector-docentes-{{ $asignatura['key'] }}" name="docentes[]" class="form-select js-subsector-docentes" multiple required>
+                                        <select id="subsector-docentes-{{ $asignatura['key'] }}" name="docentes[]" class="form-select js-subsector-docentes {{ $errorAsignatura ? 'is-invalid' : '' }}" aria-describedby="subsector-ayuda-{{ $asignatura['key'] }}" @if ($errorAsignatura) aria-invalid="true" @endif multiple required>
                                             @foreach ($docentesSubsector as $docente)
                                                 @continue(! \App\Support\DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel']))
                                                 @php $rutDocente = \App\Support\DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')); @endphp
-                                                <option value="{{ $rutDocente }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }}" data-antiguedad="{{ $docente['fecha_antiguedad'] ?? '' }}" data-titular-disponible="{{ $fmtProceso($docente['horas_titulares_disponibles'] ?? 0) }}" data-contrata-disponible="{{ $fmtProceso($docente['horas_contrata_disponibles'] ?? 0) }}" @selected(in_array($rutDocente, old('asignatura_key') === $asignatura['key'] ? old('docentes', []) : $asignatura['docentes'], true))>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · Título: {{ $docente['titulo'] ?? 'Sin título declarado' }} · {{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }} · Disponible: {{ $fmtProceso($docente['horas_disponibles'] ?? 0) }} h</option>
+                                                <option value="{{ $rutDocente }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }}" data-antiguedad="{{ $docente['fecha_antiguedad'] ?? '' }}" data-titular-disponible="{{ $fmtProceso($docente['horas_titulares_disponibles'] ?? 0) }}" data-contrata-disponible="{{ $fmtProceso($docente['horas_contrata_disponibles'] ?? 0) }}" @selected(in_array($rutDocente, $errorAsignatura ? old('docentes', []) : $asignatura['docentes'], true))>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · Título: {{ $docente['titulo'] ?? 'Sin título declarado' }} · {{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }} · Disponible: {{ $fmtProceso($docente['horas_disponibles'] ?? 0) }} h</option>
                                             @endforeach
                                         </select>
-                                        <div class="form-text">Puede seleccionar varios docentes; la lista respeta la prelación y antigüedad vigentes.</div>
+                                        <div id="subsector-ayuda-{{ $asignatura['key'] }}" class="form-text">Puede seleccionar varios docentes; la lista respeta la prelación y antigüedad vigentes. Asociar docentes no asigna horas ni modifica contratos.</div>
+                                        @if ($errorAsignatura)<div class="invalid-feedback d-block">{{ $errors->first('docentes') ?: $errors->first('docentes.*') ?: $errors->first('asignatura_key') }}</div>@endif
                                     </div>
                                     <div class="col-lg-2">
                                         <button type="submit" class="btn btn-primary rounded-pill w-100"><i class="bi bi-save" aria-hidden="true"></i> Guardar</button>
@@ -102,9 +115,20 @@
             document.addEventListener('DOMContentLoaded', function () {
                 if (!window.jQuery || !window.jQuery.fn.select2) return;
                 const $ = window.jQuery;
-                window.jQuery('#dotacion-docentes-subsector .js-subsector-docentes').select2({
+                document.getElementById('dotacion-docentes-subsector').addEventListener('invalid', function (event) {
+                    if (!event.target.matches('.js-subsector-docentes.select2-hidden-accessible')) return;
+                    event.preventDefault();
+                    const form = event.target.closest('form');
+                    form.scrollIntoView({ block: 'center' });
+                    $(event.target).select2('open');
+                }, true);
+                const initialize = function () {
+                    $('#dotacion-docentes-subsector .js-subsector-docentes').each(function () {
+                        if (this.closest('.collapse:not(.show), [hidden]') || $(this).hasClass('select2-hidden-accessible')) return;
+                        $(this).select2({
+                    theme: 'bootstrap-5',
                     width: '100%',
-                    placeholder: 'Buscar por nombre o RUT...',
+                    placeholder: 'Buscar por nombre, RUT o título...',
                     closeOnSelect: false,
                     minimumResultsForSearch: 0,
                     dropdownCssClass: 'dotacion-subsector-dropdown',
@@ -129,6 +153,22 @@
                     },
                     language: { noResults: function () { return 'No se encontraron docentes.'; } }
                 });
+                        const native = this;
+                        const accessibleName = native.labels[0]?.textContent.trim() || 'Docentes por asignatura';
+                        const updateLabels = function () {
+                            const container = $(native).next('.select2-container');
+                            container.find('.select2-selection').attr({ 'aria-label': accessibleName, 'aria-describedby': native.getAttribute('aria-describedby') });
+                            container.find('.select2-search__field').attr('aria-label', 'Buscar docentes: ' + accessibleName);
+                            container.find('.select2-selection__choice__remove').attr({ 'aria-label': 'Quitar docente asociado', title: 'Quitar docente asociado' });
+                        };
+                        updateLabels();
+                        $(native).on('change.dotacionLabels', updateLabels);
+                    });
+                };
+                initialize();
+                $(document).on('shown.bs.collapse', initialize);
+                document.addEventListener('dotacion:visibility', initialize);
+                window.addEventListener('load', initialize, { once: true });
             });
         </script>
     @endpush

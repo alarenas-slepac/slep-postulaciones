@@ -1,6 +1,11 @@
 @extends('layouts.app')
 
+@push('styles')
+    @vite(['resources/css/dotacion-establecimiento.css', 'resources/js/dotacion-asignacion.js'])
+@endpush
+
 @section('content')
+<div class="dotacion-workspace">
     @php
         $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
         $activeTab = $tab ?? 'resumen';
@@ -160,6 +165,43 @@
         </div>
     </div>
 
+    <nav class="dotacion-pill-tabs mb-4" aria-label="Secciones de dotación">
+        <ul class="nav nav-pills gap-2" >
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'resumen' ? 'active' : '' }}" @if ($activeTab === 'resumen') aria-current="page" @endif data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'resumen']) }}">
+                    <i class="bi bi-grid-3x3-gap"></i> Resumen Establecimiento
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'docentes' ? 'active' : '' }}" @if ($activeTab === 'docentes') aria-current="page" @endif data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'docentes']) }}">
+                    <i class="bi bi-person-workspace"></i> Docentes
+                </a>
+            </li>
+            @if ($canViewSobredotacion ?? false)
+                <li class="nav-item">
+                    <a class="nav-link {{ $activeTab === 'sobredotacion' ? 'active' : '' }}" @if ($activeTab === 'sobredotacion') aria-current="page" @endif data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion']) }}">
+                        <i class="bi bi-person-exclamation"></i> Detalle sobredotación
+                    </a>
+                </li>
+            @endif
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'asignacion' ? 'active' : '' }}" @if ($activeTab === 'asignacion') aria-current="page" @endif data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion']) }}">
+                    <i class="bi bi-clipboard-plus"></i> Asignación de horas
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'asignaturas' ? 'active' : '' }}" @if ($activeTab === 'asignaturas') aria-current="page" @endif data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignaturas']) }}">
+                    <i class="bi bi-journal-check"></i> Horas por asignatura
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'cursos-combinados' ? 'active' : '' }}" @if ($activeTab === 'cursos-combinados') aria-current="page" @endif data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'cursos-combinados']) }}">
+                    <i class="bi bi-intersect"></i> Cursos combinados
+                </a>
+            </li>
+        </ul>
+    </nav>
+
     @if (!empty($alertas))
         <div class="alert alert-warning shadow-sm border-0 rounded-4 mb-4">
             <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle"></i> Alertas de consolidación</div>
@@ -171,8 +213,32 @@
         </div>
     @endif
 
-    @include('admin.dotacion-establecimiento.partials._proporcion_excepcion')
-    @include('admin.dotacion-establecimiento.partials._proceso_2027')
+    @include('admin.dotacion-establecimiento.partials._proceso_etapas')
+
+    @php
+        $configuracionAbierta = $activeTab === 'resumen' || ($errors->any() && !old('necesidad_key'));
+    @endphp
+    <section class="card dotacion-section mb-4" aria-labelledby="dotacion-configuracion-titulo">
+        <button type="button" class="dotacion-panel-toggle d-flex justify-content-between align-items-center gap-3" data-bs-toggle="collapse" data-bs-target="#dotacion-configuracion" aria-controls="dotacion-configuracion" aria-expanded="{{ $configuracionAbierta ? 'true' : 'false' }}">
+            <span><strong id="dotacion-configuracion-titulo">Configuración y avance</strong><span class="d-block small text-muted">Planes, docentes asociados, máximos y cobertura obligatoria.</span></span>
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div id="dotacion-configuracion" class="collapse{{ $configuracionAbierta ? ' show' : '' }}">
+            <div class="card-body pb-0">
+                @include('admin.dotacion-establecimiento.partials._proporcion_excepcion')
+                @include('admin.dotacion-establecimiento.partials._proceso_2027')
+            </div>
+        </div>
+    </section>
+
+    <section class="card dotacion-section mb-4" aria-labelledby="dotacion-indicadores-titulo">
+        <button type="button" class="dotacion-panel-toggle d-flex justify-content-between align-items-center gap-3" data-bs-toggle="collapse" data-bs-target="#dotacion-indicadores" aria-controls="dotacion-indicadores" aria-expanded="{{ $activeTab === 'resumen' ? 'true' : 'false' }}">
+            <span><strong id="dotacion-indicadores-titulo">Indicadores y desgloses del establecimiento</strong><span class="d-block small text-muted">Matrícula, contratos, necesidades y brechas. Año {{ $anio }}.</span></span>
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div id="dotacion-indicadores" class="collapse{{ $activeTab === 'resumen' ? ' show' : '' }}">
+        <div class="card-body">
+
 
     {{-- Inicio de filas de indicadores --}}
     @foreach ($kpiFilas as $filaKey => $fila)
@@ -363,49 +429,9 @@
         </div>
     </div>
 
-    <div class="dotacion-pill-tabs mb-4">
-        <ul class="nav nav-pills gap-2" role="tablist">
-            <li class="nav-item" role="presentation">
-                <a class="nav-link {{ $activeTab === 'resumen' ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'resumen']) }}">
-                    <i class="bi bi-grid-3x3-gap"></i> Resumen Establecimiento
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link {{ $activeTab === 'docentes' ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'docentes']) }}">
-                    <i class="bi bi-person-workspace"></i> Docentes
-                </a>
-            </li>
-            @if ($canViewSobredotacion ?? false)
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link {{ $activeTab === 'sobredotacion' ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion']) }}">
-                        <i class="bi bi-person-exclamation"></i> Detalle sobredotación
-                    </a>
-                </li>
-            @endif
-            <li class="nav-item" role="presentation">
-                <a class="nav-link {{ $activeTab === 'asignacion' ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion']) }}">
-                    <i class="bi bi-clipboard-plus"></i> Asignación de horas
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link {{ $activeTab === 'asignaturas' ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignaturas']) }}">
-                    <i class="bi bi-journal-check"></i> Horas por asignatura
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link {{ $activeTab === 'cursos-combinados' ? 'active' : '' }}" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'cursos-combinados']) }}">
-                    <i class="bi bi-intersect"></i> Cursos combinados
-                </a>
-            </li>
-            @if (Route::has('admin.dotacion-funciones.show'))
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link" href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio, 'desde_dotacion' => 1, 'tab_origen' => $tab ?? 'resumen']) }}" data-dotacion-contexto-salida>
-                        <i class="bi bi-diagram-3"></i> Funciones y planes
-                    </a>
-                </li>
-            @endif
-        </ul>
-    </div>
+        </div>
+        </div>
+    </section>
 
     @if ($activeTab === 'sobredotacion')
         @include('admin.dotacion-establecimiento.partials._sobredotacion')
@@ -421,4 +447,5 @@
         @include('admin.dotacion-establecimiento.partials._resumen')
     @endif
     @include('admin.dotacion-establecimiento.partials._restore_context')
+</div>
 @endsection
