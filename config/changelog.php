@@ -1,6 +1,24 @@
 <?php
 
 return [
+    '2026.10.5.568' => [
+        'date' => '2026-10-05',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Selección libre de docentes para libre disposición de Parvularia',
+        'files' => [
+            'app/Support/DotacionPlanTitularPrimero.php',
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Feature/DotacionLibreDisposicionParvulariaTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Libre disposición NT1/NT2 con JEC permite seleccionar un docente de especialidad sin exigir asociación previa, prelación ni justificación, incluso con horas titulares disponibles.',
+            'El selector conserva búsqueda por nombre, RUT y título, muestra los saldos y permite elegir una persona por asignación, ordenada por nombre.',
+            'Mantiene las validaciones de contrato, máximos por bloque, cobertura y permisos. La excepción se determina con la necesidad vigente y también admite cursos combinados.',
+        ],
+        'roles' => ['Administrador', 'Directivo', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.5.567' => [
         'date' => '2026-10-05',
         'module' => 'Dotación establecimiento',

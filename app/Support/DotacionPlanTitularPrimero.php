@@ -11,6 +11,20 @@ class DotacionPlanTitularPrimero
 {
     private const MINIMO_SALDO_ASIGNABLE = 1.0;
 
+    /** Se evalúa con la necesidad vigente, nunca con el subtipo enviado por el formulario. */
+    public static function permiteSeleccionLibre(array $necesidad): bool
+    {
+        $curso = $necesidad['curso'] ?? null;
+
+        return ($necesidad['tipo_asignacion'] ?? '') === 'plan_estudio'
+            && (($necesidad['subtipo_asignacion'] ?? '') === 'libre_disposicion'
+                || (($necesidad['curso_combinado'] ?? false)
+                    && ($necesidad['curso_combinado_libre_disposicion'] ?? false)))
+            && $curso instanceof EstablecimientoCurso
+            && DotacionProfesionDocenteResolver::esCursoNt($curso)
+            && DotacionParvulariaCalculator::conJec($curso, $necesidad['proporcion_key'] ?? null);
+    }
+
     /** @param Collection<int, array<string, mixed>> $docentes
      *  @param array<int, string> $rutsPermitidos
      *  @return Collection<int, array<string, mixed>>
