@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.10.5.569' => [
+        'date' => '2026-10-05',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Limitar libre disposición de Parvularia a docentes asociados',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'tests/Feature/DotacionLibreDisposicionParvulariaTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'El selector de libre disposición NT1/NT2 con JEC muestra sólo los docentes asociados a la asignatura y con saldo disponible.',
+            'Mantiene la elección individual sin prelación ni justificación, incluso para especialistas a contrata cuando hay titulares disponibles.',
+            'El servidor valida la asociación al crear o reasignar horas, conservando los límites de contrato, máximos del bloque y asignaciones históricas.',
+        ],
+        'roles' => ['Administrador', 'Directivo', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.5.568' => [
         'date' => '2026-10-05',
         'module' => 'Dotación establecimiento',

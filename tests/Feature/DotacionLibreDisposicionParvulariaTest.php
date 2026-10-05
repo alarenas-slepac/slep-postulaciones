@@ -77,6 +77,7 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
             'max_horas_bloque_1' => 500, 'max_horas_bloque_2' => 500, 'max_horas_bloque_3' => 500,
         ]);
         $this->configureStages();
+        $this->associate('99000002K');
         $this->actingAs($this->testUser(1, 3));
         $this->withSession(['active_role' => 'admin']);
     }
@@ -87,12 +88,12 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         parent::tearDown();
     }
 
-    public function test_especialista_no_asociado_puede_asignarse_sin_prelar_ni_justificar(): void
+    public function test_especialista_asociado_puede_asignarse_sin_prelar_ni_justificar(): void
     {
         $process = DotacionProceso2027Calculator::resumen($this->ee, 2027);
         $this->assertTrue($process['asignacion_habilitada']);
         $this->assertGreaterThanOrEqual(1, collect($process['docentes'])->firstWhere('rut_normalizado', '99000001K')['horas_titulares_disponibles']);
-        $this->assertFalse(DB::table('dotacion_docente_subsectores')->where('docente_rut_normalizado', '99000002K')->exists());
+        $this->assertTrue(DB::table('dotacion_docente_subsectores')->where('docente_rut_normalizado', '99000002K')->exists());
 
         $response = $this->store();
         $assignment = DotacionDocenteAsignacion::sole();
@@ -109,9 +110,10 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertEquals(0, $after['bloques']['bloque_2']['asignadas']);
     }
 
-    public function test_reasignacion_admite_otro_especialista_no_asociado(): void
+    public function test_reasignacion_admite_otro_especialista_asociado(): void
     {
         $this->store();
+        $this->associate('99000003K');
         $assignment = DotacionDocenteAsignacion::sole();
         app(DotacionAsignacionController::class)->update($this->request([
             'docente_rut' => '99000003-K', 'estamento_cobertura' => 'docente', 'horas_plan_pedagogicas' => 2,
@@ -121,7 +123,7 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertEquals(0, DotacionEstablecimientoCalculator::docentes($this->ee, 2027)->firstWhere('rut_normalizado', '99000002K')['horas_asignadas_total']);
     }
 
-    public function test_curso_combinado_nt1_nt2_admite_especialista_sin_asociacion(): void
+    public function test_curso_combinado_nt1_nt2_admite_especialista_asociado_sin_prelacion(): void
     {
         $second = $this->createCourse('NT2');
         $group = DB::table('dotacion_cursos_combinados')->insertGetId([
@@ -143,7 +145,7 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertNull($assignment->excepcion_prelacion);
     }
 
-    public function test_selector_es_individual_e_incluye_especialistas_no_asociados(): void
+    public function test_selector_es_individual_y_muestra_solo_docentes_asociados(): void
     {
         $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
         $this->app['view']->share('errors', new ViewErrorBag);
@@ -161,11 +163,38 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertSame('', $select->getAttribute('data-fase-plan'));
         $this->assertSame(1, $xpath->query('.//option[@value="99000002-K"]', $select)->length);
         $this->assertSame(1, $xpath->query('.//option[@value="99000001-K"]', $select)->length);
+        $this->assertSame(0, $xpath->query('.//option[@value="99000003-K"]', $select)->length);
         $this->assertSame(0, $xpath->query('.//input[@name="excepcion_prelacion"]', $form)->length);
-        $this->assertStringContainsString('No se exige asociación previa a esta asignatura, prelación ni justificación', $form->textContent);
+        $this->assertStringContainsString('Elija un docente asociado a esta asignatura', $form->textContent);
+        $this->assertStringContainsString('No se exige prelación ni justificación', $form->textContent);
         $options = $xpath->query('.//option[@data-estamento="docente"]', $select);
+        $this->assertSame(2, $options->length);
         $this->assertSame('99000001-K', $options->item(0)->getAttribute('value'));
-        $this->assertSame('99000003-K', $options->item(1)->getAttribute('value'));
+        $this->assertSame('99000002-K', $options->item(1)->getAttribute('value'));
+    }
+
+    public function test_libre_disposicion_rechaza_docente_no_asociado_a_la_asignatura(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('El docente no está asociado a esta asignatura');
+        $this->store(['docente_rut' => '99000003-K']);
+    }
+
+    public function test_reasignacion_no_admite_docente_no_asociado_y_conserva_asignacion(): void
+    {
+        $this->store();
+        $assignment = DotacionDocenteAsignacion::sole();
+        $before = $assignment->getAttributes();
+        try {
+            app(DotacionAsignacionController::class)->update($this->request([
+                'docente_rut' => '99000003-K', 'estamento_cobertura' => 'docente', 'horas_plan_pedagogicas' => 2,
+            ]), $this->ee, $assignment);
+            $this->fail('Una reasignación requiere un docente asociado a la asignatura.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('El docente no está asociado', $exception->getMessage());
+        }
+        $this->assertSame($before, $assignment->fresh()->getAttributes());
+        $this->assertSame(1, DotacionDocenteAsignacion::count());
     }
 
     public function test_subtipo_enviado_no_exime_asignatura_obligatoria(): void
@@ -296,6 +325,17 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
     {
         $items = data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.plan_estudio');
         return collect($items)->first(fn ($item) => DotacionPlanTitularPrimero::permiteSeleccionLibre($item) === $ld);
+    }
+
+    private function associate(string $rut): void
+    {
+        $need = $this->need();
+        DB::table('dotacion_docente_subsectores')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027,
+            'asignatura_key' => DotacionDocentesSubsector::keyParaNecesidad($need),
+            'nivel' => 'parvularia', 'asignatura_nombre' => $need['titulo'],
+            'docente_rut_normalizado' => $rut,
+        ]);
     }
 
     private function store(array $overrides = [], ?array $need = null): \Illuminate\Http\RedirectResponse

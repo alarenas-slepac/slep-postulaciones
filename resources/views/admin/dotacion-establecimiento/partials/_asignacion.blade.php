@@ -405,7 +405,7 @@
                                                     <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                                     <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
                                                     @if ($seleccionLibreParvularia)
-                                                        <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Selección libre de docente.</strong> Elija un docente, incluido uno de especialidad, con al menos 1 h de contrato disponible. No se exige asociación previa a esta asignatura, prelación ni justificación. Se mantienen los límites del contrato y del bloque autorizado.</span></div>
+                                                        <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Selección sin prelación.</strong> Elija un docente asociado a esta asignatura, incluido uno de especialidad, con al menos 1 h de contrato disponible. No se exige prelación ni justificación. Se mantienen los límites del contrato y del bloque autorizado.</span></div>
                                                     @elseif ($proceso2027Asignacion['aplica'] ?? false)
                                                         <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>{{ $fasePlan === 'titular' ? 'Primero, horas titulares.' : 'Sin saldo titular asignable: sigue contrata.' }}</strong> Solo se muestran docentes asociados a esta asignatura con al menos 1 h {{ $fasePlan === 'titular' ? 'titular' : 'a contrata' }} disponible, en orden de prelación. Los saldos menores a 1 h se omiten. Si el saldo de un docente no cubre todas las horas pendientes, asigne primero una fracción del aula.</span></div>
                                                     @endif
@@ -414,12 +414,12 @@
                                                         <option value="docente">Cubierto por docente</option>
                                                         @unless ($soloParvularia || $fasePlan === 'titular')<option value="asistente">Cubierto por Asistente de la Educación</option>@endunless
                                                     </select>
-                                                    <label class="form-label small mb-0" for="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">{{ $seleccionLibreParvularia ? 'Docente o asistente' : 'Docente asociado o asistente' }}</label>
+                                                    <label class="form-label small mb-0" for="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Docente asociado o asistente</label>
                                                     <select id="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre, RUT o título..." data-fase-plan="{{ $fasePlan }}" required>
                                                         <option value="">Seleccione persona...</option>
                                                         <optgroup label="{{ $fasePlan === 'titular' ? 'Docentes con horas titulares disponibles' : ($fasePlan === 'contrata' ? 'Docentes con horas a contrata disponibles' : 'Docentes vigentes y por contratar') }}">
                                                             @foreach ($opcionesDocentesPlan as $doc)
-                                                                @continue(!$seleccionLibreParvularia && $docentesPermitidosSubsector !== null && !in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
+                                                                @continue($docentesPermitidosSubsector !== null && !in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
                                                                 @continue($seleccionLibreParvularia && $doc['saldo'] < 1)
                                                                 @continue($fasePlan !== null && !in_array($doc['rut_normalizado'], $rutsFasePlan, true))
                                                                 @continue($doc['virtual'] && ($doc['cupo_bloque'] !== 'parvularia' || ! (($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2')))
