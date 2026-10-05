@@ -1,6 +1,23 @@
 <?php
 
 return [
+    '2026.10.5.571' => [
+        'date' => '2026-10-05',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Mostrar todos los saldos titulares en el selector de reservas',
+        'files' => [
+            'app/Support/DotacionReservaNoNormativa.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_reserva_no_normativa.blade.php',
+            'tests/Feature/DotacionReservaSaldosTitularesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Muestra los docentes reales de los tres bloques con al menos 1 h titular neta, conservando su orden y descontando asignaciones y reservas previas.',
+            'Conserva visibles las opciones sin margen autorizado, con bloque, saldo, máximo y motivo; no permite seleccionarlas ni traspasar sus horas.',
+            'Informa cuántos docentes tienen saldo y cuántos están habilitados; mantiene los límites individuales, por bloque y por establecimiento y la prohibición de reservar contrata.',
+        ],
+        'roles' => ['Administrador', 'Directivo', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.5.570' => [
         'date' => '2026-10-05',
         'module' => 'Dotación establecimiento',

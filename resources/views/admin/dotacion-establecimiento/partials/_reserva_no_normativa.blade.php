@@ -1,8 +1,12 @@
 @php
-    $docentesReserva = \App\Support\DotacionReservaNoNormativa::elegibles($proceso2027Asignacion);
+    $docentesReserva = \App\Support\DotacionReservaNoNormativa::candidatos($proceso2027Asignacion);
     $faseReserva = \App\Support\DotacionReservaNoNormativa::fase($docentesReserva);
     $opcionesReserva = \App\Support\DotacionReservaNoNormativa::opciones($docentesReserva);
     $capacidadReserva = (float) ($proceso2027Asignacion['capacidad_reserva_no_normativa'] ?? 0);
+    $habilitadosReserva = $opcionesReserva->filter(fn (array $docente) =>
+        \App\Support\DotacionReservaNoNormativa::maximoParaDocente($proceso2027Asignacion, $docente, $faseReserva) >= 1
+    )->count();
+    $labelsBloquesReserva = ['bloque_1' => 'Plan general', 'bloque_2' => 'Educación Parvularia', 'bloque_3' => 'PIE especializado'];
     $reservasActivas = collect($asignaciones)->where('tipo_asignacion', 'reserva_no_normativa')->values();
     $funcionesVinculables = collect($necesidades['funciones'] ?? [])
         ->filter(fn (array $item) => (int) ($item['dotacion_funcion_id'] ?? 0) > 0
@@ -26,7 +30,7 @@
             <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Origen permitido</div><strong>Horas titulares</strong><div class="small text-muted">No se traspasan horas a contrata ni saldos titulares menores a 1 h.</div></div></div>
         </div>
 
-        @if ($capacidadReserva >= 1 && $opcionesReserva->isNotEmpty())
+        @if ($opcionesReserva->isNotEmpty())
         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.reservas.store', $establecimiento) }}" class="border rounded-4 p-3 bg-light">
             @csrf
             <input type="hidden" name="anio" value="2027">
@@ -34,28 +38,38 @@
                 <div class="col-lg-7">
                     <label class="form-label fw-semibold" for="docente-reserva-no-normativa">Docente con saldo titular <span class="text-danger">*</span></label>
                     <div class="dotacion-reserva-picker" data-reserva-picker data-fase="{{ $faseReserva }}" data-maximo-global="{{ $capacidadReserva }}">
-                        <select id="docente-reserva-no-normativa" name="docente_rut" class="form-select" required>
+                        <select id="docente-reserva-no-normativa" name="docente_rut" class="form-select" aria-describedby="ayuda-reserva-no-normativa" required>
                             <option value="">Seleccione docente...</option>
                             @foreach ($opcionesReserva as $docente)
                                 @php
                                     $maximoDocente = \App\Support\DotacionReservaNoNormativa::maximoParaDocente($proceso2027Asignacion, $docente, $faseReserva);
                                     $saldoDocente = \App\Support\DotacionPlanTitularPrimero::disponibles($docente, $faseReserva);
+                                    $bloqueDocente = \App\Support\DotacionReservaNoNormativa::bloque($docente);
+                                    $labelBloque = $labelsBloquesReserva[$bloqueDocente];
+                                    $motivoNoReservable = $maximoDocente >= 1 ? '' : ($capacidadReserva < 1
+                                        ? 'No queda al menos 1 h de saldo no normativo para reservar.'
+                                        : 'El bloque '.$labelBloque.' no tiene al menos 1 h de margen autorizado para reservar.');
                                 @endphp
-                                @continue($maximoDocente < 1)
-                                <option value="{{ $docente['rut'] }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ $docente['prioridad_2027_label'] ?? '' }}" data-saldo="{{ $fmt($saldoDocente) }}" data-maximo="{{ $fmt($maximoDocente) }}" data-maximo-numero="{{ $maximoDocente }}">{{ $docente['nombre'] }} · {{ $docente['rut'] }} · {{ ucfirst($faseReserva) }}: {{ $fmt($saldoDocente) }} h · Máximo: {{ $fmt($maximoDocente) }} h</option>
+                                <option value="{{ $docente['rut'] }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ $docente['prioridad_2027_label'] ?? '' }}" data-bloque="{{ $labelBloque }}" data-motivo="{{ $motivoNoReservable }}" data-saldo="{{ $fmt($saldoDocente) }}" data-maximo="{{ $fmt($maximoDocente) }}" data-maximo-numero="{{ $maximoDocente }}" @disabled($maximoDocente < 1)>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · {{ $labelBloque }} · {{ ucfirst($faseReserva) }}: {{ $fmt($saldoDocente) }} h · Máximo: {{ $fmt($maximoDocente) }} h{{ $motivoNoReservable ? ' · '.$motivoNoReservable : '' }}</option>
                             @endforeach
                         </select>
                     </div>
                 </div>
                 <div class="col-lg-2">
                     <label class="form-label fw-semibold" for="horas-reserva-no-normativa">Horas contrato <span class="text-danger">*</span></label>
-                    <input id="horas-reserva-no-normativa" type="number" name="horas_contrato" class="form-control" min="1" max="{{ $capacidadReserva }}" step="0.01" required>
+                    <input id="horas-reserva-no-normativa" type="number" name="horas_contrato" class="form-control" min="1" max="{{ max(1, $capacidadReserva) }}" step="0.01" required @disabled(!$habilitadosReserva)>
                 </div>
                 <div class="col-lg-3">
-                    <button class="btn btn-primary rounded-pill w-100" type="submit" @disabled(!$asignacion2027Habilitada || $capacidadReserva < 1 || $opcionesReserva->isEmpty())><i class="bi bi-arrow-left-right"></i> Traspasar horas</button>
+                    <button class="btn btn-primary rounded-pill w-100" type="submit" @disabled(!$asignacion2027Habilitada || !$habilitadosReserva)><i class="bi bi-arrow-left-right"></i> Traspasar horas</button>
                 </div>
             </div>
-            <div class="form-text">Sólo se pueden traspasar horas titulares, hasta el saldo disponible del docente, su bloque y el establecimiento.</div>
+            <div id="ayuda-reserva-no-normativa" class="form-text">{{ $opcionesReserva->count() }} docente(s) con saldo titular de al menos 1 h; {{ $habilitadosReserva }} habilitado(s) para reservar. Se incluyen los tres bloques. El saldo descuenta asignaciones y reservas previas; los saldos menores a 1 h se omiten. No se habilitan horas a contrata después de las titulares.</div>
+            @if ($habilitadosReserva < $opcionesReserva->count())
+                <div class="alert alert-info small mt-3 mb-0" role="status">Las opciones no reservables muestran su saldo, máximo y motivo. Tener saldo titular no implica que exista margen autorizado en su bloque o saldo no normativo en el establecimiento.</div>
+            @endif
+            @if (!$asignacion2027Habilitada)
+                <div class="form-text">Complete las etapas previas y configure máximos suficientes para habilitar el traspaso.</div>
+            @endif
         </form>
         @else
             <div class="alert alert-info border-0 rounded-4 small mb-0"><i class="bi bi-info-circle me-1"></i>
@@ -141,6 +155,8 @@
             .dotacion-reserva-picker__detail { display: block; margin-top: .15rem; color: #475569; font-size: .78rem; }
             .dotacion-reserva-picker__balance { display: flex; gap: 1rem; align-items: center; margin-top: .35rem; color: #0f766e; font-size: .82rem; font-weight: 700; }
             .dotacion-reserva-picker__maximum { color: #0b4aa2; }
+            .dotacion-reserva-picker__option[aria-disabled="true"] { background: #f8fafc; cursor: not-allowed; }
+            .dotacion-reserva-picker__reason { display: block; margin-top: .35rem; color: #8a4b00; font-size: .82rem; }
             .dotacion-reserva-picker__empty { padding: .8rem; color: #64748b; font-size: .875rem; }
             @media (max-width: 575.98px) {
                 .dotacion-reserva-picker__trigger { flex-wrap: wrap; }
@@ -198,12 +214,13 @@
                     row.className = 'dotacion-reserva-picker__option';
                     row.setAttribute('role', 'option');
                     row.setAttribute('aria-selected', 'false');
+                    row.setAttribute('aria-disabled', option.disabled ? 'true' : 'false');
                     const name = document.createElement('span');
                     name.className = 'dotacion-reserva-picker__name';
                     name.textContent = `${option.dataset.nombre} · ${option.dataset.rut}`;
                     const detail = document.createElement('span');
                     detail.className = 'dotacion-reserva-picker__detail';
-                    detail.textContent = [option.dataset.titulo, option.dataset.prioridadLabel].filter(Boolean).join(' · ');
+                    detail.textContent = [option.dataset.bloque, option.dataset.titulo, option.dataset.prioridadLabel].filter(Boolean).join(' · ');
                     const balance = document.createElement('span');
                     balance.className = 'dotacion-reserva-picker__balance';
                     const available = document.createElement('span');
@@ -213,8 +230,15 @@
                     maximum.textContent = `Máximo a traspasar: ${option.dataset.maximo} h`;
                     balance.append(available, maximum);
                     row.append(name, detail, balance);
+                    if (option.disabled) {
+                        const reason = document.createElement('span');
+                        reason.className = 'dotacion-reserva-picker__reason';
+                        reason.textContent = 'No reservable: ' + option.dataset.motivo;
+                        row.append(reason);
+                    }
                     row.dataset.search = normalize(option.textContent + ' ' + option.dataset.titulo);
                     row.addEventListener('click', () => {
+                        if (option.disabled) return;
                         select.value = option.value;
                         select.dispatchEvent(new Event('change', { bubbles: true }));
                         trigger.classList.remove('is-invalid');

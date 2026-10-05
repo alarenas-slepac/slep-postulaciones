@@ -14,13 +14,20 @@ class DotacionReservaNoNormativa
     }
 
     /** @return Collection<int, array<string, mixed>> */
+    public static function candidatos(array $proceso): Collection
+    {
+        // Visibilidad del saldo individual, independiente del margen del bloque.
+        // El controlador sigue usando elegibles() para autorizar el traspaso.
+        return collect($proceso['docentes'] ?? [])->filter(fn (array $docente) =>
+            empty($docente['cupo_contrata_id'])
+                && DotacionPlanTitularPrimero::disponibles($docente, 'titular') >= 1.0
+        )->values();
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
     public static function elegibles(array $proceso): Collection
     {
-        return collect($proceso['docentes'] ?? [])->filter(function (array $docente) use ($proceso): bool {
-            if (! empty($docente['cupo_contrata_id'])) {
-                return false;
-            }
-
+        return self::candidatos($proceso)->filter(function (array $docente) use ($proceso): bool {
             $bloque = self::bloque($docente);
 
             return (float) data_get($proceso, 'bloques.'.$bloque.'.saldo_maximo', 0) >= 1.0
