@@ -1056,6 +1056,7 @@ class DotacionAsignacionController extends Controller
 
         $docentesPermitidosSubsector = null;
         $necesidadPlan = null;
+        $seleccionLibreParvularia = false;
         if (in_array((string) ($payload['tipo_asignacion'] ?? ''), ['plan_estudio', 'acompanamiento_parvularia'], true)) {
             $necesidadPlan = DotacionAsignacionCalculator::planNeedForKey(
                 $establecimiento, $anio, (string) ($payload['necesidad_key'] ?? '')
@@ -1063,6 +1064,8 @@ class DotacionAsignacionController extends Controller
             if (! $necesidadPlan) {
                 throw ValidationException::withMessages(['necesidad_key' => 'La asignatura del plan ya no está vigente. Actualice la página.']);
             }
+            $seleccionLibreParvularia = ($payload['tipo_asignacion'] ?? '') === 'plan_estudio'
+                && DotacionPlanTitularPrimero::permiteSeleccionLibre($necesidadPlan);
             $subsectorKey = DotacionDocentesSubsector::keyParaNecesidad($necesidadPlan);
             $docentesPermitidosSubsector = collect($proceso['docentes_subsector']['asignaturas'] ?? [])
                 ->firstWhere('key', $subsectorKey)['docentes'] ?? [];
@@ -1070,6 +1073,7 @@ class DotacionAsignacionController extends Controller
                 (string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? '')
             );
             if (($payload['estamento_cobertura'] ?? 'docente') === 'docente'
+                && ! $seleccionLibreParvularia
                 && ! in_array($rutSeleccionado, $docentesPermitidosSubsector, true)) {
                 throw ValidationException::withMessages([
                     'docente_rut' => 'El docente no está asociado a esta asignatura. Asócielo primero en la etapa Docentes por asignatura.',
@@ -1077,7 +1081,7 @@ class DotacionAsignacionController extends Controller
             }
         }
 
-        if (($payload['tipo_asignacion'] ?? '') === 'plan_estudio' && $necesidadPlan !== null) {
+        if (($payload['tipo_asignacion'] ?? '') === 'plan_estudio' && $necesidadPlan !== null && ! $seleccionLibreParvularia) {
             $docentesPlan = DotacionPlanTitularPrimero::elegibles(
                 collect($proceso['docentes'] ?? []), $docentesPermitidosSubsector ?? [], $necesidadPlan, $current
             );
@@ -1162,6 +1166,11 @@ class DotacionAsignacionController extends Controller
             ));
         }
         $disponibles = max(0.0, (float) ($persona['horas_contrato'] ?? 0) - $asignadasPersona);
+        if ($seleccionLibreParvularia && $disponibles < 1.0) {
+            throw ValidationException::withMessages([
+                'docente_rut' => 'Seleccione un docente con al menos 1 h de contrato disponible.',
+            ]);
+        }
         if ($horas > $disponibles + 0.01) {
             throw ValidationException::withMessages([
                 'horas_contrato' => 'La persona seleccionada dispone de '.$disponibles.' hora(s) de contrato para asignar.',
@@ -1187,7 +1196,7 @@ class DotacionAsignacionController extends Controller
             $seleccionado ?? [],
             $horas
         );
-        if ($hayPrelacionAnterior && ! ($payload['_desde_reserva'] ?? false)) {
+        if ($hayPrelacionAnterior && ! $seleccionLibreParvularia && ! ($payload['_desde_reserva'] ?? false)) {
             throw ValidationException::withMessages([
                 'docente_rut' => 'Existen docentes de prioridad superior o de mayor antigüedad en el mismo grupo con horas suficientes para cubrir esta asignación. Seleccione uno de ellos.',
             ]);
