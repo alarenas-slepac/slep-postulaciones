@@ -3,12 +3,22 @@
 namespace App\Models;
 
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionSituacionesAnuales;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Schema;
 
 class DotacionDocenteExclusion extends Model
 {
+    protected static function booted(): void
+    {
+        static::saved(function (self $situacion): void {
+            app(DotacionSituacionesAnuales::class)->copiarAlAnioSiguiente(
+                (int) $situacion->establecimiento_id, (int) $situacion->anio
+            );
+        });
+    }
+
     protected $table = 'dotacion_docente_exclusiones';
 
     public const MOTIVOS = [
