@@ -1073,7 +1073,6 @@ class DotacionAsignacionController extends Controller
                 (string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? '')
             );
             if (($payload['estamento_cobertura'] ?? 'docente') === 'docente'
-                && ! $seleccionLibreParvularia
                 && ! in_array($rutSeleccionado, $docentesPermitidosSubsector, true)) {
                 throw ValidationException::withMessages([
                     'docente_rut' => 'El docente no está asociado a esta asignatura. Asócielo primero en la etapa Docentes por asignatura.',
