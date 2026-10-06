@@ -7,6 +7,7 @@
 @section('content')
 <div class="dotacion-workspace">
     @php
+        $mostrarMatricula = ($activeRole ?? null) !== 'funcionario_directivo_estab';
         $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
         $activeTab = $tab ?? 'resumen';
         $horasContratoActuales = (float) ($resumen['horas_contrato_docentes'] ?? 0);
@@ -73,7 +74,9 @@
             $desgloseDeclaradoItems[] = ['label' => 'Otras funciones PIE declaradas', 'assigned' => $desgloseContratoBloque['otras_funciones_pie_asignadas'] ?? 0, 'value' => $desgloseContratoBloque['otras_funciones_pie'], 'tone' => 'info', 'icon' => 'bi-universal-access'];
         }
         $kpisGenerales = [
-            ['label' => 'Matrícula', 'value' => number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.'), 'hint' => 'Estudiantes con matrícula vigente.', 'tone' => 'dark', 'icon' => 'bi-people'],
+            ...($mostrarMatricula ? [
+                ['label' => 'Matrícula', 'value' => number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.'), 'hint' => 'Estudiantes con matrícula vigente.', 'tone' => 'dark', 'icon' => 'bi-people'],
+            ] : []),
             ['label' => 'Cursos', 'value' => number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.'), 'hint' => 'Cursos con matrícula.', 'tone' => 'primary', 'icon' => 'bi-grid-3x3-gap'],
             ['label' => 'Docentes', 'value' => number_format((int) ($resumen['docentes_total'] ?? 0), 0, ',', '.'), 'hint' => 'Base contractual vigente.', 'tone' => 'success', 'icon' => 'bi-person-workspace'],
         ];
@@ -99,7 +102,7 @@
                 : 'Contrato PIE de Educación Diferencial: '.$fmt($horasContratoEducadorasDiferenciales).' · Coordinación PIE de otros docentes: '.$fmt($horasContratoCoordinacionPie).'. Las horas normativas de Educación Diferencial se contabilizan en Aula, excepto Coordinación PIE. El saldo permanece en PIE, sin duplicar coordinación.', 'tone' => 'info', 'icon' => 'bi-universal-access'],
         ];
         $kpiFilas = [
-            'generales' => ['items' => $kpisGenerales, 'columns' => 'row-cols-md-3'],
+            'generales' => ['items' => $kpisGenerales, 'columns' => 'row-cols-md-'.count($kpisGenerales)],
             'necesidades' => ['items' => $kpisNecesidades, 'columns' => 'row-cols-md-2 row-cols-xl-'.count($kpisNecesidades)],
             'contratos' => ['items' => $kpisContratos, 'columns' => 'row-cols-md-2 row-cols-xl-'.count($kpisContratos)],
         ];
@@ -233,7 +236,7 @@
 
     <section class="card dotacion-section mb-4" aria-labelledby="dotacion-indicadores-titulo">
         <button type="button" class="dotacion-panel-toggle d-flex justify-content-between align-items-center gap-3" data-bs-toggle="collapse" data-bs-target="#dotacion-indicadores" aria-controls="dotacion-indicadores" aria-expanded="{{ $activeTab === 'resumen' ? 'true' : 'false' }}">
-            <span><strong id="dotacion-indicadores-titulo">Indicadores y desgloses del establecimiento</strong><span class="d-block small text-muted">Matrícula, contratos, necesidades y brechas. Año {{ $anio }}.</span></span>
+            <span><strong id="dotacion-indicadores-titulo">Indicadores y desgloses del establecimiento</strong><span class="d-block small text-muted">{{ $mostrarMatricula ? 'Matrícula, contratos' : 'Contratos' }}, necesidades y brechas. Año {{ $anio }}.</span></span>
             <i class="bi bi-chevron-down" aria-hidden="true"></i>
         </button>
         <div id="dotacion-indicadores" class="collapse{{ $activeTab === 'resumen' ? ' show' : '' }}">

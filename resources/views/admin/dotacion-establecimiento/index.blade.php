@@ -7,6 +7,7 @@
 @section('content')
 <div class="dotacion-workspace">
     @php
+        $mostrarMatricula = ($activeRole ?? null) !== 'funcionario_directivo_estab';
         $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
         $itemsPagina = collect(method_exists($establecimientos, 'items') ? $establecimientos->items() : $establecimientos);
         $totalMatriculaPagina = $itemsPagina->sum(fn ($ee) => (int) (($ee->dotacion_establecimiento_resumen['matricula_total'] ?? 0)));
@@ -71,10 +72,12 @@
     @enderror
 
     <div class="row g-3 mb-4">
-        <div class="col-xl-3 col-md-6"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Establecimientos visibles</div><div class="fs-3 fw-bold text-primary">{{ number_format($establecimientos->total(), 0, ',', '.') }}</div><div class="small text-muted">Según filtros y rol activo.</div></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Matrícula página</div><div class="fs-3 fw-bold">{{ number_format($totalMatriculaPagina, 0, ',', '.') }}</div><div class="small text-muted">Suma de registros visibles.</div></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Cursos página</div><div class="fs-3 fw-bold text-primary">{{ number_format($totalCursosPagina, 0, ',', '.') }}</div><div class="small text-muted">Cursos con matrícula.</div></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Horas contrato docentes</div><div class="fs-3 fw-bold text-success">{{ $fmt($totalContratoPagina) }}</div><div class="small text-muted">Base contractual visible.</div></div></div></div>
+        <div class="{{ $mostrarMatricula ? 'col-xl-3 col-md-6' : 'col-xl-4 col-md-6' }}"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Establecimientos visibles</div><div class="fs-3 fw-bold text-primary">{{ number_format($establecimientos->total(), 0, ',', '.') }}</div><div class="small text-muted">Según filtros y rol activo.</div></div></div></div>
+        @if ($mostrarMatricula)
+            <div class="{{ $mostrarMatricula ? 'col-xl-3 col-md-6' : 'col-xl-4 col-md-6' }}"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Matrícula página</div><div class="fs-3 fw-bold">{{ number_format($totalMatriculaPagina, 0, ',', '.') }}</div><div class="small text-muted">Suma de registros visibles.</div></div></div></div>
+        @endif
+        <div class="{{ $mostrarMatricula ? 'col-xl-3 col-md-6' : 'col-xl-4 col-md-6' }}"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Cursos página</div><div class="fs-3 fw-bold text-primary">{{ number_format($totalCursosPagina, 0, ',', '.') }}</div><div class="small text-muted">Cursos con matrícula.</div></div></div></div>
+        <div class="{{ $mostrarMatricula ? 'col-xl-3 col-md-6' : 'col-xl-4 col-md-6' }}"><div class="card dotacion-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Horas contrato docentes</div><div class="fs-3 fw-bold text-success">{{ $fmt($totalContratoPagina) }}</div><div class="small text-muted">Base contractual visible.</div></div></div></div>
     </div>
 
     <form method="GET" class="card dotacion-section mb-4">
@@ -126,7 +129,9 @@
                         <th>RBD</th>
                         <th>Establecimiento</th>
                         <th>Comuna</th>
-                        <th class="text-end">Matrícula</th>
+                        @if ($mostrarMatricula)
+                            <th class="text-end">Matrícula</th>
+                        @endif
                         <th class="text-end">Cursos</th>
                         <th class="text-end">Docentes</th>
                         <th class="text-end">Hrs plan</th>
@@ -146,7 +151,9 @@
                             <td class="text-nowrap fw-semibold">{{ $establecimiento->rbd }}</td>
                             <td><div class="fw-bold">{{ $establecimiento->nombre_establecimiento }}</div><div class="text-muted small">{{ $establecimiento->clasificacion ?? '—' }}</div></td>
                             <td>{{ $establecimiento->comuna ?: '—' }}</td>
-                            <td class="text-end">{{ number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.') }}</td>
+                            @if ($mostrarMatricula)
+                                <td class="text-end">{{ number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.') }}</td>
+                            @endif
                             <td class="text-end">{{ number_format((int) ($resumen['cursos_total'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end">{{ number_format((int) ($resumen['docentes_total'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end fw-semibold text-primary">{{ $fmt($resumen['horas_plan_total'] ?? 0) }}</td>
@@ -155,7 +162,7 @@
                             <td class="text-end"><a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio]) }}"><i class="bi bi-eye"></i> Ver dotación</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="10" class="text-center text-muted py-4">No se encontraron establecimientos para los filtros aplicados.</td></tr>
+                        <tr><td colspan="{{ $mostrarMatricula ? 10 : 9 }}" class="text-center text-muted py-4">No se encontraron establecimientos para los filtros aplicados.</td></tr>
                     @endforelse
                 </tbody>
             </table>
