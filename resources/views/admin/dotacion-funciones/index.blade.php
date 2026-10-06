@@ -1,6 +1,9 @@
 @extends('layouts.app')
 
 @section('content')
+    @php
+        $mostrarMatricula = ($activeRole ?? null) !== 'funcionario_directivo_estab';
+    @endphp
     <div class="slep-card p-4 d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
         <div>
             <div class="small text-muted text-uppercase mb-2"><i class="bi bi-people me-1" aria-hidden="true"></i> Planificación de dotación</div>
@@ -58,7 +61,9 @@
                         <th>RBD</th>
                         <th>Establecimiento</th>
                         <th>Comuna</th>
-                        <th class="text-end">Matrícula</th>
+                        @if ($mostrarMatricula)
+                            <th class="text-end">Matrícula</th>
+                        @endif
                         <th class="text-end">Cursos NEE</th>
                         <th class="text-end">Directivos</th>
                         <th class="text-end">Téc. ped.</th>
@@ -83,7 +88,9 @@
                                 <div class="text-muted small">{{ $establecimiento->clasificacion ?? '—' }}</div>
                             </td>
                             <td>{{ $establecimiento->comuna ?: '—' }}</td>
-                            <td class="text-end">{{ number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.') }}</td>
+                            @if ($mostrarMatricula)
+                                <td class="text-end">{{ number_format((int) ($resumen['matricula_total'] ?? 0), 0, ',', '.') }}</td>
+                            @endif
                             <td class="text-end">{{ number_format((int) ($resumen['cursos_nee'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end fw-semibold text-primary">{{ number_format((int) ($consolidado['directiva']['total'] ?? 0), 0, ',', '.') }}</td>
                             <td class="text-end fw-semibold text-success">{{ number_format((int) ($consolidado['tecnico_pedagogica']['total'] ?? 0), 0, ',', '.') }}</td>
@@ -106,7 +113,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="13" class="text-center text-muted py-4">No se encontraron establecimientos para los filtros aplicados.</td>
+                            <td colspan="{{ $mostrarMatricula ? 13 : 12 }}" class="text-center text-muted py-4">No se encontraron establecimientos para los filtros aplicados.</td>
                         </tr>
                     @endforelse
                 </tbody>

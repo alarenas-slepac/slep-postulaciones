@@ -7,6 +7,7 @@
 @section('content')
 <div class="dotacion-workspace">
     @php
+        $mostrarMatricula = ($activeRole ?? null) !== 'funcionario_directivo_estab';
         $categoriaClass = [
             'directiva' => 'primary',
             'tecnico_pedagogica' => 'success',
@@ -52,20 +53,22 @@
     @endif
 
     <div class="row g-3 mb-3">
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 h-100"><div class="card-body">
-                <div class="text-muted small">Matrícula total</div>
-                <div class="fs-3 fw-bold">{{ number_format((int) $contexto['matricula_total'], 0, ',', '.') }}</div>
-            </div></div>
-        </div>
-        <div class="col-md-4">
+        @if ($mostrarMatricula)
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100"><div class="card-body">
+                    <div class="text-muted small">Matrícula total</div>
+                    <div class="fs-3 fw-bold">{{ number_format((int) $contexto['matricula_total'], 0, ',', '.') }}</div>
+                </div></div>
+            </div>
+        @endif
+        <div class="{{ $mostrarMatricula ? 'col-md-4' : 'col-md-6' }}">
             <div class="card shadow-sm border-0 h-100"><div class="card-body">
                 <div class="text-muted small">Cursos con estudiantes NEE</div>
                 <div class="fs-3 fw-bold text-success">{{ number_format((int) $contexto['cursos_nee'], 0, ',', '.') }}</div>
                 <div class="small text-muted">Coordinación PIE = 2 hrs por curso.</div>
             </div></div>
         </div>
-        <div class="col-md-4">
+        <div class="{{ $mostrarMatricula ? 'col-md-4' : 'col-md-6' }}">
             <div class="card shadow-sm border-0 h-100"><div class="card-body">
                 <div class="text-muted small">Total horas estimadas</div>
                 <div class="fs-3 fw-bold text-primary">{{ number_format((int) $resumen['horas_totales'], 0, ',', '.') }}</div>
@@ -194,7 +197,11 @@
                     </thead>
                     <tbody>
                         @foreach (($sugerencias[$categoriaKey] ?? collect()) as $item)
-                            <tr data-catalog-row data-catalog-search="{{ $item['nombre_funcion'] }} {{ $categoriaLabel }} {{ $item['detalle'] }}" data-catalog-state="automatica">
+                            @php
+                                $detalleSugerencia = ! $mostrarMatricula && in_array($item['codigo'] ?? '', ['coordinador_extraescolar', 'cra', 'coordinador_ciclo_tp_especialidad'], true)
+                                    ? '' : $item['detalle'];
+                            @endphp
+                            <tr data-catalog-row data-catalog-search="{{ $item['nombre_funcion'] }} {{ $categoriaLabel }} {{ $detalleSugerencia }}" data-catalog-state="automatica">
                                 <td>
                                     <div class="fw-semibold">{{ $item['nombre_funcion'] }}</div>
                                     @if (($item['codigo'] ?? '') === 'coordinador_pie')
@@ -207,7 +214,7 @@
                                     @endif
                                 </td>
                                 <td><span class="badge text-bg-light border">Automática</span></td>
-                                <td class="small text-muted">{{ $item['detalle'] }}</td>
+                                <td class="small text-muted">{{ $detalleSugerencia }}</td>
                                 <td class="text-end fw-semibold">{{ number_format((int) $item['horas_sugeridas'], 0, ',', '.') }}</td>
                                 <td class="text-end">—</td>
                                 <td class="text-end">—</td>

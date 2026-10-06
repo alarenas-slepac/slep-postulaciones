@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.10.6.574' => [
+        'date' => '2026-10-06',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Ocultar los indicadores de matrícula al directivo del establecimiento',
+        'files' => [
+            'resources/views/admin/dotacion-establecimiento/index.blade.php',
+            'resources/views/admin/dotacion-establecimiento/show.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_cursos_combinados.blade.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'resources/views/admin/dotacion-funciones/index.blade.php',
+            'resources/views/admin/dotacion-funciones/show.blade.php',
+            'tests/Feature/DotacionMatriculaVisibilidadTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Omite en el servidor las tarjetas, columnas, totales y cifras de matrícula de cursos para el rol activo funcionario_directivo_estab, sin avisos de restricción.',
+            'Aplica la misma ocultación al informe PDF y a los fundamentos automáticos que contienen cifras de matrícula en Dotación funciones y planes.',
+            'Ajusta la distribución de las tarjetas y las columnas de las tablas; conserva la información de los demás roles y los cálculos de dotación.',
+        ],
+        'roles' => ['Directivo de establecimiento'],
+    ],
     '2026.10.6.573' => [
         'date' => '2026-10-06',
         'module' => 'Dotación establecimiento',
