@@ -1,5 +1,4 @@
 @php
-    $mostrarMatricula = ($activeRole ?? null) !== 'funcionario_directivo_estab';
     $fmt = $fmt ?? fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
     $config = $cursosCombinados ?? [];
     $tablesReady = (bool) ($config['tables_ready'] ?? false);
@@ -93,7 +92,7 @@
                             <div class="col-xl-3 col-md-4 col-sm-6">
                                 <label for="combinado-nuevo-curso-{{ $course['id'] }}" class="border rounded-3 p-2 d-flex gap-2 align-items-start h-100">
                                     <input id="combinado-nuevo-curso-{{ $course['id'] }}" class="form-check-input mt-1" type="checkbox" name="curso_ids[]" value="{{ $course['id'] }}" @checked(in_array((string) $course['id'], array_map('strval', old('curso_ids', [])), true))>
-                                    <span><span class="fw-semibold">{{ $course['label'] }}</span>@if ($mostrarMatricula)<br><span class="small text-muted">Matrícula {{ $course['matricula'] }}</span>@endif</span>
+                                    <span><span class="fw-semibold">{{ $course['label'] }}</span><br><span class="small text-muted">Matrícula {{ $course['matricula'] }}</span></span>
                                 </label>
                             </div>
                         @empty
@@ -177,7 +176,7 @@
                                         <div class="col-xl-3 col-md-4 col-sm-6">
                                             <label for="combinado-{{ $group['id'] }}-curso-{{ $course['id'] }}" class="border rounded-3 p-2 d-flex gap-2 align-items-start h-100">
                                                 <input id="combinado-{{ $group['id'] }}-curso-{{ $course['id'] }}" class="form-check-input mt-1" type="checkbox" name="curso_ids[]" value="{{ $course['id'] }}" @checked($memberIds->contains((int) $course['id']))>
-                                                <span><span class="fw-semibold">{{ $course['label'] }}</span>@if ($mostrarMatricula)<br><span class="small text-muted">Matrícula {{ $course['matricula'] }}</span>@endif</span>
+                                                <span><span class="fw-semibold">{{ $course['label'] }}</span><br><span class="small text-muted">Matrícula {{ $course['matricula'] }}</span></span>
                                             </label>
                                         </div>
                                     @endforeach
