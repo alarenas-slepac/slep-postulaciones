@@ -153,6 +153,7 @@ class SolicitudReemplazoController extends Controller
         $validTipos = $this->tiposReemplazoValidos();
         $tiposDeshabilitados = $this->tiposReemplazoDeshabilitados();
         $messages = [
+            'tipo_reemplazo.in' => 'El tipo de reemplazo seleccionado no es válido. Seleccione una opción de la lista.',
             'postulant_profile_id.required' => 'Debe seleccionar un postulante cuando propone reemplazo.',
             'oficio_pdf.max' => 'El archivo Oficio Solicitud de Reemplazo no puede superar 10 MB.',
             'oficio_pdf.mimes' => 'El archivo Oficio Solicitud de Reemplazo debe estar en formato PDF.',
@@ -177,7 +178,7 @@ class SolicitudReemplazoController extends Controller
             'contacto_fono' => ['required', 'string', 'max:30'],
 
             'reemplazo_personal_id' => ['required', 'integer', 'exists:reemplazos_personal,id'],
-            'tipo_reemplazo' => ['required', 'string', 'in:' . implode(',', $validTipos)],
+            'tipo_reemplazo' => ['required', 'string', Rule::in($validTipos)],
             'tipo_reemplazo_otro' => ['nullable', 'string', 'max:255'],
             'area_desempeno_id' => ['required', 'integer', 'exists:areas_desempeno,id'],
 
@@ -627,7 +628,7 @@ class SolicitudReemplazoController extends Controller
             'reemplazo_personal_id' => ['required', 'integer', 'exists:reemplazos_personal,id'],
             'area_desempeno_id' => ['required', 'integer', 'exists:areas_desempeno,id'],
 
-            'tipo_reemplazo' => ['required', 'string', 'in:' . implode(',', $validTipos)],
+            'tipo_reemplazo' => ['required', 'string', Rule::in($validTipos)],
             'tipo_reemplazo_otro' => ['nullable', 'string', 'max:255'],
 
             'fecha_inicio' => ['required', 'date_format:d/m/Y'],
@@ -652,6 +653,7 @@ class SolicitudReemplazoController extends Controller
             'declaracion_responsabilidad_aceptada' => ['accepted'],
             'action' => ['nullable', 'in:guardar,reenviar'],
         ], [
+            'tipo_reemplazo.in' => 'El tipo de reemplazo seleccionado no es válido. Seleccione una opción de la lista.',
             'declaracion_responsabilidad_aceptada.accepted' => 'Debe aceptar la declaración de responsabilidad del director del establecimiento.',
             'oficio_pdf.max' => 'El archivo Oficio Solicitud de Reemplazo no puede superar 10 MB.',
             'oficio_pdf.mimes' => 'El archivo Oficio Solicitud de Reemplazo debe estar en formato PDF.',

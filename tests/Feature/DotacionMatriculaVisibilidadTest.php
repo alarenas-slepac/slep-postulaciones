@@ -30,7 +30,8 @@ class DotacionMatriculaVisibilidadTest extends IsolatedSecurityTestCase
                 $ee->dotacion_establecimiento_resumen = $ee->dotacion_resumen = $data['resumen'];
                 $data['establecimientos'] = new LengthAwarePaginator($withRows ? [$ee] : [], $withRows ? 1 : 0, 20);
                 $html = view('admin.'.$module.'.index', $data)->render();
-                $this->assertMatriculaAbsent($html);
+                $this->assertMatriculaGeneralAbsent($html);
+                $this->assertStringNotContainsString('>Matrícula', $html);
                 $this->assertTableColumns($html, '//table', $columns);
                 if ($module === 'dotacion-establecimiento') {
                     $this->assertStringContainsString('col-xl-4 col-md-6', $html);
@@ -40,14 +41,18 @@ class DotacionMatriculaVisibilidadTest extends IsolatedSecurityTestCase
         }
     }
 
-    public function test_el_resumen_directivo_omite_tarjeta_y_todas_las_filas_de_matricula_sin_huecos(): void
+    public function test_el_resumen_directivo_muestra_matricula_por_nivel_y_grupo_sin_el_total_general(): void
     {
         $html = view('admin.dotacion-establecimiento.show', $this->data('funcionario_directivo_estab'))->render();
-        $this->assertMatriculaAbsent($html);
+        $this->assertMatriculaGeneralAbsent($html);
         $xpath = $this->xpath($html);
         $this->assertSame(2, $xpath->query('//*[@data-kpi-row="generales"]/*')->length);
         $this->assertStringContainsString('row-cols-md-2', $html);
-        $this->assertTableColumns($html, '//table[thead/tr/th[1][normalize-space(.)="Nivel"]]', 9);
+        $this->assertTableColumns($html, '//table[thead/tr/th[1][normalize-space(.)="Nivel"]]', 10);
+        $this->assertStringContainsString('Matrícula 2027', $html);
+        $this->assertSame('2.345', trim($xpath->query('//tr[td[1][normalize-space(.)="Básica sintética"]]/td[2]')->item(0)->textContent));
+        $this->assertSame('10.000', trim($xpath->query('//tr[td[1]//div[normalize-space(.)="Grupo sintético"]]/td[2]')->item(0)->textContent));
+        $this->assertSame('', trim($xpath->query('//tfoot/tr[td[1][normalize-space(.)="Total establecimiento"]]/td[2]')->item(0)->textContent));
         $this->assertStringContainsString('Grupo sintético', $html);
         $this->assertStringContainsString('Libre disposición NT1/NT2 de otros docentes', $html);
         $this->assertStringContainsString('Horas contrato docentes', $html);
@@ -58,20 +63,26 @@ class DotacionMatriculaVisibilidadTest extends IsolatedSecurityTestCase
         $data = $this->data('funcionario_directivo_estab');
         $data['cursos'] = [];
         $html = view('admin.dotacion-establecimiento.show', $data)->render();
-        $this->assertMatriculaAbsent($html);
-        $this->assertTableColumns($html, '//table[thead/tr/th[1][normalize-space(.)="Nivel"]]', 9);
+        $this->assertMatriculaGeneralAbsent($html);
+        $this->assertTableColumns($html, '//table[thead/tr/th[1][normalize-space(.)="Nivel"]]', 10);
     }
 
-    public function test_el_pdf_directivo_omite_matricula_del_resumen_y_del_detalle_de_cursos(): void
+    public function test_el_pdf_directivo_muestra_detalle_de_matricula_y_omite_el_total_general(): void
     {
         $html = view('admin.dotacion-establecimiento.pdf', $this->data('funcionario_directivo_estab'))->render();
-        $this->assertMatriculaAbsent($html);
-        $this->assertTableColumns($html, '//table[thead/tr/th[1][normalize-space(.)="Nivel"]]', 9);
+        $this->assertMatriculaGeneralAbsent($html);
+        $this->assertTableColumns($html, '//table[thead/tr/th[1][normalize-space(.)="Nivel"]]', 10);
+        $xpath = $this->xpath($html);
+        $summary = $xpath->query('//table[contains(@class,"summary")][1]')->item(0);
+        $this->assertSame(0, $xpath->query('.//th[normalize-space(.)="Matrícula"]', $summary)->length);
+        $this->assertSame('2.345', trim($xpath->query('//tr[td[1][normalize-space(.)="Básica sintética"]]/td[2]')->item(0)->textContent));
+        $this->assertSame('10.000', trim($xpath->query('//tr[td[1]/strong[normalize-space(.)="Grupo sintético"]]/td[2]')->item(0)->textContent));
+        $this->assertSame('', trim($xpath->query('//tr[td[1][normalize-space(.)="Total establecimiento"]]/td[2]')->item(0)->textContent));
         $this->assertStringContainsString('Grupo sintético', $html);
         $this->assertStringContainsString('Contrato', $html);
     }
 
-    public function test_no_se_muestra_matricula_al_crear_o_editar_cursos_combinados(): void
+    public function test_se_muestra_matricula_por_curso_al_crear_o_editar_cursos_combinados(): void
     {
         foreach (['funcionario_directivo_estab', 'admin'] as $role) {
             $data = $this->data($role);
@@ -89,12 +100,9 @@ class DotacionMatriculaVisibilidadTest extends IsolatedSecurityTestCase
             $this->assertSame(4, $this->xpath($html)->query('//input[@name="curso_ids[]"]')->length);
             $this->assertStringContainsString('NT1 sintético', $html);
             $this->assertStringContainsString('NT2 sintético', $html);
-            if ($role === 'funcionario_directivo_estab') {
-                $this->assertMatriculaAbsent($html);
-            } else {
-                $this->assertStringContainsString('Matrícula 23456', $html);
-                $this->assertStringContainsString('Matrícula 34567', $html);
-            }
+            $this->assertMatriculaGeneralAbsent($html);
+            $this->assertStringContainsString('Matrícula 23456', $html);
+            $this->assertStringContainsString('Matrícula 34567', $html);
         }
     }
 
@@ -120,7 +128,7 @@ class DotacionMatriculaVisibilidadTest extends IsolatedSecurityTestCase
             $this->assertStringContainsString('Horas sugeridas según catálogo base de dotación.', $html);
             $this->assertStringContainsString('Sugerencia: 5 hrs.', $html);
             if ($role === 'funcionario_directivo_estab') {
-                $this->assertMatriculaAbsent($html);
+                $this->assertMatriculaGeneralAbsent($html);
                 $this->assertStringContainsString('col-md-6', $html);
             } else {
                 $this->assertStringContainsString('Matrícula total', $html);
@@ -147,9 +155,9 @@ class DotacionMatriculaVisibilidadTest extends IsolatedSecurityTestCase
         }
     }
 
-    private function assertMatriculaAbsent(string $html): void
+    private function assertMatriculaGeneralAbsent(string $html): void
     {
-        foreach (['12.345', '23.456', '34.567', '12345', '23456', '34567', '>Matrícula', 'Matrícula 2027', 'no puede ver', 'no puedes ver', 'matrícula restringida'] as $text) {
+        foreach (['12.345', '12345', '>Matrícula total', '>Matrícula página', 'no puede ver', 'no puedes ver', 'matrícula restringida'] as $text) {
             $this->assertStringNotContainsString($text, $html);
         }
     }
@@ -184,9 +192,9 @@ class DotacionMatriculaVisibilidadTest extends IsolatedSecurityTestCase
         $ee->id = 99999;
         $totals = ['matricula' => 12345, 'cursos' => 2, 'horas' => 60, 'horas_contrato_equivalente' => 70,
             'trabajo_colaborativo_pie' => 6, 'contrato_mas_trabajo_colaborativo_pie' => 76];
-        $level = ['label' => 'Básica sintética', 'matricula' => 12345, 'cursos' => 2, 'horas_variable' => false,
+        $level = ['label' => 'Básica sintética', 'matricula' => 2345, 'cursos' => 2, 'horas_variable' => false,
             'horas_por_nivel' => 30, 'total_horas' => 60, 'sin_horas_plan' => 0];
-        $group = ['label' => 'Educación Básica', 'niveles' => ['basica'], 'totales' => $totals];
+        $group = ['label' => 'Educación Básica', 'niveles' => ['basica'], 'totales' => array_replace($totals, ['matricula' => 2345])];
 
         return [
             'establecimiento' => $ee, 'anio' => 2027, 'activeRole' => $role, 'tab' => 'resumen',
@@ -198,8 +206,8 @@ class DotacionMatriculaVisibilidadTest extends IsolatedSecurityTestCase
             'proporcionExcepcionTableReady' => false, 'canManageProporcionExcepcion' => false,
             'cursos' => ['grupos' => ['basica' => $group], 'rows' => ['basica' => $level], 'totales' => $totals,
                 'resumen_cursos_planes' => ['grupos' => ['basica' => $group], 'rows' => ['basica' => $level],
-                    'totales' => $totals, 'totales_combinados' => $totals, 'tiene_cursos_combinados' => true,
-                    'combinados' => [['label' => 'Grupo sintético', 'miembros_label' => 'NT1 + NT2', 'matricula' => 23456, 'cursos' => 2]],
+                    'totales' => $totals, 'totales_combinados' => array_replace($totals, ['matricula' => 10000]), 'tiene_cursos_combinados' => true,
+                    'combinados' => [['label' => 'Grupo sintético', 'miembros_label' => 'NT1 + NT2', 'matricula' => 10000, 'cursos' => 2]],
                     'refuerzo_plan_general' => ['horas' => 8, 'horas_contrato_equivalente' => 9, 'contrato_mas_trabajo_colaborativo_pie' => 9]]],
         ];
     }

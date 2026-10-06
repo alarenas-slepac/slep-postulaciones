@@ -571,9 +571,7 @@
     <thead>
         <tr>
             <th>Nivel</th>
-            @if ($mostrarMatricula)
-                <th class="text-right">Matrícula</th>
-            @endif
+            <th class="text-right">Matrícula</th>
             <th class="text-right">Cursos</th>
             <th class="text-right">Horas plan por curso</th>
             <th class="text-right">Total horas plan</th>
@@ -586,15 +584,13 @@
     </thead>
     <tbody>
         @foreach ($gruposCursosPlanes as $grupo)
-            <tr class="group-row"><td colspan="{{ $mostrarMatricula ? 10 : 9 }}">{{ $grupo['label'] ?? 'Grupo' }}{{ $cursosCombinadosCursosPlanes->isNotEmpty() ? ' · cursos independientes' : '' }}</td></tr>
+            <tr class="group-row"><td colspan="10">{{ $grupo['label'] ?? 'Grupo' }}{{ $cursosCombinadosCursosPlanes->isNotEmpty() ? ' · cursos independientes' : '' }}</td></tr>
             @foreach (($grupo['niveles'] ?? []) as $nivelKey)
                 @php $row = $rowsCursosPlanes[$nivelKey] ?? null; @endphp
                 @continue(!$row)
                 <tr>
                     <td>{{ $row['label'] }}</td>
-                    @if ($mostrarMatricula)
-                        <td class="text-right">{{ number_format((int) ($row['matricula'] ?? 0), 0, ',', '.') }}</td>
-                    @endif
+                    <td class="text-right">{{ number_format((int) ($row['matricula'] ?? 0), 0, ',', '.') }}</td>
                     <td class="text-right">{{ number_format((int) ($row['cursos'] ?? 0), 0, ',', '.') }}</td>
                     <td class="text-right">{{ ($row['horas_por_nivel'] ?? null) !== null ? $fmt($row['horas_por_nivel']) : 'Variable' }}</td>
                     <td class="text-right primary">{{ $fmt($row['total_horas'] ?? 0) }}</td>
@@ -612,9 +608,7 @@
             @endforeach
             <tr class="total-row">
                 <td>{{ $cursosCombinadosCursosPlanes->isNotEmpty() ? 'Subtotal' : 'Total' }} {{ $grupo['label'] ?? 'grupo' }}{{ $cursosCombinadosCursosPlanes->isNotEmpty() ? ' independiente' : '' }}</td>
-                @if ($mostrarMatricula)
-                    <td class="text-right">{{ number_format((int) ($grupo['totales']['matricula'] ?? 0), 0, ',', '.') }}</td>
-                @endif
+                <td class="text-right">{{ number_format((int) ($grupo['totales']['matricula'] ?? 0), 0, ',', '.') }}</td>
                 <td class="text-right">{{ number_format((int) ($grupo['totales']['cursos'] ?? 0), 0, ',', '.') }}</td>
                 <td></td>
                 <td class="text-right primary">{{ $fmt($grupo['totales']['horas'] ?? 0) }}</td>
@@ -626,13 +620,11 @@
             </tr>
         @endforeach
         @if ($cursosCombinadosCursosPlanes->isNotEmpty())
-            <tr class="group-row"><td colspan="{{ $mostrarMatricula ? 10 : 9 }}">Cursos combinados activos</td></tr>
+            <tr class="group-row"><td colspan="10">Cursos combinados activos</td></tr>
             @foreach ($cursosCombinadosCursosPlanes as $row)
                 <tr>
                     <td><strong>{{ $row['label'] }}</strong><br><span class="small muted">{{ $row['miembros_label'] }}</span><br><span class="badge badge-blue">Grupo combinado</span></td>
-                    @if ($mostrarMatricula)
-                        <td class="text-right">{{ number_format((int) ($row['matricula'] ?? 0), 0, ',', '.') }}</td>
-                    @endif
+                    <td class="text-right">{{ number_format((int) ($row['matricula'] ?? 0), 0, ',', '.') }}</td>
                     <td class="text-right">{{ number_format((int) ($row['cursos'] ?? 0), 0, ',', '.') }}</td>
                     <td class="text-right">
                         @if (!($row['horas_plan_por_curso_variable'] ?? false))
@@ -659,9 +651,7 @@
             @php $totalesCombinadosCursosPlanes = $cursosPlanesResumen['totales_combinados'] ?? []; @endphp
             <tr class="total-row">
                 <td>Total cursos combinados</td>
-                @if ($mostrarMatricula)
-                    <td class="text-right">{{ number_format((int) ($totalesCombinadosCursosPlanes['matricula'] ?? 0), 0, ',', '.') }}</td>
-                @endif
+                <td class="text-right">{{ number_format((int) ($totalesCombinadosCursosPlanes['matricula'] ?? 0), 0, ',', '.') }}</td>
                 <td class="text-right">{{ number_format((int) ($totalesCombinadosCursosPlanes['cursos'] ?? 0), 0, ',', '.') }}</td>
                 <td></td>
                 <td class="text-right primary">{{ $fmt($totalesCombinadosCursosPlanes['horas'] ?? 0) }}</td>
@@ -675,9 +665,7 @@
         @if (($refuerzoPlanGeneral['horas'] ?? 0) > 0)
             <tr>
                 <td><strong>Plan General · Libre disposición NT1/NT2 de otros docentes</strong></td>
-                @if ($mostrarMatricula)
-                    <td class="text-right">—</td>
-                @endif
+                <td class="text-right">—</td>
                 <td class="text-right">—</td>
                 <td class="text-right">—</td>
                 <td class="text-right primary">{{ $fmt($refuerzoPlanGeneral['horas']) }}</td>
@@ -690,9 +678,7 @@
         @endif
         <tr class="total-row">
             <td>Total establecimiento</td>
-            @if ($mostrarMatricula)
-                <td class="text-right">{{ number_format((int) ($totalesCursosPlanes['matricula'] ?? 0), 0, ',', '.') }}</td>
-            @endif
+            <td class="text-right">@if ($mostrarMatricula){{ number_format((int) ($totalesCursosPlanes['matricula'] ?? 0), 0, ',', '.') }}@endif</td>
             <td class="text-right">{{ number_format((int) ($totalesCursosPlanes['cursos'] ?? 0), 0, ',', '.') }}</td>
             <td></td>
             <td class="text-right primary">{{ $fmt($totalesCursosPlanes['horas'] ?? 0) }}</td>

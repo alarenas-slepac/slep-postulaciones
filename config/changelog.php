@@ -1,6 +1,40 @@
 <?php
 
 return [
+    '2026.10.6.576' => [
+        'date' => '2026-10-06',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Validar correctamente los tipos de reemplazo que contienen comas',
+        'files' => [
+            'app/Http/Controllers/FuncionarioEstab/SolicitudReemplazoController.php',
+            'tests/Feature/SolicitudReemplazoTipoValidationTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Corrige la validación al crear y editar solicitudes para aceptar el nombre completo de Reposo Mutualidad, sin interpretar sus comas como separadores de opciones.',
+            'Conserva los tipos históricos y las restricciones de nuevas solicitudes; rechaza fragmentos de nombres y opciones inexistentes con un mensaje que identifica el tipo de reemplazo.',
+            'Prueba los 15 tipos del catálogo en creación y edición, sus restricciones, los nombres históricos y el caso docente con tres adjuntos; conserva la exigencia de PDF y el máximo de 10 MB, con base de datos en memoria, almacenamiento y correo simulados.',
+        ],
+        'roles' => ['Funcionario de establecimiento', 'Administrador'],
+    ],
+    '2026.10.6.575' => [
+        'date' => '2026-10-06',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Mostrar la matrícula por curso y ocultar únicamente el total general al directivo',
+        'files' => [
+            'resources/views/admin/dotacion-establecimiento/partials/_resumen.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_cursos_combinados.blade.php',
+            'resources/views/admin/dotacion-establecimiento/pdf.blade.php',
+            'tests/Feature/DotacionMatriculaVisibilidadTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Restituye la matrícula en el detalle de niveles, grupos y cursos combinados para funcionario_directivo_estab, incluida la selección de cursos al crear y editar combinaciones.',
+            'Mantiene ocultas las sumas generales del establecimiento en tarjetas, listados, fundamentos automáticos y totales del resumen y del PDF, sin avisos de restricción.',
+            'Conserva las columnas y los valores de cursos, horas y contratos; verifica que el detalle de matrícula permanezca visible y que el total general no se incluya en el HTML.',
+        ],
+        'roles' => ['Directivo de establecimiento'],
+    ],
     '2026.10.6.574' => [
         'date' => '2026-10-06',
         'module' => 'Dotación establecimiento',
