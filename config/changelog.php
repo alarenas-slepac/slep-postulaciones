@@ -1,6 +1,26 @@
 <?php
 
 return [
+    '2026.10.6.573' => [
+        'date' => '2026-10-06',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Aplicar la base contractual especial de Parvularia desde 2027',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+            'app/Support/DotacionContratoPlanCalculator.php',
+            'app/Support/DotacionContratoParvulariaCalculator.php',
+            'app/Services/DotacionProporcionRecalculationService.php',
+            'tests/Feature/DotacionParvulariaReglaEspecial2027Test.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Desde 2027 conserva la conversión especial por base contractual y total del plan de NT1/NT2, sin sustituirla por la tabla general CPEIP.',
+            'Consolida plan y acompañamiento conservando la base de cada curso o grupo; redondea hacia arriba a horas enteras el contrato acumulado por docente, mantiene PIE separado y no deja fracciones disponibles como saldo.',
+            'Corrige en los informes las filas independientes NT JEC CPEIP de 2027 con referencia válida, sin escribir al consultar ni alterar los valores históricos de 2026.',
+            'El recálculo explícito incluye acompañamientos, guarda importes y metadatos coherentes en una transacción y no repite cambios si los datos ya están conciliados.',
+        ],
+        'roles' => ['Administrador', 'Directivo', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.5.572' => [
         'date' => '2026-10-05',
         'module' => 'Dotación establecimiento',

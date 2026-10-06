@@ -623,6 +623,7 @@ class DotacionAsignacionController extends Controller
                         $fuente = 'Acompañamiento NT1/NT2 en libre disposición';
                     }
                     if ($estamentoCobertura === 'docente'
+                        && (int) $data['anio'] < 2027
                         && DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos']
                         && \App\Support\DotacionParvulariaCalculator::conJec($curso, $proporcionConfigurada)
                         && Schema::hasTable('docente_horas_proporciones')) {
@@ -631,6 +632,21 @@ class DotacionAsignacionController extends Controller
                         );
                         $proporcion = self::PARVULARIA_CPEIP_LABEL;
                         $fuente = 'Tabla CPEIP 65/35 · aula NT1/NT2 JEC';
+                    }
+                    if ((int) $data['anio'] >= 2027
+                        && ($calculoNt['origen_proporcion'] ?? '') === 'regla_especial_parvularia') {
+                        // La tabla general no reemplaza la base contractual NT.
+                        $horasContrato = $this->contratoMarginalAulaEspecial($establecimiento, (int) $data['anio'],
+                            (string) $docente['rut_normalizado'], [
+                                'tipo_asignacion' => $tipo, 'estamento_cobertura' => 'docente',
+                                'establecimiento_curso_id' => $curso->id,
+                                'dotacion_curso_combinado_id' => $cursoCombinadoIdValidado,
+                                'horas_plan_pedagogicas' => $horasPlan, 'horas_contrato' => $horasContrato,
+                                'proporcion_aplicada' => $proporcion,
+                                'fuente_calculo' => 'Regla especial Parvularia · '.$calculoNt['motivo'],
+                            ], $current);
+                        $fuente = 'Regla especial Parvularia · '.$calculoNt['motivo'].' '
+                            .\App\Support\DotacionContratoParvulariaCalculator::MOTIVO_REDONDEO;
                     }
                 } elseif ($cursoCombinado) {
                     $proporcionKey = (string) ($necesidadCombinada['proporcion_key'] ?? '65_35');
@@ -920,8 +936,35 @@ class DotacionAsignacionController extends Controller
         return round($convertir($aulaExistente + $horasAula) - $convertir($aulaExistente), 2);
     }
 
+    private function contratoMarginalAulaEspecial(
+        Establecimiento $establecimiento, int $anio, string $rut, array $fila,
+        ?DotacionDocenteAsignacion $current = null
+    ): float {
+        $previas = Schema::hasTable('dotacion_docente_asignaciones')
+            ? DotacionDocenteAsignacion::query()->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)->where('docente_rut_normalizado', $rut)->where('estado', 'activa')
+                ->when($current, fn ($query) => $query->whereKeyNot($current->id))->get()
+            : collect();
+        $fila += ['id' => $current?->id ?? ((int) $previas->max('id') + 1),
+            'establecimiento_id' => $establecimiento->id, 'anio' => $anio,
+            'docente_rut_normalizado' => $rut, 'estado' => 'activa'];
+        return round((float) DotacionContratoPlanCalculator::consolidar($previas->concat([$fila]))->sum('horas_contrato')
+            - (float) DotacionContratoPlanCalculator::consolidar($previas)->sum('horas_contrato'), 2);
+    }
+
     private function recalcularContratoAulaParvularia(Establecimiento $establecimiento, int $anio, string $rut): void
     {
+        if ($anio >= 2027 && $rut !== '' && Schema::hasTable('dotacion_docente_asignaciones')) {
+            $filas = DotacionDocenteAsignacion::query()->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)->where('estado', 'activa')->where('docente_rut_normalizado', $rut)->get();
+            foreach (\App\Support\DotacionContratoParvulariaCalculator::consolidar($filas) as $fila) {
+                $cambios = array_intersect_key($fila->getDirty(), array_flip(['horas_contrato', 'proporcion_aplicada', 'fuente_calculo']));
+                if ($cambios !== []) {
+                    DB::table('dotacion_docente_asignaciones')->where('id', $fila->id)->update($cambios);
+                }
+            }
+            return;
+        }
         if ($rut === '' || ! Schema::hasTable('docente_horas_proporciones')) {
             return;
         }
@@ -992,7 +1035,8 @@ class DotacionAsignacionController extends Controller
         array $payload,
         ?DotacionDocenteAsignacion $current = null
     ): void {
-        if (($payload['proporcion_aplicada'] ?? '') !== self::PARVULARIA_CPEIP_LABEL
+        if ((($payload['proporcion_aplicada'] ?? '') !== self::PARVULARIA_CPEIP_LABEL
+                && ! str_starts_with((string) ($payload['proporcion_aplicada'] ?? ''), 'NT Con JEC'))
             || ! Schema::hasTable('dotacion_docente_asignaciones')) {
             return;
         }
@@ -1010,11 +1054,13 @@ class DotacionAsignacionController extends Controller
                 && \App\Support\DotacionParvulariaCalculator::conJec($row->establecimientoCurso));
         $aula = (float) $asignaciones->sum(fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0))
             + (float) ($payload['horas_plan_pedagogicas'] ?? 0);
-        $contrato = (float) $asignaciones->sum(fn ($row) => (float) ($row->horas_contrato ?? 0))
+        $contrato = (float) DotacionContratoPlanCalculator::consolidar($asignaciones)->sum('horas_contrato')
             + (float) ($payload['horas_contrato'] ?? 0);
         if ($aula > 35.01 || $contrato > 41.01) {
             throw ValidationException::withMessages([
-                'horas_plan_pedagogicas' => 'La Educadora de Párvulos no puede superar 35 horas pedagógicas de aula (26 h 15 min cronológicas), equivalentes a 41 horas de contrato de aula según CPEIP 65/35. Reserve las otras 3 horas de una jornada de 44 para PIE.',
+                'horas_plan_pedagogicas' => (int) ($payload['anio'] ?? 0) >= 2027
+                    ? 'La Educadora de Párvulos no puede superar 35 horas pedagógicas ni 41 horas de contrato para aula. La conversión usa la base especial del curso; el saldo de su jornada y las horas PIE se validan por separado.'
+                    : 'La Educadora de Párvulos no puede superar 35 horas pedagógicas de aula (26 h 15 min cronológicas), equivalentes a 41 horas de contrato de aula según CPEIP 65/35. Reserve las otras 3 horas de una jornada de 44 para PIE.',
             ]);
         }
     }

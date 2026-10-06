@@ -10,6 +10,7 @@ class DotacionContratoPlanCalculator
 {
     public static function consolidar(Collection $asignaciones): Collection
     {
+        $asignaciones = DotacionContratoParvulariaCalculator::consolidar($asignaciones);
         if (! Schema::hasTable('docente_horas_proporciones')) {
             return $asignaciones;
         }
@@ -78,8 +79,8 @@ class DotacionContratoPlanCalculator
             || ! in_array(data_get($row, 'tipo_asignacion'), ['plan_estudio', 'acompanamiento_parvularia'], true)) {
             return null;
         }
-        // Mantiene las reglas especiales NT sin JEC y las bases proporcionales
-        // históricas. La regla vigente NT JEC CPEIP ya agrupa aula y acompañamiento.
+        // Las bases especiales ya se resolvieron antes de esta conversión.
+        // Conserva CPEIP para filas históricas o sin referencia especial válida.
         if (data_get($row, 'proporcion_aplicada') === 'NT JEC · CPEIP 65/35') {
             return DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL;
         }
