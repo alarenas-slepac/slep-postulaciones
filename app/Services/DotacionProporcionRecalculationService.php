@@ -31,6 +31,7 @@ class DotacionProporcionRecalculationService
         return DB::transaction(function () use ($establecimiento, $anio, $userId, $porcentajePrioritarios): array {
             $total = 0;
             $actualizadas = 0;
+            $actualizadasIds = [];
             $omitidas = 0;
             $necesidadesCombinadas = [];
 
@@ -39,7 +40,7 @@ class DotacionProporcionRecalculationService
                 ->where('establecimiento_id', $establecimiento->id)
                 ->where('anio', $anio)
                 ->where('estado', 'activa')
-                ->where('tipo_asignacion', 'plan_estudio')
+                ->whereIn('tipo_asignacion', ['plan_estudio', 'acompanamiento_parvularia'])
                 ->when(
                     Schema::hasColumn('dotacion_docente_asignaciones', 'estamento_cobertura'),
                     fn ($query) => $query->where(function ($query) {
@@ -48,7 +49,7 @@ class DotacionProporcionRecalculationService
                     })
                 )
                 ->orderBy('id')
-                ->chunkById(100, function ($asignaciones) use (&$total, &$actualizadas, &$omitidas, &$necesidadesCombinadas, $establecimiento, $anio, $porcentajePrioritarios, $userId): void {
+                ->chunkById(100, function ($asignaciones) use (&$total, &$actualizadasIds, &$omitidas, &$necesidadesCombinadas, $establecimiento, $anio, $porcentajePrioritarios, $userId): void {
                     foreach ($asignaciones as $asignacion) {
                         $total++;
 
@@ -117,16 +118,36 @@ class DotacionProporcionRecalculationService
                                 : 'Conversión automática desde horas aula · '.($calculo['origen_proporcion_label'] ?? 'Regla general'),
                             'updated_by' => $userId,
                         ];
+                        if ($anio >= 2027 && ($calculoNt['origen_proporcion'] ?? '') === 'regla_especial_parvularia') {
+                            // El importe se asigna una sola vez, sobre el total
+                            // del docente/curso, en la consolidación de abajo.
+                            unset($payload['horas_contrato']);
+                            $payload['fuente_calculo'] .= ' '.\App\Support\DotacionContratoParvulariaCalculator::MOTIVO_REDONDEO;
+                        }
 
                         $changed = $this->payloadDiffers($asignacion, $payload);
 
                         if ($changed) {
                             $asignacion->update($payload);
-                            $actualizadas++;
+                            $actualizadasIds[(int) $asignacion->id] = true;
                         }
                     }
                 });
 
+            // El acompañamiento consume contrato de la educadora y comparte
+            // la base del curso. Se redondea hacia arriba el total por docente,
+            // sin generar saldos fraccionarios ni redondear cada asignatura.
+            $filas = DotacionDocenteAsignacion::query()->where('establecimiento_id', $establecimiento->id)
+                ->where('anio', $anio)->where('estado', 'activa')
+                ->whereIn('tipo_asignacion', ['plan_estudio', 'acompanamiento_parvularia'])->get();
+            foreach (\App\Support\DotacionContratoParvulariaCalculator::consolidar($filas) as $fila) {
+                $cambios = array_intersect_key($fila->getDirty(), array_flip(['horas_contrato', 'proporcion_aplicada', 'fuente_calculo']));
+                if ($cambios !== []) {
+                    $fila->update($cambios + ['updated_by' => $userId]);
+                    $actualizadasIds[(int) $fila->id] = true;
+                }
+            }
+            $actualizadas = count($actualizadasIds);
             return compact('total', 'actualizadas', 'omitidas');
         });
     }
