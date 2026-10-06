@@ -1,6 +1,29 @@
 <?php
 
 return [
+    '2026.10.6.577' => [
+        'date' => '2026-10-06',
+        'module' => 'Solicitudes de reemplazo',
+        'title' => 'Descarga administrativa de documentos académicos y nómina de reemplazantes',
+        'files' => [
+            'app/Http/Controllers/Gestion/ReemplazoDocumentosAcademicosController.php',
+            'app/Services/ReemplazoDocumentosAcademicosExport.php',
+            'bootstrap/app.php',
+            'routes/reemplazo_documentos.php',
+            'resources/views/gestion/solicitudes-reemplazo/index.blade.php',
+            'resources/views/gestion/solicitudes-reemplazo/documentos-academicos.blade.php',
+            'resources/views/gestion/solicitudes-reemplazo/partials/_documentos-academicos-acceso.blade.php',
+            'tests/Feature/ReemplazoDocumentosAcademicosExportTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Añade un acceso exclusivo del rol activo Administrador en Gestión de solicitudes de reemplazo para consultar y descargar los documentos académicos de solicitudes aceptadas o cerradas de todos los años.',
+            'Agrupa personas por RUT normalizado y conserva todas sus solicitudes asociadas sin duplicar archivos; incluye título profesional o técnico, título con mención, certificado de semestres/horas y licencia de Enseñanza Media según disponibilidad.',
+            'Incluye nómina Excel con identificación, solicitudes, establecimientos, área de desempeño y antecedentes académicos, además de hojas de trazabilidad, disponibilidad documental y solicitudes sin perfil disponible.',
+            'Lee solicitudes por lotes y genera Excel en streaming; utiliza copias temporales privadas para el ZIP, conserva los archivos de origen y elimina temporales al finalizar o fallar.',
+        ],
+        'roles' => ['Administrador'],
+    ],
     '2026.10.6.576' => [
         'date' => '2026-10-06',
         'module' => 'Solicitudes de reemplazo',

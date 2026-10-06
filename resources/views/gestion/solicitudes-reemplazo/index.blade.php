@@ -2,11 +2,12 @@
 
 @section('content')
     <div class="gestion-solicitudes-index">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 p-4 mb-4 bg-white border rounded-4 shadow-sm">
             <div>
-                <h1 class="h4 mb-1">Gestión de solicitudes de reemplazo</h1>
+                <h1 class="h2 fw-bold mb-1">Gestión de solicitudes de reemplazo</h1>
                 <div class="text-muted">UATP / Planificación / GDP / SLEP</div>
             </div>
+            @include('gestion.solicitudes-reemplazo.partials._documentos-academicos-acceso')
         </div>
 
         @if (session('status'))
