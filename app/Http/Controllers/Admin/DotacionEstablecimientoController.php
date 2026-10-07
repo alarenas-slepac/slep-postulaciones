@@ -386,7 +386,10 @@ class DotacionEstablecimientoController extends Controller
             'contrataHabilitaciones' => $contrataHabilitaciones,
             'docentesVirtualesPorCupo' => $docentesVirtualesPorCupo,
             'canManageContrataHabilitaciones' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true),
-            'canManageDocenteExclusiones' => in_array($activeRole, $this->allowedRoles, true),
+            'canManageDocenteExclusiones' => in_array($activeRole, DotacionDocenteExclusionController::ROLES_GESTION, true),
+            'situacionesDocentesAnteriores' => $tab === 'docentes'
+                ? DotacionDocenteExclusion::situacionesPorRut((int) $establecimiento->id, $anio - 1)
+                : [],
             'continuidadDisponible' => $continuidadDisponible,
             'continuidadPorRut' => $continuidadPorRut,
             'conservacionHorasDisponible' => $conservacionHorasDisponible,

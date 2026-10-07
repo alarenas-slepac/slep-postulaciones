@@ -370,7 +370,8 @@
                                         </div>
                                     </div>
                                 </div>
-                                @if (($canManageDocenteExclusiones ?? false) && Route::has('admin.dotacion-establecimiento.docentes.exclusiones.store'))
+                                @include('admin.dotacion-establecimiento.partials._situaciones_docentes_consulta')
+                                @if (($activeRole ?? null) !== 'funcionario_directivo_estab' && ($canManageDocenteExclusiones ?? false) && Route::has('admin.dotacion-establecimiento.docentes.exclusiones.store'))
                                     <div class="card border-warning-subtle shadow-sm mt-3">
                                         <div class="card-body">
                                             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">

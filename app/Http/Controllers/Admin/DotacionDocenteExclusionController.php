@@ -15,7 +15,9 @@ use Illuminate\Validation\ValidationException;
 
 class DotacionDocenteExclusionController extends Controller
 {
-    private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
+    public const ROLES_GESTION = ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
+
+    private array $allowedRoles = self::ROLES_GESTION;
 
     public function store(Request $request, Establecimiento $establecimiento): RedirectResponse
     {
@@ -137,9 +139,5 @@ class DotacionDocenteExclusionController extends Controller
 
         abort_unless(in_array($activeRole, $this->allowedRoles, true), 403);
         abort_if((bool) ($establecimiento->sala_cuna ?? false), 404, 'El establecimiento no participa en el proceso de dotación establecimiento.');
-
-        if ($activeRole === 'funcionario_directivo_estab') {
-            abort_unless((int) $establecimiento->id === (int) ($user->establecimiento_id ?? 0), 403);
-        }
     }
 }
