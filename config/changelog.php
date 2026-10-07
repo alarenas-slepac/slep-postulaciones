@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.10.6.578' => [
+        'date' => '2026-10-06',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Consulta de situaciones docentes para el directivo del establecimiento',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionDocenteExclusionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Models/DotacionDocenteExclusion.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_situaciones_docentes_consulta.blade.php',
+            'tests/Feature/DotacionSituacionesDirectivoConsultaTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Restringe la creación, actualización y eliminación de situaciones docentes a Administrador, Coordinador UATP, Coordinador GDP y Supervisor de Planificación, comprobando el rol activo en el servidor.',
+            'El directivo consulta en el detalle de cada docente la situación del año seleccionado y la del año anterior, con horas y decisiones registradas, sin formularios ni acciones para modificarlas.',
+            'Consulta las situaciones anteriores en un lote por establecimiento y año, normaliza RUT históricos y conserva los registros y los cálculos contractuales existentes.',
+            'Agrega pruebas aisladas de permisos, cuentas con varios roles, consulta anual, acceso por establecimiento y compatibilidad histórica.',
+        ],
+        'roles' => ['Directivo de establecimiento', 'Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.6.577' => [
         'date' => '2026-10-06',
         'module' => 'Solicitudes de reemplazo',

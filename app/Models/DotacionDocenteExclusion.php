@@ -69,6 +69,20 @@ class DotacionDocenteExclusion extends Model
         return Schema::hasColumn('dotacion_docente_exclusiones', 'considerar_dotacion_siguiente');
     }
 
+    /** Consulta anual sin copiar ni modificar situaciones históricas. */
+    public static function situacionesPorRut(int $establecimientoId, int $anio): array
+    {
+        if (! Schema::hasTable('dotacion_docente_exclusiones')) {
+            return [];
+        }
+
+        return self::query()->where('establecimiento_id', $establecimientoId)->where('anio', $anio)
+            ->get()
+            ->keyBy(fn (self $situacion) => DotacionEstablecimientoCalculator::normalizeRut(
+                $situacion->docente_rut_normalizado ?: $situacion->docente_rut
+            ))->all();
+    }
+
     /** La decisión pertenece al establecimiento y año base, no al padrón global. */
     public static function continuidadPorRut(int $establecimientoId, int $anio): array
     {
