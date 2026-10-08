@@ -46,6 +46,7 @@ class DotacionDocenteExclusion extends Model
         'considerar_dotacion_siguiente',
         'conservar_horas_necesarias',
         'posee_fuero_maternal',
+        'horas_traspaso_bir',
         'created_by',
         'updated_by',
     ];
@@ -57,6 +58,7 @@ class DotacionDocenteExclusion extends Model
         'considerar_dotacion_siguiente' => 'boolean',
         'conservar_horas_necesarias' => 'boolean',
         'posee_fuero_maternal' => 'boolean',
+        'horas_traspaso_bir' => 'decimal:2',
         'created_by' => 'integer',
         'updated_by' => 'integer',
     ];
@@ -74,6 +76,11 @@ class DotacionDocenteExclusion extends Model
     public static function fueroMaternalDisponible(): bool
     {
         return Schema::hasColumn('dotacion_docente_exclusiones', 'posee_fuero_maternal');
+    }
+
+    public static function traspasoBirDisponible(): bool
+    {
+        return Schema::hasColumn('dotacion_docente_exclusiones', 'horas_traspaso_bir');
     }
 
     /** La lactancia no implica fuero: éste debe registrarse expresamente. */

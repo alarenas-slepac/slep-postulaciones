@@ -393,6 +393,7 @@ class DotacionEstablecimientoController extends Controller
             'continuidadDisponible' => $continuidadDisponible,
             'continuidadPorRut' => $continuidadPorRut,
             'fueroMaternalDisponible' => DotacionDocenteExclusion::fueroMaternalDisponible(),
+            'traspasoBirDisponible' => DotacionDocenteExclusion::traspasoBirDisponible(),
             'conservacionHorasDisponible' => $conservacionHorasDisponible,
             'conservacionHorasPorRut' => $conservacionHorasPorRut,
             'vacanciasPorNoContinuidad' => $vacanciasPorNoContinuidad,

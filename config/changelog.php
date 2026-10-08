@@ -1,6 +1,33 @@
 <?php
 
 return [
+    '2026.10.8.580' => [
+        'date' => '2026-10-08',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Horas de contrato para el año siguiente configurables en Proceso BIR',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionDocenteExclusionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Models/DotacionDocenteExclusion.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProyeccionCalculator.php',
+            'app/Support/DotacionSituacionesAnuales.php',
+            'database/migrations/2026_10_08_170000_add_horas_traspaso_bir_to_dotacion_docente_exclusiones.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_situaciones_docentes_consulta.blade.php',
+            'tests/Feature/DotacionSituacionHorasNecesariasTest.php',
+            'tests/Feature/DotacionSituacionesAnualesTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Proceso BIR conserva el contrato completo en el año actual y permite elegir entre cero y el contrato vigente las horas que se mantienen para el siguiente, con hasta dos decimales.',
+            'La proyección utiliza la cantidad elegida en el bloque correspondiente, tanto para docentes que continúan como para contratos vacantes cuando se decide conservarlos.',
+            'La consulta del directivo muestra la cantidad registrada en las situaciones del año actual y anterior, sin permitir edición. La copia anual la conserva sin sobrescribir decisiones del destino.',
+            'Añade una columna nullable sin alterar registros históricos: cuando no existe una cantidad específica se mantiene la proyección del contrato completo. Los formularios anteriores conservan la decisión guardada.',
+            'Incluye pruebas aisladas de guardado, validación, contrato actual, bloques, continuidad, vacantes, compatibilidad histórica, consulta y copia anual.',
+        ],
+        'roles' => ['Directivo de establecimiento', 'Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.8.579' => [
         'date' => '2026-10-08',
         'module' => 'Dotación establecimiento',

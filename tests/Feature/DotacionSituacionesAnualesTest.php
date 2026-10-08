@@ -279,6 +279,35 @@ class DotacionSituacionesAnualesTest extends IsolatedSecurityTestCase
         }
     }
 
+    public static function cantidadesBir(): array
+    {
+        return [[null], [0.0], [19.37], [44.0]];
+    }
+
+    #[DataProvider('cantidadesBir')]
+    public function test_copia_anual_conserva_cantidad_bir_incluso_cero_o_historica_y_respeta_destino(?float $cantidad): void
+    {
+        (require database_path('migrations/2026_10_08_170000_add_horas_traspaso_bir_to_dotacion_docente_exclusiones.php'))->up();
+        $id = DB::table('dotacion_docente_exclusiones')->insertGetId($this->situacion([
+            'motivo' => 'proceso_bir', 'horas' => 0, 'horas_traspaso_bir' => $cantidad,
+        ]));
+        $antes = DB::table('dotacion_docente_exclusiones')->find($id);
+        $this->migrarTraspasos();
+        $destino = DotacionDocenteExclusion::query()->where('anio', 2027)->sole();
+        $this->assertSame($cantidad === null ? null : number_format($cantidad, 2, '.', ''), $destino->horas_traspaso_bir);
+        $this->assertSame('proceso_bir', $destino->motivo);
+        $this->assertSame('0.00', $destino->horas);
+        $this->assertSame((array) $antes, (array) DB::table('dotacion_docente_exclusiones')->find($id));
+
+        // La decisión explícita del año destino prevalece sobre posteriores copias.
+        DB::table('dotacion_docente_exclusiones')->where('id', $destino->id)->update(['horas_traspaso_bir' => 12]);
+        DotacionDocenteExclusion::findOrFail($id)->update(['horas_traspaso_bir' => 30]);
+        $this->migrarTraspasos();
+        $this->assertSame('12.00', $destino->fresh()->horas_traspaso_bir);
+        $this->assertSame(1, DB::table('dotacion_docente_exclusiones')->where('anio', 2027)->count());
+        $this->assertDatabaseCount('dotacion_situacion_traspasos', 1);
+    }
+
     private function situacion(array $cambios = []): array
     {
         return array_replace([

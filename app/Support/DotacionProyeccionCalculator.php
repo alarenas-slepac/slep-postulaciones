@@ -19,7 +19,14 @@ class DotacionProyeccionCalculator
         $continuaAsignacion = fn ($row) => DotacionAsignacionCalculator::coverageEstamento($row) !== 'docente'
             || ! isset($noContinuan[self::rut($row)]);
         $docentes = collect($base['docentes'] ?? []);
-        $docentesProyectados = $docentes->reject(fn ($docente) => isset($noContinuan[self::rut($docente)]))->values();
+        // BIR conserva el contrato actual; sólo su aporte al año siguiente
+        // usa la cantidad elegida. Null mantiene el comportamiento histórico.
+        $docentesParaProyeccion = $docentes->map(function (array $docente): array {
+            $docente['horas_contrato'] = self::contratoAnioSiguiente($docente);
+
+            return $docente;
+        });
+        $docentesProyectados = $docentesParaProyeccion->reject(fn ($docente) => isset($noContinuan[self::rut($docente)]))->values();
         $asignaciones = collect(data_get($base, 'asignacion.asignaciones', []));
         $asignacionesProyectadas = $asignaciones->filter($continuaAsignacion)->values();
         $resumen = $base['resumen'] ?? [];
@@ -35,7 +42,7 @@ class DotacionProyeccionCalculator
             'otras_funciones' => (float) ($resumen['horas_dotacion_funciones_declaradas'] ?? 0),
             'pie' => (float) ($resumen['horas_contrato_pie_necesarias'] ?? 0),
         ];
-        $reservas = self::reservasNecesarias($base, $noContinuan, $conservacionHorasPorRut, $especial);
+        $reservas = self::reservasNecesarias(array_replace($base, ['docentes' => $docentesParaProyeccion]), $noContinuan, $conservacionHorasPorRut, $especial);
         // El contrato proyectado conserva las plazas necesarias aunque estén vacantes.
         // Las horas no necesarias ya están descontadas en horas_contrato.
         $contratosVacantes = ['total' => $reservas['vacantes'], 'aula' => 0.0, 'parvularia' => 0.0, 'pie' => 0.0];
@@ -106,10 +113,22 @@ class DotacionProyeccionCalculator
                 'conservar_horas_necesarias' => $conservacionHorasPorRut[self::rut($docente)] ?? true,
                 'contrato_base' => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0),
                 'contrato_considerado' => (float) ($docente['horas_contrato'] ?? 0),
-                'contrato_proyectado' => isset($noContinuan[self::rut($docente)]) ? 0.0 : (float) ($docente['horas_contrato'] ?? 0),
+                'contrato_proyectado' => isset($noContinuan[self::rut($docente)]) ? 0.0 : self::contratoAnioSiguiente($docente),
             ])->values()->all(),
             'coberturas' => $coberturas,
         ];
+    }
+
+    private static function contratoAnioSiguiente(array $docente): float
+    {
+        $actual = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
+        $elegidas = data_get($docente, 'exclusion_docente.horas_traspaso_bir');
+        if (data_get($docente, 'exclusion_docente.motivo') !== 'proceso_bir' || $elegidas === null) {
+            return $actual;
+        }
+
+        // Un cambio posterior del padrón no puede proyectar más que el contrato vigente.
+        return round(min($actual, max(0.0, (float) $elegidas)), 2);
     }
 
     /** Conserva las horas de quienes salen sin duplicar necesidades ya configuradas. */
