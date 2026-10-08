@@ -1,6 +1,35 @@
 <?php
 
 return [
+    '2026.10.8.579' => [
+        'date' => '2026-10-08',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Lactancia sin prioridad automática y registro complementario de fuero maternal',
+        'files' => [
+            'app/Http/Controllers/Admin/DotacionDocenteExclusionController.php',
+            'app/Http/Controllers/Admin/DotacionEstablecimientoController.php',
+            'app/Models/DotacionDocenteExclusion.php',
+            'app/Support/DotacionEstablecimientoCalculator.php',
+            'app/Support/DotacionProceso2027Calculator.php',
+            'app/Support/DotacionSituacionesAnuales.php',
+            'app/Support/DotacionSobredotacionCalculator.php',
+            'database/migrations/2026_10_08_160000_add_fuero_maternal_to_dotacion_docente_exclusiones.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_docentes.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_situaciones_docentes_consulta.blade.php',
+            'tests/Feature/DotacionLactanciaFueroMaternalTest.php',
+            'tests/Feature/DotacionSituacionesAnualesTest.php',
+            'tests/Unit/DotacionProceso2027CalculatorTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Horas de lactancia deja de otorgar primera prioridad por sí sola; conserva la prelación por calidad contractual, tramo y antigüedad.',
+            'Permite a los cuatro roles de gestión marcar Posee fuero maternal al registrar Horas de lactancia, conservando la situación y sus horas. La prioridad y protección contractual se aplican por el fuero registrado.',
+            'El directivo mantiene la consulta sin edición del fuero en el año actual y anterior. La copia anual conserva la bandera sin sobrescribir decisiones del destino.',
+            'Añade una columna booleana sin inferir fuero en registros históricos y mantiene compatibilidad con formularios y esquemas anteriores.',
+            'Incluye pruebas aisladas de prelación, permisos, validación, persistencia, consulta, migración, copia anual y protección contractual.',
+        ],
+        'roles' => ['Directivo de establecimiento', 'Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de Planificación'],
+    ],
     '2026.10.6.578' => [
         'date' => '2026-10-06',
         'module' => 'Dotación establecimiento',

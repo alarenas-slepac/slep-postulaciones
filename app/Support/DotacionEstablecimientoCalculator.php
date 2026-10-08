@@ -1037,6 +1037,7 @@ class DotacionEstablecimientoCalculator
                     'id' => (int) $exclusionDocente->id,
                     'motivo' => (string) $exclusionDocente->motivo,
                     'motivo_label' => $exclusionDocente->motivo_label,
+                    'posee_fuero_maternal' => (bool) ($exclusionDocente->posee_fuero_maternal ?? false),
                     'horas' => $ajusteContrato['horas_excluidas'],
                 ] : null,
                 'horas_planta' => (float) ($grupo['jornada_planta_total'] ?? 0),

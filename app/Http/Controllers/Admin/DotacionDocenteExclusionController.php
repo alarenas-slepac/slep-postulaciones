@@ -32,6 +32,7 @@ class DotacionDocenteExclusionController extends Controller
             'horas' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:999999.99'],
             'considerar_dotacion_siguiente' => ['sometimes', 'required', 'boolean'],
             'conservar_horas_necesarias' => ['sometimes', 'required', 'boolean'],
+            'posee_fuero_maternal' => ['sometimes', 'required', 'boolean'],
         ]);
 
         if (array_key_exists('considerar_dotacion_siguiente', $data) && ! DotacionDocenteExclusion::continuidadDisponible()) {
@@ -47,6 +48,19 @@ class DotacionDocenteExclusionController extends Controller
             ]);
         }
         $rutNormalizado = DotacionEstablecimientoCalculator::normalizeRut((string) $data['docente_rut']);
+        $fueroMaternalDisponible = DotacionDocenteExclusion::fueroMaternalDisponible();
+        if (array_key_exists('posee_fuero_maternal', $data)) {
+            if (! $fueroMaternalDisponible) {
+                throw ValidationException::withMessages([
+                    'posee_fuero_maternal' => 'Debe ejecutar la migración de fuero maternal antes de guardar esta decisión.',
+                ]);
+            }
+            if ($request->boolean('posee_fuero_maternal') && $data['motivo'] !== 'horas_lactancia') {
+                throw ValidationException::withMessages([
+                    'posee_fuero_maternal' => 'Esta opción corresponde a la situación Horas de lactancia. Para registrar sólo fuero, seleccione Fuero maternal.',
+                ]);
+            }
+        }
         $docente = DotacionEstablecimientoCalculator::docentes($establecimiento, $anio)
             ->first(fn (array $item) => ($item['rut_normalizado'] ?? '') === $rutNormalizado);
 
@@ -94,6 +108,13 @@ class DotacionDocenteExclusionController extends Controller
         }
         if (array_key_exists('conservar_horas_necesarias', $data)) {
             $exclusion->conservar_horas_necesarias = $request->boolean('conservar_horas_necesarias');
+        }
+        if ($fueroMaternalDisponible) {
+            if ($data['motivo'] !== 'horas_lactancia') {
+                $exclusion->posee_fuero_maternal = false;
+            } elseif (array_key_exists('posee_fuero_maternal', $data)) {
+                $exclusion->posee_fuero_maternal = $request->boolean('posee_fuero_maternal');
+            }
         }
 
         // Conserva el campo histórico: "horas" son las no necesarias.

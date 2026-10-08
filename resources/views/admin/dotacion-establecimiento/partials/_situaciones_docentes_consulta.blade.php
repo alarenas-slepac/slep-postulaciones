@@ -12,6 +12,9 @@
                     <h4 class="h6 fw-semibold">Año anterior · {{ $anioSituacion - 1 }}</h4>
                     @if ($situacionAnterior)
                         <div class="fw-semibold">{{ $situacionAnterior->motivo_label }}</div>
+                        @if ($situacionAnterior->motivo === 'horas_lactancia')
+                            <div class="small mt-1">Fuero maternal: <strong>{{ $situacionAnterior->posee_fuero_maternal ? 'Sí' : 'No registrado' }}</strong></div>
+                        @endif
                         <div class="small mt-2">Horas no necesarias registradas: <strong>{{ $fmt($situacionAnterior->horas) }} h</strong></div>
                         @if ($situacionAnterior->considerar_dotacion_siguiente !== null)
                             <div class="small mt-1">Continuidad en {{ $anioSituacion }}: <strong>{{ $situacionAnterior->considerar_dotacion_siguiente ? 'Sí' : 'No' }}</strong></div>
@@ -29,6 +32,9 @@
                     <h4 class="h6 fw-semibold">Situación actual · {{ $anioSituacion }}</h4>
                     @if ($exclusionDocente)
                         <div class="fw-semibold">{{ $exclusionDocente['motivo_label'] }}</div>
+                        @if (($exclusionDocente['motivo'] ?? '') === 'horas_lactancia')
+                            <div class="small mt-1">Fuero maternal: <strong>{{ ($exclusionDocente['posee_fuero_maternal'] ?? false) ? 'Sí' : 'No registrado' }}</strong></div>
+                        @endif
                         <div class="small mt-2">Horas necesarias: <strong>{{ $fmt($docente['horas_contrato']) }} h</strong></div>
                         <div class="small mt-1">Horas no necesarias: <strong>{{ $fmt($exclusionDocente['horas']) }} h</strong></div>
                         @if ($continuidadDisponible ?? false)

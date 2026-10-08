@@ -140,8 +140,11 @@ class DotacionSobredotacionCalculator
             'funcion' => (string) ($docente['funcion'] ?? 'Sin función declarada'),
             'tipo_contrato' => (string) ($docente['tipo_contrato'] ?? 'Sin tipo contrato'),
             'es_titular' => self::esTitular($docente),
-            'contrato_protegido' => in_array($motivo, ['fuero_maternal', 'horas_gremiales'], true),
-            'motivo_proteccion' => DotacionDocenteExclusion::MOTIVOS[$motivo] ?? '',
+            'contrato_protegido' => DotacionDocenteExclusion::tieneFueroMaternal($docente['exclusion_docente'] ?? null)
+                || $motivo === 'horas_gremiales',
+            'motivo_proteccion' => DotacionDocenteExclusion::tieneFueroMaternal($docente['exclusion_docente'] ?? null)
+                ? DotacionDocenteExclusion::MOTIVOS['fuero_maternal']
+                : (DotacionDocenteExclusion::MOTIVOS[$motivo] ?? ''),
             'contrato_original' => round(max(0.0, (float) ($docente['horas_contrato_base'] ?? $horasContrato)), 2),
             'contrato_considerado' => $horasContrato,
             'aula_planta' => round(max(0.0, $planta - $piePlanta), 2),
