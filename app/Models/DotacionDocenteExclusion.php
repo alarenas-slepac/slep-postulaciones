@@ -45,6 +45,7 @@ class DotacionDocenteExclusion extends Model
         'horas',
         'considerar_dotacion_siguiente',
         'conservar_horas_necesarias',
+        'posee_fuero_maternal',
         'created_by',
         'updated_by',
     ];
@@ -55,6 +56,7 @@ class DotacionDocenteExclusion extends Model
         'horas' => 'decimal:2',
         'considerar_dotacion_siguiente' => 'boolean',
         'conservar_horas_necesarias' => 'boolean',
+        'posee_fuero_maternal' => 'boolean',
         'created_by' => 'integer',
         'updated_by' => 'integer',
     ];
@@ -67,6 +69,21 @@ class DotacionDocenteExclusion extends Model
     public static function continuidadDisponible(): bool
     {
         return Schema::hasColumn('dotacion_docente_exclusiones', 'considerar_dotacion_siguiente');
+    }
+
+    public static function fueroMaternalDisponible(): bool
+    {
+        return Schema::hasColumn('dotacion_docente_exclusiones', 'posee_fuero_maternal');
+    }
+
+    /** La lactancia no implica fuero: éste debe registrarse expresamente. */
+    public static function tieneFueroMaternal(?array $situacion): bool
+    {
+        $motivo = $situacion['motivo'] ?? null;
+
+        return $motivo === 'fuero_maternal'
+            || ($motivo === 'horas_lactancia'
+                && in_array($situacion['posee_fuero_maternal'] ?? false, [true, 1, '1'], true));
     }
 
     /** Consulta anual sin copiar ni modificar situaciones históricas. */

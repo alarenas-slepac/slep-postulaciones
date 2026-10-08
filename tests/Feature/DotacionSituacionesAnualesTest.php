@@ -250,7 +250,7 @@ class DotacionSituacionesAnualesTest extends IsolatedSecurityTestCase
         $this->assertDatabaseCount('dotacion_situacion_traspasos', 1);
     }
 
-    public function test_las_tres_situaciones_tienen_primera_prioridad_y_el_resto_conserva_tramo_antiguedad_y_saldo(): void
+    public function test_fuero_y_gremiales_tienen_primera_prioridad_y_lactancia_conserva_tramo_antiguedad_y_saldo(): void
     {
         $filas = collect([
             $this->docente('Avanzado reciente', null, 'Avanzado', '2020-01-01'),
@@ -263,16 +263,16 @@ class DotacionSituacionesAnualesTest extends IsolatedSecurityTestCase
         ]);
         $priorizados = DotacionProceso2027Calculator::docentesPriorizados($filas);
         $this->assertSame([
-            'Gremial', 'Maternal', 'Lactancia', 'Experto antiguo', 'Avanzado reciente', 'Titular inicial', 'Contrata',
+            'Gremial', 'Maternal', 'Experto antiguo', 'Avanzado reciente', 'Titular inicial', 'Lactancia', 'Contrata',
         ], $priorizados->pluck('nombre')->all());
-        $this->assertSame([1, 1, 1, 2, 2, 3, 4], $priorizados->pluck('prioridad_2027')->all());
-        foreach ($priorizados->take(3) as $docente) {
-            $this->assertSame('1. Fuero maternal, gremiales o lactancia', $docente['prioridad_2027_label']);
+        $this->assertSame([1, 1, 2, 2, 3, 3, 4], $priorizados->pluck('prioridad_2027')->all());
+        foreach ($priorizados->take(2) as $docente) {
+            $this->assertSame('1. Fuero maternal u horas gremiales', $docente['prioridad_2027_label']);
             $this->assertSame(38.0, $docente['horas_disponibles']);
         }
         $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
             $priorizados, $priorizados->firstWhere('nombre', 'Experto antiguo'), 2));
-        foreach (array_diff(array_keys(DotacionDocenteExclusion::MOTIVOS), ['fuero_maternal', 'horas_gremiales', 'horas_lactancia']) as $motivo) {
+        foreach (array_diff(array_keys(DotacionDocenteExclusion::MOTIVOS), ['fuero_maternal', 'horas_gremiales']) as $motivo) {
             $this->assertSame(3, DotacionProceso2027Calculator::docentesPriorizados(
                 collect([$this->docente('Otra situación', $motivo, 'Inicial', '2000-01-01')])
             )->sole()['prioridad_2027']);

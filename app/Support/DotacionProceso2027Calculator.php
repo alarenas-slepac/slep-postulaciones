@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionProceso2027Configuracion;
 use App\Models\Establecimiento;
@@ -427,13 +428,14 @@ class DotacionProceso2027Calculator
             $asignadas = max(0.0, (float) ($docente['horas_asignadas_total'] ?? 0));
             $tramoPreferente = preg_match('/\b(?:AVANZADO|EXPERTO (?:II|I|2|1))\b/', $tramo) === 1;
             $prioridad = match (true) {
-                in_array($motivo, ['fuero_maternal', 'horas_gremiales', 'horas_lactancia'], true) => 1,
+                DotacionDocenteExclusion::tieneFueroMaternal($docente['exclusion_docente'] ?? null)
+                    || $motivo === 'horas_gremiales' => 1,
                 $planta > 0 && $tramoPreferente => 2,
                 $planta > 0 => 3,
                 default => 4,
             };
             $label = match ($prioridad) {
-                1 => '1. Fuero maternal, gremiales o lactancia',
+                1 => '1. Fuero maternal u horas gremiales',
                 2 => '2. Titular · Avanzado / Experto 1 / Experto 2',
                 3 => '3. Titular Acceso, Inicial, Temprano',
                 default => '4. Horas a contrata',

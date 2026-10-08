@@ -81,7 +81,7 @@
             <span class="badge text-bg-warning">Sin info: {{ $countSinInfo }}</span>
         </div>
         @if ($proceso2027Docentes['aplica'] ?? false)
-            <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-sort-numeric-down" aria-hidden="true"></i> La nómina conserva la prelación 2027: fuero; titulares Avanzado, Experto 1 y Experto 2; Titular Acceso, Inicial, Temprano; y contrata. Cada grupo titular se ordena por antigüedad, con las fechas no informadas al final. Los filtros conservan ese orden.</div>
+            <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-sort-numeric-down" aria-hidden="true"></i> La nómina conserva la prelación 2027: fuero maternal u horas gremiales; titulares Avanzado, Experto 1 y Experto 2; Titular Acceso, Inicial, Temprano; y contrata. Las horas de lactancia por sí solas no otorgan prioridad. Cada grupo titular se ordena por antigüedad, con las fechas no informadas al final. Los filtros conservan ese orden.</div>
         @endif
     </div>
 </div>
@@ -91,6 +91,14 @@
         (() => {
             const syncProcesoBir = (select) => {
                 const form = select.closest('form');
+                const fuero = form?.querySelector('[data-lactancia-fuero]');
+                if (fuero) {
+                    const esLactancia = select.value === 'horas_lactancia';
+                    fuero.classList.toggle('d-none', !esLactancia);
+                    const checkbox = fuero.querySelector('input[type="checkbox"]');
+                    checkbox.disabled = !esLactancia;
+                    if (!esLactancia) checkbox.checked = false;
+                }
                 const necesarias = form?.querySelector('[data-proceso-bir-necesarias]');
                 const noNecesarias = form?.querySelector('[data-proceso-bir-no-necesarias]');
 
@@ -192,6 +200,7 @@
                         $formConErrores = $errors->any() && (int) old('anio') === (int) ($anio ?? $docente['anio'])
                             && old('docente_rut') === ($docente['rut'] ?? null) && old('motivo') !== null;
                         $motivoSeleccionado = $formConErrores ? old('motivo') : ($exclusionDocente['motivo'] ?? '');
+                        $fueroMaternalSeleccionado = $formConErrores ? old('posee_fuero_maternal', false) : ($exclusionDocente['posee_fuero_maternal'] ?? false);
                         $horasSeleccionadas = $formConErrores ? old('horas') : ($exclusionDocente['horas'] ?? 0);
                         $horasNecesariasSeleccionadas = $formConErrores ? old('horas_necesarias') : ($docente['horas_contrato'] ?? $horasContratoBaseDocente);
                         $esProcesoBir = $motivoSeleccionado === 'proceso_bir';
@@ -251,6 +260,9 @@
                                     <div class="small text-primary mt-1">Proceso BIR · contrato completo considerado este año</div>
                                 @else
                                     <div class="small text-warning mt-1">{{ $exclusionDocente['motivo_label'] }} · {{ $fmt($exclusionDocente['horas']) }} h</div>
+                                @endif
+                                @if (($exclusionDocente['motivo'] ?? '') === 'horas_lactancia' && ($exclusionDocente['posee_fuero_maternal'] ?? false))
+                                    <div class="badge text-bg-primary mt-1">Fuero maternal</div>
                                 @endif
                             @endif
                             @if (!$continuaDotacion)
@@ -416,6 +428,17 @@
                                                         @if ($formConErrores) @error('horas')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                     </div>
                                                     <div class="col-12 small text-muted" id="{{ $collapseId }}-suma">Horas necesarias + horas no necesarias = {{ $fmt($horasContratoBaseDocente) }} h de contrato original. Cada valor puede ser cero, siempre que la suma coincida con el contrato.</div>
+                                                    @if ($fueroMaternalDisponible ?? false)
+                                                        <input type="hidden" name="posee_fuero_maternal" value="0">
+                                                        <div class="col-12 mt-3 {{ $motivoSeleccionado === 'horas_lactancia' ? '' : 'd-none' }}" data-lactancia-fuero>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input @if($formConErrores && $errors->has('posee_fuero_maternal')) is-invalid @endif" type="checkbox" id="{{ $collapseId }}-fuero-maternal" name="posee_fuero_maternal" value="1" @checked($fueroMaternalSeleccionado) @disabled($motivoSeleccionado !== 'horas_lactancia') aria-describedby="{{ $collapseId }}-fuero-maternal-ayuda">
+                                                                <label class="form-check-label fw-semibold" for="{{ $collapseId }}-fuero-maternal">Posee fuero maternal</label>
+                                                                @if ($formConErrores) @error('posee_fuero_maternal')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
+                                                            </div>
+                                                            <div class="form-text" id="{{ $collapseId }}-fuero-maternal-ayuda">La primera prioridad se aplica por el fuero maternal. Las horas de lactancia por sí solas no otorgan prioridad.</div>
+                                                        </div>
+                                                    @endif
                                                     <div class="col-12 mt-3">
                                                         @if ($continuidadDisponible ?? false)
                                                             <input type="hidden" name="considerar_dotacion_siguiente" value="0">

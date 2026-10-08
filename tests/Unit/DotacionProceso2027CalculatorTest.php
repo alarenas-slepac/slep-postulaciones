@@ -201,10 +201,10 @@ class DotacionProceso2027CalculatorTest extends TestCase
         ]));
 
         $this->assertSame([
-            'Gremial', 'Lactancia', 'Avanzado', 'Experto 2', 'Experto 1', 'Experto I', 'Experto II',
-            'Resto titular', 'Contrata experto',
+            'Gremial', 'Avanzado', 'Experto 2', 'Experto 1', 'Experto I', 'Experto II',
+            'Resto titular', 'Lactancia', 'Contrata experto',
         ], $docentes->pluck('nombre')->all());
-        $this->assertSame([1, 1, 2, 2, 2, 2, 2, 3, 4], $docentes->pluck('prioridad_2027')->all());
+        $this->assertSame([1, 2, 2, 2, 2, 2, 3, 3, 4], $docentes->pluck('prioridad_2027')->all());
         $this->assertSame('3. Titular Acceso, Inicial, Temprano', $docentes->firstWhere('nombre', 'Resto titular')['prioridad_2027_label']);
         $this->assertCount(1, $docentes->filter(fn ($docente) => $docente['prioridad_2027'] === 2)->pluck('prioridad_2027_label')->unique());
         $this->assertStringContainsString('Experto 1 / Experto 2', $docentes->firstWhere('nombre', 'Experto II')['prioridad_2027_label']);
