@@ -57,6 +57,9 @@ class DotacionSituacionesAnuales
                     if (property_exists($situacion, 'posee_fuero_maternal')) {
                         $datos['posee_fuero_maternal'] = $situacion->posee_fuero_maternal ?? false;
                     }
+                    if (property_exists($situacion, 'horas_traspaso_bir')) {
+                        $datos['horas_traspaso_bir'] = $situacion->horas_traspaso_bir;
+                    }
                     // Query Builder evita disparar saved otra vez y propagar
                     // la copia indefinidamente a años futuros.
                     $copiada = DB::table('dotacion_docente_exclusiones')->insertOrIgnore($datos) === 1;

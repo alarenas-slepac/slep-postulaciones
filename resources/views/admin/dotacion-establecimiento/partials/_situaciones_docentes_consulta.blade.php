@@ -16,6 +16,9 @@
                             <div class="small mt-1">Fuero maternal: <strong>{{ $situacionAnterior->posee_fuero_maternal ? 'Sí' : 'No registrado' }}</strong></div>
                         @endif
                         <div class="small mt-2">Horas no necesarias registradas: <strong>{{ $fmt($situacionAnterior->horas) }} h</strong></div>
+                        @if ($situacionAnterior->motivo === 'proceso_bir')
+                            <div class="small mt-1">Horas definidas para dotación {{ $anioSituacion }}: <strong>{{ $situacionAnterior->horas_traspaso_bir === null ? 'Contrato completo (sin cantidad específica)' : $fmt($situacionAnterior->horas_traspaso_bir).' h' }}</strong></div>
+                        @endif
                         @if ($situacionAnterior->considerar_dotacion_siguiente !== null)
                             <div class="small mt-1">Continuidad en {{ $anioSituacion }}: <strong>{{ $situacionAnterior->considerar_dotacion_siguiente ? 'Sí' : 'No' }}</strong></div>
                         @endif
@@ -37,6 +40,9 @@
                         @endif
                         <div class="small mt-2">Horas necesarias: <strong>{{ $fmt($docente['horas_contrato']) }} h</strong></div>
                         <div class="small mt-1">Horas no necesarias: <strong>{{ $fmt($exclusionDocente['horas']) }} h</strong></div>
+                        @if (($exclusionDocente['motivo'] ?? '') === 'proceso_bir')
+                            <div class="small mt-1">Horas definidas para dotación {{ $anioSituacion + 1 }}: <strong>{{ $fmt(min((float) $docente['horas_contrato'], (float) ($exclusionDocente['horas_traspaso_bir'] ?? $docente['horas_contrato']))) }} h</strong></div>
+                        @endif
                         @if ($continuidadDisponible ?? false)
                             <div class="small mt-1">Continuidad en {{ $anioSituacion + 1 }}: <strong>{{ $continuaDotacion ? 'Sí' : 'No' }}</strong></div>
                         @endif

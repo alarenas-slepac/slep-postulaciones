@@ -336,6 +336,164 @@ class DotacionSituacionHorasNecesariasTest extends TestCase
         $this->assertEquals($antes, array_diff_key($despues->getAttributes(), ['considerar_dotacion_siguiente' => true]));
     }
 
+    #[DataProvider('distribuciones')]
+    public function test_bir_permite_elegir_horas_del_siguiente_anio_sin_modificar_contrato_actual(float $traspaso, float $resto): void
+    {
+        $this->instalarTraspasoBir();
+        $padron = DB::table('reemplazos_personal')->get()->toJson();
+        $asignaciones = DB::table('dotacion_docente_asignaciones')->get()->toJson();
+        $this->guardar(['motivo' => 'proceso_bir', 'horas_necesarias' => 0, 'horas' => 44,
+            'horas_traspaso_bir' => $traspaso, 'considerar_dotacion_siguiente' => 0, 'conservar_horas_necesarias' => 1]);
+        $docente = $this->docente();
+        $this->assertSame(44.0, $docente['horas_contrato']);
+        $this->assertSame(0.0, $docente['horas_excluidas']);
+        $this->assertSame(0.0, (float) DotacionDocenteExclusion::sole()->horas);
+        $this->assertSame($traspaso, $docente['exclusion_docente']['horas_traspaso_bir']);
+        $p = $this->proyectar();
+        $this->assertSame(44.0, $p['contratos_base']['total']);
+        $this->assertSame($traspaso, $p['contratos']['total']);
+        $this->assertSame($traspaso, $p['horas_vacantes_por_cubrir']);
+        $this->assertSame($traspaso, $p['contratos_vacantes']['aula']);
+        $this->assertSame(44.0, $p['docentes'][0]['contrato_considerado']);
+        $this->assertSame(0.0, $p['docentes'][0]['contrato_proyectado']);
+        $html = view('admin.dotacion-establecimiento.partials._docentes', [
+            'docentes' => collect([$docente]), 'establecimiento' => Establecimiento::findOrFail(1), 'anio' => 2026,
+            'canManageDocenteExclusiones' => true, 'docenteExclusionesTableReady' => true,
+            'motivosExclusionDocente' => DotacionDocenteExclusion::MOTIVOS, 'traspasoBirDisponible' => true,
+        ])->render();
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $xpath = new \DOMXPath($dom);
+        $this->assertSame((string) $traspaso, $xpath->evaluate('string(//input[@name="horas_traspaso_bir"]/@value)'));
+        $this->assertSame('44', $xpath->evaluate('string(//input[@name="horas_traspaso_bir"]/@max)'));
+        $this->assertFalse($xpath->evaluate('boolean(//input[@name="horas_traspaso_bir"]/@readonly | //input[@name="horas_traspaso_bir"]/@disabled)'));
+        $this->assertTrue($xpath->evaluate('boolean(//input[@name="horas_traspaso_bir"]/@required)'));
+        $this->assertStringContainsString('Horas de contrato a mantener en dotación 2027', $html);
+        $this->assertStringContainsString('Horas definidas para dotación 2027', $html);
+        $this->assertSame($padron, DB::table('reemplazos_personal')->get()->toJson());
+        $this->assertSame($asignaciones, DB::table('dotacion_docente_asignaciones')->get()->toJson());
+    }
+
+    #[DataProvider('categorias')]
+    public function test_bir_proyecta_cantidad_elegida_en_su_bloque_y_respeta_continuidad_y_conservacion(
+        string $titulo, bool $coordinacion, bool $especial, float $aula, float $parvularia, float $pie
+    ): void {
+        $this->instalarTraspasoBir();
+        DB::table('declaracion_sostenedores')->update(['nombre_titulo' => $titulo]);
+        if ($coordinacion) {
+            DB::table('dotacion_docente_asignaciones')->update([
+                'tipo_asignacion' => 'funcion_tecnico_pedagogica', 'subtipo_asignacion' => 'pie',
+                'asignatura_nombre' => 'Coordinador PIE',
+            ]);
+        }
+        $categoria = $pie > 0 ? 'pie' : ($parvularia > 0 ? 'parvularia' : 'aula');
+        foreach ([0.0, 19.37, 44.0] as $horas) {
+            foreach ([[0, 0], [0, 1], [1, 0], [1, 1]] as [$continua, $conserva]) {
+                $this->guardar(['motivo' => 'proceso_bir', 'horas_traspaso_bir' => $horas,
+                    'considerar_dotacion_siguiente' => $continua, 'conservar_horas_necesarias' => $conserva]);
+                $p = $this->proyectar($especial);
+                $total = $continua || $conserva ? $horas : 0.0;
+                $vacantes = ! $continua && $conserva ? $horas : 0.0;
+                $this->assertSame(44.0, $p['contratos_base']['total']);
+                $this->assertSame($total, $p['contratos']['total']);
+                $this->assertSame($total, $p['contratos'][$categoria]);
+                $this->assertSame($vacantes, $p['horas_vacantes_por_cubrir']);
+                $this->assertSame($vacantes, $p['contratos_vacantes'][$categoria]);
+                $this->assertSame($continua ? $horas : 0.0, $p['docentes'][0]['contrato_proyectado']);
+            }
+        }
+    }
+
+    public static function traspasosBirInvalidos(): array
+    {
+        return [['proceso_bir', -1], ['proceso_bir', 44.01], ['proceso_bir', 12.001],
+            ['proceso_bir', null], ['proceso_bir', 'abc'], ['traslado', 20]];
+    }
+
+    #[DataProvider('traspasosBirInvalidos')]
+    public function test_bir_rechaza_cantidades_invalidas_sin_perder_decision_anterior(string $motivo, mixed $cantidad): void
+    {
+        $this->instalarTraspasoBir();
+        $this->guardar(['motivo' => 'proceso_bir', 'horas_traspaso_bir' => 20]);
+        $antes = DotacionDocenteExclusion::sole()->getAttributes();
+        try {
+            $this->guardar(['motivo' => $motivo, 'horas_traspaso_bir' => $cantidad]);
+            $this->fail('Se esperaba rechazar las horas de traspaso.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('horas_traspaso_bir', $exception->errors());
+        }
+        $this->assertSame($antes, DotacionDocenteExclusion::sole()->getAttributes());
+        $this->assertSame(44.0, $this->docente()['horas_contrato']);
+    }
+
+    public function test_bir_conserva_formularios_y_registros_historicos_y_limita_tras_cambio_del_padron(): void
+    {
+        $this->guardar(['motivo' => 'proceso_bir']);
+        $antes = DotacionDocenteExclusion::sole()->getAttributes();
+        $this->instalarTraspasoBir();
+        $this->assertNull(DotacionDocenteExclusion::sole()->horas_traspaso_bir);
+        $this->assertEquals($antes, array_intersect_key(DotacionDocenteExclusion::sole()->getAttributes(), $antes));
+        $this->assertSame(44.0, $this->proyectar()['contratos']['total']);
+        $this->guardar(['motivo' => 'proceso_bir', 'horas_traspaso_bir' => 30]);
+        $this->guardar(['motivo' => 'proceso_bir']); // Pantalla anterior: no borra la decisión.
+        $this->assertSame('30.00', DotacionDocenteExclusion::sole()->horas_traspaso_bir);
+        DB::table('reemplazos_personal')->update(['jornada' => 25]);
+        $this->assertSame(25.0, $this->docente()['horas_contrato']);
+        $this->assertSame(25.0, $this->proyectar()['contratos']['total']);
+        try {
+            $this->guardar(['motivo' => 'proceso_bir', 'horas_traspaso_bir' => 30]);
+            $this->fail('Se esperaba validar contra el nuevo contrato.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('horas_traspaso_bir', $exception->errors());
+        }
+        $this->guardar(['motivo' => 'traslado', 'horas_necesarias' => 20, 'horas' => 5]);
+        $this->assertNull(DotacionDocenteExclusion::sole()->horas_traspaso_bir);
+    }
+
+    public function test_bir_exige_migracion_si_se_envia_cantidad_y_directivo_no_edita_el_nuevo_campo(): void
+    {
+        try {
+            $this->guardar(['motivo' => 'proceso_bir', 'horas_traspaso_bir' => 20]);
+            $this->fail('Se esperaba exigir la migración.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('horas_traspaso_bir', $exception->errors());
+        }
+        $this->assertDatabaseCount('dotacion_docente_exclusiones', 0);
+        $this->instalarTraspasoBir();
+        $this->guardar(['motivo' => 'proceso_bir', 'horas_traspaso_bir' => 20]);
+        $html = view('admin.dotacion-establecimiento.partials._docentes', [
+            'docentes' => collect([$this->docente()]), 'establecimiento' => Establecimiento::findOrFail(1), 'anio' => 2026,
+            'activeRole' => 'funcionario_directivo_estab', 'canManageDocenteExclusiones' => true,
+            'docenteExclusionesTableReady' => true, 'traspasoBirDisponible' => true,
+            'situacionesDocentesAnteriores' => ['111111111' => new DotacionDocenteExclusion([
+                'anio' => 2025, 'motivo' => 'proceso_bir', 'horas' => 0, 'horas_traspaso_bir' => 12,
+            ])],
+        ])->render();
+        $this->assertStringNotContainsString('<form', $html);
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $this->assertSame(0, (new \DOMXPath($dom))->query('//input[@name="horas_traspaso_bir"]')->length);
+        $this->assertStringContainsString('Horas definidas para dotación 2026: <strong>12 h', $html);
+        $this->assertStringContainsString('Horas definidas para dotación 2027: <strong>20 h', $html);
+    }
+
+    private function instalarTraspasoBir(): void
+    {
+        $this->instalarContinuidad();
+        (require database_path('migrations/2026_09_14_170000_add_conservar_horas_to_dotacion_docente_exclusiones.php'))->up();
+        $migracion = require database_path('migrations/2026_10_08_170000_add_horas_traspaso_bir_to_dotacion_docente_exclusiones.php');
+        $migracion->up();
+        $migracion->up();
+    }
+
+    private function proyectar(bool $especial = false): array
+    {
+        return DotacionProyeccionCalculator::build([
+            'docentes' => collect([$this->docente()]), 'resumen' => ['establecimiento_especial' => $especial],
+            'asignacion' => ['asignaciones' => DotacionAsignacionCalculator::assignmentsFor(Establecimiento::findOrFail(1), 2026)],
+        ], 2026, DotacionDocenteExclusion::continuidadPorRut(1, 2026), DotacionDocenteExclusion::conservacionHorasPorRut(1, 2026));
+    }
+
     public function test_rechaza_check_sin_migracion_y_valores_invalidos(): void
     {
         try {

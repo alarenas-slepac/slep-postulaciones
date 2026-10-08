@@ -107,6 +107,15 @@
                 }
 
                 const esProcesoBir = select.value === 'proceso_bir';
+                const traspaso = form?.querySelector('[data-proceso-bir-traspaso]');
+                if (traspaso) {
+                    traspaso.classList.toggle('d-none', !esProcesoBir);
+                    const input = traspaso.querySelector('input[name="horas_traspaso_bir"]');
+                    if (input) {
+                        input.disabled = !esProcesoBir;
+                        input.required = esProcesoBir;
+                    }
+                }
                 if (esProcesoBir) {
                     necesarias.value = noNecesarias.max;
                     noNecesarias.value = '0';
@@ -204,6 +213,9 @@
                         $horasSeleccionadas = $formConErrores ? old('horas') : ($exclusionDocente['horas'] ?? 0);
                         $horasNecesariasSeleccionadas = $formConErrores ? old('horas_necesarias') : ($docente['horas_contrato'] ?? $horasContratoBaseDocente);
                         $esProcesoBir = $motivoSeleccionado === 'proceso_bir';
+                        $horasTraspasoBirSeleccionadas = $formConErrores
+                            ? old('horas_traspaso_bir', $exclusionDocente['horas_traspaso_bir'] ?? $horasContratoBaseDocente)
+                            : ($exclusionDocente['horas_traspaso_bir'] ?? $horasContratoBaseDocente);
                         $continuaDotacion = ($continuidadPorRut ?? [])[$docente['rut_normalizado'] ?? \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? '')] ?? true;
                         $continuidadSeleccionada = $formConErrores ? old('considerar_dotacion_siguiente', $continuaDotacion) : $continuaDotacion;
                         $conservarHoras = ($conservacionHorasPorRut ?? [])[$docente['rut_normalizado'] ?? \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? '')] ?? true;
@@ -390,7 +402,7 @@
                                                 <div>
                                                     <div class="fw-semibold"><i class="bi bi-person-dash text-warning"></i> Situación docente</div>
                                                     <div class="small text-muted">Distribuya el contrato original entre horas necesarias y no necesarias. Las necesarias suman a Horas contrato aula, Educación Parvularia o Docente PIE según corresponda; las no necesarias quedan fuera de esos totales.</div>
-                                                    <div class="small text-primary">Proceso BIR considera automáticamente el contrato completo en la dotación del año seleccionado.</div>
+                                                    <div class="small text-primary">Proceso BIR conserva el contrato completo en {{ $anio }}. Puede definir por separado cuántas horas de contrato se mantienen en {{ $anio + 1 }}.</div>
                                                     <div class="small text-muted">Las horas asignadas no limitan ni se agregan a este aporte contractual. Las asignaciones registradas se conservan.</div>
                                                 </div>
                                                 @if ($exclusionDocente)
@@ -428,6 +440,18 @@
                                                         @if ($formConErrores) @error('horas')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                     </div>
                                                     <div class="col-12 small text-muted" id="{{ $collapseId }}-suma">Horas necesarias + horas no necesarias = {{ $fmt($horasContratoBaseDocente) }} h de contrato original. Cada valor puede ser cero, siempre que la suma coincida con el contrato.</div>
+                                                    <div class="col-12 mt-3 {{ $esProcesoBir ? '' : 'd-none' }}" data-proceso-bir-traspaso>
+                                                        @if ($traspasoBirDisponible ?? false)
+                                                            <div class="bg-light border rounded-3 p-3">
+                                                                <label for="{{ $collapseId }}-traspaso-bir" class="form-label fw-semibold">Horas de contrato a mantener en dotación {{ $anio + 1 }} <span class="text-danger">*</span></label>
+                                                                <input id="{{ $collapseId }}-traspaso-bir" type="number" name="horas_traspaso_bir" class="form-control @if($formConErrores && $errors->has('horas_traspaso_bir')) is-invalid @endif" min="0" max="{{ $horasContratoBaseDocente }}" step="0.01" value="{{ $horasTraspasoBirSeleccionadas }}" aria-describedby="{{ $collapseId }}-traspaso-bir-ayuda" @disabled(!$esProcesoBir) @required($esProcesoBir)>
+                                                                @if ($formConErrores) @error('horas_traspaso_bir')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
+                                                                <div class="form-text" id="{{ $collapseId }}-traspaso-bir-ayuda">Ingrese entre 0 y {{ $fmt($horasContratoBaseDocente) }} h. El contrato de {{ $anio }} se mantiene completo. Si el docente no continúa, estas horas se conservan como vacantes sólo cuando marque «Contemplar horas necesarias en dotación {{ $anio + 1 }}».</div>
+                                                            </div>
+                                                        @else
+                                                            <div class="alert alert-warning py-2 mb-0">La selección de horas BIR para el año siguiente estará disponible después de instalar su migración.</div>
+                                                        @endif
+                                                    </div>
                                                     @if ($fueroMaternalDisponible ?? false)
                                                         <input type="hidden" name="posee_fuero_maternal" value="0">
                                                         <div class="col-12 mt-3 {{ $motivoSeleccionado === 'horas_lactancia' ? '' : 'd-none' }}" data-lactancia-fuero>
@@ -460,7 +484,7 @@
                                                                 <label class="form-check-label fw-semibold" for="{{ $collapseId }}-conservar-horas">Contemplar horas necesarias en dotación {{ $anio + 1 }}</label>
                                                                 @if ($formConErrores) @error('conservar_horas_necesarias')<div class="invalid-feedback">{{ $message }}</div>@enderror @endif
                                                             </div>
-                                                            <div class="form-text" id="{{ $collapseId }}-conservar-horas-ayuda">Si el docente no continúa, mantiene sus horas necesarias en Horas de contrato {{ $anio + 1 }} y las identifica como vacantes por cubrir. Del contrato original se descuentan solo las horas no necesarias. Las necesidades de plan o funciones se cuentan una sola vez. Al desmarcar, no se conserva este contrato vacante; los planes y funciones configurados conservan sus propias necesidades.</div>
+                                                            <div class="form-text" id="{{ $collapseId }}-conservar-horas-ayuda">Si el docente no continúa, mantiene sus horas necesarias en Horas de contrato {{ $anio + 1 }} y las identifica como vacantes por cubrir. En Proceso BIR se conserva la cantidad indicada en «Horas de contrato a mantener». Para los demás motivos, del contrato original se descuentan las horas no necesarias. Las necesidades de plan o funciones se cuentan una sola vez. Al desmarcar, no se conserva este contrato vacante; los planes y funciones configurados conservan sus propias necesidades.</div>
                                                         @else
                                                             <div class="alert alert-warning py-2 mb-0">La conservación independiente de horas estará disponible después de instalar su migración.</div>
                                                         @endif

@@ -33,6 +33,7 @@ class DotacionDocenteExclusionController extends Controller
             'considerar_dotacion_siguiente' => ['sometimes', 'required', 'boolean'],
             'conservar_horas_necesarias' => ['sometimes', 'required', 'boolean'],
             'posee_fuero_maternal' => ['sometimes', 'required', 'boolean'],
+            'horas_traspaso_bir' => ['sometimes', 'required', 'numeric', 'decimal:0,2', 'min:0', 'max:999999.99'],
         ]);
 
         if (array_key_exists('considerar_dotacion_siguiente', $data) && ! DotacionDocenteExclusion::continuidadDisponible()) {
@@ -71,6 +72,19 @@ class DotacionDocenteExclusionController extends Controller
         }
 
         $horasBase = (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0);
+        $traspasoBirDisponible = DotacionDocenteExclusion::traspasoBirDisponible();
+        if (array_key_exists('horas_traspaso_bir', $data)) {
+            if (! $traspasoBirDisponible) {
+                throw ValidationException::withMessages([
+                    'horas_traspaso_bir' => 'Debe ejecutar la migración de horas de traspaso BIR antes de guardar esta cantidad.',
+                ]);
+            }
+            if ($data['motivo'] !== 'proceso_bir' || (float) $data['horas_traspaso_bir'] > $horasBase) {
+                throw ValidationException::withMessages([
+                    'horas_traspaso_bir' => 'Las horas a mantener corresponden a Proceso BIR y deben estar entre 0 y '.DotacionEstablecimientoCalculator::formatHoras($horasBase).' h de contrato vigente.',
+                ]);
+            }
+        }
         $horasNecesarias = round((float) $data['horas_necesarias'], 2);
         $horasExcluidas = round((float) $data['horas'], 2);
         if ($data['motivo'] === 'proceso_bir') {
@@ -114,6 +128,13 @@ class DotacionDocenteExclusionController extends Controller
                 $exclusion->posee_fuero_maternal = false;
             } elseif (array_key_exists('posee_fuero_maternal', $data)) {
                 $exclusion->posee_fuero_maternal = $request->boolean('posee_fuero_maternal');
+            }
+        }
+        if ($traspasoBirDisponible) {
+            if ($data['motivo'] !== 'proceso_bir') {
+                $exclusion->horas_traspaso_bir = null;
+            } elseif (array_key_exists('horas_traspaso_bir', $data)) {
+                $exclusion->horas_traspaso_bir = round((float) $data['horas_traspaso_bir'], 2);
             }
         }
 
