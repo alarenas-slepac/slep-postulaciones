@@ -52,6 +52,10 @@ class PersonalDatosController extends Controller
         abort_unless($disk->exists($path), 404);
         $datos = json_decode($disk->get($path), true, 512, JSON_THROW_ON_ERROR);
         abort_unless((int) $datos['usuario_id'] === (int) $request->user()->id, 404);
+        if (($datos['version'] ?? 1) >= 2) {
+            return $this->descargar($excel->informe($datos), 'resultados_actualizacion_personal_'.$datos['periodo'].'.xlsx');
+        }
+        // Conserva la descarga de los informes generados antes de este parche.
         return $this->descargar($excel->documento(['Fila Excel', 'RUT', 'Motivo de omisión'], $datos['omitidos'], 'Registros omitidos'), 'registros_omitidos_'.$datos['periodo'].'.xlsx');
     }
 

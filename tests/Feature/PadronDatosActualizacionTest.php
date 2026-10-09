@@ -91,10 +91,10 @@ class PadronDatosActualizacionTest extends IsolatedSecurityTestCase
             ['11111111-1', '2001-01-01'], ['33333333-3', '2002-01-01'], ['44444444-4', '2003-01-01'],
         ])->assertSessionHas('actualizacion_datos.omitidos', 2)->assertSessionHas('actualizacion_datos.registros_actualizados', 2);
         $reporte = session('actualizacion_datos.reporte');
-        $response = $this->get(route('reemplazos.personal.datos.omitidos', $reporte))->assertOk()->assertDownload('registros_omitidos_202609.xlsx');
+        $response = $this->get(route('reemplazos.personal.datos.omitidos', $reporte))->assertOk()->assertDownload('resultados_actualizacion_personal_202609.xlsx');
         $book = $this->leerRespuesta($response->streamedContent());
-        $sheet = $book->getSheet(0);
-        $this->assertSame(['Fila Excel', 'RUT', 'Motivo de omisión'], $sheet->rangeToArray('A1:C1')[0]);
+        $sheet = $book->getSheetByName('No encontrados');
+        $this->assertSame(['Filas Excel', 'RUT', 'Motivo de omisión'], $sheet->rangeToArray('A1:C1')[0]);
         $this->assertSame('33333333-3', $sheet->getCell('B2')->getValue());
         $this->assertSame('44444444-4', $sheet->getCell('B3')->getValue());
         $this->assertStringContainsString('09/2026', $sheet->getCell('C2')->getValue());
@@ -115,13 +115,20 @@ class PadronDatosActualizacionTest extends IsolatedSecurityTestCase
     {
         $this->cargar(['rut', 'fecha_antiguedad'], [
             ['11111111-1', '2000-01-01'], ['44444444-4', 'Fecha desconocida'], ['44.444.444-4', ''],
-        ])->assertSessionHas('actualizacion_datos.omitidos', 2)->assertSessionHas('actualizacion_datos.registros_actualizados', 2);
+        ])->assertSessionHas('actualizacion_datos.omitidos', 2)->assertSessionHas('actualizacion_datos.ruts_omitidos', 1)->assertSessionHas('actualizacion_datos.registros_actualizados', 2);
+        $book = $this->informe();
+        $sheet = $book->getSheetByName('No encontrados');
+        $this->assertSame(2, $sheet->getHighestDataRow());
+        $this->assertSame('3, 4', $sheet->getCell('A2')->getValue());
+        $this->assertSame('44444444-4', $sheet->getCell('B2')->getValue());
+        $book->disconnectWorksheets();
     }
 
     public function test_procesa_mas_de_un_lote_con_busquedas_agrupadas_y_filas_correctas_en_informe(): void
     {
         $rows = [['11111111-1', '2000-01-01']];
         for ($i = 70000000; $i < 70000600; $i++) { $rows[] = [$i.'-'.\App\Support\RutChile::dv($i), '2001-01-01']; }
+        $rows[] = ['11.111.111-1', '1990-01-01'];
         $consultas = 0;
         DB::listen(function (QueryExecuted $q) use (&$consultas) { if (str_starts_with($q->sql, 'select') && str_contains($q->sql, 'CHAR(9)')) { $consultas++; } });
         $this->cargar(['rut', 'fecha_antiguedad'], $rows)->assertSessionHas('actualizacion_datos.omitidos', 600)->assertSessionHas('actualizacion_datos.registros_actualizados', 2);
@@ -131,6 +138,8 @@ class PadronDatosActualizacionTest extends IsolatedSecurityTestCase
         $datos = json_decode(Storage::disk('local')->get($path), true);
         $this->assertCount(600, $datos['omitidos']);
         $this->assertSame(602, $datos['omitidos'][599][0]);
+        $this->assertSame([2, 603], $datos['modificados'][0]['filas_excel']);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 1, 'fecha_antiguedad' => '1990-01-01']);
     }
 
     public function test_vacios_y_campos_no_seleccionados_se_conservan_y_repetir_carga_no_duplica_auditoria(): void
@@ -162,12 +171,126 @@ class PadronDatosActualizacionTest extends IsolatedSecurityTestCase
         $this->assertDatabaseHas('reemplazos_personal', ['id' => 6, 'fecha_antiguedad' => '2000-01-01']);
     }
 
+    public static function fechasRepetidas(): array
+    {
+        return [
+            'antigua primero' => [['2000-01-01', '15/03/2005', '2015-03-01']],
+            'antigua al final' => [['2015-03-01', '15-03-2005', '2000-01-01']],
+            'fecha Excel y vacíos' => [['', ExcelDate::PHPToExcel(new \DateTimeImmutable('2000-01-01')), '2005-03-15', '']],
+        ];
+    }
+
+    #[DataProvider('fechasRepetidas')]
+    public function test_rut_repetido_aplica_fecha_mas_antigua_y_reporta_una_persona(array $fechas): void
+    {
+        DB::table('reemplazos_personal')->where('id', 2)->update(['fecha_antiguedad' => '2012-04-01']);
+        $rows = array_map(fn ($fecha, $i) => [$i % 2 ? '11.111.111-1' : '11111111-1', $fecha], $fechas, array_keys($fechas));
+        $this->cargar(['rut', 'fechaing'], $rows)->assertSessionHas('actualizacion_datos.ruts_actualizados', 1)
+            ->assertSessionHas('actualizacion_datos.registros_actualizados', 2)->assertSessionHas('actualizacion_datos.ruts_sin_cambios', 0);
+        foreach ([1, 2] as $id) { $this->assertDatabaseHas('reemplazos_personal', ['id' => $id, 'fecha_antiguedad' => '2000-01-01']); }
+        $this->assertDatabaseCount('padron_individual_cambios', 2);
+        $filasExcel = range(2, count($rows) + 1);
+        $this->assertSame($filasExcel, json_decode(DB::table('padron_individual_cambios')->value('controles'), true)['filas_excel']);
+        $book = $this->informe();
+        $sheet = $book->getSheetByName('Modificados');
+        $this->assertSame(2, $sheet->getHighestDataRow());
+        $this->assertSame('11111111-1', $sheet->getCell('A2')->getValue());
+        $this->assertSame(implode(', ', $filasExcel), $sheet->getCell('C2')->getValue());
+        $this->assertSame('2', $sheet->getCell('D2')->getValue());
+        $this->assertSame('2010-03-01 | 2012-04-01', $sheet->getCell('E2')->getValue());
+        $this->assertSame('2000-01-01', $sheet->getCell('F2')->getValue());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_consolida_cada_campo_de_fecha_y_acepta_otros_campos_coincidentes(): void
+    {
+        $this->cargar(['rut', 'FECHA_NACIMIENTO', 'fecha_antiguedad', 'Tramo', 'Bienios'], [
+            ['11111111-1', '1982-03-01', '2000-01-01', 'Experto II', 0],
+            ['11.111.111-1', '1981-01-01', '2005-01-01', 'Experto 2', 0],
+            ['11111111-1', '', '', '', ''],
+        ], array_keys(PadronDatosExcel::CAMPOS))->assertSessionHas('actualizacion_datos.registros_actualizados', 2);
+        $this->assertDatabaseHas('reemplazos_personal', ['id' => 1, 'fecha_nacimiento' => '1981-01-01',
+            'fecha_antiguedad' => '2000-01-01', 'tramo' => 'Experto 2', 'bienios' => 0]);
+        $book = $this->informe();
+        $sheet = $book->getSheetByName('Modificados');
+        $this->assertSame('1981-01-01', $sheet->getCell('F2')->getValue());
+        $this->assertSame('2000-01-01', $sheet->getCell('H2')->getValue());
+        $this->assertSame('0', $sheet->getCell('L2')->getValue());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_fechas_iguales_repetidas_se_informan_sin_modificar_ni_crear_auditoria(): void
+    {
+        $antes = DB::table('reemplazos_personal')->orderBy('id')->get()->toJson();
+        $this->cargar(['rut', 'fecha_antiguedad'], [['11111111-1', '01/03/2010'], ['11.111.111-1', '2010-03-01']])
+            ->assertSessionHas('actualizacion_datos.ruts_actualizados', 0)->assertSessionHas('actualizacion_datos.ruts_sin_cambios', 1)
+            ->assertSessionHas('actualizacion_datos.sin_cambios', 2)->assertSessionHas('actualizacion_datos.registros_actualizados', 0);
+        $this->assertSame($antes, DB::table('reemplazos_personal')->orderBy('id')->get()->toJson());
+        $this->assertDatabaseCount('padron_individual_cambios', 0);
+        $book = $this->informe();
+        $sheet = $book->getSheetByName('Sin cambios');
+        $this->assertSame(2, $sheet->getHighestDataRow());
+        $this->assertSame('11111111-1', $sheet->getCell('A2')->getValue());
+        $this->assertSame('2, 3', $sheet->getCell('C2')->getValue());
+        $this->assertSame('2010-03-01', $sheet->getCell('E2')->getValue());
+        $this->assertSame(1, $book->getSheetByName('Modificados')->getHighestDataRow());
+        $this->assertSame(1, $book->getSheetByName('Resumen por RBD')->getHighestDataRow());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_resumen_por_rbd_cuenta_rut_unico_aunque_tenga_varios_contratos(): void
+    {
+        $row = (array) DB::table('reemplazos_personal')->find(1);
+        $row['id'] = 6; $row['row_hash'] = hash('sha256', 'datos-prueba-6');
+        DB::table('reemplazos_personal')->insert($row);
+        $this->cargar(['rut', 'fecha_antiguedad'], [
+            ['11111111-1', '2000-01-01'], ['11.111.111-1', '2001-01-01'], ['22222222-2', '2002-01-01'],
+        ])->assertSessionHas('actualizacion_datos.ruts_actualizados', 2)->assertSessionHas('actualizacion_datos.registros_actualizados', 4);
+        $book = $this->informe();
+        $this->assertSame(['Modificados', 'Sin cambios', 'No encontrados', 'Resumen por RBD', 'Instrucciones'], $book->getSheetNames());
+        $this->assertSame([
+            ['RBD', 'RUT únicos modificados', 'Líneas actualizadas'], ['99998', '1', '1'], ['99999', '2', '3'],
+        ], $book->getSheetByName('Resumen por RBD')->toArray());
+        $this->assertSame(3, $book->getSheetByName('Modificados')->getHighestDataRow());
+        $this->assertStringContainsString('la suma no es el total de personas únicas', $book->getSheetByName('Instrucciones')->getCell('B6')->getValue());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_persona_con_lineas_iguales_y_otras_modificadas_no_se_duplica_en_sin_cambios(): void
+    {
+        DB::table('reemplazos_personal')->where('id', 1)->update(['fecha_antiguedad' => '2000-01-01']);
+        $antes = DB::table('reemplazos_personal')->find(1);
+        $this->cargar(['rut', 'fecha_antiguedad'], [['11111111-1', '2000-01-01'], ['11.111.111-1', '2005-01-01']])
+            ->assertSessionHas('actualizacion_datos.ruts_actualizados', 1)->assertSessionHas('actualizacion_datos.registros_actualizados', 1)
+            ->assertSessionHas('actualizacion_datos.sin_cambios', 1)->assertSessionHas('actualizacion_datos.ruts_sin_cambios', 0);
+        $this->assertEquals($antes, DB::table('reemplazos_personal')->find(1));
+        $book = $this->informe();
+        $this->assertSame(1, $book->getSheetByName('Sin cambios')->getHighestDataRow());
+        $this->assertSame([['RBD', 'RUT únicos modificados', 'Líneas actualizadas'], ['99998', '1', '1']], $book->getSheetByName('Resumen por RBD')->toArray());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_informe_historico_de_omitidos_conserva_descarga(): void
+    {
+        $reporte = (string) \Illuminate\Support\Str::uuid();
+        $path = app(PadronDatosActualizacionService::class)->reportePath($this->admin->id, $reporte);
+        Storage::disk('local')->put($path, json_encode(['usuario_id' => $this->admin->id, 'periodo' => 202609,
+            'omitidos' => [[2, '44444444-4', 'RUT no encontrado.']]], JSON_THROW_ON_ERROR));
+        $response = $this->get(route('reemplazos.personal.datos.omitidos', $reporte))->assertOk()->assertDownload('registros_omitidos_202609.xlsx');
+        $book = $this->leerRespuesta($response->streamedContent());
+        $this->assertSame(['Registros omitidos'], $book->getSheetNames());
+        $this->assertSame('44444444-4', $book->getSheet(0)->getCell('B2')->getValue());
+        $book->disconnectWorksheets();
+    }
+
     public static function invalidos(): array
     {
         return [
             [['rut', 'fecha_antiguedad'], [['11111111-1', '31/02/2000']]],
             [['rut', 'fecha_antiguedad'], [['11111111-1', '=DATE(2000,1,1)']]],
-            [['rut', 'fecha_antiguedad'], [['11111111-1', '2000-01-01'], ['11.111.111-1', '2001-01-01']]],
+            [['rut', 'fecha_antiguedad'], [['11111111-1', '2000-01-01'], ['11.111.111-1', '31/02/2000']]],
+            [['rut', 'Tramo'], [['11111111-1', 'Temprano'], ['11.111.111-1', 'Avanzado']]],
+            [['rut', 'Bienios'], [['11111111-1', 0], ['11.111.111-1', 1]]],
             [['rut', 'Tramo'], [['11111111-1', 'Incorrecto']]],
             [['rut', 'Bienios'], [['11111111-1', -1]]],
             [['rut', 'Bienios'], [['11111111-1', 1.5]]],
@@ -258,7 +381,7 @@ class PadronDatosActualizacionTest extends IsolatedSecurityTestCase
 
     public function test_si_no_se_guarda_informe_no_se_aplican_cambios(): void
     {
-        $file = $this->archivo(['rut', 'fecha_antiguedad'], [['11111111-1', '2000-01-01'], ['44444444-4', '2000-01-01']]);
+        $file = $this->archivo(['rut', 'fecha_antiguedad'], [['11111111-1', '2000-01-01']]);
         $disk = \Mockery::mock(FilesystemAdapter::class);
         $disk->shouldReceive('put')->once()->andReturn(false);
         $disk->shouldReceive('exists')->andReturn(false);
@@ -288,6 +411,23 @@ class PadronDatosActualizacionTest extends IsolatedSecurityTestCase
         $this->assertStringContainsString('Los RUT no encontrados se omiten', $html);
     }
 
+    public function test_resumen_ofrece_descarga_del_informe_y_admite_resumen_historico(): void
+    {
+        $this->cargar(['rut', 'fecha_antiguedad'], [['11111111-1', '2000-01-01'], ['44444444-4', '2000-01-01']]);
+        Storage::disk('local')->put('ui/layouts/app.blade.php', '@yield("content") @stack("scripts")');
+        $this->app['view']->getFinder()->prependLocation(Storage::disk('local')->path('ui'));
+        $html = view('reemplazos.personal.import', ['errors' => new ViewErrorBag])->render();
+        $this->assertStringContainsString('Descargar informe de resultados', $html);
+        $this->assertStringContainsString('RUT únicos sin cambios:', $html);
+        $this->assertStringContainsString('RUT únicos omitidos:', $html);
+        $this->assertStringContainsString('resumen de RUT modificados por RBD', $html);
+        $this->assertStringContainsString(route('reemplazos.personal.datos.omitidos', session('actualizacion_datos.reporte')), $html);
+        $historico = session('actualizacion_datos');
+        unset($historico['ruts_sin_cambios'], $historico['ruts_omitidos']);
+        session()->put('actualizacion_datos', $historico);
+        $this->assertStringContainsString('Descargar registros omitidos', view('reemplazos.personal.import', ['errors' => new ViewErrorBag])->render());
+    }
+
     private function crearDocumento(): void
     {
         Schema::create('solicitudes_reemplazo', function (Blueprint $t) { $t->id(); $t->integer('reemplazo_personal_id'); $t->json('padron_personal_snapshot')->nullable(); });
@@ -314,5 +454,12 @@ class PadronDatosActualizacionTest extends IsolatedSecurityTestCase
         $path = 'respuesta-'.bin2hex(random_bytes(6)).'.xlsx';
         Storage::disk('local')->put($path, $content);
         return IOFactory::load(Storage::disk('local')->path($path));
+    }
+
+    private function informe(): Spreadsheet
+    {
+        $response = $this->get(route('reemplazos.personal.datos.omitidos', session('actualizacion_datos.reporte')))
+            ->assertOk()->assertDownload('resultados_actualizacion_personal_202609.xlsx');
+        return $this->leerRespuesta($response->streamedContent());
     }
 }

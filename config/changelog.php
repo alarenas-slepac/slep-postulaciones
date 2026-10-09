@@ -1,6 +1,28 @@
 <?php
 
 return [
+    '2026.10.9.583' => [
+        'date' => '2026-10-09',
+        'module' => 'Carga masiva de personal',
+        'title' => 'Fechas más antiguas e informe de actualización por RUT y RBD',
+        'files' => [
+            'app/Http/Controllers/Reemplazos/PersonalDatosController.php',
+            'app/Services/Padron/PadronDatosActualizacionService.php',
+            'app/Services/Padron/PadronDatosExcel.php',
+            'resources/views/reemplazos/personal/import.blade.php',
+            'resources/views/reemplazos/personal/partials/actualizar-datos-modal.blade.php',
+            'tests/Feature/PadronDatosActualizacionTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Agrupa los RUT repetidos en el Excel y aplica la fecha más antigua de cada campo de fecha seleccionado, independientemente de su formato y orden. Las celdas vacías conservan su comportamiento y los valores contradictorios de tramo o bienios requieren corregir el archivo.',
+            'Ofrece un informe Excel privado con RUT únicos modificados y sus valores anteriores y nuevos, RUT sin cambios y RUT no encontrados. Identifica todas las filas repetidas del archivo y no altera datos ni auditoría cuando los valores coinciden con el padrón.',
+            'Añade un resumen de RUT únicos modificados y líneas contractuales actualizadas por RBD. Un docente con varios contratos se cuenta una sola vez en cada establecimiento.',
+            'Conserva las descargas de informes anteriores, el acceso exclusivo para administrador, la actualización sólo del último mes y la reversión transaccional si no se puede guardar el informe.',
+            'Actualiza las instrucciones de plantilla y modal e incorpora pruebas de duplicados, fechas iguales, múltiples RBD, informes históricos y almacenamiento simulado.',
+        ],
+        'roles' => ['Administrador'],
+    ],
     '2026.10.9.582' => [
         'date' => '2026-10-09',
         'module' => 'Carga masiva de personal',
