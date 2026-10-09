@@ -1,16 +1,19 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4 p-4 bg-white border rounded-4 shadow-sm">
         <div>
-            <h3 class="m-0">Reemplazos</h3>
+            <h1 class="h3 fw-bold m-0">Reemplazos</h1>
             <div class="text-muted">Carga masiva de personal por Excel (solo admin)</div>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{{ route('reemplazos.personal.import', ['descargar_plantilla' => 1]) }}" class="btn btn-outline-success">
+        <div class="d-flex flex-wrap gap-2">
+            @if (auth()->user()?->activeRoleName() === 'admin')
+                <button type="button" class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#actualizar-datos-personal"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Actualizar datos</button>
+            @endif
+            <a href="{{ route('reemplazos.personal.import', ['descargar_plantilla' => 1]) }}" class="btn btn-outline-primary rounded-pill">
                 <i class="bi bi-file-earmark-excel"></i> Descargar plantilla
             </a>
-            <a href="{{ route('reemplazos.index') }}" class="btn btn-outline-secondary">Volver</a>
+            <a href="{{ route('reemplazos.index') }}" class="btn btn-outline-secondary rounded-pill">Volver</a>
         </div>
     </div>
 
@@ -23,9 +26,21 @@
         </li>
     </ul>
 
+    @if (session('actualizacion_datos'))
+        @php($actualizacion = session('actualizacion_datos'))
+        <div class="alert alert-success rounded-4" role="status">
+            <h2 class="h6 fw-bold">Actualización de datos finalizada · {{ sprintf('%02d/%d', $actualizacion['periodo'] % 100, intdiv($actualizacion['periodo'], 100)) }}</h2>
+            <div>Filas leídas: <strong>{{ $actualizacion['filas'] }}</strong> · Personas actualizadas: <strong>{{ $actualizacion['ruts_actualizados'] }}</strong> · Líneas contractuales actualizadas: <strong>{{ $actualizacion['registros_actualizados'] }}</strong> · Líneas sin cambios: <strong>{{ $actualizacion['sin_cambios'] }}</strong> · Filas omitidas: <strong>{{ $actualizacion['omitidos'] }}</strong>.</div>
+            <div class="small mt-2">Campos: {{ collect($actualizacion['campos'])->map(fn ($campo) => \App\Services\Padron\PadronDatosExcel::CAMPOS[$campo]['titulo'])->implode(', ') }}. Los contratos, jornadas, asignaciones y otros meses se conservaron.</div>
+            @if ($actualizacion['reporte'])
+                <a class="btn btn-outline-primary rounded-pill mt-3" href="{{ route('reemplazos.personal.datos.omitidos', $actualizacion['reporte']) }}"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i> Descargar registros omitidos</a>
+            @endif
+        </div>
+    @endif
+
     @if (session('import_summary'))
         @php($s = session('import_summary'))
-        <div class="alert alert-success">
+        <div class="alert alert-success rounded-4">
             <div class="fw-semibold mb-1">Importación finalizada</div>
             <div class="small">
                 <div><strong>Archivo:</strong> {{ $s['archivo'] }}</div>
@@ -49,9 +64,9 @@
         </div>
     @endif
 
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Subir archivo Excel</h5>
+    <div class="card border rounded-4 shadow-sm">
+        <div class="card-body p-4">
+            <h2 class="h5 fw-bold card-title">Subir archivo Excel del padrón completo</h2>
             <p class="text-muted mb-3">
                 Primero se genera una <strong>previsualización del padrón completo</strong>, sin modificar personal.
                 Puede resolver coincidencias ambiguas, revisar vínculos históricos y autorizar excesos con justificación.
@@ -62,8 +77,8 @@
             <form method="POST" action="{{ route('reemplazos.personal.import.store') }}" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="accion" value="previsualizar">
-                @if ($errors->any())
-                    <div class="alert alert-danger" role="alert">{{ $errors->first() }}</div>
+                @if ($errors->any() && ! old('actualizar_datos'))
+                    <div class="alert alert-danger rounded-4" role="alert">{{ $errors->first() }}</div>
                 @endif
 
                 <div class="mb-3">
@@ -93,7 +108,7 @@
                         Si está vacía o no viene en la plantilla, no se propone borrar la fecha existente.
                     </div>
                     <div class="mt-2">
-                        <a href="{{ route('reemplazos.personal.import', ['descargar_plantilla' => 1]) }}" class="btn btn-sm btn-outline-success">
+                        <a href="{{ route('reemplazos.personal.import', ['descargar_plantilla' => 1]) }}" class="btn btn-sm btn-outline-primary rounded-pill">
                             <i class="bi bi-download"></i> Descargar plantilla oficial
                         </a>
                     </div>
@@ -103,10 +118,13 @@
                     <input class="form-check-input" type="checkbox" name="padron_completo" value="1" id="padron-completo" required>
                     <label class="form-check-label" for="padron-completo">Confirmo que el archivo contiene el padrón completo de todos los establecimientos para un único año y mes.</label>
                 </div>
-                <button class="btn btn-primary">
+                <button class="btn btn-primary rounded-pill">
                     <i class="bi bi-search"></i> Analizar y previsualizar
                 </button>
             </form>
         </div>
     </div>
+    @if (auth()->user()?->activeRoleName() === 'admin')
+        @include('reemplazos.personal.partials.actualizar-datos-modal')
+    @endif
 @endsection
