@@ -1,6 +1,31 @@
 <?php
 
 return [
+    '2026.10.9.581' => [
+        'date' => '2026-10-09',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Suspensión temporal de la etapa 6 de Dotación 2027 para directivos',
+        'files' => [
+            'app/Http/Middleware/SuspenderAsignacionesDotacion.php',
+            'app/Support/DotacionAsignacionSuspension.php',
+            'bootstrap/app.php',
+            'config/dotacion_asignacion.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignacion_editor.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_asignaciones_huerfanas.blade.php',
+            'resources/views/admin/dotacion-establecimiento/partials/_reserva_no_normativa.blade.php',
+            'tests/Feature/DotacionAsignacionSuspensionTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'La etapa 6 de Dotación 2027 permanece en modo sólo consulta para el rol activo Funcionario Directivo de Establecimiento desde el 9 de octubre hasta el martes 13 de octubre de 2026 a las 00:00, hora de Chile.',
+            'Impide crear, modificar y eliminar asignaciones, incluidas reservas, traspasos, vinculaciones y eliminaciones masivas; verifica el año del registro en el servidor para evitar alterar asignaciones mediante formularios anteriores.',
+            'Conserva la consulta de horas, tablas y filtros; muestra el motivo y la fecha de reapertura y oculta los formularios de escritura durante la suspensión.',
+            'Las otras etapas, los demás años y los roles de administración y coordinación conservan sus accesos. La reapertura es automática y las fechas se configuran sin modificar datos históricos.',
+            'Incluye pruebas aisladas de las acciones HTTP, roles activos, límites horarios, consulta, otras etapas y restauración de los formularios.',
+        ],
+        'roles' => ['Directivo de establecimiento'],
+    ],
     '2026.10.8.580' => [
         'date' => '2026-10-08',
         'module' => 'Dotación establecimiento',

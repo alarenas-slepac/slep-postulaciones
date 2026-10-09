@@ -1,4 +1,5 @@
 @php
+    $asignacionesSoloConsulta = \App\Support\DotacionAsignacionSuspension::bloqueada((int) ($anio ?? 2027), $activeRole ?? auth()->user()?->activeRoleName());
     $docentesReserva = \App\Support\DotacionReservaNoNormativa::candidatos($proceso2027Asignacion);
     $faseReserva = \App\Support\DotacionReservaNoNormativa::fase($docentesReserva);
     $opcionesReserva = \App\Support\DotacionReservaNoNormativa::opciones($docentesReserva);
@@ -30,7 +31,9 @@
             <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Origen permitido</div><strong>Horas titulares</strong><div class="small text-muted">No se traspasan horas a contrata ni saldos titulares menores a 1 h.</div></div></div>
         </div>
 
-        @if ($opcionesReserva->isNotEmpty())
+        @if ($asignacionesSoloConsulta)
+            <div class="small text-muted mb-3"><i class="bi bi-lock" aria-hidden="true"></i> Las reservas y traspasos de horas están disponibles sólo para consulta durante la suspensión de asignaciones.</div>
+        @elseif ($opcionesReserva->isNotEmpty())
         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.reservas.store', $establecimiento) }}" class="border rounded-4 p-3 bg-light">
             @csrf
             <input type="hidden" name="anio" value="2027">
@@ -93,7 +96,9 @@
                                 <td>{{ $reserva->subtipo_asignacion === 'titular' ? 'Titular' : 'Contrata' }}</td>
                                 <td class="text-end">{{ $fmt($reserva->horas_contrato) }}</td>
                                 <td>
-                                    @if (($proceso2027Asignacion['funciones_no_normativas_habilitadas'] ?? false) && $funcionesVinculables->isNotEmpty())
+                                    @if ($asignacionesSoloConsulta)
+                                        <span class="small text-muted">Sólo consulta</span>
+                                    @elseif (($proceso2027Asignacion['funciones_no_normativas_habilitadas'] ?? false) && $funcionesVinculables->isNotEmpty())
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.reservas.vincular', [$establecimiento, $reserva]) }}" class="d-flex gap-2 flex-wrap align-items-end">
                                             @csrf
                                             <div class="flex-grow-1">
@@ -116,11 +121,15 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @unless ($asignacionesSoloConsulta)
                                     <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $reserva]) }}" onsubmit="return confirm('¿Liberar las horas reservadas de este docente?');">
                                         @csrf
                                         @method('DELETE')
                                         <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit">Liberar</button>
                                     </form>
+                                    @else
+                                        <span class="small text-muted">Sólo consulta</span>
+                                    @endunless
                                 </td>
                             </tr>
                         @endforeach
