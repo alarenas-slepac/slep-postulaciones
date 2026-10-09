@@ -1,6 +1,7 @@
 @if ($asignacionesHuerfanas->isNotEmpty())
     @php
-        $puedeEliminarFantasmas = in_array($activeRole ?? null, ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true);
+        $puedeEliminarFantasmas = in_array($activeRole ?? null, ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true)
+            && ! \App\Support\DotacionAsignacionSuspension::bloqueada((int) $anio, $activeRole ?? auth()->user()?->activeRoleName());
         $horasFantasma = (float) ($resumenAsignacion['horas_fantasma'] ?? $asignacionesHuerfanas->sum(fn ($row) => (float) ($row->horas_contrato ?? 0)));
         $docentesAfectados = (int) ($resumenAsignacion['docentes_horas_fantasma'] ?? $asignacionesHuerfanas
             ->pluck('docente_rut_normalizado')
@@ -69,7 +70,7 @@
                 <i class="bi bi-info-circle mt-1" aria-hidden="true"></i>
                 <div>
                     <strong>Estas horas no se eliminan automáticamente.</strong>
-                    Revise las asignaciones del detalle. Puede eliminar una fila o todas las horas fantasmas mostradas para {{ $anio }}; al confirmar se recalcula la carga de los docentes afectados. Las asignaciones vigentes y las reservas para otras funciones se conservan.
+                    Revise las asignaciones del detalle. @if ($puedeEliminarFantasmas) Puede eliminar una fila o todas las horas fantasmas mostradas para {{ $anio }}; al confirmar se recalcula la carga de los docentes afectados. @else Las acciones de eliminación no están disponibles para esta consulta. @endif Las asignaciones vigentes y las reservas para otras funciones se conservan.
                 </div>
             </div>
 

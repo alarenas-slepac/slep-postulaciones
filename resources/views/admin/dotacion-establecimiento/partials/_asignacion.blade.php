@@ -8,6 +8,7 @@
     $subvenciones = $asignacion['subvenciones'] ?? collect();
     $docentesAsignacion = $asignacion['docentes'] ?? $docentes;
     $proceso2027Asignacion = $proceso2027 ?? ['aplica' => false];
+    $asignacionesSoloConsulta = \App\Support\DotacionAsignacionSuspension::bloqueada((int) $anio, $activeRole ?? auth()->user()?->activeRoleName());
     $subsectoresAsignacion = collect($proceso2027Asignacion['docentes_subsector']['asignaturas'] ?? [])->keyBy('key');
     $asignacion2027Habilitada = !($proceso2027Asignacion['aplica'] ?? false) || ($proceso2027Asignacion['asignacion_habilitada'] ?? false);
     $asistentesAsignacion = collect($asignacion['asistentes'] ?? []);
@@ -128,6 +129,12 @@
 @endonce
 
 <div id="dotacion-asignacion" data-dotacion-asignacion data-process-blocked="{{ $asignacion2027Habilitada ? '0' : '1' }}">
+@if ($asignacionesSoloConsulta)
+    <div class="alert alert-info rounded-4 d-flex gap-2 align-items-start" role="status" data-asignaciones-solo-consulta>
+        <i class="bi bi-lock mt-1" aria-hidden="true"></i>
+        <div>{{ \App\Support\DotacionAsignacionSuspension::mensaje() }}</div>
+    </div>
+@endif
 <div class="card dotacion-section mb-4">
     <div class="dotacion-section-header">
         <div class="d-flex align-items-start gap-3">
@@ -296,6 +303,7 @@
                                 <span class="badge rounded-pill text-bg-primary">Aula asignada: {{ $fmt($cursoAsig) }}</span>
                                 <span class="badge rounded-pill {{ $cursoSaldo > 0.01 ? 'text-bg-warning' : 'text-bg-success' }}">Saldo aula: {{ $fmt($cursoSaldo) }}</span>
                                 @if ($asignacionesCurso->isNotEmpty())
+                                    @unless ($asignacionesSoloConsulta)
                                     <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.curso-bloque.destroy', $establecimiento) }}" data-confirm="¿Eliminar todas las {{ $asignacionesCurso->count() }} asignaciones del plan de estudio en {{ $cursoLabel }}? Esta acción no se puede deshacer." onsubmit="return confirm(this.dataset.confirm);">
                                         @csrf
                                         @method('DELETE')
@@ -304,6 +312,7 @@
                                         <input type="hidden" name="curso_label" value="{{ $cursoLabel }}">
                                         <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Eliminar todas del curso ({{ $asignacionesCurso->count() }})</button>
                                     </form>
+                                    @endunless
                                 @endif
                                 <button class="btn btn-sm btn-outline-primary rounded-pill" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $cursoCollapseId }}" aria-expanded="{{ $cursoTieneErrores ? 'true' : 'false' }}" aria-controls="{{ $cursoCollapseId }}">
                                     <i class="bi bi-chevron-down"></i> Ver asignaturas
@@ -366,6 +375,7 @@
                                                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                                                         <span class="fw-semibold small text-uppercase">{{ $bloqueActual }}</span>
                                                         @if ($asignacionesCursoBloque->isNotEmpty())
+                                                            @unless ($asignacionesSoloConsulta)
                                                             <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.curso-bloque.destroy', $establecimiento) }}" data-confirm="¿Eliminar las {{ $asignacionesCursoBloque->count() }} asignaciones del bloque {{ $bloqueActual }} en {{ $cursoLabel }}? Esta acción no se puede deshacer." onsubmit="return confirm(this.dataset.confirm);">
                                                                 @csrf
                                                                 @method('DELETE')
@@ -375,6 +385,7 @@
                                                                 <input type="hidden" name="bloque" value="{{ $bloqueActual }}">
                                                                 <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Eliminar asignaciones del bloque ({{ $asignacionesCursoBloque->count() }})</button>
                                                             </form>
+                                                            @endunless
                                                         @endif
                                                     </div>
                                                 </td>
@@ -414,7 +425,8 @@
                                             <td role="cell" data-label="Saldo aula" class="text-end {{ ($pendingPlan ?? 0) > 0.01 ? 'text-warning' : 'text-success' }} fw-semibold">{{ $fmt($pendingPlan) }}</td>
                                             <td role="cell" data-label="Estado"><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
                                             <td role="cell" data-label="Acción">
-                                                @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['editorId' => 'dotacion-editor-'.sha1($item['key'].$item['tipo_asignacion']), 'abierto' => $esFormularioFallido($item, $item['tipo_asignacion']), 'accion' => 'Asignar horas', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
+                                                @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['soloConsulta' => $asignacionesSoloConsulta, 'editorId' => 'dotacion-editor-'.sha1($item['key'].$item['tipo_asignacion']), 'abierto' => $esFormularioFallido($item, $item['tipo_asignacion']), 'accion' => 'Asignar horas', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
+                                                @unless ($asignacionesSoloConsulta)
                                                 <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form" data-dotacion-asignacion-form>
                                                     @csrf
                                                     @include('admin.dotacion-establecimiento.partials._asignacion_errores', ['tipoFormulario' => null])
@@ -486,6 +498,7 @@
                                                     <input id="observacion-{{ sha1($item['key'].null) }}" type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional" value="{{ $valorFormulario($item, 'observacion', '', null) }}">
                                                     <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar</button>
                                                 </form>
+                                                @endunless
                                                 @endcomponent
                                             </td>
                                         </tr>
@@ -499,7 +512,8 @@
                                                     <div class="fw-semibold small mb-1">Acompañamiento de Educadora de Párvulos</div>
                                                     <div class="small text-muted mb-2">Otro docente imparte {{ $fmt($item['horas_externas_libre_disposicion']) }} h de libre disposición. Puede asignar hasta {{ $fmt($item['horas_acompanamiento_disponibles'] ?? 0) }} h adicionales a la Educadora que permanece en aula. Estas horas cuentan en su contrato, sin duplicar la cobertura del plan.</div>
                                                     @if (($item['horas_acompanamiento_disponibles'] ?? 0) > 0.01)
-                                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['editorId' => 'dotacion-editor-'.sha1($item['key'].'acompanamiento_parvularia'), 'abierto' => $esFormularioFallido($item, 'acompanamiento_parvularia'), 'accion' => 'Asignar acompañamiento', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
+                                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['soloConsulta' => $asignacionesSoloConsulta, 'editorId' => 'dotacion-editor-'.sha1($item['key'].'acompanamiento_parvularia'), 'abierto' => $esFormularioFallido($item, 'acompanamiento_parvularia'), 'accion' => 'Asignar acompañamiento', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
+                                                        @unless ($asignacionesSoloConsulta)
                                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form">
                                                             @csrf
                                                             @include('admin.dotacion-establecimiento.partials._asignacion_errores', ['tipoFormulario' => 'acompanamiento_parvularia'])
@@ -528,6 +542,7 @@
                                                             <label class="form-label small mb-0" for="observacion-{{ sha1($item['key'].'acompanamiento_parvularia') }}">Observación opcional</label>
                                                             <input id="observacion-{{ sha1($item['key'].'acompanamiento_parvularia') }}" type="text" name="observacion" class="form-control form-control-sm" placeholder="Observación opcional" value="{{ $valorFormulario($item, 'observacion', '', 'acompanamiento_parvularia') }}">
                                                         </form>
+                                                        @endunless
                                                         @endcomponent
                                                     @endif
                                                 </td>
@@ -550,11 +565,13 @@
                                                                         <td class="text-end">{{ $fmt($asig->horas_contrato) }}</td>
                                                                         <td>{{ $asig->observacion }}</td>
                                                                         <td class="text-end">
+                                                                            @unless ($asignacionesSoloConsulta)
                                                                             <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" data-confirm="¿Eliminar la asignación de {{ $asig->docente_nombre }}: {{ $asig->asignatura_nombre }} ({{ $fmt($asig->horas_contrato) }} h de contrato)?" onsubmit="return confirm(this.dataset.confirm);">
                                                                                 @csrf
                                                                                 @method('DELETE')
                                                                                 <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" aria-label="Eliminar asignación de {{ $asig->docente_nombre }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                                                             </form>
+                                                                            @endunless
                                                                         </td>
                                                                     </tr>
                                                                 @endforeach
@@ -634,6 +651,7 @@
                                             );
                                         @endphp
                                         @if ($asignacionesCursoPie->isNotEmpty())
+                                            @unless ($asignacionesSoloConsulta)
                                             <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.curso-bloque.destroy', $establecimiento) }}" class="mt-2" data-confirm="¿Eliminar las {{ $asignacionesCursoPie->count() }} asignaciones de trabajo colaborativo PIE en {{ $item['curso_label'] ?? 'este curso' }}? Esta acción no se puede deshacer." onsubmit="return confirm(this.dataset.confirm);">
                                                 @csrf
                                                 @method('DELETE')
@@ -642,6 +660,7 @@
                                                 <input type="hidden" name="curso_label" value="{{ $item['curso_label'] ?? 'Curso sin identificar' }}">
                                                 <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Eliminar asignaciones del curso ({{ $asignacionesCursoPie->count() }})</button>
                                             </form>
+                                            @endunless
                                         @endif
                                     @endif
                                 </td>
@@ -657,7 +676,8 @@
                                             <div>Docente Directivo por asumir · {{ $fmt($item['horas_contrato_asignadas'] ?? 0) }} hrs contrato.</div>
                                             <div class="mt-1">La plaza activa {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas definidas como necesidad hasta asignar al docente directivo.</div>
                                         </div>
-                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['editorId' => 'dotacion-editor-'.sha1($item['key'].'funcion_directiva'), 'abierto' => $esFormularioFallido($item, 'funcion_directiva'), 'accion' => 'Asignar docente directivo', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
+                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['soloConsulta' => $asignacionesSoloConsulta, 'editorId' => 'dotacion-editor-'.sha1($item['key'].'funcion_directiva'), 'abierto' => $esFormularioFallido($item, 'funcion_directiva'), 'accion' => 'Asignar docente directivo', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
+                                        @unless ($asignacionesSoloConsulta)
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 mt-2 dotacion-assignment-form">
                                             @csrf
                                             @include('admin.dotacion-establecimiento.partials._asignacion_errores', ['tipoFormulario' => 'funcion_directiva'])
@@ -682,9 +702,11 @@
                                             <div class="small text-muted">Contrato definido: {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas.</div>
                                             <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
                                         </form>
+                                        @endunless
                                         @endcomponent
                                     @else
-                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['editorId' => 'dotacion-editor-'.sha1($item['key'].$item['tipo_asignacion']), 'abierto' => $esFormularioFallido($item, $item['tipo_asignacion']), 'accion' => 'Asignar horas', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
+                                        @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['soloConsulta' => $asignacionesSoloConsulta, 'editorId' => 'dotacion-editor-'.sha1($item['key'].$item['tipo_asignacion']), 'abierto' => $esFormularioFallido($item, $item['tipo_asignacion']), 'accion' => 'Asignar horas', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
+                                        @unless ($asignacionesSoloConsulta)
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form" data-dotacion-asignacion-form>
                                         @csrf
                                         @include('admin.dotacion-establecimiento.partials._asignacion_errores', ['tipoFormulario' => null])
@@ -745,6 +767,7 @@
                                         @endif
                                         <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada || ($esNormativa2027 && $pendingContrato <= 0))><i class="bi bi-plus-circle"></i> Asignar</button>
                                         </form>
+                                        @endunless
                                         @endcomponent
                                     @endif
                                 </td>
@@ -769,11 +792,13 @@
                                                                 @if (data_get($asig, 'asignacion_automatica', false))
                                                                     <span class="badge rounded-pill text-bg-primary">Automática</span>
                                                                 @else
+                                                                    @unless ($asignacionesSoloConsulta)
                                                                     <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.destroy', [$establecimiento, $asig]) }}" data-confirm="¿Eliminar la asignación de {{ $asig->docente_nombre }}: {{ $asig->asignatura_nombre }} ({{ $fmt($asig->horas_contrato) }} h de contrato)?" onsubmit="return confirm(this.dataset.confirm);">
                                                                         @csrf
                                                                         @method('DELETE')
                                                                         <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" aria-label="Eliminar asignación de {{ $asig->docente_nombre }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                                                     </form>
+                                                                    @endunless
                                                                 @endif
                                                             </td>
                                                         </tr>

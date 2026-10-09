@@ -1,3 +1,6 @@
+@if ($soloConsulta ?? false)
+    <span class="small text-muted"><i class="bi bi-lock" aria-hidden="true"></i> Sólo consulta</span>
+@else
 <details id="{{ $editorId }}" class="dotacion-editor" data-dotacion-editor @if ($abierto) open @endif>
     <summary class="dotacion-editor-toggle">
         <span><i class="bi bi-plus-circle" aria-hidden="true"></i> <span class="dotacion-editor-label-closed">{{ $accion }}</span><span class="dotacion-editor-label-open">Cerrar formulario</span><span class="visually-hidden"> para {{ $contexto }}</span></span>
@@ -8,3 +11,4 @@
         {{ $slot }}
     </div>
 </details>
+@endif
