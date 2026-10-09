@@ -40,7 +40,7 @@
                     </fieldset>
                     <section class="mb-4" aria-labelledby="actualizar-plantilla-titulo">
                         <h3 id="actualizar-plantilla-titulo" class="h6 fw-bold">2. Descargue y complete la plantilla</h3>
-                        <p class="small text-muted mb-2">La plantilla incluirá RUT y sólo los campos seleccionados. Complete una fila por persona. Las celdas vacías conservan los valores actuales; Bienios admite cero.</p>
+                        <p class="small text-muted mb-2">La plantilla incluirá RUT y sólo los campos seleccionados. Si un RUT se repite, se aplicará la fecha más antigua de cada campo de fecha seleccionado. Tramo y Bienios deben coincidir entre sus filas. Las celdas vacías conservan los valores actuales; Bienios admite cero.</p>
                         <a class="btn btn-outline-primary rounded-pill" href="{{ route('reemplazos.personal.datos.plantilla', ['campos' => $camposSeleccionados]) }}" data-template-url="{{ route('reemplazos.personal.datos.plantilla') }}" data-padron-template>
                             <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i> Descargar plantilla seleccionada
                         </a>
@@ -50,7 +50,7 @@
                         <label class="form-label fw-semibold" for="excel-actualizacion">3. Cargue el Excel completado <span class="text-danger" aria-hidden="true">*</span></label>
                         <input id="excel-actualizacion" type="file" name="excel_actualizacion" class="form-control @error('excel_actualizacion') is-invalid @enderror" accept=".xlsx,.xls" required aria-describedby="excel-actualizacion-ayuda">
                         @error('excel_actualizacion')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        <div id="excel-actualizacion-ayuda" class="form-text">Hasta 10 MB y 10.000 filas. Se procesa la primera hoja. Los RUT no encontrados se omiten y se informan en un Excel descargable al terminar. Los datos inválidos de personas encontradas impiden aplicar el archivo.</div>
+                        <div id="excel-actualizacion-ayuda" class="form-text">Hasta 10 MB y 10.000 filas. Se procesa la primera hoja. Los RUT no encontrados se omiten. Al terminar podrá descargar un informe con RUT únicos modificados, sin cambios y no encontrados, y un resumen por RBD. Las fechas iguales a las registradas se informan sin modificarlas. Los datos inválidos de personas encontradas impiden aplicar el archivo.</div>
                     </div>
                 </div>
                 <div class="modal-footer px-4 pb-4">

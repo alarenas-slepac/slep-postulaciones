@@ -12,6 +12,7 @@ use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class PadronDatosExcel
 {
@@ -142,15 +143,15 @@ class PadronDatosExcel
         $instrucciones = $book->createSheet();
         $instrucciones->setTitle('Instrucciones');
         $instrucciones->fromArray([
-            ['Complete la primera hoja con una fila por RUT. No hay datos de ejemplo para importar.'],
+            ['Complete la primera hoja. Si un RUT se repite, se aplica la fecha más antigua de cada campo de fecha seleccionado.'],
             ['Sólo se actualizan las líneas contractuales del último mes cargado al momento de ejecutar la actualización.'],
             ['Un RUT con varios contratos en ese mes actualiza todas sus líneas. Otros meses se conservan.'],
             ['Las celdas vacías conservan sus valores actuales. Para Bienios, cero es un valor válido.'],
             ['Fechas: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY o fecha Excel. fechaing se admite como alias de fecha_antiguedad.'],
             ['Tramo: Acceso, Inicial, Temprano, Avanzado, Experto 1, Experto 2 o Sin tramo. Bienios: entero de 0 a 50.'],
-            ['Los RUT no encontrados se omiten y se incluyen en un informe Excel descargable.'],
+            ['El informe Excel incluye RUT únicos modificados, sin cambios y no encontrados, además de un resumen de modificaciones por RBD.'],
             ['Seleccione en el modal los mismos campos que completará. Las demás columnas no se actualizan. No use fórmulas.'],
-            ['Se conservan los IDs, contratos, jornadas, vigencias y asignaciones. Se auditan los cambios.'],
+            ['Fechas iguales a las registradas no se modifican. Tramo y Bienios deben coincidir si el RUT se repite. Se conservan contratos y asignaciones.'],
         ], null, 'A1');
         $instrucciones->getColumnDimension('A')->setWidth(110);
         $instrucciones->getStyle('A1:A9')->getAlignment()->setWrapText(true);
@@ -166,7 +167,52 @@ class PadronDatosExcel
     public function documento(array $headers, array $filas, string $titulo): Spreadsheet
     {
         $book = new Spreadsheet;
-        $sheet = $book->getActiveSheet();
+        $this->llenarHoja($book->getActiveSheet(), $headers, $filas, $titulo);
+        return $book;
+    }
+
+    public function informe(array $datos): Spreadsheet
+    {
+        $headers = ['RUT', 'RBD asociados', 'Filas Excel', 'Líneas actualizadas'];
+        $headersSinCambios = ['RUT', 'RBD asociados', 'Filas Excel', 'Líneas sin cambios'];
+        foreach ($datos['campos'] as $campo) {
+            $headers[] = self::CAMPOS[$campo]['titulo'].' anterior';
+            $headers[] = self::CAMPOS[$campo]['titulo'].' nueva';
+            $headersSinCambios[] = self::CAMPOS[$campo]['titulo'].' registrada';
+        }
+        $modificados = $sinCambios = [];
+        foreach ($datos['modificados'] as $grupo) {
+            $fila = [$grupo['rut'], implode(', ', $grupo['rbds']), implode(', ', $grupo['filas_excel']), $grupo['lineas']];
+            foreach ($datos['campos'] as $campo) {
+                $fila[] = implode(' | ', $grupo['anteriores'][$campo] ?? []);
+                $fila[] = $grupo['nuevos'][$campo] ?? '';
+            }
+            $modificados[] = $fila;
+        }
+        foreach ($datos['sin_cambios'] as $grupo) {
+            $fila = [$grupo['rut'], implode(', ', $grupo['rbds']), implode(', ', $grupo['filas_excel']), $grupo['lineas']];
+            foreach ($datos['campos'] as $campo) { $fila[] = implode(' | ', $grupo['anteriores'][$campo] ?? []); }
+            $sinCambios[] = $fila;
+        }
+        $book = $this->documento($headers, $modificados, 'Modificados');
+        $this->llenarHoja($book->createSheet(), $headersSinCambios, $sinCambios, 'Sin cambios');
+        $this->llenarHoja($book->createSheet(), ['Filas Excel', 'RUT', 'Motivo de omisión'], $datos['omitidos'], 'No encontrados');
+        $this->llenarHoja($book->createSheet(), ['RBD', 'RUT únicos modificados', 'Líneas actualizadas'], $datos['por_rbd'], 'Resumen por RBD');
+        $instrucciones = [
+            ['Período actualizado', sprintf('%02d/%d', $datos['periodo'] % 100, intdiv($datos['periodo'], 100))],
+            ['Modificados', 'Una fila por RUT con cambios efectivos. Los valores anteriores distintos se separan con |.'],
+            ['Sin cambios', 'RUT encontrados cuyos valores coinciden o cuyas celdas están vacías. No se modificaron ni se creó auditoría de cambio.'],
+            ['RUT repetidos', 'Filas Excel identifica todas sus apariciones en el archivo. En fechas se utiliza la más antigua, independientemente del orden.'],
+            ['Resumen por RBD', 'Cada RUT se cuenta una vez por establecimiento. Si pertenece a varios RBD, aparece en el conteo de cada uno; la suma no es el total de personas únicas.'],
+        ];
+        $this->llenarHoja($book->createSheet(), ['Detalle', 'Descripción'], $instrucciones, 'Instrucciones');
+        $book->getSheetByName('Instrucciones')->getColumnDimension('B')->setWidth(110);
+        $book->setActiveSheetIndex(0);
+        return $book;
+    }
+
+    private function llenarHoja(Worksheet $sheet, array $headers, array $filas, string $titulo): void
+    {
         $sheet->setTitle($titulo);
         // Texto explícito: ni datos del archivo ni motivos se interpretan como fórmulas.
         foreach ([$headers, ...$filas] as $index => $fila) {
@@ -180,7 +226,7 @@ class PadronDatosExcel
         $sheet->freezePane('A2');
         $sheet->setAutoFilter('A1:'.$last.max(1, count($filas) + 1));
         foreach (range(1, count($headers)) as $col) { $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col))->setWidth($col === 3 ? 70 : 25); }
-        return $book;
+        $sheet->getStyle('A1:'.$last.max(1, count($filas) + 1))->getAlignment()->setWrapText(true);
     }
 
     private function fallar(string $mensaje): never

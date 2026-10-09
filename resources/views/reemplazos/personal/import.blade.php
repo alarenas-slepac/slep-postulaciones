@@ -31,9 +31,12 @@
         <div class="alert alert-success rounded-4" role="status">
             <h2 class="h6 fw-bold">Actualización de datos finalizada · {{ sprintf('%02d/%d', $actualizacion['periodo'] % 100, intdiv($actualizacion['periodo'], 100)) }}</h2>
             <div>Filas leídas: <strong>{{ $actualizacion['filas'] }}</strong> · Personas actualizadas: <strong>{{ $actualizacion['ruts_actualizados'] }}</strong> · Líneas contractuales actualizadas: <strong>{{ $actualizacion['registros_actualizados'] }}</strong> · Líneas sin cambios: <strong>{{ $actualizacion['sin_cambios'] }}</strong> · Filas omitidas: <strong>{{ $actualizacion['omitidos'] }}</strong>.</div>
+            @if (array_key_exists('ruts_sin_cambios', $actualizacion))
+                <div class="small mt-2">RUT únicos sin cambios: <strong>{{ $actualizacion['ruts_sin_cambios'] }}</strong> · RUT únicos omitidos: <strong>{{ $actualizacion['ruts_omitidos'] }}</strong>. El informe incluye los valores anteriores y nuevos, las repeticiones del Excel y el resumen de RUT modificados por RBD.</div>
+            @endif
             <div class="small mt-2">Campos: {{ collect($actualizacion['campos'])->map(fn ($campo) => \App\Services\Padron\PadronDatosExcel::CAMPOS[$campo]['titulo'])->implode(', ') }}. Los contratos, jornadas, asignaciones y otros meses se conservaron.</div>
             @if ($actualizacion['reporte'])
-                <a class="btn btn-outline-primary rounded-pill mt-3" href="{{ route('reemplazos.personal.datos.omitidos', $actualizacion['reporte']) }}"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i> Descargar registros omitidos</a>
+                <a class="btn btn-outline-primary rounded-pill mt-3" href="{{ route('reemplazos.personal.datos.omitidos', $actualizacion['reporte']) }}"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i> {{ array_key_exists('ruts_sin_cambios', $actualizacion) ? 'Descargar informe de resultados' : 'Descargar registros omitidos' }}</a>
             @endif
         </div>
     @endif
