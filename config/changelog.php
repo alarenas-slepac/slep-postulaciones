@@ -1,6 +1,31 @@
 <?php
 
 return [
+    '2026.10.9.582' => [
+        'date' => '2026-10-09',
+        'module' => 'Carga masiva de personal',
+        'title' => 'Actualización selectiva de antecedentes por RUT desde Excel',
+        'files' => [
+            'app/Http/Controllers/Reemplazos/PersonalDatosController.php',
+            'app/Services/Padron/PadronDatosActualizacionService.php',
+            'app/Services/Padron/PadronDatosExcel.php',
+            'bootstrap/app.php',
+            'routes/padron_datos.php',
+            'resources/views/reemplazos/personal/import.blade.php',
+            'resources/views/reemplazos/personal/partials/actualizar-datos-modal.blade.php',
+            'tests/Feature/PadronDatosActualizacionTest.php',
+            'config/changelog.php',
+        ],
+        'changes' => [
+            'Añade Actualizar datos en Carga masiva de personal, disponible exclusivamente para el rol activo Administrador, con modal de selección de fecha de nacimiento, fecha de antigüedad, tramo y bienios.',
+            'Genera una plantilla Excel con RUT y sólo los campos seleccionados. Acepta fechaing como alias de fecha_antiguedad, fechas Excel o de texto, y conserva los valores de celdas vacías.',
+            'Actualiza por RUT normalizado todas las líneas del último mes cargado, verificando el período dentro del control transaccional del padrón. No crea registros ni altera contratos, jornadas, vigencias, asignaciones o períodos anteriores.',
+            'Omite RUT no encontrados o inválidos y ofrece un informe Excel privado con fila, RUT y motivo, descargable por el administrador que realizó la carga.',
+            'Conserva las copias contractuales de documentos históricos y registra cambios en la auditoría existente. Los datos inválidos de personas encontradas, duplicados o fallos de auditoría y almacenamiento impiden confirmar actualizaciones parciales.',
+            'Lee la primera hoja por lotes y agrupa las búsquedas por RUT. Incluye pruebas aisladas de permisos, fechas, contratos múltiples, omisiones, plantillas, preservación de datos, rollback y estructura del modal.',
+        ],
+        'roles' => ['Administrador'],
+    ],
     '2026.10.9.581' => [
         'date' => '2026-10-09',
         'module' => 'Dotación establecimiento',
