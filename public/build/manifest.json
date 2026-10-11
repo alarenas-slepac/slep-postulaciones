@@ -2213,6 +2213,15 @@
       "dotacion-establecimiento.css"
     ]
   },
+  "resources/css/notification-events.css": {
+    "file": "assets/notification-events-9hnmAjNk.css",
+    "src": "resources/css/notification-events.css",
+    "isEntry": true,
+    "name": "notification-events",
+    "names": [
+      "notification-events.css"
+    ]
+  },
   "resources/css/votaciones-admin.css": {
     "file": "assets/votaciones-admin-Bufya2o9.css",
     "src": "resources/css/votaciones-admin.css",

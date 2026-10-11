@@ -6457,8 +6457,24 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.11.590',
+    'current_version' => '2026.10.11.591',
     'entries' => [
+        [
+            'version' => '2026.10.11.591',
+            'title' => 'Administración: catálogo y configuración de eventos de notificaciones',
+            'summary' => 'Centraliza la consulta de avisos existentes y la configuración por correo y WhatsApp, con destinatarios, presentación y vista previa sin envíos.',
+            'roles' => ['admin'],
+            'items' => [
+                'Incorpora el permiso notifications.manage, filtros por módulo/canal y configuración persistente por evento, conservando los controles propios de cada proceso.',
+                'Permite copias de correo y selección restringida de destinatarios WhatsApp autorizados, manteniendo propietario, asignación y preferencias de las fichas.',
+                'Ofrece asunto y presentación con variables seguras, contenido original obligatorio, vista previa ficticia y restablecimiento; protege avisos de acceso.',
+                'Revalida desactivaciones en el transporte de correo y los jobs WhatsApp, con historial cifrado y revisión para evitar sobrescrituras entre administradores.',
+                'Agrega 77 canales WhatsApp inicialmente desactivados a los eventos de correo, con destinatario original verificado, ficha AC o perfil válido, resumen con enlace y reintentos sin duplicar.',
+                'Detecta nuevas clases de notificación en el catálogo y exige registrar cada nuevo evento mediante regla AGENTS.md y pruebas de cobertura, sin depender de envíos reales.',
+                'Documenta el inventario de emisores, canales disponibles, instalación cPanel y pruebas aisladas sin mensajes reales.',
+            ],
+            'published_at' => '2026-10-11',
+        ],
         [
             'version' => '2026.10.11.590',
             'title' => 'Reemplazos: WhatsApp al reemplazante con orden de trabajo y ubicación',

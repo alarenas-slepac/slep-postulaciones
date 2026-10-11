@@ -33,6 +33,14 @@
     como referencia visual el módulo `resources/views/tramites/cometidos-funcionarios/`.
     Si una pantalla existente se interviene, aplicar estas reglas a la zona
     modificada y evitar nuevos estilos visuales divergentes.
+14. Toda nueva notificación o evento de correo/WhatsApp debe registrarse en el
+    catálogo central `config/notification_events.php` y quedar disponible en
+    Administración → Eventos de notificaciones al desplegar el código, sin
+    necesitar un envío real ni sembrar preferencias. Seguir la regla de
+    `docs/NOTIFICACIONES_ADMINISTRACION.md`: clave estable, módulo, destinatarios,
+    canales, enlace al SGA y pruebas de cobertura. Las clases detectadas sin
+    catalogar requieren completar sus metadatos; los nuevos WhatsApp comienzan
+    desactivados y conservan permisos, preferencias y deduplicación.
 
 ## Validaciones antes de entregar
 

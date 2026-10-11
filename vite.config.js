@@ -24,6 +24,7 @@ export default defineConfig({
                 'resources/css/dotacion-establecimiento.css',
                 'resources/js/dotacion-asignacion.js',
                 'resources/css/whatsapp-admin.css',
+                'resources/css/notification-events.css',
                 'resources/js/whatsapp-admin.js',
             ],
             refresh: true,

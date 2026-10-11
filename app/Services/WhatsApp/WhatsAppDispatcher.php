@@ -16,6 +16,16 @@ class WhatsAppDispatcher
         if (!config('whatsapp.enabled')) {
             return null;
         }
+        $policy = app(\App\Services\Notifications\NotificationEventPolicy::class);
+        if (!$policy->enabled($event, 'whatsapp')) return null;
+        try {
+            if (isset($deliveryPolicy['user_id']) && !$policy->recipientAllowed($event, (int) $deliveryPolicy['user_id'])) return null;
+            $text = $policy->whatsappText($event, $text, $event === 'solicitud_reemplazo.aceptada_reemplazante' || ($deliveryPolicy['scope'] ?? '') === 'notification_event');
+        } catch (WhatsAppException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw new WhatsAppException('queue_unavailable', true);
+        }
         $to = trim($to);
         if (!preg_match('/^\+[1-9][0-9]{7,14}$/D', $to) || trim($text) === '' || mb_strlen($text) > 1000
             || strlen($key) > 128 || $key === '' || strlen($event) > 100) {
