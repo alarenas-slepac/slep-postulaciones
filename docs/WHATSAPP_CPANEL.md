@@ -1,12 +1,14 @@
 # WhatsApp por QR en cPanel: instalación paso a paso
 
-Actualizada el 11 de octubre de 2026 para el Node instalado mediante nvm en la cuenta.
+Actualizada el 11 de octubre de 2026 para el Node instalado mediante nvm y el inicio del puente real desde Cron Jobs.
 
 Esta guía se guarda en el repositorio local. Los comandos de instalación son para **Terminal de cPanel / Linux**, no para PowerShell de Windows. Ejecutar un paso, comprobar su resultado y continuar. Si un comando falla, resolverlo antes de avanzar. Los comandos no se han ejecutado desde este equipo contra producción.
 
 ## Estado actual y rutas
 
-Según las comprobaciones compartidas por el operador, ya están disponibles **Terminal, Node v22.23.3, npm 10.9.9 y la carga de node:sqlite**. El archivo privado del servicio también fue creado por el operador; se incluye un paso que permite crearlo sin sobrescribirlo.
+Según las comprobaciones compartidas por el operador, ya están disponibles **Terminal, Node v22.23.3, npm 10.9.9 y la carga de node:sqlite**. También comprobó el puente autenticado en `idle`, DNS, HTTPS 200 y apertura WebSocket saliente a WhatsApp. La prueba temporal de cron inició una instancia, la recuperó tras `crash` con `starts: 2` y terminó a los quince minutos; el cron de diagnóstico fue retirado. Después informó que la vinculación real funciona. No se ha comprobado desde este equipo el servidor ni se ha informado aún la recuperación de esa sesión tras reiniciar el puente o el servidor.
+
+Si la instalación **ya está vinculada**, continuar en los pasos **11 y 16** para cambiar el mecanismo de inicio: conservar el token, `service.env`, la configuración de Laravel y el directorio de sesión. No repetir migraciones, regenerar credenciales, desvincular ni forzar otro QR. Los pasos iniciales corresponden a una instalación nueva.
 
 | Elemento | Valor para esta instalación |
 | --- | --- |
@@ -17,6 +19,7 @@ Según las comprobaciones compartidas por el operador, ya están disponibles **T
 | PHP 8.3, ruta que debe verificarse | /opt/cpanel/ea-php83/root/usr/bin/php |
 | Configuración privada de Node | /home/slepac/.config/sga-whatsapp/service.env |
 | Sesión y registro de deduplicación | /home/slepac/.local/share/sga-whatsapp |
+| Control privado del inicio por cron | /home/slepac/.local/share/sga-whatsapp/cron-control |
 | API privada | http://127.0.0.1:3210 |
 | Administración Laravel | /admin/whatsapp |
 
@@ -31,19 +34,20 @@ Tener Terminal y Node no confirma que el hosting admita una conexión permanente
 | Requisito | Estado conocido | Qué falta / responsable |
 | --- | --- | --- |
 | Terminal de cPanel | Confirmado por el operador | SSH no ha sido comprobado; Terminal sirve para estos pasos |
-| Node y npm | Confirmados: 22.23.3 y 10.9.9 | Usar la ruta absoluta de nvm en el supervisor |
+| Node y npm | Confirmados: 22.23.3 y 10.9.9 | Usar la ruta absoluta de nvm en cron o supervisor |
 | Carga de node:sqlite | Confirmada por el operador | Escritura, permisos y persistencia Linux: pasos 5, 10 y proveedor |
-| Dependencias nativas de Baileys | Pendiente | Usuario: paso 4; proveedor: compatibilidad Linux/arquitectura de whatsapp-rust-bridge y límites de recursos |
+| Dependencias nativas de Baileys | Arranque y vinculación informados por el operador | Mantener versiones fijadas; proveedor: límites de recursos y compatibilidad al actualizar |
 | PHP 8.3 y BD | Pendiente de verificación en esta instalación | Usuario: pasos 2 y 9; proveedor: confirmar binario absoluto y acceso a MySQL |
-| Proceso Node continuo | Pendiente | Proveedor: autorizarlo y evitar que termine al cerrar Terminal o por inactividad |
-| Reinicio automático | Pendiente | Proveedor: supervisor, inicio tras reiniciar servidor, límites y monitoreo |
-| Salida a WhatsApp | Pendiente | Proveedor: DNS, TLS y WebSocket saliente persistente por 443 |
-| Loopback PHP–Node | Pendiente | Paso 13 y proveedor: acceso a 127.0.0.1:3210 desde ambos procesos, incluido CageFS |
+| Proceso Node continuo | Prueba temporal de cron correcta | Usuario: instalar y comprobar el lanzador real del paso 11; proveedor: política de procesos continuos |
+| Reinicio automático | Recuperación del diagnóstico comprobada con starts: 2 | Usuario: reinicio del puente real; proveedor: recuperación después de reiniciar el servidor |
+| Salida a WhatsApp | DNS, HTTPS 200 y apertura WebSocket comprobados | Proveedor: restricciones y disponibilidad sostenida por 443; HTTPS entrante del sitio es una condición diferente |
+| Loopback PHP–Node | API autenticada comprobada; SGA informado funcionando | Paso 13 si falta; verificar restricciones de PHP web/CageFS cuando cambie el hosting |
 | Almacenamiento privado persistente | Pendiente | Proveedor: disco local, no efímero ni NFS; usuario: permisos 700/600 |
 | Cola dedicada | Pendiente | Usuario/proveedor: tablas existentes, cron o worker supervisado, pasos 9 y 12 |
-| QR y mensaje real | Pendiente | Operador autorizado: pasos 14 y 15, después de completar los requisitos |
+| QR / sesión real | Operador informó que funciona | Usuario: conservar sesión y comprobar recuperación sin QR en el paso 16 |
+| Recepción de mensaje real | Sin resultado detallado compartido | Operador autorizado: prueba expresa del paso 15 y cola del paso 12 |
 
-**Passenger por sí solo no garantiza este servicio permanente.** No iniciar clusters, varias instancias de Node ni copias activas de la misma sesión. Una ventana Terminal, `nohup` o un cron que lance el puente sin supervisión no prueban recuperación ante fallos.
+**Passenger por sí solo no garantiza este servicio permanente.** No iniciar clusters, varias instancias de Node ni copias activas de la misma sesión. El paso 11 usa un lanzador con bloqueo, control de detención y límite persistente de arranques. Cron comprobará una vez por minuto si debe iniciar el proceso; el proceso permanece activo entre ejecuciones. El mecanismo real requiere su propia validación, aunque la prueba temporal haya pasado.
 
 Si el hosting no autoriza el proceso continuo, hace falta que el proveedor habilite un supervisor permitido **en el mismo servidor**, o trasladar SGA y puente a un servidor/VPS con ese control. Un puente remoto cambia el requisito de mismo servidor y exige otro transporte seguro; esta implementación sólo admite loopback.
 
@@ -79,7 +83,7 @@ ls -l /home/slepac/apps/slep_postulaciones/services/whatsapp/src/index.js
 ls -l /home/slepac/apps/slep_postulaciones/database/migrations/2026_10_10_120000_create_whatsapp_dispatches.php
 ~~~
 
-Si una ruta no existe, completar el despliegue antes de instalar. La plantilla del supervisor actualizada está en `services/whatsapp/deploy/sga-whatsapp.service`.
+Si una ruta no existe, completar el despliegue antes de instalar. El lanzador de cron está en `services/whatsapp/deploy/cron-service.mjs`; la alternativa systemd del proveedor sigue disponible en `services/whatsapp/deploy/sga-whatsapp.service`.
 
 El dominio debe apuntar al **public/** de Laravel, nunca al repositorio completo ni al servicio Node. Las dependencias de Composer del SGA no cambian. Los assets Vite de la integración ya están compilados; cualquier reconstrucción se hace en desarrollo.
 
@@ -253,7 +257,7 @@ El canal usa conexión persistente `database` y cola `whatsapp`. No usar `sync` 
 
 ## Paso 10. Prueba breve de arranque y autenticación — usuario cPanel
 
-Hacerla con el supervisor detenido y **sin otra instancia del puente**. Si el servicio ya está instalado, coordinar primero su detención con el proveedor. El bloqueo de sesión rechaza una segunda instancia.
+Hacerla con el mecanismo de inicio detenido y **sin otra instancia del puente**. Si se usa cron, aplicar `stop` del paso 16; si se usa systemd, coordinar su detención con el proveedor. El bloqueo de sesión rechaza una segunda instancia. Omitir el arranque manual si ya hay una instalación vinculada y sólo se cambia al lanzador del paso 11.
 
 En una Terminal A:
 
@@ -279,23 +283,72 @@ cd /home/slepac/apps/slep_postulaciones/services/whatsapp &&
 
 Esperado para una sesión nueva: **Estado: idle**. Este diagnóstico no imprime el token, QR ni mensajes.
 
-Cuando ambas comprobaciones pasen, detener la Terminal A con **Ctrl+C** antes del inicio permanente del paso 11. Si no puedes abrir una segunda Terminal, realizar los diagnósticos después de que el proveedor inicie el supervisor. Esta prueba breve no valida persistencia al cerrar Terminal ni después de reiniciar el servidor.
+Cuando ambas comprobaciones pasen, detener la Terminal A con **Ctrl+C** antes del inicio del paso 11. Si no puedes abrir una segunda Terminal, realizar los diagnósticos después de guardar el cron. Esta prueba breve no valida persistencia al cerrar Terminal ni después de reiniciar el servidor.
 
-## Paso 11. Instalar el inicio permanente — proveedor del hosting
+## Paso 11. Instalar el inicio mediante Cron Jobs — usuario cPanel
 
-Enviar al proveedor esta solicitud, sin adjuntar credenciales:
+La cuenta ya comprobó que Cron Jobs puede iniciar y recuperar el proceso de diagnóstico. Ahora se instala **el lanzador del puente real**, sin el vencimiento de quince minutos de aquella prueba. Usa el mismo `service.env`, puerto **3210** y sesión persistente; no usa `cron-probe.mjs` ni crea otra sesión.
 
-> Necesito ejecutar un único servicio Node continuo para el SGA, con el usuario slepac, usando /home/slepac/.nvm/versions/node/v22.23.3/bin/node. Debe iniciar tras reiniciar el servidor, recuperarse ante fallos y permitir DNS/TLS/WebSocket saliente por 443 a WhatsApp. Laravel y Node deben compartir acceso a 127.0.0.1:3210. El puerto debe permanecer privado. La configuración está en /home/slepac/.config/sga-whatsapp/service.env y los datos persistentes en /home/slepac/.local/share/sga-whatsapp. ¿Pueden instalar o habilitar un supervisor con estas condiciones, confirmar acceso al Node de nvm dentro de CageFS y almacenamiento local persistente?
+### 11.1. Desplegar el lanzador y detener el arranque anterior
 
-La plantilla **actualizada con la ruta de nvm** está en `services/whatsapp/deploy/sga-whatsapp.service`. Su línea de arranque es:
+Subir únicamente los archivos nuevos/modificados del parche, conservando sus rutas. Comprobar:
 
-~~~ini
-ExecStart=/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env src/index.js
+~~~bash
+ls -l /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/cron-service.mjs
 ~~~
 
-El proveedor debe revisar usuario/grupo, lectura/ejecución de Node y módulos nativos, rutas y restricciones del servidor. La unidad permite escribir sólo en el directorio persistente, aplica umask 077, reinicia ante caída cada 15 segundos y limita reinicios repetidos.
+Las dependencias no cambian: el lanzador reutiliza `proper-lockfile`, ya comprobado. No requiere un `flock` externo para Node. Si el puente está ejecutándose en Terminal, detener **esa instancia** con **Ctrl+C** y esperar su cierre antes de guardar el cron. Si existe systemd, Passenger u otro mecanismo que arranque el puente, detenerlo y deshabilitar su inicio con su responsable. Usar **un solo mecanismo de inicio**. No usar `pkill node` ni borrar bloqueos de una instancia activa.
 
-**Los comandos siguientes requieren privilegios administrativos y corresponden al proveedor**, no a la cuenta cPanel común. Para una instalación nueva, tras revisar que no sustituye otra configuración vigente:
+La sesión y el token se conservan. En una instalación ya vinculada, no deshabilitar ni modificar el `.env` como parte de este cambio de arranque. El cron temporal de `cron-probe.mjs` ya debe estar eliminado.
+
+### 11.2. Habilitar el control de cron
+
+~~~bash
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/cron-service.mjs start
+~~~
+
+Esperado: `enabled: true`, `blocked: false`, `runner_running: false`, `recent_starts: 0`. **start prepara el control; el siguiente cron inicia Node**. Se crea el subdirectorio privado `cron-control` dentro de la sesión, con permiso 700. Su configuración contiene sólo marcadores e intentos; el token sigue en `service.env`.
+
+Si indica que existe una instancia activa del lanzador, consultar `status`; no forzar la eliminación de bloqueos. Este control no detiene un puente iniciado manualmente o por systemd: aplicar primero el apartado 11.1. `start` se usa con el lanzador detenido y, después de corregir la causa, para reabrir su límite de arranques.
+
+### 11.3. Crear el cron del puente
+
+En **cPanel → Cron Jobs**, seleccionar **una vez por minuto**: los cinco campos de tiempo son `*`. Pegar **sólo este comando** en Comando:
+
+~~~bash
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/cron-service.mjs run >/dev/null 2>&1
+~~~
+
+Crear una sola entrada. El comando usa rutas absolutas; cron no necesita cargar `nvm use` ni mantener una Terminal abierta. El lanzador mantiene el bloqueo y carga el puente **en el mismo proceso Node**. Las ejecuciones siguientes salen sin iniciar otra instancia ni abrir otra sesión. Si ese proceso cae, la siguiente ejecución de cron vuelve a iniciarlo; una caída abrupta puede dejar el bloqueo fresco durante algo más de 30 segundos, por lo que la recuperación puede tardar uno o dos minutos.
+
+No usar `&`, `nohup`, `timeout`, el puerto 3211 ni el archivo del diagnóstico. No iniciar `src/index.js` manualmente mientras este cron esté activo.
+
+**Límite de reinicios:** se admiten como máximo cinco arranques dentro de diez minutos. Al intentar exceder ese límite se guarda `blocked: true` y cron deja de arrancar el puente hasta que el operador corrija la causa y ejecute `start`. Los arranques fallidos y los reinicios solicitados cuentan; un proceso que permanece estable no se vuelve a iniciar cada minuto. La pausa de reconexión de WhatsApp es un control separado que se resuelve desde la pantalla administrativa.
+
+### 11.4. Verificar el puente real y cerrar Terminal
+
+Esperar uno o dos minutos y consultar ambos estados:
+
+~~~bash
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/cron-service.mjs status
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/src/check-status.js
+~~~
+
+Esperado: `enabled: true`, `blocked: false`, `runner_running: true`; una sesión ya vinculada debe llegar a **Estado: connected** sin otro QR. En una instalación nueva será `idle`. `runner_running` indica un bloqueo reciente del lanzador, no autentica WhatsApp: comprobar siempre el segundo comando y la pantalla del SGA.
+
+Cerrar Terminal, esperar dos minutos, volver a abrirla y repetir ambos comandos. El puente debe seguir conectado y no debe haber arranques adicionales dentro de ese intervalo. Confirmar además rechazo sin token, como en el paso 10. No probar recuperación con mensajes pendientes; seguir el `restart` del paso 16.
+
+### 11.5. Logs, límites del hosting y alternativa del proveedor
+
+~~~bash
+tail -n 30 /home/slepac/.local/share/sga-whatsapp/cron-control/events.log
+~~~
+
+El lanzador registra sólo nombres de eventos conocidos y su fecha; descarta credenciales, QR, cuerpos y errores sin filtrar de dependencias. Mantiene `events.log` y `events.previous.log` de unos 64 KiB cada uno, con permiso 600. La salida restante se descarta para evitar correos de cron con datos sensibles. `service_started` confirma el arranque de la API; el estado autenticado confirma la conexión. Si no se creó el log, comprobar rutas, permisos, `service.env`, dependencias y registro del cron.
+
+El usuario cPanel puede instalar, detener, habilitar y reiniciar este mecanismo sin privilegios administrativos. **Siguen correspondiendo al proveedor** las políticas de procesos continuos, restricciones de recursos/CageFS, almacenamiento local persistente y recuperación después de reiniciar el servidor. Cuando el daemon de cron vuelva a funcionar tras un reinicio, intentará arrancar el puente en el siguiente minuto, salvo que esté detenido o bloqueado; aún debe comprobarse en este hosting. No hace falta agregar un segundo cron `@reboot`.
+
+Si el proveedor mata procesos prolongados por política, cron no elimina esa restricción: debe autorizar el proceso o instalar un supervisor permitido en el mismo servidor. Se conserva la alternativa `services/whatsapp/deploy/sga-whatsapp.service`. Para usarla, detener el lanzador, retirar **sólo su cron** y coordinar con el proveedor; no mantener ambos activos. Los comandos siguientes son exclusivamente del proveedor, después de revisar usuario, Node, rutas y permisos:
 
 ~~~bash
 install -m 644 /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/sga-whatsapp.service /etc/systemd/system/sga-whatsapp.service
@@ -305,9 +358,9 @@ systemctl enable --now sga-whatsapp
 systemctl status sga-whatsapp --no-pager
 ~~~
 
-Después, el usuario repite los diagnósticos del paso 10 sin iniciar una instancia manual.
+Solicitud sin credenciales, sólo si hace falta esa alternativa:
 
-Si systemd no está disponible, el proveedor debe ofrecer un mecanismo equivalente: una instancia, inicio en boot, reinicio ante caída, usuario de la cuenta, umask 077, almacenamiento privado persistente y logs limitados. No considerar resuelto este requisito sólo por tener Application Manager o Passenger.
+> La cuenta slepac ya comprobó DNS/HTTPS/WebSocket saliente y Cron Jobs con Node /home/slepac/.nvm/versions/node/v22.23.3/bin/node. Necesitamos mantener un único puente continuo, con sesión privada persistente en /home/slepac/.local/share/sga-whatsapp y API sólo en 127.0.0.1:3210. ¿Confirman que permiten el proceso, sus recursos y almacenamiento local, y que cron vuelve a ejecutarse tras reiniciar el servidor? Si su política impide mantenerlo mediante cron, ¿pueden instalar la unidad sga-whatsapp.service en este mismo servidor, usando la configuración privada existente sin compartir sus credenciales?
 
 ## Paso 12. Configurar la cola de WhatsApp — usuario cPanel / proveedor
 
@@ -377,7 +430,7 @@ La pantalla web sólo consultará el puente cuando la integración se habilite. 
 
 ## Paso 14. Habilitar únicamente el módulo administrativo — usuario autorizado
 
-Continuar cuando dependencias, autenticación, proceso permanente, almacenamiento y cola estén comprobados, y el proveedor confirme las conexiones salientes.
+Para una instalación nueva, continuar cuando dependencias, autenticación, inicio del puente real, almacenamiento, cola y conexiones salientes estén comprobados. Mantener presentes las condiciones del proveedor indicadas en 11.5. Si el operador ya vinculó la cuenta y el módulo funciona, conservar su configuración al aplicar este parche.
 
 En el editor privado del `.env` existente, cambiar **sólo**:
 
@@ -412,39 +465,59 @@ No hacer cambios en WhatsApp Business del número personal. No fotografiar, comp
 
 ## Paso 16. Comprobar recuperación y mantener el servicio — usuario / proveedor
 
-Después de vincular, sin mensajes pendientes, pedir un reinicio controlado al proveedor:
+Con el mecanismo de cron del paso 11 y sin mensajes pendientes, solicitar un reinicio del único proceso:
+
+~~~bash
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/cron-service.mjs restart
+~~~
+
+El lanzador detecta el marcador y envía SIGTERM **a su propio proceso**, dejando que el puente cierre sesión y SQLite; el siguiente cron lo inicia de nuevo. La orden no se ejecuta contra un PID externo ni contra un Node iniciado manualmente. Esperar uno o dos minutos y consultar:
+
+~~~bash
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/cron-service.mjs status
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/src/check-status.js
+~~~
+
+Esperado: control habilitado, sin bloqueo y activo; **Estado: connected** sin otro QR. Comprobar también la pantalla y el dispositivo vinculado en Messenger. Este resultado confirma la recuperación de sesión tras reiniciar el proceso. La recuperación después de reiniciar todo el servidor requiere una comprobación posterior del proveedor; no reiniciar el servidor ni otros servicios desde estos pasos.
+
+Para detener el puente y evitar que cron lo vuelva a iniciar:
+
+~~~bash
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/cron-service.mjs stop
+~~~
+
+Consultar `status` hasta ver `enabled: false` y `runner_running: false`. El cierre normal empieza en aproximadamente un segundo; si el puente no termina de cerrar, el lanzador limita la espera a 30 segundos. Un bloqueo abandonado tras un cierre abrupto puede seguir apareciendo fresco durante unos 30 segundos. No copiar ni respaldar SQLite hasta que el proceso haya terminado. **Eliminar el cron no detiene un proceso ya activo**: aplicar `stop` antes de retirar exclusivamente la entrada de `cron-service.mjs run`.
+
+Para habilitarlo nuevamente, con el lanzador detenido y después de corregir cualquier causa de `blocked: true`:
+
+~~~bash
+/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env /home/slepac/apps/slep_postulaciones/services/whatsapp/deploy/cron-service.mjs start
+~~~
+
+El siguiente cron lo inicia. Si se eliminó la entrada, volver a guardar exactamente la del paso 11.3. No ejecutar `run` en Terminal para mantenerlo permanente. Para revisar eventos:
+
+~~~bash
+tail -n 30 /home/slepac/.local/share/sga-whatsapp/cron-control/events.log
+~~~
+
+No eliminar bloqueos mientras otra instancia esté activa. El lanzador pausa nuevos arranques al exceder cinco dentro de diez minutos y requiere `start` para reabrirlos. El puente limita por separado a seis los intentos de reconexión a WhatsApp; desconexiones definitivas o conflictos suspenden sus intentos hasta una acción administrativa. `start` no borra ese estado, no desvincula la cuenta ni recrea credenciales. Cierres breves e inestables no reinician el contador de conexión.
+
+Si se eligió la alternativa systemd, **usar únicamente el mecanismo del proveedor**, con el cron del puente retirado:
 
 ~~~bash
 systemctl restart sga-whatsapp
 systemctl status sga-whatsapp --no-pager
 ~~~
 
-El usuario comprueba el estado mediante el comando autenticado del paso 10 y la pantalla del SGA. Debe recuperar la sesión sin necesitar otro QR. La recuperación después de reiniciar todo el servidor también debe ser comprobada por el proveedor.
+El proveedor administra `stop`, `start`, el journal y `reset-failed` de esa unidad. El comando de control de cron no detiene una unidad systemd ni un proceso manual.
 
-Operación del supervisor, exclusivamente por el proveedor:
+**Actualizaciones de Node:** si nvm instala otra revisión, `nvm which 22` puede dar una nueva ruta. Con cron, detener el lanzador con el binario todavía vigente, actualizar la ruta del comando de cron y de los controles, y habilitarlo con el nuevo binario antes de retirar Node 22.23.3. Con systemd, el proveedor adapta `ExecStart`, ejecuta `systemctl daemon-reload` y reinicia la unidad. No depender del alias interactivo de nvm.
 
-~~~bash
-systemctl stop sga-whatsapp
-systemctl start sga-whatsapp
-journalctl -u sga-whatsapp -n 50 --no-pager
-~~~
-
-Si se alcanzó el límite de reinicios, corregir la causa antes de usar:
-
-~~~bash
-systemctl reset-failed sga-whatsapp
-systemctl start sga-whatsapp
-~~~
-
-El bloqueo tras una caída abrupta puede tardar más de 30 segundos en recuperarse. No eliminarlo mientras otra instancia esté activa. El servicio limita a seis los intentos de reconexión; desconexiones definitivas o conflictos suspenden los intentos hasta una acción manual. Cierres breves e inestables no reinician el contador.
-
-**Actualizaciones de Node:** si nvm instala otra revisión, `nvm which 22` puede dar una nueva ruta. El proveedor debe adaptar `ExecStart`, ejecutar `systemctl daemon-reload` y reiniciar el servicio antes de retirar Node 22.23.3. No depender del alias interactivo de nvm.
-
-**Rotación del token:** es una tarea coordinada: detener el puente, cambiar el token en ambos entornos privados, reconstruir caché de Laravel, reiniciar worker y supervisor, y repetir la autenticación. El paso 7 conserva el token; no es un comando de rotación.
+**Rotación del token:** detener el puente con su mecanismo vigente, confirmar que terminó, cambiar el token en ambos entornos privados, reconstruir caché de Laravel, reiniciar worker, habilitar el lanzador y repetir la autenticación. El paso 7 conserva el token; no es un comando de rotación.
 
 **Respaldo:** detener el puente y respaldar el directorio privado completo, incluido `state.sqlite` y sus WAL/SHM, en almacenamiento privado/cifrado. Conservar su coherencia con `whatsapp_dispatches`. No borrar ni recrear la base: también guarda la deduplicación, incluso tras desvincular. No restaurar un registro atrasado ni purgarlo sin evaluar mensajes pendientes. Conservar `APP_KEY`: los pendientes de Laravel dependen de ella.
 
-**Desactivar:** el operador cambia `WHATSAPP_ENABLED=false` en el editor privado, reconstruye caché y reinicia worker. El proveedor puede detener el puente. No usar rollback ni borrar datos para desactivar. Al desvincular sin conexión, eliminar además el dispositivo del SGA en Messenger: el olvido local no garantiza cerrar la sesión remota.
+**Desactivar:** el operador cambia `WHATSAPP_ENABLED=false` en el editor privado, reconstruye caché, reinicia worker y ejecuta `stop` del mecanismo de cron; si se usa systemd, el proveedor detiene la unidad. No usar rollback ni borrar datos para desactivar. Al desvincular sin conexión, eliminar además el dispositivo del SGA en Messenger: el olvido local no garantiza cerrar la sesión remota.
 
 ## Diagnóstico
 
@@ -457,6 +530,9 @@ El bloqueo tras una caída abrupta puede tardar más de 30 segundos en recuperar
 | Node no carga service.env | Revisar ruta, propietario, permisos 700/600 y variables con el editor privado |
 | Token duplicado o con marcador | Pasos 7 y 8; dejar una línea y el mismo valor en ambos archivos |
 | startup_failed / proceso detenido | Dependencias, token, puerto, permisos, segunda instancia o límite del supervisor |
+| blocked: true / runner_limit | Revisar events.log y causa de los arranques; con el lanzador detenido, corregir y ejecutar start |
+| runner_running: false | Revisar cron, binario absoluto, service.env, permisos, enabled y blocked; no iniciar otra instancia manual |
+| Control activo pero API no responde | Puede estar iniciando; comprobar eventos, bloqueo de sesión, puerto y dependencias; no borrar state.sqlite |
 | Diagnóstico sin token devuelve 200 | Detener el despliegue y revisar autenticación; debe ser 401 |
 | Node funciona, Laravel no conecta | Token efectivo, config cache y acceso loopback/CageFS desde PHP |
 | Pantalla desactivada | Esperado hasta el paso 14; no habilitar antes de completar requisitos |
@@ -492,7 +568,7 @@ npm run check
 
 Desde la raíz en desarrollo: `node --test tests/js/whatsapp-admin.test.mjs`, `php artisan route:list --path=admin/whatsapp -vv`, `php artisan optimize:clear` y `npm run build`. Los PHP requieren PHP 8.3 y revisión con `php -l`; revisar diff y exclusión de credenciales, dependencias y archivos de usuarios.
 
-No hay acceso directo de este agente al servidor. Los datos de Node/Terminal/SQLite proceden de la salida compartida por el operador. Aún no se han verificado desde aquí dependencias Linux, supervisor, persistencia, cola productiva, QR real ni recepción. La conexión no oficial depende de cambios de WhatsApp y puede perder compatibilidad o provocar restricciones de cuenta. No se declara funcionamiento en producción.
+No hay acceso directo de este agente al servidor. Las comprobaciones de Node, autenticación, DNS/HTTPS/WebSocket y cron proceden de las salidas compartidas por el operador; la vinculación real fue informada como funcionando. Esta actualización no ejecuta el nuevo lanzador contra producción: aún deben verificarse su instalación, supervivencia al cerrar Terminal, recuperación de la sesión y reinicio completo del servidor, política de procesos, almacenamiento y cola. No se presume recepción de mensajes a partir de `connected`. La conexión no oficial depende de cambios de WhatsApp y puede perder compatibilidad o provocar restricciones de cuenta.
 
 ## Referencias oficiales
 
@@ -500,4 +576,5 @@ No hay acceso directo de este agente al servidor. Los datos de Node/Terminal/SQL
 - [Node 22: generador criptográfico randomBytes](https://nodejs.org/download/release/v22.22.0/docs/api/crypto.html#cryptorandombytessize-callback), [parseEnv](https://nodejs.org/download/release/v22.22.0/docs/api/util.html#utilparseenvcontent) y [SQLite](https://nodejs.org/download/release/v22.22.0/docs/api/sqlite.html).
 - [Baileys 7.0.0-rc14](https://github.com/WhiskeySockets/Baileys/releases/tag/v7.0.0-rc14), [README](https://github.com/WhiskeySockets/Baileys/blob/v7.0.0-rc14/README.md) y [requisitos](https://github.com/WhiskeySockets/Baileys/blob/v7.0.0-rc14/package.json).
 - [cPanel: Node.js](https://docs.cpanel.net/knowledge-base/general-server-administration/guide-to-node-js-installations/), [Terminal](https://docs.cpanel.net/cpanel/advanced/terminal-in-cpanel/) y [Application Manager](https://docs.cpanel.net/cpanel/software/application-manager/).
+- [cPanel: Cron Jobs](https://docs.cpanel.net/cpanel/advanced/cron-jobs/) y [proper-lockfile: bloqueo, actualización y recuperación](https://github.com/moxystudio/node-proper-lockfile#readme).
 - [Passenger: límite de inactividad](https://www.phusionpassenger.com/library/config/apache/reference/#passengerpoolidletime).

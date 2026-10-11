@@ -101,7 +101,11 @@ tail -n 20 /home/slepac/.local/share/sga-whatsapp-cron-test/events.log
 
 Se pueden compartir las salidas de DNS, HTTPS, `status` y ese log. **No compartir `probe.json`, `.env`, `service.env`, QR ni credenciales**. Conservar la carpeta privada hasta terminar de revisar resultados; no hace falta borrarla para detener el proceso. Para otra prueba, usar una carpeta privada nueva mediante `--directory` en todos los comandos y cambiar también la redirección del log; no reutilizar ni borrar el directorio de sesión real.
 
-Si la prueba funciona, queda demostrado únicamente el comportamiento observado durante esos 15 minutos. Antes de usar cron para el servicio real debe confirmarse con el proveedor que admite procesos continuos, conexiones salientes WebSocket y almacenamiento persistente. Si los mata por política, cron no elimina esa restricción. La alternativa mínima es que el proveedor habilite un supervisor permitido en el mismo servidor, como el del paso 11.
+Si la prueba funciona, queda demostrado únicamente el comportamiento observado durante esos 15 minutos. El [paso 11 de instalación](WHATSAPP_CPANEL.md) ahora entrega un lanzador independiente para el puente real, `cron-service.mjs`, sin vencimiento, con bloqueo, detención y límite de arranques. No reutilizar este diagnóstico para producción. Siguen correspondiendo al proveedor las políticas de procesos continuos, conexiones salientes y almacenamiento persistente. Si los mata por política, cron no elimina esa restricción: el mismo paso 11 conserva una alternativa de supervisor en el servidor.
+
+## Resultados informados en el hosting
+
+El 11 de octubre de 2026 el operador compartió `running`, `starts: 1`, HTTP 401/200 y, tras `crash`, `running`, `starts: 2`, conservando el vencimiento `2026-10-11T04:19:55.508Z`. Al terminar compartió `finished`, `starts: 2`, y confirmó la retirada del cron. También compartió DNS correcto, HTTPS 200 y apertura WebSocket a WhatsApp, y después informó que la vinculación real funciona. Estos son resultados informados por el operador, no una ejecución del agente ni una validación del lanzador permanente nuevo.
 
 ## Validación local del 11 de octubre de 2026
 
@@ -113,7 +117,7 @@ Rama: `test/whatsapp-cron-probe`. Versión: `2026.10.11.586`. Windows con Node 2
 - `php artisan optimize:clear` con `CACHE_STORE=file`: correcto; MySQL local no está disponible. No hubo cambios de rutas, vistas, CSS o JavaScript compilado, por lo que no corresponde un build ni otro listado de rutas.
 - Sintaxis de los comandos Bash y de los tres fragmentos Node comprobada sin ejecutar comandos de instalación ni conexiones externas. `.env` y los tres PDF locales previos conservan sus hashes; credenciales, dependencias, logs y archivos de usuarios quedan fuera del parche.
 
-**Pendiente en el hosting:** permisos 700/600 efectivos, ejecución real de Cron Jobs, acceso al Node de nvm desde cron/CageFS, supervivencia al cerrar Terminal, recuperación desde cron, DNS/TLS saliente y autorización del proveedor para un proceso permanente. Los chequeos POSIX de permisos del test se omiten en Windows. Las pruebas locales no sustituyen los pasos anteriores ni demuestran el funcionamiento productivo.
+**Pendiente después de los resultados informados:** instalar y comprobar el lanzador del puente real del paso 11, permisos 700/600 efectivos, supervivencia al cerrar Terminal, recuperación de la sesión y tras reiniciar el servidor, y política del proveedor para un proceso permanente. La ejecución y recuperación del diagnóstico mediante cron, así como DNS/HTTPS/WebSocket, ya fueron informados como correctos arriba. Los chequeos POSIX de permisos del test se omiten en Windows. Las pruebas locales no sustituyen la comprobación del mecanismo permanente en el hosting.
 
 ## Fuentes
 
