@@ -37,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        \App\Models\SolicitudReemplazo::observe(\App\Observers\SolicitudReemplazoWhatsAppObserver::class);
+
         Route::middleware(['web', 'auth'])->get('/changelog/entries', [ChangeLogController::class, 'entries'])
             ->name('changelog.entries');
         Route::middleware(['web', 'auth', 'verified', 'ensure.role:admin|coordinador_gdp'])

@@ -34,7 +34,7 @@ try {
     store = new Store(directory);
     const baileys = await import('@whiskeysockets/baileys');
     session = new Session({
-        store, authFactory: () => store.auth(baileys), reasons: baileys.DisconnectReason,
+        store, documentRoot: config.documentRoot, authFactory: () => store.auth(baileys), reasons: baileys.DisconnectReason,
         qrImage: qr => QRCode.toDataURL(qr, { errorCorrectionLevel: 'M', margin: 2, width: 320 }), logger: log,
         createSocket: auth => baileys.default({ auth, logger: pino({ enabled: false }),
             browser: baileys.Browsers.ubuntu('SGA'), markOnlineOnConnect: false, syncFullHistory: false,

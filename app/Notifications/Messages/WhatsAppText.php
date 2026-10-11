@@ -9,5 +9,6 @@ final readonly class WhatsAppText
         public string $idempotencyKey,
         public string $eventKey,
         public ?array $deliveryPolicy = null,
+        public ?array $document = null,
     ) {}
 }

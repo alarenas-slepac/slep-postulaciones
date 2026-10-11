@@ -59,13 +59,13 @@ https://sga.example.test/gestion/solicitudes-reemplazo/1
 
 Los rechazos UATP/Planificación y la observación SLEP mantienen el correo al establecimiento. No se envían a `contacto_fono`, porque ese destinatario está fuera de los cuatro roles elegidos. Guardar un borrador, editar sin reenviar, ajustar jornadas o cambiar documentos no avisa.
 
-Orden de trabajo, contrato firmado, resolución docente, cierre, anulación, finiquito, modificación de término y retorno desde cierre no disparan WhatsApp en esta fase. Tampoco `derivarCasoGestion` (SLEP devuelve a GDP/administrador): sus posibles destinatarios incluyen roles fuera de lo autorizado. Antes de ampliarlos hay que elegir evento y siguiente responsable elegible; no basta con activar el flag de reemplazos.
+La aceptación con orden de trabajo avisa ahora al reemplazante bajo la política específica descrita al final. Contrato firmado, resolución docente, cierre, anulación, finiquito, modificación de término y retorno desde cierre no disparan WhatsApp. Tampoco `derivarCasoGestion` (SLEP devuelve a GDP/administrador): sus posibles destinatarios incluyen roles fuera de lo autorizado. Antes de ampliarlos hay que elegir evento y siguiente responsable elegible; no basta con activar el flag de reemplazos.
 
 ## Activación paso a paso en cPanel
 
 Prerequisito: integración instalada según [WHATSAPP_CPANEL.md](WHATSAPP_CPANEL.md), sesión conectada y cola dedicada funcionando. El operador ya informó conexión autenticada y estado `connected`; estos cambios no se instalaron ni probaron en producción desde el entorno local.
 
-1. Desplegar los archivos de este parche. Mantener el módulo automático desactivado mientras se instala. No cambia Node, sus dependencias, token, sesión ni cron del puente.
+1. Desplegar los archivos de este parche. Mantener el módulo automático desactivado mientras se instala. El parche 589 de avisos internos no cambia Node; el parche 590 de aceptación al reemplazante amplía el puente y requiere los ajustes de la guía específica enlazada al final. Conservar dependencias, token y sesión.
 2. Ejecutar únicamente la migración aditiva nueva, desde Terminal:
 
    ```bash
@@ -108,8 +108,18 @@ Prerequisito: integración instalada según [WHATSAPP_CPANEL.md](WHATSAPP_CPANEL
    /opt/cpanel/ea-php83/root/usr/bin/php artisan queue:restart
    ```
 
-   `queue:restart` comunica la salida al worker; el mecanismo existente debe volver a iniciarlo. Mantener el cron/worker del paso 12 de la guía, con cola `whatsapp`; el cron de Node por sí solo no procesa jobs PHP. Si usa un worker persistente, su `retry_after` debe superar el timeout de 35 segundos y respetar los cinco intentos y backoff. No ejecutar dos mecanismos distintos para iniciar el puente.
+   `queue:restart` comunica la salida al worker; el mecanismo existente debe volver a iniciarlo. Mantener el cron/worker del paso 12 de la guía, con cola `whatsapp`; el cron de Node por sí solo no procesa jobs PHP. Si usa un worker persistente, su `retry_after` debe superar el timeout de 60 segundos y respetar los cinco intentos y backoff. No ejecutar dos mecanismos distintos para iniciar el puente.
 7. Primero validar el flujo en un entorno de pruebas con un número ingresado y autorizado expresamente. Con el operador, aprobar una solicitud de prueba en UATP y comprobar que recibe sólo el supervisor de Planificación marcado; validar en Planificación y derivar en GDP para comprobar la siguiente etapa y el enlace. No crear ni aprobar solicitudes ficticias en producción como parte de pruebas automatizadas. La recepción real y apertura del enlace requieren comprobación manual del operador.
 8. Revisar **Administración → WhatsApp → Últimos envíos** y, en Terminal, `queue:failed` sin publicar contenidos de jobs. `sent` significa aceptación por WhatsApp, no lectura. `cancelled` puede indicar revocación o cambio de etapa; `failed/invalid_recipient` indica que WhatsApp no reconoce el número. `unknown` requiere comprobar recepción antes de cualquier decisión manual.
 
 Para pausar sólo reemplazos, poner `WHATSAPP_REEMPLAZOS_ENABLED=false`, reconstruir caché y reiniciar workers como en el paso 6. La sesión y la prueba manual siguen disponibles. Rehabilitar no recrea avisos cancelados ni genera un envío masivo retrospectivo.
+
+## Regla específica: aceptación al reemplazante con PDF
+
+Por instrucción expresa del operador, `derivada_slep → aceptada` después de guardar la OT es el evento `solicitud_reemplazo.aceptada_reemplazante`. El observer reconoce únicamente esa transición y encola dentro de la transacción, esperando el commit. Regeneraciones, retornos desde cierre y consultas no avisan.
+
+Esta política `scope=reemplazante_ot` es una excepción autorizada a las reglas generales de preferencia individual y destinatarios AC: resuelve directamente `postulant_profile_id → user` y **`telefono1`**, con cuenta verificada, no eliminada y rol permitido en Mis reemplazos. No reutiliza roles ni flags de la nómina ni usa `telefono2` como fallback. La activación independiente comienza falsa: `WHATSAPP_REEMPLAZANTES_ENABLED`.
+
+Excepción explícita a la exclusión general de documentos: adjuntar **sólo la orden de trabajo propia del reemplazante definitivo**, desde almacenamiento privado, con hash y límite de tamaño. No extenderla a otros PDFs, expedientes o avisos por rol. La tarjeta de ubicación acompaña al documento del mismo evento; su descripción siempre incluye el enlace HTTPS a **Mis reemplazos** y termina indicando que es automática y que no debe responder. Usar `fecha_inicio_trabajo`, dirección pública y coordenadas registradas del establecimiento, sin inferir ubicaciones ni usar domicilios personales.
+
+La aceptación se deduplica por solicitud y se revalida el destinatario y la versión del PDF antes de cada intento. Cambios de perfil, número, estado, fechas o PDF cancelan el pendiente. Un resultado incierto puede corresponder sólo a la tarjeta de ubicación; no reenviar automáticamente. Instalación y ejemplo: [WHATSAPP_REEMPLAZANTE_ORDEN_TRABAJO.md](WHATSAPP_REEMPLAZANTE_ORDEN_TRABAJO.md).

@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.11.589',
+    'current_version' => '2026.10.11.590',
     'entries' => [
+        [
+            'version' => '2026.10.11.590',
+            'title' => 'Reemplazos: WhatsApp al reemplazante con orden de trabajo y ubicación',
+            'summary' => 'Notifica la aceptación al teléfono principal del reemplazante definitivo, con PDF privado, datos del establecimiento, inicio efectivo y enlace a Mis reemplazos.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'postulante', 'funcionario'],
+            'items' => [
+                'Reconoce únicamente la transición derivada_slep a aceptada con OT guardada y espera el commit; regeneraciones y retornos desde cierre no repiten el aviso.',
+                'Normaliza y valida telefono1 del perfil, comprueba cuenta y acceso, y cancela pendientes si cambian destinatario, número, fechas, estado o versión del PDF.',
+                'Amplía el puente autenticado con referencia local y hash del PDF, máximo 5 MiB, tarjeta de ubicación nativa y enlace Google Maps cuando hay coordenadas válidas.',
+                'Conserva deduplicación y privacidad; resultados parcialmente inciertos no se reenvían. El texto termina indicando que es una notificación automática y que no debe responder.',
+                'Entrega flag independiente WHATSAPP_REEMPLAZANTES_ENABLED, desactivado por defecto, guía cPanel y pruebas con HTTP, colas y sockets simulados sin mensajes reales.',
+            ],
+            'published_at' => '2026-10-11',
+        ],
         [
             'version' => '2026.10.11.589',
             'title' => 'Reemplazos: avisos WhatsApp al responsable de la siguiente etapa',

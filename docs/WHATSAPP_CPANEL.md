@@ -25,7 +25,7 @@ Si la instalación **ya está vinculada**, continuar en los pasos **11 y 16** pa
 
 La implementación requiere **Node >=22.13.0**. Baileys está fijado en **7.0.0-rc14**, con lockfile; no actualizarlo automáticamente ni usar instalaciones globales. SQLite emite una advertencia experimental en Node 22: el mensaje `ExperimentalWarning` acompañado de `SQLite disponible` no indica que la comprobación haya fallado.
 
-La integración permanece **desactivada por defecto**. Entrega el canal y el envío de prueba, sin eventos automáticos ni destinatarios inferidos. Sólo se vincula el número de notificaciones registrado en **WhatsApp Messenger**; el número personal de WhatsApp Business conserva su configuración.
+La integración permanece **desactivada por defecto**. Entrega el canal y el envío de prueba; los avisos automáticos de reemplazos requieren sus activaciones independientes y destinatarios definidos, según las guías del final. Sólo se vincula el número de notificaciones registrado en **WhatsApp Messenger**; el número personal de WhatsApp Business conserva su configuración.
 
 ## Requisitos y responsables
 
@@ -251,7 +251,7 @@ Comprobar las tablas de cola sin modificar datos:
 /opt/cpanel/ea-php83/root/usr/bin/php /home/slepac/apps/slep_postulaciones/artisan tinker --execute='foreach (["jobs", "failed_jobs", "whatsapp_dispatches"] as $table) { echo $table.": ".(\Illuminate\Support\Facades\Schema::hasTable($table) ? "OK" : "FALTA").PHP_EOL; } echo "retry_after: ".config("queue.connections.database.retry_after").PHP_EOL;'
 ~~~
 
-Las tres tablas deben mostrar **OK** y `retry_after` debe ser **mayor que 35**; el valor predeterminado es 90. Si falta una tabla, revisar con el responsable del SGA su migración existente antes de crearla. La migración `0001_01_01_000002_create_jobs_table.php` crea varias tablas: no reaplicarla a ciegas si alguna ya existe.
+Las tres tablas deben mostrar **OK** y `retry_after` debe ser **mayor que 60**; el valor predeterminado es 90. Si falta una tabla, revisar con el responsable del SGA su migración existente antes de crearla. La migración `0001_01_01_000002_create_jobs_table.php` crea varias tablas: no reaplicarla a ciegas si alguna ya existe.
 
 El canal usa conexión persistente `database` y cola `whatsapp`. No usar `sync` ni `null`.
 
@@ -373,7 +373,7 @@ Verificar `flock`:
 Antes de generar mensajes, probar que el worker arranca y sale al quedar vacío:
 
 ~~~bash
-/usr/bin/flock -n /home/slepac/.local/share/sga-whatsapp/queue-worker.lock /opt/cpanel/ea-php83/root/usr/bin/php /home/slepac/apps/slep_postulaciones/artisan queue:work database --queue=whatsapp --stop-when-empty --max-time=50 --timeout=35 --tries=5
+/usr/bin/flock -n /home/slepac/.local/share/sga-whatsapp/queue-worker.lock /opt/cpanel/ea-php83/root/usr/bin/php /home/slepac/apps/slep_postulaciones/artisan queue:work database --queue=whatsapp --stop-when-empty --max-time=50 --timeout=60 --tries=5
 ~~~
 
 El worker procesa cualquier job existente en esa cola: esta comprobación corresponde a una instalación nueva, sin envíos pendientes y con `WHATSAPP_ENABLED=false`.
@@ -381,12 +381,12 @@ El worker procesa cualquier job existente en esa cola: esta comprobación corres
 En **cPanel → Cron Jobs**, elegir **una vez por minuto**: los cinco campos de tiempo son `*`. Pegar **sólo este comando** en el campo Comando:
 
 ~~~bash
-/usr/bin/flock -n /home/slepac/.local/share/sga-whatsapp/queue-worker.lock /opt/cpanel/ea-php83/root/usr/bin/php /home/slepac/apps/slep_postulaciones/artisan queue:work database --queue=whatsapp --stop-when-empty --max-time=50 --timeout=35 --tries=5
+/usr/bin/flock -n /home/slepac/.local/share/sga-whatsapp/queue-worker.lock /opt/cpanel/ea-php83/root/usr/bin/php /home/slepac/apps/slep_postulaciones/artisan queue:work database --queue=whatsapp --stop-when-empty --max-time=50 --timeout=60 --tries=5
 ~~~
 
 No crear un segundo cron para el mismo worker. El bloqueo evita que los procesos de este comando se solapen. No cambiar las colas de correo existentes. Si el proveedor instala un worker permanente dedicado a `whatsapp`, usar ese mecanismo en lugar de este cron.
 
-Conservar **15 / 35 / 90 segundos** como referencia para petición HTTP / timeout del worker / `retry_after`. Si se elige otra conexión persistente, ajustar tanto Laravel como el worker y su tiempo de visibilidad.
+Conservar **15 / 60 / 90 segundos** como referencia para petición HTTP de texto / timeout del worker / `retry_after`. Para PDF, la petición usa **45 segundos**, configurable mediante `WHATSAPP_MEDIA_TIMEOUT` y acotada a 50. Si se elige otra conexión persistente, ajustar tanto Laravel como el worker y su tiempo de visibilidad.
 
 Después de modificar código o configuración:
 
@@ -570,6 +570,8 @@ Los jobs reintentan fallos de desconexión hasta cinco veces, con esperas de 30,
 Node escucha sólo en **127.0.0.1**. No crear un proxy público, túnel, regla de Apache ni apertura del puerto 3210. No habilitar depuración de Baileys/libsignal ni registrar credenciales, QR, objetos de sesión o cuerpos de mensajes.
 
 ## Eventos automáticos
+
+La aceptación con orden de trabajo incorpora un aviso independiente al reemplazante, desactivado por defecto con `WHATSAPP_REEMPLAZANTES_ENABLED=false`. Requiere configurar la raíz privada de órdenes para Node y actualizar el worker según [WHATSAPP_REEMPLAZANTE_ORDEN_TRABAJO.md](WHATSAPP_REEMPLAZANTE_ORDEN_TRABAJO.md). No requiere otro QR, token ni migración.
 
 Las solicitudes de reemplazo incorporan avisos al responsable de la siguiente etapa, desactivados por defecto mediante `WHATSAPP_REEMPLAZOS_ENABLED=false`, y selección individual mediante `funcionarios_ac_autorizados.notificar_whatsapp_reemplazos`. La matriz de eventos, regla reutilizable y activación paso a paso están en [WHATSAPP_NOTIFICACIONES_REGLAS.md](WHATSAPP_NOTIFICACIONES_REGLAS.md). Instalar la migración nueva y seleccionar las fichas antes de habilitar ese flag. No interpretar teléfonos históricos ni el campo genérico `enviar_notificacion` como consentimiento para WhatsApp. Los demás módulos requieren definir sus eventos y preferencias.
 
