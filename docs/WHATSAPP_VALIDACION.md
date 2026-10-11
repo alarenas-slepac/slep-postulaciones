@@ -52,6 +52,41 @@ Los permisos del bloque Node se comprobaron como operaciones previstas sobre arc
 
 ## Pendientes del despliegue
 
-La disponibilidad de Terminal, Node/npm y la carga de SQLite ya fue informada por el operador. Quedan pendientes SSH, dependencia nativa Linux en cPanel, autorización de proceso persistente y WebSocket saliente, supervisor/reinicio de servidor, almacenamiento/permisos Linux, conectividad PHP–Node bajo CageFS y desde PHP web, migración en MySQL, worker de cola productivo, escaneo real y recepción del mensaje. No se ejecutó la suite completa del SGA ni se enviaron mensajes reales.
+Los resultados anteriores describen su fecha y versión; la evidencia posterior del hosting se recoge a continuación. No se ejecutó la suite completa del SGA ni se enviaron mensajes reales desde este agente.
 
-Seguir [WHATSAPP_CPANEL.md](WHATSAPP_CPANEL.md) para completar estas condiciones antes de escanear. La selección de eventos, destinatarios y preferencias de WhatsApp permanece pendiente: no hay envíos automáticos activados.
+## Inicio del puente real con cron: versión 2026.10.11.587
+
+Rama local: `feat/whatsapp-cron-service`. El paso 11 de [WHATSAPP_CPANEL.md](WHATSAPP_CPANEL.md) ahora usa `deploy/cron-service.mjs`, con Node y `service.env` absolutos, bloqueo de instancia, controles `start`, `stop`, `restart` y `status`, y límite de cinco arranques en diez minutos. El puente corre dentro del mismo proceso del lanzador; no queda un hijo huérfano si el proceso muere. Conserva la sesión, el token y la deduplicación. Los logs contienen sólo eventos conocidos, rotan a dos archivos acotados y descartan los datos restantes de dependencias.
+
+### Evidencia compartida por el operador
+
+- Puente real en 3210: HTTP 401 sin token y estado autenticado `idle`.
+- Salida desde Node del hosting: DNS correcto, HTTPS a WhatsApp con HTTP 200 y conexión WebSocket establecida.
+- Diagnóstico de cron: `starts: 1`, recuperación tras `crash` con `starts: 2` y vencimiento original intacto; estado final `finished` y retirada del cron confirmada.
+- Después de las instrucciones de vinculación, el operador informó que la sesión real funciona. No se presupone un resultado de recepción de mensajes ni recuperación tras reiniciar el puente a partir de ese informe.
+
+El agente no tiene acceso directo al servidor y no instaló el lanzador permanente allí. El diagnóstico temporal anterior no ejecuta el nuevo mecanismo del puente real.
+
+### Validación local del lanzador
+
+Comprobaciones ejecutadas el 11 de octubre de 2026 en Windows, Node 22.22.0 y PHP 8.3.30:
+
+| Comprobación | Resultado |
+| --- | --- |
+| `services/whatsapp`: `npm test` | 26 pruebas correctas: 13 del puente, 6 del diagnóstico y 7 del lanzador permanente |
+| Lanzador permanente | Bloqueo de duplicados, detención persistente, reinicio, cinco arranques en diez minutos, reapertura manual y rotación de logs sin datos sensibles |
+| CLI con el puente real | API autenticada en `idle`, duplicado descartado, reinicio y caída abrupta recuperables; conserva credenciales sintéticas, clave de deduplicación e historial SQLite |
+| `services/whatsapp`: `npm run check` | Los siete archivos incluidos tienen sintaxis válida |
+| `ChangeLogLazyTest.php` | 5 pruebas y 53 aserciones correctas; SQLite en memoria |
+| `php -l config/changelog.php` | Sin errores de sintaxis |
+| `php artisan optimize:clear`, `CACHE_STORE=file` | Correcto; MySQL local no está disponible |
+| Sintaxis Bash de las dos guías, `bash -n` | 43 bloques válidos, sin ejecutar la instalación: 34 de cPanel y 9 del diagnóstico |
+| Fragmentos Node de la guía | Los tres compilan, sin ejecutarlos ni cambiar configuración |
+| Integridad del changelog | Los 319 registros históricos y las 604 entradas anteriores conservan su contenido |
+| Integridad y alcance | `.env` y los tres PDF locales previos conservan sus hashes; diff revisado y parche limitado a siete archivos, sin credenciales, dependencias, logs ni archivos de usuarios |
+
+Las pruebas usan directorios temporales y una sesión nueva en `idle`, sin QR ni conexiones a WhatsApp. La prueba de caída abrupta modifica únicamente los mtimes de sus bloqueos después de confirmar el cierre del proceso para simular la espera de caducidad; no sustituye observar los 30 segundos reales en Linux. Las aserciones POSIX de permisos 700/600 no se ejecutan en Windows. No se instaló el cron ni se comprobó systemd en el hosting. No hay cambios de rutas, vistas, CSS o JavaScript compilado: no corresponde otro listado de rutas ni build. No se enviaron mensajes reales.
+
+### Condiciones aún pendientes
+
+Instalar y comprobar el cron **del puente real**, su supervivencia al cerrar Terminal, recuperación `connected` sin QR después de `restart`, recuperación tras reiniciar el servidor, política del proveedor para procesos continuos, persistencia y permisos efectivos del disco, acceso SSH si se necesita y cola productiva. La entrega real de mensajes requiere su prueba expresa del paso 15. La selección de eventos, destinatarios y preferencias permanece pendiente: no hay envíos automáticos activados.

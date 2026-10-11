@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.11.586',
+    'current_version' => '2026.10.11.587',
     'entries' => [
+        [
+            'version' => '2026.10.11.587',
+            'title' => 'WhatsApp: inicio del puente real mediante Cron Jobs',
+            'summary' => 'Actualiza el paso 11 para instalar y mantener el servicio Node con cron desde la cuenta cPanel.',
+            'roles' => ['admin'],
+            'items' => [
+                'Incorpora un lanzador sin vencimiento que ejecuta el puente en el mismo proceso, con bloqueo de instancia y controles de inicio, detención y reinicio.',
+                'Pausa nuevos arranques al exceder cinco dentro de diez minutos y conserva sesión, credenciales y deduplicación al reiniciar.',
+                'Registra sólo eventos conocidos y rota logs privados; no guarda QR, mensajes ni errores sensibles de dependencias.',
+                'Integra las pruebas de cron y WebSocket informadas por el operador, conserva systemd como alternativa y documenta las verificaciones permanentes pendientes.',
+            ],
+            'published_at' => '2026-10-11',
+        ],
         [
             'version' => '2026.10.11.586',
             'title' => 'WhatsApp: prueba temporal de Node desde cron',
