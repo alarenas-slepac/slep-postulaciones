@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\FuncionarioAcAutorizado;
+use App\Services\WhatsApp\ReemplazoWhatsAppRecipients;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class FuncionarioAcAutorizadoController extends Controller
@@ -31,6 +33,7 @@ class FuncionarioAcAutorizadoController extends Controller
             'funcionarioAc' => new FuncionarioAcAutorizado(),
             'subdireccionesDependencia' => $this->subdireccionesDependencia,
             'modoCrear' => true,
+            'whatsappPreferenceAvailable' => Schema::hasColumn('funcionarios_ac_autorizados', 'notificar_whatsapp_reemplazos'),
         ]);
     }
 
@@ -40,6 +43,7 @@ class FuncionarioAcAutorizadoController extends Controller
 
         $data = $this->validatedData($request);
         $data['rut_normalizado'] = $this->rutNormalizado($data['run'] ?? '', $data['dv'] ?? '');
+        $this->validateWhatsAppPreference(new FuncionarioAcAutorizado(), $data);
         $data = $this->agregarAuditoriaSiExiste($data, $request->user()->id, true);
         $data = $this->prepararDatosPersistencia($data);
 
@@ -58,6 +62,7 @@ class FuncionarioAcAutorizadoController extends Controller
             'funcionarioAc' => $funcionarioAc,
             'subdireccionesDependencia' => $this->subdireccionesDependencia,
             'modoCrear' => false,
+            'whatsappPreferenceAvailable' => Schema::hasColumn('funcionarios_ac_autorizados', 'notificar_whatsapp_reemplazos'),
         ]);
     }
 
@@ -67,6 +72,7 @@ class FuncionarioAcAutorizadoController extends Controller
 
         $data = $this->validatedData($request, $funcionarioAc->id);
         $data['rut_normalizado'] = $this->rutNormalizado($data['run'] ?? '', $data['dv'] ?? '');
+        $this->validateWhatsAppPreference($funcionarioAc, $data);
         $data = $this->agregarAuditoriaSiExiste($data, $request->user()->id, false);
         $data = $this->prepararDatosPersistencia($data);
 
@@ -100,6 +106,7 @@ class FuncionarioAcAutorizadoController extends Controller
             'estado_autorizacion' => ['nullable', Rule::in(['activo', 'inactivo', 'pendiente'])],
             'jefatura' => ['nullable', 'boolean'],
             'telefono' => ['nullable', 'string', 'max:50'],
+            'notificar_whatsapp_reemplazos' => ['sometimes', 'required', 'boolean'],
             'email' => ['nullable', 'email', 'max:190'],
             'fecha_nacimiento' => ['nullable', 'date', 'before:today'],
         ], [], [
@@ -113,6 +120,27 @@ class FuncionarioAcAutorizadoController extends Controller
             'calidad_juridica' => 'calidad jurídica',
             'fecha_nacimiento' => 'fecha de nacimiento',
         ]);
+    }
+
+    private function validateWhatsAppPreference(FuncionarioAcAutorizado $record, array &$data): void
+    {
+        if (!array_key_exists('notificar_whatsapp_reemplazos', $data)) {
+            return; // Formularios e importaciones históricos conservan la preferencia.
+        }
+        if (!Schema::hasColumn('funcionarios_ac_autorizados', 'notificar_whatsapp_reemplazos')) {
+            throw ValidationException::withMessages(['notificar_whatsapp_reemplazos' => 'Primero debe instalarse la actualización de notificaciones.']);
+        }
+        $data['notificar_whatsapp_reemplazos'] = (bool) $data['notificar_whatsapp_reemplazos'];
+        if (!$data['notificar_whatsapp_reemplazos']) {
+            return;
+        }
+        $candidate = clone $record;
+        $candidate->forceFill($data);
+        $recipients = app(ReemplazoWhatsAppRecipients::class);
+        if (!$candidate->estaActivo() || !$recipients->phone($candidate->telefono) || !$recipients->account($candidate)) {
+            throw ValidationException::withMessages(['notificar_whatsapp_reemplazos' =>
+                'Para activar WhatsApp se requiere autorización vigente, teléfono válido y una cuenta verificada con acceso a Gestión Solicitudes y rol UATP, supervisor de Planificación, coordinador GDP o funcionario SLEP.']);
+        }
     }
 
 

@@ -11,7 +11,7 @@ use Throwable;
 
 class WhatsAppDispatcher
 {
-    public function enqueue(string $to, string $text, string $key, string $event, ?int $userId = null): ?WhatsAppDispatch
+    public function enqueue(string $to, string $text, string $key, string $event, ?int $userId = null, ?array $deliveryPolicy = null): ?WhatsAppDispatch
     {
         if (!config('whatsapp.enabled')) {
             return null;
@@ -25,13 +25,15 @@ class WhatsAppDispatcher
         if (!in_array(config("queue.connections.$connection.driver"), ['database', 'redis', 'sqs', 'beanstalkd'], true)) {
             throw new WhatsAppException('queue_configuration');
         }
-        $fingerprint = hash_hmac('sha256', json_encode([$to, $text], JSON_THROW_ON_ERROR), (string) config('app.key'));
+        $identity = $deliveryPolicy === null ? [$to, $text] : [$to, $text, $deliveryPolicy];
+        $fingerprint = hash_hmac('sha256', json_encode($identity, JSON_THROW_ON_ERROR), (string) config('app.key'));
         $dispatch = null;
         try {
-            return DB::transaction(function () use ($to, $text, $key, $event, $userId, $fingerprint, $connection, &$dispatch) {
+            return DB::transaction(function () use ($to, $text, $key, $event, $userId, $fingerprint, $connection, $deliveryPolicy, &$dispatch) {
                 $dispatch = WhatsAppDispatch::firstOrCreate(['idempotency_key' => $key], [
                     'id' => (string) Str::uuid(), 'event_key' => $event, 'fingerprint' => $fingerprint,
-                    'payload' => ['to' => $to, 'text' => $text], 'triggered_by_user_id' => $userId,
+                    'payload' => ['to' => $to, 'text' => $text] + ($deliveryPolicy === null ? [] : ['policy' => $deliveryPolicy]),
+                    'triggered_by_user_id' => $userId,
                     'status' => 'queued',
                 ]);
                 if (!hash_equals($dispatch->fingerprint, $fingerprint)) {

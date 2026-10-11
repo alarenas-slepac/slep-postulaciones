@@ -34,6 +34,7 @@ use App\Services\RestrictedRutService;
 use App\Services\SolicitudReemplazoAutorizacionDocenteService;
 use App\Services\ResolucionDocenteDocxService;
 use App\Support\TipoReemplazo;
+use App\Services\WhatsApp\ReemplazoWhatsAppNotifier;
 
 class SolicitudReemplazoGestionController extends Controller
 {
@@ -2889,16 +2890,23 @@ class SolicitudReemplazoGestionController extends Controller
             'justificacion_tecnica_uatp' => 'justificación técnica de la aprobación',
         ]);
 
-        $solicitud->update([
-            'estado' => 'pendiente_validacion',
-            'motivo_rechazo' => null,
-            'justificacion_tecnica_uatp' => trim((string) $data['justificacion_tecnica_uatp']),
-            'plani_motivo_rechazo' => null,
-            'plani_decision_user_id' => null,
-            'plani_decision_at' => null,
-            'uatp_decision_user_id' => $request->user()->id,
-            'uatp_decision_at' => now(),
-        ]);
+        DB::transaction(function () use ($solicitud, $request, $data, $autorizacionDocenteService) {
+            $s = SolicitudReemplazo::whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+            abort_unless($s->estado === 'pendiente_uatp', 422, 'La solicitud ya no está pendiente de UATP.');
+            abort_unless($autorizacionDocenteService->cumpleRegistroParaAprobacionUatp($s), 422, 'Debe registrar la autorización docente.');
+            $s->update([
+                'estado' => 'pendiente_validacion',
+                'motivo_rechazo' => null,
+                'justificacion_tecnica_uatp' => trim((string) $data['justificacion_tecnica_uatp']),
+                'plani_motivo_rechazo' => null,
+                'plani_decision_user_id' => null,
+                'plani_decision_at' => null,
+                'uatp_decision_user_id' => $request->user()->id,
+                'uatp_decision_at' => now(),
+            ]);
+            app(ReemplazoWhatsAppNotifier::class)->notify($s, 'aprobada_uatp_pendiente_plani');
+        });
+        $solicitud->refresh();
 
         if (!empty($solicitud->contacto_email)) {
             NotificationAudit::sendMail($solicitud->contacto_email, new SolicitudReemplazoAprobadaUatpPendientePlani($solicitud->fresh()), [
@@ -3010,6 +3018,7 @@ class SolicitudReemplazoGestionController extends Controller
                 'plani_decision_user_id' => null,
                 'plani_decision_at' => null,
             ])->save();
+            app(ReemplazoWhatsAppNotifier::class)->notify($s, 'reabierta_uatp');
         });
 
         return redirect()
@@ -3023,12 +3032,18 @@ class SolicitudReemplazoGestionController extends Controller
             return back()->withErrors(['estado' => 'La solicitud no está en estado Pendiente de Validación.']);
         }
 
-        $solicitud->update([
-            'estado' => 'pendiente_gdp',
-            'plani_motivo_rechazo' => null,
-            'plani_decision_user_id' => $request->user()->id,
-            'plani_decision_at' => now(),
-        ]);
+        DB::transaction(function () use ($solicitud, $request) {
+            $s = SolicitudReemplazo::whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+            abort_unless($s->estado === 'pendiente_validacion', 422, 'La solicitud ya no está pendiente de validación.');
+            $s->update([
+                'estado' => 'pendiente_gdp',
+                'plani_motivo_rechazo' => null,
+                'plani_decision_user_id' => $request->user()->id,
+                'plani_decision_at' => now(),
+            ]);
+            app(ReemplazoWhatsAppNotifier::class)->notify($s, 'validada_plani');
+        });
+        $solicitud->refresh();
 
         if (!empty($solicitud->contacto_email)) {
             NotificationAudit::sendMail($solicitud->contacto_email, new SolicitudReemplazoValidadaPlani($solicitud->fresh()), [
@@ -3133,6 +3148,7 @@ class SolicitudReemplazoGestionController extends Controller
                 'plani_decision_user_id' => null,
                 'plani_decision_at' => null,
             ])->save();
+            app(ReemplazoWhatsAppNotifier::class)->notify($s, 'reabierta_plani');
         });
 
         return redirect()
@@ -3173,6 +3189,7 @@ class SolicitudReemplazoGestionController extends Controller
                     'derivada_por_user_id' => $request->user()->id,
                     'derivada_at' => now(),
                 ]);
+                app(ReemplazoWhatsAppNotifier::class)->notify($s, 'derivada_slep');
             }
         });
 
@@ -3211,12 +3228,16 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
     DB::transaction(function () use ($solicitud, $destinatarioId, $user) {
         $s = SolicitudReemplazo::whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
         abort_unless($s->estado === 'derivada_slep', 403);
+        if ((int) $s->derivada_a_user_id === $destinatarioId) {
+            return;
+        }
 
         $s->update([
             'derivada_a_user_id' => $destinatarioId,
             'derivada_por_user_id' => (int) $user->id,
             'derivada_at' => now(),
         ]);
+        app(ReemplazoWhatsAppNotifier::class)->notify($s, 'reasignada_slep');
     });
 
     return back()->with('status', 'Derivación actualizada correctamente.');
