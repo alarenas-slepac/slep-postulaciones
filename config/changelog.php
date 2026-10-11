@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.11.585',
+    'current_version' => '2026.10.11.586',
     'entries' => [
+        [
+            'version' => '2026.10.11.586',
+            'title' => 'WhatsApp: prueba temporal de Node desde cron',
+            'summary' => 'Permite diagnosticar Cron Jobs en cPanel sin vincular cuentas ni enviar mensajes.',
+            'roles' => ['admin'],
+            'items' => [
+                'Incluye un servidor de diagnóstico privado, con token propio, bloqueo de instancia y vencimiento a los quince minutos.',
+                'Documenta inicio, cierre de Terminal, caída simulada, recuperación y retiro del cron; limita la prueba a cinco arranques.',
+                'Diferencia HTTPS entrante de DNS y TLS/WebSocket saliente a WhatsApp; los requisitos permanentes del hosting siguen pendientes.',
+                'Agrega pruebas aisladas sin acceder a Laravel, credenciales de producción o sesiones de Messenger/Business.',
+            ],
+            'published_at' => '2026-10-11',
+        ],
         [
             'version' => '2026.10.11.585',
             'title' => 'WhatsApp: instalación paso a paso con Node de la cuenta',
