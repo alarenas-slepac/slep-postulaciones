@@ -10,8 +10,9 @@ Type=simple
 User=slepac
 Group=slepac
 WorkingDirectory=/home/slepac/apps/slep_postulaciones/services/whatsapp
-# Confirmar esta ruta con el proveedor; Node >=22.13.0, preferentemente Node 22 LTS.
-ExecStart=/opt/cpanel/ea-nodejs22/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env src/index.js
+# Node instalado con nvm en la cuenta; confirmar acceso a esta ruta con el proveedor.
+# Al actualizar Node, adaptar ExecStart antes de retirar la version anterior.
+ExecStart=/home/slepac/.nvm/versions/node/v22.23.3/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env src/index.js
 Restart=on-failure
 RestartSec=15
 TimeoutStopSec=30

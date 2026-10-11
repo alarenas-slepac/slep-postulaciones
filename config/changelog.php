@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.10.584',
+    'current_version' => '2026.10.11.585',
     'entries' => [
+        [
+            'version' => '2026.10.11.585',
+            'title' => 'WhatsApp: instalación paso a paso con Node de la cuenta',
+            'summary' => 'Adapta la guía de cPanel y la plantilla del supervisor al Node 22.23.3 instalado mediante nvm.',
+            'roles' => ['admin'],
+            'items' => [
+                'Documenta las comprobaciones de Terminal, Node, npm y SQLite informadas por el operador, separándolas de los requisitos del hosting todavía pendientes.',
+                'Incluye comandos para crear la configuración privada y generar un token sin mostrarlo, conservarlo al repetir el paso y comprobar su coincidencia con Laravel.',
+                'Ordena dependencias, migración aditiva, diagnóstico autenticado, supervisor, cola, activación, QR de Messenger y prueba manual.',
+                'Actualiza la ruta absoluta del servicio y documenta mantenimiento, recuperación y tareas que requieren al proveedor; no modifica producción ni activa envíos automáticos.',
+            ],
+            'published_at' => '2026-10-11',
+        ],
         [
             'version' => '2026.10.10.584',
             'title' => 'WhatsApp de notificaciones mediante dispositivo vinculado',
