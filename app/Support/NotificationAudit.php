@@ -17,6 +17,13 @@ class NotificationAudit
 {
     public static function sendMail(string $to, Mailable $mailable, array $meta = []): void
     {
+        // La clave viaja con el mailable, también al ejecutarlo desde una cola.
+        $eventKey = app(\App\Services\Notifications\NotificationEventCatalog::class)->resolveMail(
+            ['__laravel_mailable' => get_class($mailable), 'sga_event_key' => $meta['event_key'] ?? null]
+            + get_object_vars($mailable), (string) ($meta['subject'] ?? ''));
+        if ($eventKey) $mailable->with('sga_event_key', $eventKey);
+        $mailable->with('sga_occurrence_id', $meta['occurrence_id'] ?? $mailable->viewData['sga_occurrence_id'] ?? (string) \Illuminate\Support\Str::uuid());
+        $enabled = !$eventKey || app(\App\Services\Notifications\NotificationEventPolicy::class)->enabled($eventKey, 'mail');
         $cc = collect((array) ($meta['cc'] ?? []))
             ->map(fn ($email) => trim((string) $email))
             ->filter(fn ($email) => $email !== '')
@@ -26,22 +33,25 @@ class NotificationAudit
 
         $log = self::createBaseLog(array_merge($meta, [
             'channel' => 'mail',
-            'status' => 'pending',
+            'status' => $enabled ? 'pending' : 'suppressed',
             'recipient_email' => trim($to),
             'mailable_class' => get_class($mailable),
         ]));
+
+        if (!$enabled && (!$eventKey || !(app(\App\Services\Notifications\NotificationEventCatalog::class)->find($eventKey)['whatsapp_from_mail'] ?? false)
+            || !app(\App\Services\Notifications\NotificationEventPolicy::class)->enabled($eventKey, 'whatsapp'))) return;
 
         try {
             $mailer = Mail::to($to);
             if (!empty($cc)) {
                 $mailer->cc($cc);
             }
-            $mailer->send($mailable);
+            $sent = $mailer->send($mailable);
 
             if ($log) {
                 $log->update([
-                    'status' => 'sent',
-                    'sent_at' => now(),
+                    'status' => $sent === null && !($mailable instanceof ShouldQueue) && !Mail::isFake() ? 'suppressed' : 'sent',
+                    'sent_at' => $sent === null && !($mailable instanceof ShouldQueue) && !Mail::isFake() ? null : now(),
                 ]);
             }
         } catch (Throwable $e) {

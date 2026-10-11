@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(IncidenciaCatalogo::class);
         $this->app->scoped(\App\Services\Padron\PadronEscrituraService::class);
         $this->app->scoped(ChangeLogViewData::class);
+        $this->app->singleton(\App\Services\Notifications\NotificationEventOccurrence::class);
 
         // No bindear manualmente 'request' aquí.
         $this->app->singleton(Client::class, function () {
@@ -37,6 +38,13 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Mail\Events\MessageSending::class, \App\Listeners\ConfigureNotificationMail::class.'@configure');
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Queue\Events\JobProcessing::class, \App\Services\Notifications\NotificationEventOccurrence::class.'@processing');
+        foreach ([\Illuminate\Queue\Events\JobProcessed::class, \Illuminate\Queue\Events\JobExceptionOccurred::class] as $event) {
+            \Illuminate\Support\Facades\Event::listen($event, \App\Services\Notifications\NotificationEventOccurrence::class.'@clear');
+        }
+        require base_path('routes/notification_events.php');
+
         \App\Models\SolicitudReemplazo::observe(\App\Observers\SolicitudReemplazoWhatsAppObserver::class);
 
         Route::middleware(['web', 'auth'])->get('/changelog/entries', [ChangeLogController::class, 'entries'])

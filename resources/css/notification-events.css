@@ -1,0 +1,7 @@
+.ne-admin .form-select { min-height: 2.65rem; border-color: var(--slep-border, #dbe4f0); border-radius: .75rem; color: #0f172a; }
+.ne-admin .ne-key { overflow-wrap: anywhere; font-size: .8rem; color: #64748b; }
+.ne-admin .ne-preview { white-space: pre-wrap; overflow-wrap: anywhere; padding: 1.5rem; border: 1px solid #dbe4f0; background: #f8fafc; border-radius: 1rem; }
+.ne-admin .select2-container--bootstrap-5 .select2-selection { min-height: 2.65rem; border-color: #dbe4f0; border-radius: .75rem; font-family: inherit; }
+.ne-select-dropdown.select2-dropdown { border-color: #dbe4f0; border-radius: .75rem; box-shadow: 0 12px 28px rgb(15 23 42 / 12%); }
+.ne-select-dropdown .select2-results__option { padding: .6rem .8rem; }
+.ne-admin .form-check-input:focus-visible, .ne-admin .form-select:focus { border-color: #86b7fe; box-shadow: 0 0 0 .2rem rgb(13 110 253 / 20%); }

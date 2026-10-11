@@ -41,6 +41,11 @@ class SendWhatsAppMessage implements ShouldQueue
         }
 
         try {
+            $eventPolicy = app(\App\Services\Notifications\NotificationEventPolicy::class);
+            if (!$eventPolicy->enabled($dispatch->event_key, 'whatsapp')) {
+                $dispatch->finish('cancelled', 'event_disabled');
+                return;
+            }
             $payload = $dispatch->payload;
             if (!$payload) {
                 $dispatch->finish('failed', 'invalid_message');
@@ -48,10 +53,19 @@ class SendWhatsAppMessage implements ShouldQueue
             }
             if (isset($payload['policy'])) {
                 $policy = $payload['policy'];
+                if (isset($policy['user_id']) && !$eventPolicy->recipientAllowed($dispatch->event_key, (int) $policy['user_id'])) {
+                    $dispatch->finish('cancelled', 'recipient_ineligible');
+                    return;
+                }
                 if (($policy['scope'] ?? '') === 'reemplazante_ot') {
                     $error = app(ReemplazanteWhatsAppNotifier::class)->deliveryError($payload);
                     if ($error) {
                         $dispatch->finish('cancelled', $error);
+                        return;
+                    }
+                } elseif (($policy['scope'] ?? '') === 'notification_event') {
+                    if (!app(\App\Services\Notifications\NotificationWhatsAppRecipients::class)->stillEligible($policy, $payload['to'])) {
+                        $dispatch->finish('cancelled', 'recipient_ineligible');
                         return;
                     }
                 } elseif (($policy['scope'] ?? '') === 'reemplazos') {

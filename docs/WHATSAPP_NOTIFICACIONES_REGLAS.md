@@ -2,6 +2,10 @@
 
 ## Regla obligatoria para incorporar otros módulos
 
+Desde el parche 591, **cada notificación o evento nuevo debe registrarse en el catálogo central y aparecer en Administración → Eventos de notificaciones** antes de activarlo. Esta obligación figura también en AGENTS.md (14). Seguir [NOTIFICACIONES_ADMINISTRACION.md](NOTIFICACIONES_ADMINISTRACION.md): claves estables, metadatos, registro de clases/vistas/etapas y pruebas de cobertura. El catálogo no depende de envíos reales ni de insertar una preferencia por evento. Las nuevas clases sin registro aparecen como pendientes; la prueba de cobertura exige completar el registro.
+
+Las reglas siguientes conservan la política específica de los avisos internos de reemplazos. Para los **nuevos canales derivados de correo**, el operador autorizó una política distinta (`scope=notification_event`): activación explícita por evento en BD, cuenta verificada del destinatario original, ficha AC vigente o teléfono principal del perfil, selección restringida y enlace HTTPS al SGA. No usa `enviar_notificacion` como opt-in ni el flag de reemplazos; comienza desactivada. Se identifica la cuenta por su email original normalizado, y la ficha por vínculo/RUT; no se inventan destinatarios por un correo adicional. No copia PDF ni texto sensible del correo, y vuelve a comprobar cuenta/email/teléfono antes de cada intento. Si falta un enlace explícito válido al detalle, enlaza al inicio HTTPS del SGA, con autenticación normal. Los avisos de acceso con tokens permanecen sólo por correo.
+
 1. Definir un catálogo cerrado de eventos de negocio y su siguiente responsable. Emitir desde la acción que confirma la transición, dentro de su transacción; no desde cada `save`, una consulta, una importación ni un cambio de archivos.
 2. Exigir tanto `WHATSAPP_ENABLED=true` como la activación explícita del módulo. Cada nuevo módulo comienza desactivado y utiliza una preferencia individual propia, inicialmente falsa. **`enviar_notificacion` no activa WhatsApp.** Un flag de reemplazos no autoriza avisos de otro módulo.
 3. Resolver una cuenta vigente, verificada, con el rol exacto del responsable y acceso al módulo. Usar su ficha en `funcionarios_ac_autorizados`, su `telefono` y su preferencia. Primero `registered_user_id`; sólo si está vacío, coincidencia única del RUT normalizado. Omitir vínculos contradictorios, cuentas eliminadas y registros ambiguos. No resolver por nombres, correos, teléfono del solicitante o destinatarios inventados.
@@ -57,9 +61,9 @@ https://sga.example.test/gestion/solicitudes-reemplazo/1
 
 ## Eventos analizados que necesitan otra decisión
 
-Los rechazos UATP/Planificación y la observación SLEP mantienen el correo al establecimiento. No se envían a `contacto_fono`, porque ese destinatario está fuera de los cuatro roles elegidos. Guardar un borrador, editar sin reenviar, ajustar jornadas o cambiar documentos no avisa.
+Los rechazos UATP/Planificación y la observación SLEP mantienen el correo al establecimiento. Desde el parche 591 puede habilitarse su nuevo WhatsApp en el mantenedor central, **sólo si el destinatario original tiene una cuenta verificada y teléfono válido** bajo la política derivada de correo. No se usa `contacto_fono` ni se amplían los cuatro roles del notifier interno. Guardar un borrador, editar sin reenviar, ajustar jornadas o cambiar documentos no crea un evento.
 
-La aceptación con orden de trabajo avisa ahora al reemplazante bajo la política específica descrita al final. Contrato firmado, resolución docente, cierre, anulación, finiquito, modificación de término y retorno desde cierre no disparan WhatsApp. Tampoco `derivarCasoGestion` (SLEP devuelve a GDP/administrador): sus posibles destinatarios incluyen roles fuera de lo autorizado. Antes de ampliarlos hay que elegir evento y siguiente responsable elegible; no basta con activar el flag de reemplazos.
+La aceptación con OT conserva la política específica descrita al final. Contrato y resolución firmados pueden habilitar su resumen con enlace mediante su correo existente y la política nueva; no se adjuntan esos PDF a WhatsApp. Acciones sin un emisor registrado (cierre, finiquito, modificación de término, retorno desde cierre y `derivarCasoGestion`) no adquieren disparadores nuevos. Antes de ampliarlas hay que registrar evento y responsable, política y pruebas; no basta con activar el flag de reemplazos.
 
 ## Activación paso a paso en cPanel
 

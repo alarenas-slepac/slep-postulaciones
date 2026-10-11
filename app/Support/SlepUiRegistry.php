@@ -116,6 +116,7 @@ class SlepUiRegistry
                 self::entry('Usuarios y roles', 'admin.users.index', 'bi-people-fill', ['admin'], 'admin.users'),
                 self::entry('Correos masivos por rol', 'admin.bulk-role-mail.index', 'bi-envelope-at', ['admin', 'coordinador_gdp']),
                 self::entry('Historial de notificaciones', 'admin.notification-logs.index', 'bi-envelope-check', ['admin'], 'admin.notification-logs'),
+                self::entry('Eventos de notificaciones', 'admin.notification-events.index', 'bi-bell', ['admin']),
                 self::entry('WhatsApp · Notificaciones', 'admin.whatsapp.index', 'bi-whatsapp', ['admin']),
                 self::entry('Roles', 'admin.roles.index', 'bi-person-gear', ['admin'], 'admin.roles'),
                 self::entry('Configuración reemplazos', 'admin.solicitudes-reemplazo-configuracion.edit', 'bi-gear', ['admin']),
@@ -286,6 +287,9 @@ class SlepUiRegistry
 
     private static function entryVisible(array $item, $user, ?string $activeRole): bool
     {
+        if ($item['route'] === 'admin.notification-events.index' && (!$user || !$user->can('notifications.manage'))) {
+            return false;
+        }
         if ($item['route'] === 'admin.whatsapp.index' && (!$user || !$user->can('whatsapp.manage'))) {
             return false;
         }
