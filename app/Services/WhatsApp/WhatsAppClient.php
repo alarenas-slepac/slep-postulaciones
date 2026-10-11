@@ -24,7 +24,8 @@ class WhatsAppClient
         try {
             $response = Http::withToken($token)->acceptJson()->asJson()->withoutRedirecting()
                 ->connectTimeout(max(1, min(5, (int) config('whatsapp.connect_timeout'))))
-                ->timeout(max(2, min(20, (int) config('whatsapp.timeout'))))
+                ->timeout(isset($data['document']) ? max(2, min(50, (int) config('whatsapp.media_timeout')))
+                    : max(2, min(20, (int) config('whatsapp.timeout'))))
                 ->send($method, $url.'/v1/'.$path, $method === 'GET' ? [] : ['json' => (object) $data]);
         } catch (ConnectionException) {
             throw new WhatsAppException('service_unavailable', true);
@@ -35,7 +36,7 @@ class WhatsAppClient
         $result = $response->json();
         if (!$response->successful() || !is_array($result)) {
             $code = is_array($result) ? ($result['error'] ?? '') : '';
-            $safeCodes = ['disconnected', 'delivery_unknown', 'idempotency_conflict', 'invalid_recipient', 'connected', 'busy', 'qr_expired', 'unlink_failed'];
+            $safeCodes = ['disconnected', 'delivery_unknown', 'idempotency_conflict', 'invalid_recipient', 'invalid_document', 'document_unavailable', 'document_changed', 'connected', 'busy', 'qr_expired', 'unlink_failed'];
             $code = in_array($code, $safeCodes, true) ? $code : match ($response->status()) {
                 401, 403 => 'authentication',
                 422, 413 => 'invalid_message',

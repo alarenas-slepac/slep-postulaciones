@@ -151,3 +151,55 @@ Modificados, incluyendo las instrucciones de diagnóstico local previas conserva
 - `tests/Feature/SolicitudReemplazoTipoValidationTest.php`
 - `docs/WHATSAPP_CPANEL.md`
 - `docs/WHATSAPP_VALIDACION.md`
+
+## Actualización 2026.10.11.590: aceptación al reemplazante con OT y ubicación
+
+Rama: `feat/whatsapp-reemplazante-orden-trabajo`. El operador pidió avisar al reemplazante al aceptar, usando su teléfono de perfil, con PDF de orden de trabajo, establecimiento/RBD/dirección, ubicación, fechas efectivas, enlace al SGA y pie de notificación automática sin respuesta. Implementado localmente, bajo `WHATSAPP_REEMPLAZANTES_ENABLED=false` por defecto. Producción no se modificó ni se enviaron mensajes reales.
+
+### Comprobaciones ejecutadas
+
+- PHP 8.3.30: **139 pruebas, 1046 aserciones correctas**, con `ReemplazanteWhatsAppNotificationTest`, `ReemplazoWhatsAppNotificationsTest`, `WhatsAppIntegrationTest`, `SolicitudReemplazoTipoValidationTest`, `OrdenTrabajoSupervisorPlanificacionAccessTest`, `ChangeLogLazyTest` y `FuncionarioAcDirectoryRolesTest`. Incluye 26 casos nuevos del aviso al reemplazante; SQLite en memoria, discos aislados, cola/HTTP simulados.
+- Se verifica el observer de la transición real `derivada_slep → aceptada`, commit/rollback, ausencia de envíos por regeneración/retorno desde cierre, clave estable, PDF privado propio, inicio efectivo, dirección pública, RBD, enlace a Mis reemplazos y pie final. El teléfono principal se normaliza sin modificar el perfil ni usar el secundario.
+- Cancelación antes de HTTP si cambian perfil, teléfono, cuenta/verificación/rol, estado, fechas, flag o documento; autenticación Bearer, política excluida del transporte, UUID conservado tras desconexión y `unknown` definitivo. Un puente antiguo devuelve 404 en `/v1/messages/document` y no se degrada a texto indicando un PDF inexistente.
+- Node 22.22.0 / Baileys 7.0.0-rc14: **34 pruebas correctas** del puente, diagnóstico y lanzador de cron, con sockets simulados. Ocho casos nuevos cubren tarjeta de ubicación seguida de PDF con descripción, deduplicación persistente, contenido/ubicación incluidos en la huella, desconexión previa, resultado parcialmente incierto, autenticación, rutas/URLs/traversal/symlinks, firma/tamaño/hash y configuración privada. La reserva previa a ambos componentes impide reenviarlos después de una caída.
+- **13 PHP nuevos/modificados** pasan `php -l`; el diagnóstico PHP de la guía también pasa sintaxis, sin ejecutarlo contra el hosting. `npm run check` y `node --check src/documents.js` correctos.
+- `php artisan optimize:clear` correcto con `CACHE_STORE=file`; `route:list --except-vendor --json`: **766 rutas**, sin agregar o eliminar rutas Laravel. Las dos rutas adicionales del listado completo corresponden al almacenamiento del framework. Se incorpora únicamente una ruta privada al API Node, con la autenticación existente. Sin cambios en vistas/assets Vite; no corresponde build.
+- **41 bloques Bash** de las tres guías pasan `bash -n`, sin ejecutar instalación ni comandos remotos. El changelog anterior completo se conserva al comparar el archivo, retirando sólo la entrada 590 y revirtiendo su indicador de versión.
+- Diff revisado y `git diff --check` correcto. `.env` y los tres PDF locales anteriores conservan sus hashes y quedan fuera del parche. No se incluyen credenciales, datos personales, logs, `vendor` ni `node_modules`.
+
+### Límites pendientes
+
+No se probó MySQL/concurrencia ni permisos POSIX/CageFS en este entorno Windows. Falta desplegar los cambios, confirmar la raíz real y lectura de las órdenes desde Node, actualizar timeout del worker y comprobar la carga a servidores multimedia de WhatsApp en el hosting. La recepción de tarjeta/PDF, apariencia en iPhone y apertura autenticada del enlace requieren prueba manual autorizada. Las comprobaciones previas de DNS/HTTPS/WebSocket no prueban el envío de adjuntos.
+
+`unknown` puede representar ubicación enviada y PDF pendiente o incierto; revisar recepción sin borrar el ledger ni forzar reenvíos. El sistema conserva los correos y la confirmación del trámite aunque falle WhatsApp. Guía paso a paso y ejemplo: [WHATSAPP_REEMPLAZANTE_ORDEN_TRABAJO.md](WHATSAPP_REEMPLAZANTE_ORDEN_TRABAJO.md).
+
+### Archivos del parche 590
+
+Nuevos:
+
+- `app/Observers/SolicitudReemplazoWhatsAppObserver.php`
+- `app/Services/WhatsApp/ReemplazanteWhatsAppNotifier.php`
+- `app/Services/WhatsApp/WhatsAppPhone.php`
+- `services/whatsapp/src/documents.js`
+- `tests/Feature/ReemplazanteWhatsAppNotificationTest.php`
+- `docs/WHATSAPP_REEMPLAZANTE_ORDEN_TRABAJO.md`
+
+Modificados:
+
+- `app/Providers/AppServiceProvider.php`
+- `app/Jobs/SendWhatsAppMessage.php`
+- `app/Notifications/Channels/WhatsAppChannel.php`
+- `app/Notifications/Messages/WhatsAppText.php`
+- `app/Services/WhatsApp/ReemplazoWhatsAppRecipients.php`
+- `app/Services/WhatsApp/WhatsAppDispatcher.php`
+- `app/Services/WhatsApp/WhatsAppClient.php`
+- `config/whatsapp.php`
+- `config/changelog.php`
+- `services/whatsapp/src/config.js`
+- `services/whatsapp/src/index.js`
+- `services/whatsapp/src/server.js`
+- `services/whatsapp/src/session.js`
+- `services/whatsapp/test/bridge.test.js`
+- `docs/WHATSAPP_CPANEL.md`
+- `docs/WHATSAPP_NOTIFICACIONES_REGLAS.md`
+- `docs/WHATSAPP_VALIDACION.md`

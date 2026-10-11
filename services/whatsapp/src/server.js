@@ -36,7 +36,16 @@ export function createApi({ token, session }) {
             if (request.method === 'GET' && path === '/v1/qr') { reply(200, session.getQr()); return; }
             if (request.method === 'POST' && path === '/v1/session/qr') { await body(request); reply(202, await session.renewQr()); return; }
             if (request.method === 'POST' && path === '/v1/session/unlink') { await body(request); reply(200, await session.unlink()); return; }
-            if (request.method === 'POST' && path === '/v1/messages') { reply(200, await session.send(await body(request))); return; }
+            if (request.method === 'POST' && path === '/v1/messages') {
+                const message = await body(request);
+                if (message.document !== undefined) throw new BridgeError('invalid_message', 422);
+                reply(200, await session.send(message)); return;
+            }
+            if (request.method === 'POST' && path === '/v1/messages/document') {
+                const message = await body(request);
+                if (!message.document) throw new BridgeError('invalid_document', 422);
+                reply(200, await session.send(message)); return;
+            }
             reply(404, { error: 'not_found' });
         } catch (error) {
             reply(error instanceof BridgeError ? error.status : 503, { error: error instanceof BridgeError ? error.code : 'service_unavailable' });

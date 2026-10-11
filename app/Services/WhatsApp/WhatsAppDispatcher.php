@@ -11,7 +11,7 @@ use Throwable;
 
 class WhatsAppDispatcher
 {
-    public function enqueue(string $to, string $text, string $key, string $event, ?int $userId = null, ?array $deliveryPolicy = null): ?WhatsAppDispatch
+    public function enqueue(string $to, string $text, string $key, string $event, ?int $userId = null, ?array $deliveryPolicy = null, ?array $document = null): ?WhatsAppDispatch
     {
         if (!config('whatsapp.enabled')) {
             return null;
@@ -26,13 +26,21 @@ class WhatsAppDispatcher
             throw new WhatsAppException('queue_configuration');
         }
         $identity = $deliveryPolicy === null ? [$to, $text] : [$to, $text, $deliveryPolicy];
+        if ($document !== null) {
+            if (!preg_match('~^[1-9][0-9]*/ORDEN_TRABAJO_[A-Za-z0-9_-]{1,100}\.pdf$~D', $document['path'] ?? '')
+                || !preg_match('/^[a-f0-9]{64}$/D', $document['sha256'] ?? '')) {
+                throw new WhatsAppException('invalid_document');
+            }
+            $identity[] = $document;
+        }
         $fingerprint = hash_hmac('sha256', json_encode($identity, JSON_THROW_ON_ERROR), (string) config('app.key'));
         $dispatch = null;
         try {
-            return DB::transaction(function () use ($to, $text, $key, $event, $userId, $fingerprint, $connection, $deliveryPolicy, &$dispatch) {
+            return DB::transaction(function () use ($to, $text, $key, $event, $userId, $fingerprint, $connection, $deliveryPolicy, $document, &$dispatch) {
                 $dispatch = WhatsAppDispatch::firstOrCreate(['idempotency_key' => $key], [
                     'id' => (string) Str::uuid(), 'event_key' => $event, 'fingerprint' => $fingerprint,
-                    'payload' => ['to' => $to, 'text' => $text] + ($deliveryPolicy === null ? [] : ['policy' => $deliveryPolicy]),
+                    'payload' => ['to' => $to, 'text' => $text] + ($deliveryPolicy === null ? [] : ['policy' => $deliveryPolicy])
+                        + ($document === null ? [] : ['document' => $document]),
                     'triggered_by_user_id' => $userId,
                     'status' => 'queued',
                 ]);

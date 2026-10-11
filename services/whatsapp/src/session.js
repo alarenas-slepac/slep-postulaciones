@@ -1,10 +1,13 @@
+import { createHash } from 'node:crypto';
+import { validateDocument, readDocument, DocumentError } from './documents.js';
+
 export class BridgeError extends Error {
     constructor(code, status = 503) { super(code); this.code = code; this.status = status; }
 }
 
 export class Session {
-    constructor({ store, createSocket, authFactory, qrImage, reasons, logger, schedule = setTimeout, cancel = clearTimeout }) {
-        Object.assign(this, { store, createSocket, authFactory, qrImage, reasons, logger, schedule, cancel });
+    constructor({ store, createSocket, authFactory, qrImage, reasons, logger, documentRoot = null, schedule = setTimeout, cancel = clearTimeout }) {
+        Object.assign(this, { store, createSocket, authFactory, qrImage, reasons, logger, documentRoot, schedule, cancel });
         this.state = 'idle'; this.socket = null; this.generation = 0; this.timer = null; this.attempts = 0;
         this.qr = null; this.busy = false; this.stopped = false; this.tail = Promise.resolve(); this.stableTimer = null;
     }
@@ -128,13 +131,19 @@ export class Session {
         return this.qr;
     }
 
-    async send({ id, to, text }) {
+    async send({ id, to, text, document }) {
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id ?? '')
             || typeof to !== 'string' || !/^\+[1-9][0-9]{7,14}$/.test(to)
             || typeof text !== 'string' || !text.trim() || [...text].length > 1000) {
             throw new BridgeError('invalid_message', 422);
         }
-        const fingerprint = this.store.fingerprint(to, text);
+        let media;
+        if (document !== undefined) {
+            try { media = validateDocument(document); }
+            catch (error) { throw new BridgeError(error instanceof DocumentError ? error.code : 'invalid_document', 422); }
+        }
+        // Conservar las huellas históricas de texto; incluir PDF y ubicación en las nuevas.
+        const fingerprint = this.store.fingerprint(to, media ? JSON.stringify({ text, document: media }) : text);
         const prior = this.store.find(id);
         if (prior) {
             if (prior.fingerprint !== fingerprint) throw new BridgeError('idempotency_conflict', 409);
@@ -153,9 +162,23 @@ export class Session {
             if (generation !== this.generation || this.state !== 'connected') throw new BridgeError('disconnected');
             const recipient = recipients?.find(item => item.exists);
             if (!recipient) throw new BridgeError('invalid_recipient', 422);
+            let content = { text };
+            if (media) {
+                try { content = { ...readDocument(media, this.documentRoot), caption: text }; }
+                catch (error) { throw new BridgeError(error instanceof DocumentError ? error.code : 'document_unavailable', 422); }
+            }
             this.store.reserve(id, fingerprint);
             try {
-                const result = await socket.sendMessage(recipient.jid, { text }, { messageId: id.replaceAll('-', '').toUpperCase() });
+                if (media?.location) {
+                    const l = media.location;
+                    const locationId = createHash('sha256').update(id + '|location').digest('hex').slice(0, 32).toUpperCase();
+                    const locationResult = await socket.sendMessage(recipient.jid, { location: {
+                        degreesLatitude: l.latitude, degreesLongitude: l.longitude, name: l.name, address: l.address,
+                    } }, { messageId: locationId });
+                    if (!locationResult?.key?.id) throw new Error('no_ack');
+                }
+                const result = await socket.sendMessage(recipient.jid, content, { messageId: id.replaceAll('-', '').toUpperCase(),
+                    ...(media ? { mediaUploadTimeoutMs: 40000 } : {}) });
                 if (!result?.key?.id) throw new Error('no_ack');
                 this.store.finish(id, 'sent', result.key.id);
                 return { id, status: 'sent' };

@@ -25,7 +25,7 @@ class WhatsAppChannel
                 return;
             }
             $this->dispatcher->enqueue((string) $to, $message->text, $message->idempotencyKey, $message->eventKey,
-                deliveryPolicy: $message->deliveryPolicy);
+                deliveryPolicy: $message->deliveryPolicy, document: $message->document);
         } catch (Throwable) {
             Log::warning('No fue posible preparar la notificación WhatsApp.', ['code' => 'channel_unavailable']);
         }
