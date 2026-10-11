@@ -1,5 +1,9 @@
 /.phpunit.cache
 /node_modules
+/services/whatsapp/node_modules
+/services/whatsapp/data
+/storage/app/private/whatsapp
+/services/whatsapp/service.env
 /public/hot
 /public/storage
 /storage/*.key

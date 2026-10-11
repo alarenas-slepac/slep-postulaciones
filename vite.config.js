@@ -23,6 +23,8 @@ export default defineConfig({
                 'resources/js/votaciones-admin-rutas.js',
                 'resources/css/dotacion-establecimiento.css',
                 'resources/js/dotacion-asignacion.js',
+                'resources/css/whatsapp-admin.css',
+                'resources/js/whatsapp-admin.js',
             ],
             refresh: true,
         }),

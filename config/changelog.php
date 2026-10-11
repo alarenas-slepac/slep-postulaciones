@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.2.563',
+    'current_version' => '2026.10.10.584',
     'entries' => [
+        [
+            'version' => '2026.10.10.584',
+            'title' => 'WhatsApp de notificaciones mediante dispositivo vinculado',
+            'summary' => 'Integra un servicio Baileys privado y una pantalla administrativa para vincular por QR y probar envíos en cola.',
+            'roles' => ['admin'],
+            'items' => [
+                'Integración desactivada por defecto; permiso whatsapp.manage, vinculación desde Messenger y envío sólo a un destinatario ingresado expresamente.',
+                'Sesión SQLite privada, autenticación entre Laravel y Node, reconexiones limitadas y una sola instancia.',
+                'Cola dedicada con datos cifrados, claves persistentes de deduplicación y bloqueo de reenvíos cuando el resultado es incierto.',
+                'No activa eventos automáticos ni reutiliza teléfonos históricos como destinatarios autorizados.',
+                'Incluye pruebas sin mensajes reales y guía de requisitos, instalación, recuperación y diagnóstico para cPanel.',
+            ],
+            'published_at' => '2026-10-10',
+        ],
         [
             'version' => '2026.10.2.563',
             'title' => 'Acceso protegido y reemplazo seguro de documentos',
