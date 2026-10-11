@@ -8,4 +8,7 @@ return [
     'timeout' => (int) env('WHATSAPP_TIMEOUT', 15),
     'queue_connection' => env('WHATSAPP_QUEUE_CONNECTION', 'database'),
     'queue' => env('WHATSAPP_QUEUE', 'whatsapp'),
+    'reemplazos' => [
+        'enabled' => (bool) env('WHATSAPP_REEMPLAZOS_ENABLED', false),
+    ],
 ];

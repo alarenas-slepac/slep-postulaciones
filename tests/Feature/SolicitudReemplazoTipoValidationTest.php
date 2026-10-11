@@ -10,6 +10,7 @@ use App\Models\Establecimiento;
 use App\Models\ReemplazoPersonal;
 use App\Models\SolicitudReemplazo;
 use App\Support\TipoReemplazo;
+use App\Services\WhatsApp\ReemplazoWhatsAppNotifier;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -101,6 +102,51 @@ class SolicitudReemplazoTipoValidationTest extends IsolatedSecurityTestCase
         $this->assertSame('44.00', $solicitud->jornadas->sole()->reemplazo_total);
         Storage::disk('local')->assertExists([$solicitud->oficio_pdf_path, $solicitud->respaldo_pdf_path]);
         Mail::assertSent(SolicitudReemplazoCreada::class);
+    }
+
+    public function test_creation_prepares_whatsapp_after_request_and_hours_inside_transaction(): void
+    {
+        $this->mock(ReemplazoWhatsAppNotifier::class, function ($mock): void {
+            $mock->shouldReceive('notify')->once()->withArgs(fn ($solicitud, $event) =>
+                $event === 'created' && $solicitud->estado === 'pendiente_uatp'
+                && $solicitud->jornadas()->exists() && DB::transactionLevel() > 0);
+        });
+        $this->post(route('funcionario.solicitudes-reemplazo.store'), $this->payload(TipoReemplazo::REPOSO_MUTUALIDAD))
+            ->assertRedirect()->assertSessionHasNoErrors();
+        Mail::assertSent(SolicitudReemplazoCreada::class);
+    }
+
+    #[DataProvider('correctionStages')]
+    public function test_correction_notifies_return_stage_once_and_keeps_existing_uatp_approval(string $stage, string $state, string $event): void
+    {
+        Schema::table('roles', fn (Blueprint $table) => $table->timestamps());
+        foreach (['2026_04_08_223000_add_plani_validation_workflow_to_solicitudes_reemplazo.php',
+            '2026_07_06_130000_add_devolucion_historial_to_solicitudes_reemplazo.php'] as $migration) {
+            (require database_path('migrations/'.$migration))->up();
+        }
+        $solicitud = $this->existingRequest(TipoReemplazo::ENFERMEDAD_ACCIDENTE_COMUN);
+        $solicitud->update(['estado' => $state, 'retornar_a_etapa' => $stage,
+            'justificacion_tecnica_uatp' => 'Aprobación UATP histórica de prueba']);
+        $this->mock(ReemplazoWhatsAppNotifier::class, function ($mock) use ($event): void {
+            $mock->shouldReceive('notify')->once()->withArgs(fn ($record, $actualEvent) =>
+                $actualEvent === $event && DB::transactionLevel() > 0);
+        });
+        $payload = $this->payload(TipoReemplazo::ENFERMEDAD_ACCIDENTE_COMUN, false) + ['action' => 'reenviar'];
+        $this->put(route('funcionario.solicitudes-reemplazo.update', $solicitud), $payload)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame($stage === 'plani' ? 'pendiente_validacion' : 'pendiente_uatp', $solicitud->fresh()->estado);
+        if ($stage === 'plani') {
+            $this->assertSame('Aprobación UATP histórica de prueba', $solicitud->fresh()->justificacion_tecnica_uatp);
+        } else {
+            // Un segundo submit en pendiente UATP no genera otro aviso de corrección.
+            $this->put(route('funcionario.solicitudes-reemplazo.update', $solicitud), $payload)
+                ->assertRedirect()->assertSessionHasNoErrors();
+        }
+    }
+
+    public static function correctionStages(): array
+    {
+        return [['uatp', 'rechazada_uatp', 'corregida_uatp'], ['plani', 'rechazada_plani', 'corregida_plani']];
     }
 
     public function test_it_updates_a_request_to_mutualidad_without_changing_its_documents(): void

@@ -90,3 +90,64 @@ Las pruebas usan directorios temporales y una sesión nueva en `idle`, sin QR ni
 ### Condiciones aún pendientes
 
 Instalar y comprobar el cron **del puente real**, su supervivencia al cerrar Terminal, recuperación `connected` sin QR después de `restart`, recuperación tras reiniciar el servidor, política del proveedor para procesos continuos, persistencia y permisos efectivos del disco, acceso SSH si se necesita y cola productiva. La entrega real de mensajes requiere su prueba expresa del paso 15. La selección de eventos, destinatarios y preferencias permanece pendiente: no hay envíos automáticos activados.
+
+## Diagnóstico Laravel con el módulo habilitado: versión 2026.10.11.588
+
+Rama local: `docs/whatsapp-diagnostico-laravel`. El operador compartió el fallo genérico del paso 13. El bloque anterior rechazaba la configuración cuando `whatsapp.enabled` era verdadero, antes de consultar Node; la salida recibida no permite determinar si ésa fue la causa en el hosting. Se corrige el diagnóstico para admitir ambos estados de activación, conservar el acceso exclusivo a loopback y clasificar errores sin mostrar token, QR, cuerpo de respuesta ni detalles de excepciones. La consulta sigue siendo únicamente `GET /v1/status`.
+
+Validación local el 11 de octubre de 2026 con PHP 8.3.30 y Node 22.22.0:
+
+- El bloque PHP extraído de la guía pasó **13 escenarios** con Laravel real y HTTP simulado: desactivado/idle, habilitado/connected, habilitado/reconnecting, URL inválida, token ausente o inválido, HTTP 401 y 403, conexión fallida, HTTP 500, estado inválido, JSON inválido y fallo de arranque. Se comprueba la petición GET autenticada, su ausencia ante configuración inválida y que no se impriman valores sensibles sintéticos.
+- El diagnóstico PHP y `config/changelog.php` tienen sintaxis válida. Los **34 bloques Bash** de la guía pasan `bash -n`, sin ejecutar instalación ni conexiones al hosting.
+- `ChangeLogLazyTest.php`: **5 pruebas y 53 aserciones** correctas con SQLite en memoria. `php artisan optimize:clear` con `CACHE_STORE=file`: correcto; MySQL local no está disponible.
+- Se conserva el contenido de los **319 registros históricos y las 605 entradas anteriores**. Diff revisado; `.env` y los tres PDF locales previos conservan sus hashes y quedan fuera del cambio, al igual que credenciales, dependencias, logs y archivos de usuarios.
+
+No cambian el código de envío, las rutas ni los assets compilados; no corresponde repetir suites Node, listado de rutas o build. El resultado del nuevo diagnóstico en el hosting sigue pendiente de la ejecución del operador. No se cambió configuración productiva, reiniciaron servicios, generaron QR ni enviaron mensajes.
+
+## Actualización 2026.10.11.589: notificaciones automáticas de reemplazos
+
+El operador informó `Integracion: habilitada`, caché de configuración activa y `Laravel conecta autenticado. Estado: connected`. Después autorizó implementar avisos de reemplazos al responsable de la siguiente etapa y una preferencia individual para los cuatro roles existentes. Esto acredita lo informado sobre la conexión previa; la instalación y recepción de los nuevos eventos todavía necesitan validación manual en el hosting.
+
+Validación local con PHP 8.3.30 y Node 22.22.0, sin mensajes reales:
+
+- `ReemplazoWhatsAppNotificationsTest`, `WhatsAppIntegrationTest`, `SolicitudReemplazoTipoValidationTest`, `FuncionarioAcDirectoryRolesTest` y `ChangeLogLazyTest`: **112 pruebas, 875 aserciones, todas correctas**. SQLite en memoria, almacenamiento ficticio, HTTP bloqueado salvo respuestas simuladas y cola simulada. Se ejercitan las rutas reales de aprobación, validación, derivación, reasignación, reapertura, creación, corrección y edición de preferencias.
+- Se verifican los flags inicialmente falsos, independencia de `enviar_notificacion`, cuatro roles exactos, autorización vigente, correo verificado, acceso al módulo, identidad histórica única, conflictos de vínculo, deduplicación por teléfono, resumen con enlace HTTPS, cifrado del payload y job con sólo UUID.
+- Doce escenarios de formato telefónico comprueban añadir `+56` o sólo `+`, conservar internacionales explícitos, retirar separadores y rechazar números incompletos, anexos y listas. Un rechazo `invalid_recipient` del servicio es definitivo. La suite Node comprueba además que `onWhatsApp` impide enviar a un número inexistente.
+- Se comprueban rollback sin job, repetición de acciones sin segundo aviso, reintento con el mismo UUID/Bearer, ausencia de política interna en HTTP, fallos sin impedir el trámite y cancelaciones al cambiar flag, teléfono, autorización, rol, acceso, cuenta, etapa o asignación.
+- `npm test` en `services/whatsapp`: **26 pruebas correctas**, con sockets sintéticos; incluye deduplicación, recuperación y bloqueo del proceso. No se modifican dependencias, sesión ni código Node.
+- `php -l`: **18 archivos PHP/Blade nuevos o modificados correctos**. El editor se renderiza en una prueba HTTP; se comprueban etiqueta asociada, ayuda accesible y casilla inicialmente desmarcada. No se realizó revisión visual con navegador en escritorio/móvil.
+- `php artisan route:list --except-vendor`: correcto, **766 rutas**. No se agregan ni eliminan rutas ni permisos. `php artisan optimize:clear` con `CACHE_STORE=file`: correcto. No se modifican assets compilados; no corresponde `npm run build`.
+- `git diff --check`: correcto. Se conservan los **319 registros históricos y las 606 entradas anteriores** del changelog, incluida la documentación local previa 588. La comparación del contenido histórico mantiene SHA-256 `ae0753dd97f30139391e45bc4a3505d81acc62ab80f5aa6fd14f2da10e4cb0db`.
+- Los **36 bloques Bash** de las dos guías pasan `bash -n`, sin ejecutar comandos de despliegue. La comparación estructural de los dos controladores de reemplazos verifica 146 métodos: sólo cambian los ocho puntos de integración del catálogo; no se elimina ningún método ni se modifica el cuerpo de los restantes.
+- `.env` y los tres PDF locales previos conservan sus hashes. No se incluyen datos de usuarios, credenciales, logs, `vendor` ni `node_modules` en el parche. Rama: `feat/whatsapp-reemplazos-notificaciones`.
+
+No se pudo ejecutar contra MySQL local porque no está disponible, ni comprobar bloqueos concurrentes con MySQL, el worker productivo, la migración en cPanel, los nuevos mensajes reales o la apertura del enlace desde el iPhone. No se modificó producción ni se regeneró QR. El operador conserva la sesión ya vinculada; la guía [WHATSAPP_NOTIFICACIONES_REGLAS.md](WHATSAPP_NOTIFICACIONES_REGLAS.md) indica la migración, selección por ficha y activación del módulo.
+
+### Archivos del parche
+
+Nuevos:
+
+- `database/migrations/2026_10_11_150000_add_whatsapp_reemplazos_preference.php`
+- `app/Services/WhatsApp/ReemplazoWhatsAppRecipients.php`
+- `app/Services/WhatsApp/ReemplazoWhatsAppNotifier.php`
+- `app/Notifications/ReemplazoWhatsAppNotification.php`
+- `tests/Feature/ReemplazoWhatsAppNotificationsTest.php`
+- `docs/WHATSAPP_NOTIFICACIONES_REGLAS.md`
+
+Modificados, incluyendo las instrucciones de diagnóstico local previas conservadas:
+
+- `app/Models/FuncionarioAcAutorizado.php`
+- `app/Http/Controllers/FuncionarioAcAutorizadoController.php`
+- `app/Http/Controllers/FuncionarioEstab/SolicitudReemplazoController.php`
+- `app/Http/Controllers/Gestion/SolicitudReemplazoGestionController.php`
+- `app/Notifications/Channels/WhatsAppChannel.php`
+- `app/Notifications/Messages/WhatsAppText.php`
+- `app/Services/WhatsApp/WhatsAppDispatcher.php`
+- `app/Jobs/SendWhatsAppMessage.php`
+- `config/whatsapp.php`
+- `config/changelog.php`
+- `resources/views/tramites/cargas-familiares/funcionarios-ac/edit.blade.php`
+- `resources/views/admin/whatsapp/index.blade.php`
+- `tests/Feature/SolicitudReemplazoTipoValidationTest.php`
+- `docs/WHATSAPP_CPANEL.md`
+- `docs/WHATSAPP_VALIDACION.md`

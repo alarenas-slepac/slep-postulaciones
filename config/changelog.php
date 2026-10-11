@@ -6457,8 +6457,34 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.11.587',
+    'current_version' => '2026.10.11.589',
     'entries' => [
+        [
+            'version' => '2026.10.11.589',
+            'title' => 'Reemplazos: avisos WhatsApp al responsable de la siguiente etapa',
+            'summary' => 'Permite seleccionar funcionarios autorizados para recibir avisos automáticos de reemplazos, con fechas, continuidad y enlace al SGA.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Agrega una preferencia individual de WhatsApp para reemplazos en la nómina AC, inicialmente desactivada y separada de enviar_notificacion; exige cuenta verificada, autorización vigente, rol y acceso al módulo.',
+                'Notifica creación a UATP, aprobación a Planificación, validación a GDP y derivación o reasignación sólo al funcionario asignado; incorpora correcciones y reaperturas de UATP y Planificación.',
+                'Normaliza teléfonos chilenos antes de encolar, omite formatos incompletos y mantiene la consulta de existencia en WhatsApp previa al envío.',
+                'Conserva colas cifradas, confirmación transaccional, UUID de reintento y deduplicación; cancela pendientes si cambian preferencia, teléfono, autorización, rol, acceso, etapa o asignación.',
+                'Documenta la regla reutilizable, los eventos que requieren decisión adicional y la activación por WHATSAPP_REEMPLAZOS_ENABLED, sin modificar producción ni enviar mensajes reales en pruebas.',
+            ],
+            'published_at' => '2026-10-11',
+        ],
+        [
+            'version' => '2026.10.11.588',
+            'title' => 'WhatsApp: diagnóstico Laravel después de la vinculación',
+            'summary' => 'Corrige el paso 13 para consultar el puente con la integración habilitada o desactivada.',
+            'roles' => ['admin'],
+            'items' => [
+                'Elimina el rechazo previo cuando el módulo ya está habilitado; la consulta sigue siendo de sólo lectura y no genera QR ni envíos.',
+                'Distingue fallos de arranque, URL, token, conexión, autenticación HTTP y respuesta sin mostrar credenciales ni detalles sensibles.',
+                'Informa activación y uso de caché para revisar la configuración efectiva, preservando la sesión vinculada.',
+            ],
+            'published_at' => '2026-10-11',
+        ],
         [
             'version' => '2026.10.11.587',
             'title' => 'WhatsApp: inicio del puente real mediante Cron Jobs',

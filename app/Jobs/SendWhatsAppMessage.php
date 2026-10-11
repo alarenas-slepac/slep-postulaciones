@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\WhatsAppDispatch;
+use App\Models\SolicitudReemplazo;
+use App\Services\WhatsApp\ReemplazoWhatsAppRecipients;
 use App\Services\WhatsApp\WhatsAppClient;
 use App\Services\WhatsApp\WhatsAppException;
 use Illuminate\Bus\Queueable;
@@ -43,8 +45,29 @@ class SendWhatsAppMessage implements ShouldQueue
                 $dispatch->finish('failed', 'invalid_message');
                 return;
             }
+            if (isset($payload['policy'])) {
+                $policy = $payload['policy'];
+                if (($policy['scope'] ?? '') !== 'reemplazos') {
+                    $dispatch->finish('cancelled', 'invalid_policy');
+                    return;
+                }
+                if (!config('whatsapp.reemplazos.enabled')) {
+                    $dispatch->finish('cancelled', 'event_disabled');
+                    return;
+                }
+                $solicitud = SolicitudReemplazo::find($policy['solicitud_id'] ?? 0);
+                if (!$solicitud || $solicitud->estado !== ($policy['state'] ?? '')
+                    || (!empty($policy['assigned']) && (int) $solicitud->derivada_a_user_id !== (int) ($policy['user_id'] ?? 0))) {
+                    $dispatch->finish('cancelled', 'stage_changed');
+                    return;
+                }
+                if (!app(ReemplazoWhatsAppRecipients::class)->stillEligible($policy, $payload['to'])) {
+                    $dispatch->finish('cancelled', 'recipient_ineligible');
+                    return;
+                }
+            }
             $dispatch->update(['status' => 'sending', 'error_code' => null]);
-            $result = $client->request('POST', 'messages', ['id' => $dispatch->id] + $payload);
+            $result = $client->request('POST', 'messages', ['id' => $dispatch->id, 'to' => $payload['to'], 'text' => $payload['text']]);
             if (($result['status'] ?? '') !== 'sent') {
                 throw new WhatsAppException('delivery_unknown');
             }

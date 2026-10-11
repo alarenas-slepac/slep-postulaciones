@@ -110,6 +110,32 @@
                     </div>
                 </div>
 
+                @if($whatsappPreferenceAvailable ?? false)
+                    <section class="card border shadow-sm rounded-4 mb-4" aria-labelledby="whatsapp-reemplazos-title">
+                        <div class="card-header bg-white p-4 border-bottom rounded-top-4">
+                            <h2 id="whatsapp-reemplazos-title" class="h5 fw-bold mb-0">
+                                <i class="bi bi-whatsapp text-primary me-2" aria-hidden="true"></i>Notificaciones de reemplazos
+                            </h2>
+                        </div>
+                        <div class="card-body p-4">
+                            <input type="hidden" name="notificar_whatsapp_reemplazos" value="0">
+                            <div class="form-check">
+                                <input type="checkbox" id="notificar_whatsapp_reemplazos" name="notificar_whatsapp_reemplazos" value="1"
+                                    class="form-check-input @error('notificar_whatsapp_reemplazos') is-invalid @enderror"
+                                    aria-describedby="whatsapp-reemplazos-help @error('notificar_whatsapp_reemplazos') whatsapp-reemplazos-error @enderror"
+                                    @checked(old('notificar_whatsapp_reemplazos', $funcionarioAc->notificar_whatsapp_reemplazos ?? false))>
+                                <label for="notificar_whatsapp_reemplazos" class="form-check-label fw-semibold">Recibir WhatsApp de solicitudes de reemplazo</label>
+                                @error('notificar_whatsapp_reemplazos')
+                                    <div id="whatsapp-reemplazos-error" class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <p id="whatsapp-reemplazos-help" class="form-text mb-0 mt-3">
+                                Se utiliza el teléfono de esta ficha: 9XXXXXXXX, 569XXXXXXXX o un número internacional con +. Requiere autorización vigente y una cuenta verificada con acceso a Gestión Solicitudes y rol coordinador UATP, supervisor de Planificación, coordinador GDP o funcionario SLEP. Los avisos llegan cuando corresponde gestionar la siguiente etapa.
+                            </p>
+                        </div>
+                    </section>
+                @endif
+
                 <div class="card border-0 shadow-sm rounded-4">
                     <div class="card-header bg-white border-0 p-4 border-bottom">
                         <div class="text-uppercase text-muted small fw-bold">Datos administrativos</div>

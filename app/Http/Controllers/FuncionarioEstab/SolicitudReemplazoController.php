@@ -28,6 +28,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\RestrictedRutService;
 use App\Support\ReemplazoSolicitudReglaMinima;
 use App\Support\TipoReemplazo;
+use App\Services\WhatsApp\ReemplazoWhatsAppNotifier;
 
 class SolicitudReemplazoController extends Controller
 {
@@ -449,6 +450,7 @@ class SolicitudReemplazoController extends Controller
                     'reemplazo_total'  => $totalIn,
                 ]);
             }
+            app(ReemplazoWhatsAppNotifier::class)->notify($solicitud, 'created');
         });
 
         // Email + PDF resumen (requiere motor PDF, ver sección 7)
@@ -803,6 +805,8 @@ class SolicitudReemplazoController extends Controller
         $correccionObservacion = trim((string) ($request->input('correccion_establecimiento_observacion') ?: $request->input('observaciones', '')));
 
         DB::transaction(function () use ($request, $solicitud, $titular, $inicio, $termino, $propone, $distTitular, $jornadasIn, $action, $estadoAnterior, $retornarAEtapa, $estadoReenvio, $correccionObservacion, $horasAulaCronologicasTitular, $horasAulaPedagogicasTitular, $horasAulaCronologicasReemplazo, $horasAulaPedagogicasReemplazo, $titularEsDocente, $resultadoRegla) {
+            $solicitud = SolicitudReemplazo::whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+            abort_unless($solicitud->estado === $estadoAnterior, 422, 'La etapa cambió. Recargue la solicitud antes de guardar.');
 
             // Archivos (si vienen, reemplazan)
             $dir = "reemplazos/solicitudes/{$solicitud->id}";
@@ -929,6 +933,10 @@ class SolicitudReemplazoController extends Controller
                     'observacion' => $observacionHistorial,
                     'user_id' => auth()->id(),
                 ]);
+                if ($estadoAnterior !== $estadoReenvio) {
+                    app(ReemplazoWhatsAppNotifier::class)->notify($solicitud,
+                        $retornarAEtapa === 'plani' ? 'corregida_plani' : 'corregida_uatp');
+                }
             }
         });
 

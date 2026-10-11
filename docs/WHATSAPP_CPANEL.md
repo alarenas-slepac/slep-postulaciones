@@ -394,37 +394,61 @@ Después de modificar código o configuración:
 /opt/cpanel/ea-php83/root/usr/bin/php /home/slepac/apps/slep_postulaciones/artisan queue:restart
 ~~~
 
-## Paso 13. Comprobar comunicación desde Laravel sin activar envíos — usuario cPanel
+## Paso 13. Comprobar comunicación desde Laravel — diagnóstico de sólo lectura
 
-El diagnóstico de Node no prueba el acceso desde PHP. Este bloque carga la configuración efectiva de Laravel y consulta sólo el estado autenticado, sin imprimir credenciales, QR ni cuerpos HTTP:
+El diagnóstico de Node no prueba el acceso desde PHP. Este bloque carga la configuración efectiva de Laravel y consulta sólo el estado autenticado. Funciona con la integración habilitada o desactivada, no modifica configuración, no genera QR ni envía mensajes. Informa la activación y el uso de caché, y distingue errores sin imprimir credenciales, QR, cuerpos HTTP ni excepciones sin filtrar.
+
+El bloque anterior exigía `WHATSAPP_ENABLED=false`: si se repetía después de vincular y habilitar el módulo, fallaba antes de consultar Node. No desactivar una instalación vinculada para diagnosticarla; usar este bloque:
 
 ~~~bash
 /opt/cpanel/ea-php83/root/usr/bin/php <<'PHP'
 <?php
+$failure = 'ARRANQUE: no se pudo cargar Laravel; revisar rutas, dependencias y PHP 8.3.';
 try {
     require '/home/slepac/apps/slep_postulaciones/vendor/autoload.php';
     $app = require '/home/slepac/apps/slep_postulaciones/bootstrap/app.php';
     $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-    if (config('whatsapp.enabled') || config('whatsapp.url') !== 'http://127.0.0.1:3210') {
+    echo 'Integracion: '.(config('whatsapp.enabled') ? 'habilitada' : 'desactivada').PHP_EOL;
+    echo 'Cache de configuracion: '.($app->configurationIsCached() ? 'si' : 'no').PHP_EOL;
+    $failure = 'URL: configurar WHATSAPP_SERVICE_URL=http://127.0.0.1:3210 y revisar la cache de Laravel.';
+    if (config('whatsapp.url') !== 'http://127.0.0.1:3210') {
         throw new \RuntimeException('configuration');
     }
-    $response = \Illuminate\Support\Facades\Http::withToken((string) config('whatsapp.token'))
+    $token = (string) config('whatsapp.token');
+    $failure = 'TOKEN: falta un token valido en la configuracion efectiva de Laravel; revisar el editor privado y la cache.';
+    if (!preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $token)) {
+        throw new \RuntimeException('configuration');
+    }
+    $failure = 'CONEXION: PHP no pudo consultar Node; revisar cron, puerto 3210 y acceso loopback/CageFS.';
+    $response = \Illuminate\Support\Facades\Http::withToken($token)
         ->connectTimeout(3)->timeout(15)->withoutRedirecting()
         ->get('http://127.0.0.1:3210/v1/status');
+    $http = $response->status();
+    if (in_array($http, [401, 403], true)) {
+        $failure = 'AUTENTICACION: HTTP '.$http.'; revisar coincidencia del token efectivo de Laravel con el servicio Node y su cache.';
+        throw new \RuntimeException('authentication');
+    }
+    if (!$response->successful()) {
+        $failure = 'HTTP: respuesta '.$http.'; revisar servicio y ruta privada, sin publicar el puerto.';
+        throw new \RuntimeException('communication');
+    }
+    $failure = 'RESPUESTA: HTTP '.$http.' sin un estado reconocido; revisar que responda el puente correcto.';
     $state = $response->json('state');
     $allowed = ['idle', 'connecting', 'qr', 'connected', 'reconnecting', 'paused', 'logged_out', 'unlinked'];
-    if (!$response->successful() || !in_array($state, $allowed, true)) {
+    if (!in_array($state, $allowed, true)) {
         throw new \RuntimeException('communication');
     }
     echo 'Laravel conecta autenticado. Estado: '.$state.PHP_EOL;
 } catch (\Throwable $exception) {
-    file_put_contents('php://stderr', 'Fallo de comprobacion: revisar proceso, token, cache de configuracion y loopback con el proveedor.'.PHP_EOL);
+    file_put_contents('php://stderr', $failure.PHP_EOL);
     exit(1);
 }
 PHP
 ~~~
 
-Esperado para una sesión nueva: **Laravel conecta autenticado. Estado: idle**. Si Node responde pero PHP no, revisar CageFS/aislamiento, token y caché con el proveedor; no publicar el puerto para resolverlo.
+Esperado para una sesión nueva: **Laravel conecta autenticado. Estado: idle**; para la sesión vinculada, normalmente **Estado: connected**. Un estado válido como `reconnecting` confirma comunicación autenticada, pero no conexión estable con WhatsApp.
+
+Si falla, compartir únicamente estas líneas de salida. `AUTENTICACION` indica un rechazo HTTP 401/403; `CONEXION` indica que PHP no obtuvo respuesta; `URL` o `TOKEN` señalan configuración efectiva inválida. Si se corrigió el archivo privado de Laravel y muestra que usa caché, reconstruirla con el comando `config:cache` del paso 14; no basta con editar el archivo. Si Node responde pero PHP no, revisar CageFS/aislamiento con el proveedor. No publicar el puerto, rotar tokens, borrar la sesión ni generar un QR para resolver un error del diagnóstico.
 
 La pantalla web sólo consultará el puente cuando la integración se habilite. Si PHP CLI y PHP web están aislados de forma diferente, comprobar también el estado de la pantalla en el siguiente paso antes de escanear.
 
@@ -545,9 +569,9 @@ Los jobs reintentan fallos de desconexión hasta cinco veces, con esperas de 30,
 
 Node escucha sólo en **127.0.0.1**. No crear un proxy público, túnel, regla de Apache ni apertura del puerto 3210. No habilitar depuración de Baileys/libsignal ni registrar credenciales, QR, objetos de sesión o cuerpos de mensajes.
 
-## Eventos automáticos: decisión pendiente
+## Eventos automáticos
 
-Se entrega el canal y la prueba manual. Falta definir eventos concretos, destinatarios autorizados, preferencias/consentimiento, contenido y tratamiento de datos. No interpretar teléfonos históricos ni el campo genérico `enviar_notificacion` como consentimiento para WhatsApp.
+Las solicitudes de reemplazo incorporan avisos al responsable de la siguiente etapa, desactivados por defecto mediante `WHATSAPP_REEMPLAZOS_ENABLED=false`, y selección individual mediante `funcionarios_ac_autorizados.notificar_whatsapp_reemplazos`. La matriz de eventos, regla reutilizable y activación paso a paso están en [WHATSAPP_NOTIFICACIONES_REGLAS.md](WHATSAPP_NOTIFICACIONES_REGLAS.md). Instalar la migración nueva y seleccionar las fichas antes de habilitar ese flag. No interpretar teléfonos históricos ni el campo genérico `enviar_notificacion` como consentimiento para WhatsApp. Los demás módulos requieren definir sus eventos y preferencias.
 
 Para incorporar después un evento, conservar sus correos/trámites y agregar `App\Notifications\Channels\WhatsAppChannel` a sus canales. El notificable debe tener una ruta explícita `routeNotificationForWhatsApp($notification)` que valide su preferencia; la notificación debe implementar `toWhatsApp($notifiable)` y devolver `App\Notifications\Messages\WhatsAppText`.
 

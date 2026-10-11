@@ -87,7 +87,11 @@
             </section>
         </div>
     </div>
-    <div class="alert alert-info mt-4 mb-0"><i class="bi bi-bell me-2" aria-hidden="true"></i>Los eventos automáticos están pendientes de definición: evento, destinatario y preferencia para recibir WhatsApp. Esta pantalla permite comprobar la conexión y un envío dirigido.</div>
+    <div class="alert alert-info mt-4 mb-0" role="status">
+        <i class="bi bi-bell me-2" aria-hidden="true"></i>Los eventos automáticos de reemplazos están
+        <strong>{{ config('whatsapp.enabled') && config('whatsapp.reemplazos.enabled') ? 'habilitados' : 'desactivados' }}</strong> por configuración.
+        Sólo reciben avisos los funcionarios seleccionados en la nómina de funcionarios AC autorizados, con teléfono válido, autorización vigente y rol responsable de la etapa. Otros módulos requieren definir sus propios eventos y preferencias.
+    </div>
 </div>
 @endsection
 
