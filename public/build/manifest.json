@@ -2231,6 +2231,15 @@
       "votaciones-publicas.css"
     ]
   },
+  "resources/css/whatsapp-admin.css": {
+    "file": "assets/whatsapp-admin-B2JxymnP.css",
+    "src": "resources/css/whatsapp-admin.css",
+    "isEntry": true,
+    "name": "whatsapp-admin",
+    "names": [
+      "whatsapp-admin.css"
+    ]
+  },
   "resources/fonts/Gilmer-Bold.otf": {
     "file": "assets/Gilmer-Bold-DZRjtHOG.otf",
     "src": "resources/fonts/Gilmer-Bold.otf"
@@ -2297,6 +2306,12 @@
     "imports": [
       "_leaflet-Bu0uVQ8k.js"
     ]
+  },
+  "resources/js/whatsapp-admin.js": {
+    "file": "assets/whatsapp-admin-CirOB12h.js",
+    "name": "whatsapp-admin",
+    "src": "resources/js/whatsapp-admin.js",
+    "isEntry": true
   },
   "resources/scss/app.scss": {
     "file": "assets/app-gsxBnehD.css",

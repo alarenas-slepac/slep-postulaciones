@@ -1,0 +1,27 @@
+[Unit]
+Description=SGA WhatsApp bridge (single linked device)
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=slepac
+Group=slepac
+WorkingDirectory=/home/slepac/apps/slep_postulaciones/services/whatsapp
+# Confirmar esta ruta con el proveedor; Node >=22.13.0, preferentemente Node 22 LTS.
+ExecStart=/opt/cpanel/ea-nodejs22/bin/node --env-file=/home/slepac/.config/sga-whatsapp/service.env src/index.js
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/slepac/.local/share/sga-whatsapp
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
