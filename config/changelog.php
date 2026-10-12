@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.11.591',
+    'current_version' => '2026.10.12.592',
     'entries' => [
+        [
+            'version' => '2026.10.12.592',
+            'title' => 'PIE: comparación editable de cursos entre dos años',
+            'summary' => 'Permite a administrador y coordinador UATP comparar un establecimiento, editar NEET/NEEP de ambos años y guardar todos los cambios juntos.',
+            'roles' => ['admin', 'coordinador_uatp'],
+            'items' => [
+                'Agrega Comparar años al listado PIE sólo para los dos roles autorizados, con selección de establecimiento por RBD/nombre y años configurables.',
+                'Compara el mismo nivel y letra, muestra cursos sin contraparte y actualiza al instante estudiantes, horas crono, Educador Diferencial y PAEC por año y sus diferencias.',
+                'Reutiliza el cálculo vigente JEC/SIN JEC/EPJA, conserva horas históricas al dejar un registro sin cambios y distingue horas pendientes de cálculo de cero.',
+                'Guarda NEET/NEEP en una transacción, valida matrícula, alcance e integridad y rechaza datos concurrentes o formularios incompletos; conserva estado, observación y creador.',
+                'Incluye controles por rol activo y módulo, vista previa sin escrituras y pruebas aisladas de cálculos, permisos, concurrencia y reversión de lotes.',
+            ],
+            'published_at' => '2026-10-12',
+        ],
         [
             'version' => '2026.10.11.591',
             'title' => 'Administración: catálogo y configuración de eventos de notificaciones',

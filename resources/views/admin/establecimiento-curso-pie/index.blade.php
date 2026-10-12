@@ -8,6 +8,11 @@
         </div>
         @if ($canEditPie)
             <div class="d-flex flex-wrap gap-2">
+                @if (in_array($activeRole, ['admin', 'coordinador_uatp'], true))
+                    <a class="btn btn-outline-secondary pc-comparison-link" href="{{ route('admin.establecimiento-curso-pie.comparison', ['establecimiento_id' => $establecimientoId ?: null, 'anio_a' => $anio ?: now()->year, 'anio_b' => (int) ($anio ?: now()->year) + 1]) }}">
+                        <i class="bi bi-layout-split" aria-hidden="true"></i> Comparar años
+                    </a>
+                @endif
                 <a class="btn btn-outline-success" href="{{ route('admin.establecimiento-curso-pie.template') }}">
                     <i class="bi bi-file-earmark-excel"></i> Plantilla
                 </a>
@@ -389,6 +394,7 @@
 @endsection
 
 @push('styles')
+@vite('resources/css/pie-comparison.css')
 <style>
     .filtros-pie-card .form-label {
         margin-bottom: .35rem;

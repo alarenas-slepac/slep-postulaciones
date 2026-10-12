@@ -39,6 +39,11 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
                 ->first(fn (string $middleware) => str_starts_with($middleware, 'ensure.role:'));
 
             $this->assertNotNull($roleMiddleware, "La ruta {$routeName} no tiene middleware de rol.");
+            if (str_starts_with($routeName, 'admin.establecimiento-curso-pie.comparison')) {
+                // Comparación y guardado conjunto: reservados expresamente a admin y UATP.
+                $this->assertStringNotContainsString('supervisor_plani', $roleMiddleware);
+                continue;
+            }
             $this->assertStringContainsString(
                 'supervisor_plani',
                 $roleMiddleware,
@@ -54,6 +59,11 @@ class SupervisorPlaniDotacionAccessTest extends TestCase
     {
         $user = new class
         {
+            public function can(string $permission): bool
+            {
+                return false;
+            }
+
             public function canModule(string $module, ?string $role = null): bool
             {
                 return true;

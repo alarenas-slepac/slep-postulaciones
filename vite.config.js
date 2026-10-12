@@ -25,6 +25,8 @@ export default defineConfig({
                 'resources/js/dotacion-asignacion.js',
                 'resources/css/whatsapp-admin.css',
                 'resources/css/notification-events.css',
+                'resources/css/pie-comparison.css',
+                'resources/js/pie-comparison.js',
                 'resources/js/whatsapp-admin.js',
             ],
             refresh: true,
