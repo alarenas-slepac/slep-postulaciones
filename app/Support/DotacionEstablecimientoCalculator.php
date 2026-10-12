@@ -80,7 +80,7 @@ class DotacionEstablecimientoCalculator
         ];
     }
 
-    public static function build(Establecimiento $establecimiento, int $anio, bool $incluirResumenAsignaturas = true): array
+    public static function build(Establecimiento $establecimiento, int $anio, bool $incluirResumenAsignaturas = true, bool $incluirConsolidadoAsignaturas = true): array
     {
         $anioPadron = app(PadronPeriodoService::class)->anioDisponibleParaDotacion($anio) ?? $anio;
         $proporcionExcepcion = DocenteHorasNoLectivasCalculator::activeExceptionFor((int) $establecimiento->id, $anio);
@@ -103,7 +103,9 @@ class DotacionEstablecimientoCalculator
             $anio,
             $planNeeds
         );
-        $asignaturas = $incluirResumenAsignaturas
+        // Omitir sólo el consolidado cuando la pestaña no lo consume. Asistentes,
+        // cupos virtuales y cobertura siguen alimentando los indicadores comunes.
+        $asignaturas = $incluirResumenAsignaturas && $incluirConsolidadoAsignaturas
             ? DotacionAsignaturaResumenCalculator::build(
                 $planNeeds,
                 $asignacion['docentes']->concat($asistentes)->values()
@@ -399,7 +401,7 @@ class DotacionEstablecimientoCalculator
         $porcentajePrioritarios = self::porcentajePrioritarios($establecimiento, $anio);
         $cursosConNee = self::cursosConNeeMap($establecimiento, $anio);
         $rows = EstablecimientoCurso::query()
-            ->with(['curso', 'planEstudio'])
+            ->with(['curso', 'planEstudio.asignaturas', 'planEstudio.bloques'])
             ->where('establecimiento_id', $establecimiento->id)
             ->where('anio', $anio)
             ->where('activo', true)

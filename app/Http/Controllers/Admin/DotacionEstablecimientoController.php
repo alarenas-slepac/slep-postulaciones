@@ -273,7 +273,9 @@ class DotacionEstablecimientoController extends Controller
             $allowedTabs[] = 'sobredotacion';
         }
         $tab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'resumen';
-        $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
+        $data = DotacionEstablecimientoCalculator::build(
+            $establecimiento, $anio, true, $tab === 'asignaturas' && ! $request->boolean('proyeccion')
+        );
         $proceso2027 = DotacionProceso2027Calculator::resumen($establecimiento, $anio, $data);
         if ($proceso2027['aplica'] ?? false) {
             $data['docentes'] = collect($proceso2027['docentes'])
@@ -296,7 +298,7 @@ class DotacionEstablecimientoController extends Controller
         $vacanciasPorNoContinuidad = null;
         $anioPadron = (int) data_get($data, 'resumen.anio_padron', $anio);
         if ($continuidadDisponible && $anioPadron === $anio - 1) {
-            $baseVacancias = DotacionEstablecimientoCalculator::build($establecimiento, $anioPadron);
+            $baseVacancias = DotacionEstablecimientoCalculator::build($establecimiento, $anioPadron, true, false);
             $vacanciasPorNoContinuidad = DotacionProyeccionCalculator::build(
                 $baseVacancias,
                 $anioPadron,
