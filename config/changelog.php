@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.12.592',
+    'current_version' => '2026.10.12.593',
     'entries' => [
+        [
+            'version' => '2026.10.12.593',
+            'title' => 'Dotación: carga más rápida de la pestaña Docentes',
+            'summary' => 'Reduce cálculos repetidos y consultas por curso al revisar dotaciones grandes, conservando las horas, permisos y formularios existentes.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Carga y consolida las asignaciones una vez por establecimiento/año dentro de cada consulta de dotación, entregando copias independientes a sus consumidores.',
+                'Consulta las asignaturas personalizadas en lote, conserva la prioridad del vínculo directo y el respaldo histórico y precarga las relaciones de los planes.',
+                'Busca las asignaciones curriculares por su clave y calcula el consolidado por asignatura únicamente en la pestaña que lo utiliza; mantiene asistentes, cupos e indicadores comunes.',
+                'Incluye pruebas con 24 cursos y 90 docentes, controles de integridad y un informe de mediciones locales antes/después; los tiempos efectivos de cPanel requieren comprobación tras el despliegue.',
+            ],
+            'published_at' => '2026-10-12',
+        ],
         [
             'version' => '2026.10.12.592',
             'title' => 'PIE: comparación editable de cursos entre dos años',

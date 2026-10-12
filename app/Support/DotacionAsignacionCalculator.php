@@ -147,6 +147,18 @@ class DotacionAsignacionCalculator
 
     public static function assignmentsFor(Establecimiento $establecimiento, int $anio): Collection
     {
+        $asignaciones = DotacionLecturaCache::recordar(
+            'asignaciones:'.$establecimiento->id.':'.$anio,
+            fn () => self::consultarAsignaciones($establecimiento, $anio)
+        );
+
+        // Cada consumidor recibe sus propias instancias: marcar una asignación
+        // huérfana no altera las filas ya entregadas a docentes u otros cálculos.
+        return $asignaciones->map(fn ($row) => clone $row);
+    }
+
+    private static function consultarAsignaciones(Establecimiento $establecimiento, int $anio): Collection
+    {
         if (! self::schemaHasTable('dotacion_docente_asignaciones')) {
             return collect();
         }
@@ -527,8 +539,15 @@ class DotacionAsignacionCalculator
             ->get();
 
         $items = collect();
+        // Las filas curriculares se vinculan por su clave; indexarla evita
+        // recorrer todas las asignaciones por cada asignatura de cada sección.
+        $asignacionesPorKey = $asignaciones->groupBy(fn ($row) => (string) ($row->necesidad_key ?? ''));
+        $planesPorCurso = $cursos->mapWithKeys(fn ($curso) => [$curso->id => DotacionPlanEstudioResolver::resolve($curso)]);
+        $configuracionesPersonalizadas = self::asignaturasPersonalizadasParaCursos(
+            $cursos->filter(fn ($curso) => $planesPorCurso->get($curso->id) !== null)
+        );
         foreach ($cursos as $curso) {
-            $plan = DotacionPlanEstudioResolver::resolve($curso);
+            $plan = $planesPorCurso->get($curso->id);
             if (! $plan) {
                 continue;
             }
@@ -536,7 +555,7 @@ class DotacionAsignacionCalculator
             $planEsReferencial = DotacionPlanEstudioResolver::isReferential($curso, $plan);
             $fuentePlan = $planEsReferencial ? 'plan referencial estimado' : 'plan asociado';
             $oficiales = $plan->asignaturas ?? collect();
-            $personalizadas = self::asignaturasPersonalizadas($curso, (int) $plan->id);
+            $personalizadas = self::asignaturasPersonalizadas($curso, (int) $plan->id, $configuracionesPersonalizadas);
             $tieneLibreDisposicionPersonalizada = $personalizadas
                 ->filter(fn ($custom) => ($custom['tipo_bloque'] ?? null) === 'libre_disposicion')
                 ->isNotEmpty();
@@ -605,7 +624,7 @@ class DotacionAsignacionCalculator
                     'fuente' => $fuente,
                     'horas_plan_oficial' => $esOrientacionOficial && $horasLibreDisposicionOrientacion > 0 ? $horasPlanOriginal : null,
                     'horas_libre_disposicion_consolidada' => $esOrientacionOficial && $horasLibreDisposicionOrientacion > 0 ? $horasLibreDisposicionOrientacion : null,
-                ], $asignaciones));
+                ], $asignacionesPorKey->get($key, collect())));
             }
 
             foreach ($personalizadas as $custom) {
@@ -649,7 +668,7 @@ class DotacionAsignacionCalculator
                     'fuente' => $custom['plan_comun_asociado']
                         ? 'Libre disposición configurada · Plan común asociado: '.$custom['plan_comun_asociado']
                         : 'Libre disposición configurada por establecimiento',
-                ], $asignaciones));
+                ], $asignacionesPorKey->get($key, collect())));
             }
 
             if ($oficiales->isEmpty() && $items->where('establecimiento_curso_id', $curso->id)->isEmpty()) {
@@ -686,7 +705,7 @@ class DotacionAsignacionCalculator
                         'plan_bloque_id' => $bloque->id,
                         'asignatura_nombre' => $bloque->nombre,
                         'fuente' => 'Bloque del plan',
-                    ], $asignaciones));
+                    ], $asignacionesPorKey->get($key, collect())));
                 }
             }
 
@@ -725,7 +744,7 @@ class DotacionAsignacionCalculator
                 float $horasDesglosadas,
                 string $detalleFuente,
                 bool $usarClaveRespaldoAnterior = false
-            ) use ($curso, $porcentaje, $plan, $planEsReferencial, $fuentePlan, $asignaciones, $horasPlanTotal, $items): void {
+            ) use ($curso, $porcentaje, $plan, $planEsReferencial, $fuentePlan, $asignacionesPorKey, $horasPlanTotal, $items): void {
                 if ($horas <= 0.01) {
                     return;
                 }
@@ -765,7 +784,7 @@ class DotacionAsignacionCalculator
                         $fuentePlan,
                         $horasDesglosadas
                     ),
-                ], $asignaciones));
+                ], $asignacionesPorKey->get($key, collect())));
             };
 
             $agregarRespaldo(
@@ -809,9 +828,9 @@ class DotacionAsignacionCalculator
         )->map(fn (array $item) => self::withAcompanamientoParvularia($item))->values();
     }
 
-    private static function asignaturasPersonalizadas(EstablecimientoCurso $curso, int $planEstudioId): Collection
+    private static function asignaturasPersonalizadasParaCursos(Collection $cursos): Collection
     {
-        if (! self::schemaHasTable('establecimiento_planes_estudio') || ! self::schemaHasTable('establecimiento_planes_estudio_asignaturas')) {
+        if ($cursos->isEmpty() || ! self::schemaHasTable('establecimiento_planes_estudio') || ! self::schemaHasTable('establecimiento_planes_estudio_asignaturas')) {
             return collect();
         }
 
@@ -827,6 +846,11 @@ class DotacionAsignacionCalculator
             'bloque.nombre as bloque_nombre',
             'bloque.tipo_bloque as bloque_tipo',
             'asig.nombre as asignatura_nombre',
+            'config.establecimiento_curso_id',
+            'config.establecimiento_id',
+            'config.curso_id',
+            'config.anio',
+            'config.plan_estudio_id',
         ];
 
         if (self::schemaHasColumn('establecimiento_planes_estudio_asignaturas', 'nombre_asignatura_personalizada')) {
@@ -854,20 +878,31 @@ class DotacionAsignacionCalculator
             return $query;
         };
 
-        $rows = $buildQuery()
-            ->where('config.establecimiento_curso_id', $curso->id)
-            ->where('config.plan_estudio_id', $planEstudioId)
-            ->get();
+        $contexto = $cursos->first();
+        // Incluir vínculos directos y el respaldo histórico en una sola consulta.
+        // Un vínculo directo conserva prioridad aunque su contexto antiguo difiera.
+        return $buildQuery()->where(function ($query) use ($cursos, $contexto): void {
+            $query->whereIn('config.establecimiento_curso_id', $cursos->modelKeys())
+                ->orWhere(function ($fallback) use ($contexto): void {
+                    $fallback->where('config.establecimiento_id', $contexto->establecimiento_id)
+                        ->where('config.anio', $contexto->anio);
+                });
+        })->get();
+    }
+
+    private static function asignaturasPersonalizadas(EstablecimientoCurso $curso, int $planEstudioId, Collection $configuraciones): Collection
+    {
+        $rows = $configuraciones->where('establecimiento_curso_id', $curso->id)
+            ->where('plan_estudio_id', $planEstudioId);
 
         // Respaldo para instalaciones donde la configuracion exista por establecimiento/curso/anio,
         // pero el identificador establecimiento_curso_id haya cambiado por recarga de cursos.
         if ($rows->isEmpty()) {
-            $rows = $buildQuery()
-                ->where('config.establecimiento_id', $curso->establecimiento_id)
-                ->where('config.curso_id', $curso->curso_id)
-                ->where('config.anio', $curso->anio)
-                ->where('config.plan_estudio_id', $planEstudioId)
-                ->get();
+            $rows = $configuraciones
+                ->where('establecimiento_id', $curso->establecimiento_id)
+                ->where('curso_id', $curso->curso_id)
+                ->where('anio', $curso->anio)
+                ->where('plan_estudio_id', $planEstudioId);
         }
 
         return $rows->map(function ($detalle) {

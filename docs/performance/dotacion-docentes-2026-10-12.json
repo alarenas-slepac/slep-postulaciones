@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-12",
+  "patch": "2026.10.12.593",
+  "baseline_commit": "e74300dd7d5ddbd5762e6d6caae8b15e76257e14",
+  "environment": "Windows local, PHP 8.3.30, PHPUnit 11.5.50, SQLite :memory:. Sin acceso a producción ni cambios en .env.",
+  "dataset": {
+    "courses": 24,
+    "levels": 8,
+    "teachers": 90,
+    "assignments": 360,
+    "year": 2026,
+    "personal_data": "Exclusivamente nombres, RUT y establecimiento ficticios creados en memoria."
+  },
+  "scope": "Cálculo del controlador show(tab=docentes) y renderizado del parcial _docentes. Tres ejecuciones por variante en procesos PHP independientes, con Blade previamente compilado. Excluye middleware HTTP, layout compartido, transferencia, JavaScript, MySQL y cPanel.",
+  "memory_metric": "Pico de asignación PHP de la ejecución PHPUnit completa; incluye bootstrap y fixture. No representa una medición de memoria de la petición productiva.",
+  "before": {
+    "calculation_seconds": [
+      2.5978,
+      2.6139,
+      2.6164
+    ],
+    "median_calculation_seconds": 2.6139,
+    "docentes_render_seconds": [
+      0.0547,
+      0.0541,
+      0.0549
+    ],
+    "queries": 169,
+    "peak_mb": [
+      76,
+      76,
+      76
+    ],
+    "docentes_html_bytes": 1138706
+  },
+  "after": {
+    "calculation_seconds": [
+      1.073,
+      1.0817,
+      1.0813
+    ],
+    "median_calculation_seconds": 1.0813,
+    "docentes_render_seconds": [
+      0.0547,
+      0.0566,
+      0.0548
+    ],
+    "queries": 100,
+    "peak_mb": [
+      74,
+      74,
+      74
+    ],
+    "docentes_html_bytes": 1138706
+  },
+  "reductions": {
+    "calculation_percent": 58.6,
+    "queries_percent": 40.8
+  },
+  "summary_equal": true,
+  "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355",
+  "validation": {
+    "php_tests": 524,
+    "assertions": 6198,
+    "result": "passed",
+    "new_performance_cases": 6,
+    "php_l": "6 archivos sin errores",
+    "optimize_clear": "correcto, configuración local aislada",
+    "routes": "23 rutas existentes de dotación verificadas; sin cambios",
+    "build": "No aplica: no se modificaron CSS/JavaScript/assets."
+  },
+  "remaining_verification": "TTFB, descarga y memoria de la petición completa en cPanel/MySQL después del despliegue. El HTML de los formularios permanece completo; no se extrapola la reducción local a los 33,86 segundos de la captura."
+}
