@@ -44,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Support\Facades\Event::listen($event, \App\Services\Notifications\NotificationEventOccurrence::class.'@clear');
         }
         require base_path('routes/notification_events.php');
+        require base_path('routes/pie_comparison.php');
 
         \App\Models\SolicitudReemplazo::observe(\App\Observers\SolicitudReemplazoWhatsAppObserver::class);
 

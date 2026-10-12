@@ -2222,6 +2222,15 @@
       "notification-events.css"
     ]
   },
+  "resources/css/pie-comparison.css": {
+    "file": "assets/pie-comparison-C7ws-Z4O.css",
+    "src": "resources/css/pie-comparison.css",
+    "isEntry": true,
+    "name": "pie-comparison",
+    "names": [
+      "pie-comparison.css"
+    ]
+  },
   "resources/css/votaciones-admin.css": {
     "file": "assets/votaciones-admin-Bufya2o9.css",
     "src": "resources/css/votaciones-admin.css",
@@ -2287,6 +2296,12 @@
     "file": "assets/dotacion-asignacion-Bo9GicbL.js",
     "name": "dotacion-asignacion",
     "src": "resources/js/dotacion-asignacion.js",
+    "isEntry": true
+  },
+  "resources/js/pie-comparison.js": {
+    "file": "assets/pie-comparison-CQRO3NbM.js",
+    "name": "pie-comparison",
+    "src": "resources/js/pie-comparison.js",
     "isEntry": true
   },
   "resources/js/votaciones-admin-rutas.js": {

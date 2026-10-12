@@ -4,10 +4,11 @@ namespace App\Support;
 
 use App\Models\EstablecimientoCurso;
 use App\Models\PieHorasApoyoMinimo;
+use Illuminate\Support\Collection;
 
 class PieHorasCalculator
 {
-    public static function calculate(EstablecimientoCurso $curso, int $neet, int $neep): array
+    public static function calculate(EstablecimientoCurso $curso, int $neet, int $neep, ?Collection $rules = null): array
     {
         $curso->loadMissing(['curso', 'planEstudio']);
 
@@ -52,7 +53,7 @@ class PieHorasCalculator
             return self::payload($regimen, 0, 0, 0, 0, 0, $observaciones ?: ['Sin estudiantes PIE registrados.']);
         }
 
-        $rule = PieHorasApoyoMinimo::query()
+        $rule = $rules !== null ? $rules->first(fn ($rule) => $rule->vigente && $rule->regimen_jec === $regimen && $rule->neep_cantidad === $neep) : PieHorasApoyoMinimo::query()
             ->where('regimen_jec', $regimen)
             ->where('neep_cantidad', $neep)
             ->where('vigente', true)
