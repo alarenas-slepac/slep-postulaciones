@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\Admin\DotacionAsignacionController;
 use App\Models\Curso;
 use App\Models\DotacionDocenteAsignacion;
+use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionProceso2027Configuracion;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
@@ -14,6 +15,7 @@ use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionDocentesSubsector;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionFuncionesNormativas2027;
 use App\Support\DotacionPlanTitularPrimero;
 use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Database\Schema\Blueprint;
@@ -55,6 +57,9 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         }
         Schema::table('dotacion_docente_asignaciones', function (Blueprint $t): void {
             $t->string('estamento_cobertura')->default('docente');
+        });
+        Schema::table('establecimiento_curso_pie', function (Blueprint $t): void {
+            $t->unsignedInteger('prof_educ_dif_minutos')->nullable();
         });
         Schema::table('dotacion_proceso_2027_configuraciones', function (Blueprint $t): void {
             $t->json('funciones_normativas')->nullable();
@@ -121,6 +126,222 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertSame('99000003K', $assignment->fresh()->docente_rut_normalizado);
         $this->assertNull($assignment->fresh()->excepcion_prelacion);
         $this->assertEquals(0, DotacionEstablecimientoCalculator::docentes($this->ee, 2027)->firstWhere('rut_normalizado', '99000002K')['horas_asignadas_total']);
+    }
+
+    public function test_libre_disposicion_admite_profesor_de_ingles_tercero_en_el_orden(): void
+    {
+        $this->personal('99000004-K', 'Educadora sintética B', 'PLANTA', 'Pedagogía en Educación de Párvulos');
+        DB::table('declaracion_sostenedores')->where('rut', '99000002-K')->update(['nombres' => 'Profesor de Inglés sintético', 'nombre_titulo' => 'Pedagogía en Inglés']);
+        DB::table('declaracion_sostenedores')->where('rut', '99000003-K')->update(['nombres' => 'Z docente sintético']);
+        $process = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertSame('99000002K', collect($process['docentes'])->values()[2]['rut_normalizado']);
+        $this->store();
+        $this->assertSame('99000002K', DotacionDocenteAsignacion::sole()->docente_rut_normalizado);
+    }
+
+    public static function functionCategories(): array
+    {
+        return [
+            'directiva' => ['directiva', 'funcion_directiva'],
+            'técnico pedagógica' => ['tecnico_pedagogica', 'funcion_tecnico_pedagogica'],
+            'planes' => ['planes_programas', 'plan_normativo'],
+            'otras funciones' => ['otras_funciones_docentes', 'otra_funcion'],
+        ];
+    }
+
+    #[DataProvider('functionCategories')]
+    public function test_funcion_permite_docente_de_menor_prioridad_sin_excepcion(string $category, string $type): void
+    {
+        $this->coverPlan();
+        $need = $this->declaredFunction($category);
+        $this->assertTrue(DotacionProceso2027Calculator::resumen($this->ee, 2027)['funciones_no_normativas_habilitadas']);
+        $response = app(DotacionAsignacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => $type, 'subtipo_asignacion' => $need['subtipo_asignacion'],
+            'necesidad_key' => $need['key'], 'dotacion_funcion_id' => $need['dotacion_funcion_id'],
+            'horas_contrato' => 4,
+        ]), $this->ee);
+        $this->assertNotNull($response->getSession()->get('success'));
+        $saved = DotacionDocenteAsignacion::where('tipo_asignacion', $type)->sole();
+        $this->assertSame('99000002K', $saved->docente_rut_normalizado);
+        $this->assertNull($saved->excepcion_prelacion);
+        app(DotacionAsignacionController::class)->update($this->request([
+            'docente_rut' => '99000003-K', 'estamento_cobertura' => 'docente', 'horas_contrato' => 4,
+        ]), $this->ee, $saved);
+        $this->assertSame('99000003K', $saved->fresh()->docente_rut_normalizado);
+    }
+
+    public function test_bolsa_excluye_otros_titulos_de_la_prelacion(): void
+    {
+        $need = $this->differentialNeed();
+        $this->personal('99000005-K', 'Diferencial sintética', 'CONTRATA', 'Pedagogía en Educación Diferencial');
+        $this->assignDifferential($need, '99000005-K');
+        $this->assertSame('99000005K', DotacionDocenteAsignacion::sole()->docente_rut_normalizado);
+    }
+
+    public function test_bolsa_rechaza_otro_titulo_aunque_se_fuerce_el_formulario(): void
+    {
+        $need = $this->differentialNeed();
+        try {
+            $this->assignDifferential($need, '99000001-K');
+            $this->fail('Un título de otra especialidad no puede recibir la bolsa diferencial.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('docente_rut', $exception->errors());
+        }
+        $this->assertSame(0, DotacionDocenteAsignacion::count());
+    }
+
+    public function test_bolsa_admite_sin_titulo_y_mantiene_preferencia_dentro_del_grupo(): void
+    {
+        $need = $this->differentialNeed();
+        $this->personal('99000005-K', 'Diferencial sintética', 'CONTRATA', 'Pedagogía en Educación Diferencial');
+        $this->personal('99000006-K', 'Sin título sintético', 'PLANTA', '');
+        try {
+            $this->assignDifferential($need, '99000005-K');
+            $this->fail('La bolsa debe respetar la prelación de los candidatos elegibles.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('prioridad superior', $exception->getMessage());
+        }
+        $this->assignDifferential($need, '99000006-K');
+        $this->assertSame('99000006K', DotacionDocenteAsignacion::sole()->docente_rut_normalizado);
+    }
+
+    public function test_bolsa_reasignacion_rechaza_otro_titulo_sin_modificar_el_registro(): void
+    {
+        $need = $this->differentialNeed();
+        $this->personal('99000005-K', 'Diferencial sintética', 'CONTRATA', 'Pedagogía en Educación Diferencial');
+        $this->assignDifferential($need, '99000005-K');
+        $saved = DotacionDocenteAsignacion::sole();
+        $before = $saved->getAttributes();
+        try {
+            app(DotacionAsignacionController::class)->update($this->request([
+                'docente_rut' => '99000001-K', 'estamento_cobertura' => 'docente', 'horas_contrato' => 2,
+            ]), $this->ee, $saved);
+            $this->fail('La reasignación debe conservar la restricción de título de la bolsa.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('sólo admite', $exception->getMessage());
+        }
+        $this->assertSame($before, $saved->fresh()->getAttributes());
+    }
+
+    public function test_funcion_normativa_sin_prelar_conserva_sus_horas_definidas(): void
+    {
+        $process = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $potential = collect($process['funciones_normativas'])->first(fn ($item) =>
+            ($item['subtipo'] ?? '') === 'tecnico_pedagogica'
+            && (float) ($item['horas_potenciales'] ?? 0) >= 4
+        );
+        $this->assertNotNull($potential);
+        $settings = DotacionProceso2027Configuracion::first()->funciones_normativas;
+        $settings[$potential['key']] = true;
+        $settings[DotacionFuncionesNormativas2027::HORAS_KEY] = [$potential['codigo'] => 4];
+        DotacionProceso2027Configuracion::first()->update(['funciones_normativas' => $settings]);
+        $need = DotacionAsignacionCalculator::funcionNormativaParaAsignacion($this->ee, 2027, [
+            'necesidad_key' => $potential['key'],
+        ]);
+        $this->assertEquals(4, $need['horas_contrato_requeridas']);
+        $fields = [
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => $need['tipo_asignacion'], 'subtipo_asignacion' => $need['subtipo_asignacion'],
+            'necesidad_key' => $need['key'], 'dotacion_funcion_regla_id' => $need['dotacion_funcion_regla_id'],
+            'horas_contrato' => 4,
+        ];
+        app(DotacionAsignacionController::class)->store($this->request($fields), $this->ee);
+        $this->assertSame('99000002K', DotacionDocenteAsignacion::sole()->docente_rut_normalizado);
+        try {
+            $fields['horas_contrato'] = 0.25;
+            app(DotacionAsignacionController::class)->store($this->request($fields), $this->ee);
+            $this->fail('No se puede superar la definición normativa al quitar la prelación.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('horas_contrato', $exception->errors());
+        }
+        $this->assertSame(1, DotacionDocenteAsignacion::count());
+    }
+
+    public function test_selector_bolsa_filtra_perfiles_y_funcion_conserva_orden_informativo(): void
+    {
+        $bag = $this->differentialNeed();
+        $this->personal('99000005-K', 'Diferencial sintética', 'CONTRATA', 'Educación Diferencial');
+        $this->personal('99000006-K', 'Sin título sintético', 'PLANTA', '');
+        $function = $this->declaredFunction('otras_funciones_docentes');
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $this->app['view']->share('errors', new ViewErrorBag);
+        $html = view('admin.dotacion-establecimiento.partials._asignacion', [
+            'establecimiento' => $this->ee, 'anio' => 2027, 'docentes' => $data['docentes'],
+            'asignacion' => $data['asignacion'], 'proceso2027' => DotacionProceso2027Calculator::resumen($this->ee, 2027, $data),
+        ])->render(function ($view, string $content): string {
+            if (getenv('SGA_PRELACION_PREVIEW') === '1') {
+                $manifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);
+                $styles = $this->app['view']->yieldPushContent('styles');
+                $scripts = $this->app['view']->yieldPushContent('scripts');
+                $preview = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Asignación 2027 · Datos ficticios</title>'
+                    .'<link rel="stylesheet" href="/build/'.$manifest['resources/scss/app.scss']['file'].'">'
+                    .'<link rel="stylesheet" href="/build/'.$manifest['resources/css/dotacion-establecimiento.css']['file'].'">'.$styles.'</head><body>'
+                    .'<main class="container-fluid p-3"><p class="text-muted">Prueba con datos ficticios.</p><div class="dotacion-workspace">'.$content.'</div></main>'
+                    .'<script>document.addEventListener("submit",function(event){event.preventDefault();event.stopImmediatePropagation();},true);</script>'
+                    .'<script type="module" src="/build/'.$manifest['resources/js/app.js']['file'].'"></script>'.$scripts.'</body></html>';
+                file_put_contents(storage_path('framework/testing/prelacion-2027-preview.html'), $preview);
+            }
+            return $content;
+        });
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $xpath = new \DOMXPath($dom);
+        $bagForm = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$bag['key'].'"]]')->item(0);
+        $this->assertNotNull($bagForm);
+        $options = $xpath->query('.//select[@name="docente_rut"]//option[@data-estamento="docente"]', $bagForm);
+        $this->assertSame(2, $options->length);
+        $this->assertSame('99000006-K', $options[0]->getAttribute('value'));
+        $this->assertSame('99000005-K', $options[1]->getAttribute('value'));
+        $functionForm = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$function['key'].'"]]')->item(0);
+        $this->assertNotNull($functionForm);
+        $this->assertStringContainsString('Orden informativo', $functionForm->textContent);
+        $this->assertStringContainsString('no bloquea', $functionForm->textContent);
+        $this->assertSame(1, $xpath->query('.//option[@value="99000001-K"][@data-prioridad-label]', $functionForm)->length);
+        $this->assertSame(1, $xpath->query('.//option[@value="99000002-K"][@data-prioridad-label]', $functionForm)->length);
+    }
+
+    private function coverPlan(): void
+    {
+        $this->personal('99000007-K', 'Titular sintético de cobertura', 'PLANTA', 'Pedagogía en Educación Básica');
+        $need = $this->need(false);
+        DB::table('dotacion_docente_subsectores')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027,
+            'asignatura_key' => DotacionDocentesSubsector::keyParaNecesidad($need),
+            'nivel' => 'parvularia', 'asignatura_nombre' => $need['titulo'], 'docente_rut_normalizado' => '99000007K',
+        ]);
+        $this->store(['docente_rut' => '99000007-K', 'horas_plan_pedagogicas' => 32], $need);
+        $this->store(['horas_plan_pedagogicas' => 6]);
+    }
+
+    private function declaredFunction(string $category): array
+    {
+        $function = DotacionFuncionEstablecimiento::create([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'categoria' => $category,
+            'nombre_funcion' => 'Función sintética '.$category, 'horas_declaradas' => 4, 'estado' => 'borrador',
+        ]);
+        return collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.funciones'))
+            ->firstWhere('dotacion_funcion_id', $function->id);
+    }
+
+    private function differentialNeed(): array
+    {
+        DB::table('establecimiento_curso_pie')->insert([
+            'establecimiento_id' => $this->ee->id, 'establecimiento_curso_id' => $this->course->id,
+            'curso_id' => $this->course->curso_id, 'anio' => 2027, 'total_pie' => 6,
+            'necesidades_transitorias' => 5, 'necesidades_permanentes' => 1, 'prof_educ_dif_minutos' => 600,
+        ]);
+        $this->configureStages();
+        return collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.pie_educadora_diferencial'))->sole();
+    }
+
+    private function assignDifferential(array $need, string $rut): void
+    {
+        app(DotacionAsignacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => $rut, 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => 'pie_educadora_diferencial', 'subtipo_asignacion' => 'bolsa_total',
+            'necesidad_key' => $need['key'], 'horas_contrato' => 2,
+        ]), $this->ee);
     }
 
     public function test_curso_combinado_nt1_nt2_admite_especialista_asociado_sin_prelacion(): void

@@ -13,6 +13,7 @@ use App\Models\EstablecimientoCurso;
 use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
+use App\Support\DotacionAsignacionElegibilidad2027;
 use App\Support\DotacionContratoPlanCalculator;
 use App\Support\DotacionAsignacionPorCursoBloque;
 use App\Support\DotacionCursoCombinadoCalculator;
@@ -1083,6 +1084,14 @@ class DotacionAsignacionController extends Controller
             return;
         }
 
+        if (($payload['tipo_asignacion'] ?? '') === 'pie_educadora_diferencial'
+            && ($payload['estamento_cobertura'] ?? 'docente') === 'docente'
+            && ! DotacionAsignacionElegibilidad2027::puedeRecibirBolsaDiferencial($persona)) {
+            throw ValidationException::withMessages([
+                'docente_rut' => 'La Bolsa Educadoras Diferenciales sólo admite docentes de Educación Diferencial o sin título declarado.',
+            ]);
+        }
+
         if ((int) ($payload['dotacion_funcion_id'] ?? 0) <= 0
             && in_array($payload['tipo_asignacion'] ?? '', ['funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo'], true)
             && ($payload['subtipo_asignacion'] ?? '') !== 'pie') {
@@ -1231,7 +1240,8 @@ class DotacionAsignacionController extends Controller
             ));
         }
         $docentesPrelacion = DotacionProceso2027Calculator::docentesPrelacionParaAsignacion(
-            $docentesElegibles, $persona, $payload, $bloque
+            DotacionAsignacionElegibilidad2027::candidatosParaPrelacion($docentesElegibles, $payload),
+            $persona, $payload, $bloque
         );
         $seleccionado = $docentesPrelacion->first(
             fn (array $docente) => ($docente['rut_normalizado'] ?? '') === $rut
@@ -1241,7 +1251,9 @@ class DotacionAsignacionController extends Controller
             $seleccionado ?? [],
             $horas
         );
-        if ($hayPrelacionAnterior && ! $seleccionLibreParvularia && ! ($payload['_desde_reserva'] ?? false)) {
+        if ($hayPrelacionAnterior && ! $seleccionLibreParvularia
+            && ! DotacionAsignacionElegibilidad2027::esFuncionSinPrelacion($payload)
+            && ! ($payload['_desde_reserva'] ?? false)) {
             throw ValidationException::withMessages([
                 'docente_rut' => 'Existen docentes de prioridad superior o de mayor antigüedad en el mismo grupo con horas suficientes para cubrir esta asignación. Seleccione uno de ellos.',
             ]);
