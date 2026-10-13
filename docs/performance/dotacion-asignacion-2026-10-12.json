@@ -1,0 +1,221 @@
+{
+  "patch": "2026.10.12.595",
+  "date": "2026-10-12",
+  "baseline_commit": "de26c1ef687241b86917df887bab1f32e224abb8",
+  "environment": {
+    "php": "8.3.30",
+    "database": "SQLite :memory:",
+    "fixture": {
+      "courses": 24,
+      "teachers": 90,
+      "assignments": 360
+    },
+    "samples_per_variant": 3,
+    "blade": "compiled before sampling"
+  },
+  "summaries": [
+    {
+      "year": 2026,
+      "before_html_bytes": 29307649,
+      "after_html_bytes": 4228669,
+      "html_reduction_percent": 85.57,
+      "before_options": 30210,
+      "after_options": 1140,
+      "options_reduction_percent": 96.23,
+      "before_render_seconds": 0.697,
+      "after_render_seconds": 0.5169,
+      "before_calculation_seconds": 1.1192,
+      "after_calculation_seconds": 1.0958,
+      "queries": 99,
+      "render_queries": 0,
+      "before_peak_mb": 128,
+      "after_peak_mb": 84,
+      "summary_hash_unchanged": true
+    },
+    {
+      "year": 2027,
+      "before_html_bytes": 14463343,
+      "after_html_bytes": 4564223,
+      "html_reduction_percent": 68.44,
+      "before_options": 10573,
+      "after_options": 1303,
+      "options_reduction_percent": 87.68,
+      "before_render_seconds": 0.5614,
+      "after_render_seconds": 0.5639,
+      "before_calculation_seconds": 1.564,
+      "after_calculation_seconds": 1.5969,
+      "queries": 114,
+      "render_queries": 0,
+      "before_peak_mb": 106,
+      "after_peak_mb": 90,
+      "summary_hash_unchanged": true
+    }
+  ],
+  "samples": {
+    "before": [
+      {
+        "year": 2026,
+        "calculation_seconds": 1.1074,
+        "render_seconds": 0.697,
+        "queries": 99,
+        "render_queries": 0,
+        "html_bytes": 29307649,
+        "options": 30210,
+        "forms": 732,
+        "peak_mb": 128,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2027,
+        "calculation_seconds": 1.564,
+        "render_seconds": 0.5863,
+        "queries": 114,
+        "render_queries": 0,
+        "html_bytes": 14463343,
+        "options": 10573,
+        "forms": 733,
+        "peak_mb": 106,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2026,
+        "calculation_seconds": 1.1796,
+        "render_seconds": 0.7829,
+        "queries": 99,
+        "render_queries": 0,
+        "html_bytes": 29307649,
+        "options": 30210,
+        "forms": 732,
+        "peak_mb": 128,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2027,
+        "calculation_seconds": 1.5863,
+        "render_seconds": 0.5614,
+        "queries": 114,
+        "render_queries": 0,
+        "html_bytes": 14463343,
+        "options": 10573,
+        "forms": 733,
+        "peak_mb": 106,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2026,
+        "calculation_seconds": 1.1192,
+        "render_seconds": 0.6921,
+        "queries": 99,
+        "render_queries": 0,
+        "html_bytes": 29307649,
+        "options": 30210,
+        "forms": 732,
+        "peak_mb": 128,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2027,
+        "calculation_seconds": 1.5588,
+        "render_seconds": 0.5529,
+        "queries": 114,
+        "render_queries": 0,
+        "html_bytes": 14463343,
+        "options": 10573,
+        "forms": 733,
+        "peak_mb": 106,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      }
+    ],
+    "after": [
+      {
+        "year": 2026,
+        "calculation_seconds": 1.0958,
+        "render_seconds": 0.5169,
+        "queries": 99,
+        "render_queries": 0,
+        "html_bytes": 4228669,
+        "options": 1140,
+        "forms": 732,
+        "peak_mb": 84,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2027,
+        "calculation_seconds": 1.6061,
+        "render_seconds": 0.5602,
+        "queries": 114,
+        "render_queries": 0,
+        "html_bytes": 4564223,
+        "options": 1303,
+        "forms": 733,
+        "peak_mb": 90,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2026,
+        "calculation_seconds": 1.0917,
+        "render_seconds": 0.5442,
+        "queries": 99,
+        "render_queries": 0,
+        "html_bytes": 4228669,
+        "options": 1140,
+        "forms": 732,
+        "peak_mb": 84,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2027,
+        "calculation_seconds": 1.5969,
+        "render_seconds": 0.5639,
+        "queries": 114,
+        "render_queries": 0,
+        "html_bytes": 4564223,
+        "options": 1303,
+        "forms": 733,
+        "peak_mb": 90,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2026,
+        "calculation_seconds": 1.1106,
+        "render_seconds": 0.5121,
+        "queries": 99,
+        "render_queries": 0,
+        "html_bytes": 4228669,
+        "options": 1140,
+        "forms": 732,
+        "peak_mb": 84,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      },
+      {
+        "year": 2027,
+        "calculation_seconds": 1.5952,
+        "render_seconds": 0.5671,
+        "queries": 114,
+        "render_queries": 0,
+        "html_bytes": 4564223,
+        "options": 1303,
+        "forms": 733,
+        "peak_mb": 90,
+        "summary_hash": "abd94ff1d2024409f0e8f82c1e8c74345d8c7ddd4d1381d88f6c93c0f0655355"
+      }
+    ]
+  },
+  "browser_validation": {
+    "year": 2027,
+    "needs": 324,
+    "personal_selects": 325,
+    "shared_catalogs": 15,
+    "prepared_forms_on_initial_load": 0,
+    "prepared_forms_after_opening_one": 1,
+    "initial_native_personal_options": 415,
+    "opened_subject_personal_options": 30,
+    "includes_reservation_select": true
+  },
+  "limits": [
+    "Measures controller calculation and assignment partial rendering locally; excludes HTTP middleware, shared layout, network transfer and production resources.",
+    "HTML bytes are uncompressed; the measurements do not establish transfer bytes or page load time in cPanel.",
+    "Controller queries and 2027 PHP render time are essentially unchanged; the main improvement is smaller HTML and deferred browser work.",
+    "No production data, writes or real notifications were used."
+  ]
+}

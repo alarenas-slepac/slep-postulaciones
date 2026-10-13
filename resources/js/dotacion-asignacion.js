@@ -203,9 +203,23 @@ function openAncestors(element, root) {
     }
 }
 
+// Las plantillas contienen exclusivamente candidatos autorizados por el servidor.
+// Se clonan al abrir el formulario; nunca se comparte un grupo mutable entre selects.
+export function hydratePersonalOptions(select) {
+    if (!select) return;
+    const selected = select.value;
+    select.querySelectorAll('optgroup[data-personal-catalogo]').forEach(group => {
+        const template = select.ownerDocument.getElementById(group.dataset.personalCatalogo);
+        if (!template?.content) return;
+        group.replaceWith(template.content.cloneNode(true));
+    });
+    select.value = selected;
+}
+
 export function initDotacionAsignacion(root) {
     if (!root || root.dataset.initialized) return;
     root.dataset.initialized = 'true';
+    root.addEventListener('dotacion:prepare-personal', event => hydratePersonalOptions(event.target));
     const filterPanel = root.querySelector('[data-dotacion-filters]');
     const needs = Array.from(root.querySelectorAll('[data-dotacion-need]'));
     if (filterPanel) {

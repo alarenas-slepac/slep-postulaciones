@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.12.594',
+    'current_version' => '2026.10.12.595',
     'entries' => [
+        [
+            'version' => '2026.10.12.595',
+            'title' => 'Dotación: carga más liviana de Asignación de horas',
+            'summary' => 'Comparte los candidatos de personal entre formularios y prepara cada selector al abrirlo, reduciendo el HTML y el trabajo inicial del navegador en establecimientos grandes.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Emite una sola plantilla por conjunto autorizado de docentes o asistentes; cada formulario utiliza su propia copia al abrirse, conservando el orden, los títulos, cupos, saldos y filtros del proceso 2027.',
+                'Evita clonar opciones e inicializar selectores de formularios cerrados y conserva la búsqueda por teclado, el cambio de cobertura, el contrato AAEE y la recuperación del único formulario fallido.',
+                'Mantiene los cálculos, controles del servidor, permisos, suspensión de asignaciones y registros históricos, sin consultas nuevas ni cambios en datos.',
+                'Incluye mediciones con 24 cursos, 90 docentes y 360 asignaciones, regresiones de elegibilidad y pruebas de catálogos compartidos, aislamiento de opciones y contenido escapado.',
+                'Requiere desplegar conjuntamente las vistas y el build de JavaScript actualizado; documenta instalación, límites de las mediciones locales y comprobación en cPanel.',
+            ],
+            'published_at' => '2026-10-12',
+        ],
         [
             'version' => '2026.10.12.594',
             'title' => 'Dotación 2027: prelación según el tipo de asignación',

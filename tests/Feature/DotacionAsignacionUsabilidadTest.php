@@ -83,6 +83,23 @@ class DotacionAsignacionUsabilidadTest extends IsolatedSecurityTestCase
         }
     }
 
+    public function test_formularios_comparten_catalogos_inertes_y_escapan_el_nombre(): void
+    {
+        $data = $this->data();
+        $person = $data['docentes'][0];
+        $person['nombre'] = 'Docente <script>prueba</script> & "sintético"';
+        $data['docentes'][0] = $person;
+        $data['asignacion']['docentes'] = $data['docentes'];
+        $xpath = $this->xpath($this->renderAsignacion(new ViewErrorBag, $data));
+        $this->assertSame(0, $xpath->query('//select[@name="docente_rut"]//option[@data-estamento]')->length);
+        $this->assertSame(2, $xpath->query('//template[@data-dotacion-personal-catalogo]')->length);
+        $this->assertSame(0, $xpath->query('//template//script')->length);
+        $this->assertSame(2, $xpath->query('//template//option[@data-estamento]')->length);
+        $this->assertSame($person['nombre'], $xpath->query('//template//option[@data-estamento="docente"]')->item(0)->getAttribute('data-nombre'));
+        $references = $xpath->query('//select[@name="docente_rut"]/optgroup[@data-personal-catalogo]');
+        $this->assertSame($references[0]->getAttribute('data-personal-catalogo'), $references[2]->getAttribute('data-personal-catalogo'));
+    }
+
     public function test_las_asignaciones_registradas_comparten_el_identificador_de_su_necesidad(): void
     {
         $xpath = $this->xpath($this->renderAsignacion(new ViewErrorBag));

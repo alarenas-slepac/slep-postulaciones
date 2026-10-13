@@ -1,9 +1,59 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchesCatalog, matchesNeed, matchesRevision, normalizeSearch } from '../../resources/js/dotacion-asignacion.js';
+import { hydratePersonalOptions, matchesCatalog, matchesNeed, matchesRevision, normalizeSearch } from '../../resources/js/dotacion-asignacion.js';
 
 const need = { section: 'plan_estudio', course: 'NT1 + NT2', pending: true, search: 'NT1 + NT2 · Exploración del entorno natural · Libre disposición' };
 const all = { q: '', section: '', course: '', pending: false };
+
+// Doble del select nativo: cambiar sus grupos restablece la selección como en el DOM.
+function deferredSelect(template, selected = '') {
+    let value = selected;
+    let pending = true;
+    const select = {
+        options: [{ value: '' }],
+        ownerDocument: { getElementById: () => template },
+        querySelectorAll: () => pending ? [{
+            dataset: { personalCatalogo: 'autorizados' },
+            replaceWith(fragment) { select.options = [{ value: '' }, ...fragment.options]; value = ''; pending = false; },
+        }] : [],
+        get value() { return value; },
+        set value(next) { value = select.options.some(option => option.value === next) ? next : ''; },
+    };
+    return select;
+}
+
+test('el catálogo conserva selección, orden y metadatos sin compartir opciones entre formularios', () => {
+    let clones = 0;
+    const authorized = [
+        { value: 'docente', dataset: { titulo: 'Educación Diferencial', prioridadLabel: 'Titular', titularDisponible: '4' } },
+        { value: 'sin-titulo', dataset: { titulo: '', prioridadLabel: 'Contrata', contrataDisponible: '12' } },
+    ];
+    const template = { content: { cloneNode(deep) { assert.equal(deep, true); clones++; return { options: structuredClone(authorized) }; } } };
+    const first = deferredSelect(template, 'sin-titulo');
+    const second = deferredSelect(template);
+    hydratePersonalOptions(first);
+    hydratePersonalOptions(second);
+    assert.equal(first.value, 'sin-titulo');
+    assert.equal(second.value, '');
+    assert.deepEqual(first.options.slice(1), authorized);
+    first.options[1].dataset.titulo = 'Edición local';
+    assert.equal(second.options[1].dataset.titulo, 'Educación Diferencial');
+    assert.equal(authorized[0].dataset.titulo, 'Educación Diferencial');
+    first.value = 'docente';
+    hydratePersonalOptions(first);
+    assert.equal(first.value, 'docente');
+    assert.equal(clones, 2, 'Reabrir el formulario no vuelve a clonar su catálogo.');
+});
+
+test('una referencia ausente o una selección ajena no agrega candidatos', () => {
+    const missing = deferredSelect(null);
+    hydratePersonalOptions(missing);
+    assert.deepEqual(missing.options, [{ value: '' }]);
+    const select = deferredSelect({ content: { cloneNode: () => ({ options: [{ value: 'autorizado' }] }) } }, 'ajeno');
+    hydratePersonalOptions(select);
+    assert.equal(select.value, '');
+    assert.deepEqual(select.options.map(option => option.value), ['', 'autorizado']);
+});
 
 test('la inicialización sin fragmento conserva los eventos de navegación', async () => {
     const events = [];

@@ -66,6 +66,14 @@
         $esFormularioFallido($item, $tipo) ? old($campo, $defecto) : $defecto;
     $docenteOptions = $buildPersonalOptions($docentesAsignacion, 'docente');
     $asistenteOptions = $buildPersonalOptions($asistentesAsignacion, 'asistente');
+    // Cada conjunto autorizado se emite una vez, sin repetir el padrón por formulario.
+    $catalogosPersonal = [];
+    $registrarCatalogoPersonal = function ($opciones, string $grupo, ?string $fase = null) use (&$catalogosPersonal): string {
+        $opciones = collect($opciones)->values();
+        $id = 'dotacion-personal-'.sha1(json_encode([$grupo, $fase, $opciones->pluck('rut')->all()]));
+        $catalogosPersonal[$id] ??= ['opciones' => $opciones, 'grupo' => $grupo, 'fase' => $fase];
+        return $id;
+    };
 @endphp
 
 @include('admin.dotacion-establecimiento.partials._personal_select_assets')
@@ -458,23 +466,20 @@
                                                     <label class="form-label small mb-0" for="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Docente asociado o asistente</label>
                                                     <select id="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre, RUT o título..." data-fase-plan="{{ $fasePlan }}" required>
                                                         <option value="">Seleccione persona...</option>
-                                                        <optgroup label="{{ $fasePlan === 'titular' ? 'Docentes con horas titulares disponibles' : ($fasePlan === 'contrata' ? 'Docentes con horas a contrata disponibles' : 'Docentes vigentes y por contratar') }}">
-                                                            @foreach ($opcionesDocentesPlan as $doc)
-                                                                @continue($docentesPermitidosSubsector !== null && !in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
-                                                                @continue($seleccionLibreParvularia && $doc['saldo'] < 1)
-                                                                @continue($fasePlan !== null && !in_array($doc['rut_normalizado'], $rutsFasePlan, true))
-                                                                @continue($doc['virtual'] && ($doc['cupo_bloque'] !== 'parvularia' || ! (($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2')))
-                                                                @continue($soloParvularia && !$doc['es_parvularia'])
-                                                                <option value="{{ $doc['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $doc['rut']) data-estamento="docente" data-fase-plan="{{ $fasePlan }}" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $fasePlan === null ? $doc['label'] : $doc['nombre'].' · '.$doc['rut'].' · Título: '.$doc['titulo'].' · '.$doc['prioridad_label'].' · Disponible '.($fasePlan === 'titular' ? 'titular: '.$fmt($doc['titular_disponible']) : 'a contrata: '.$fmt($doc['contrata_disponible'])).' h' }}</option>
-                                                            @endforeach
-                                                        </optgroup>
+                                                        @include('admin.dotacion-establecimiento.partials._personal_select_referencia', [
+                                                            'opcionesPersonal' => $opcionesDocentesPlan->filter(fn ($doc) =>
+                                                                ($docentesPermitidosSubsector === null || in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
+                                                                && (!$seleccionLibreParvularia || $doc['saldo'] >= 1)
+                                                                && ($fasePlan === null || in_array($doc['rut_normalizado'], $rutsFasePlan, true))
+                                                                && (!$doc['virtual'] || ($doc['cupo_bloque'] === 'parvularia' && (($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2')))
+                                                                && (!$soloParvularia || $doc['es_parvularia'])
+                                                            ),
+                                                            'grupoPersonal' => $fasePlan === 'titular' ? 'Docentes con horas titulares disponibles' : ($fasePlan === 'contrata' ? 'Docentes con horas a contrata disponibles' : 'Docentes vigentes y por contratar'),
+                                                            'fasePersonal' => $fasePlan,
+                                                            'seleccionPersonal' => $valorFormulario($item, 'docente_rut', ''),
+                                                        ])
                                                         @unless ($fasePlan === 'titular')
-                                                            <optgroup label="Asistentes de la Educación">
-                                                                @foreach ($asistenteOptions as $asistente)
-                                                                    @continue($soloParvularia)
-                                                                    <option value="{{ $asistente['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $asistente['rut']) data-estamento="asistente" data-nombre="{{ $asistente['nombre'] }}" data-rut="{{ $asistente['rut'] }}" data-funcion="{{ $asistente['funcion'] }}" data-titular-disponible="{{ $fmt($asistente['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($asistente['contrata_disponible']) }}">{{ $asistente['label'] }}</option>
-                                                                @endforeach
-                                                            </optgroup>
+                                                            @include('admin.dotacion-establecimiento.partials._personal_select_referencia', ['opcionesPersonal' => $soloParvularia ? collect() : $asistenteOptions, 'grupoPersonal' => 'Asistentes de la Educación', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', '')])
                                                         @endunless
                                                     </select>
                                                     @if ($fasePlan !== null && $rutsFasePlan === [])
@@ -696,10 +701,7 @@
                                             <div class="dotacion-selector-guide"><i class="bi bi-search"></i><span><strong>Orden informativo.</strong> Busque por nombre o RUT. La lista muestra la prelación 2027 y las horas disponibles; la prioridad no bloquea la elección del docente directivo.</span></div>
                                             <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar docente por nombre o RUT..." required>
                                                 <option value="">Seleccione docente...</option>
-                                                @foreach ($docenteOptions as $doc)
-                                                    @continue($doc['virtual'])
-                                                    <option value="{{ $doc['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '', 'funcion_directiva') === $doc['rut']) data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
-                                                @endforeach
+                                                @include('admin.dotacion-establecimiento.partials._personal_select_referencia', ['opcionesPersonal' => $docenteOptions->reject(fn ($doc) => $doc['virtual']), 'grupoPersonal' => 'Docentes vigentes', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', '', 'funcion_directiva')])
                                             </select>
                                             <div class="small text-muted">Contrato definido: {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas.</div>
                                             <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
@@ -742,18 +744,14 @@
                                         <label class="form-label small mb-0" for="personal-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Docente o asistente</label>
                                         <select id="personal-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
                                             <option value="">Seleccione persona...</option>
-                                            <optgroup label="Docentes vigentes y por contratar">
-                                                @foreach ($docenteOptions as $doc)
-                                                @continue($doc['virtual'] && ! in_array($doc['cupo_bloque'], $cuposPermitidos, true))
-                                                @continue(($proceso2027Asignacion['aplica'] ?? false) && $groupKey === 'pie_educadora_diferencial' && !$doc['elegible_bolsa_diferencial'])
-                                                <option value="{{ $doc['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $doc['rut']) data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
-                                                @endforeach
-                                            </optgroup>
-                                            <optgroup label="Asistentes de la Educación">
-                                                @foreach ($asistenteOptions as $asistente)
-                                                <option value="{{ $asistente['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $asistente['rut']) data-estamento="asistente" data-nombre="{{ $asistente['nombre'] }}" data-rut="{{ $asistente['rut'] }}" data-funcion="{{ $asistente['funcion'] }}" data-titular-disponible="{{ $fmt($asistente['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($asistente['contrata_disponible']) }}">{{ $asistente['label'] }}</option>
-                                                @endforeach
-                                            </optgroup>
+                                            @include('admin.dotacion-establecimiento.partials._personal_select_referencia', [
+                                                'opcionesPersonal' => $docenteOptions->filter(fn ($doc) =>
+                                                    (!$doc['virtual'] || in_array($doc['cupo_bloque'], $cuposPermitidos, true))
+                                                    && (!(($proceso2027Asignacion['aplica'] ?? false) && $groupKey === 'pie_educadora_diferencial') || $doc['elegible_bolsa_diferencial'])
+                                                ),
+                                                'grupoPersonal' => 'Docentes vigentes y por contratar', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', ''),
+                                            ])
+                                            @include('admin.dotacion-establecimiento.partials._personal_select_referencia', ['opcionesPersonal' => $asistenteOptions, 'grupoPersonal' => 'Asistentes de la Educación', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', '')])
                                         </select>
                                         <div class="row g-2">
                                             <div class="col">
@@ -829,13 +827,24 @@
     </div>
 @endforeach
 
+@foreach ($catalogosPersonal as $catalogoId => $catalogo)
+    <template id="{{ $catalogoId }}" data-dotacion-personal-catalogo>
+        <optgroup label="{{ $catalogo['grupo'] }}">
+            @foreach ($catalogo['opciones'] as $doc)
+                @include('admin.dotacion-establecimiento.partials._personal_select_opcion', ['opcionPersonal' => $doc, 'fasePersonal' => $catalogo['fase'], 'opcionSeleccionada' => false])
+            @endforeach
+        </optgroup>
+    </template>
+@endforeach
 
 </div>
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    let initPersonalSelect = function () {};
+    const visible = element => !element.closest('.collapse:not(.show), [hidden], details:not([open])');
+    const prepararOpciones = element => element.dispatchEvent(new Event('dotacion:prepare-personal', { bubbles: true }));
+    let initPersonalSelect = function (element) { if (visible(element)) prepararOpciones(element); };
     if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
         const $ = window.jQuery;
         const optionData = function (item) {
@@ -896,7 +905,8 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         initPersonalSelect = function (element) {
-            if (element.closest('.collapse:not(.show), [hidden], details:not([open])') || $(element).hasClass('select2-hidden-accessible')) return;
+            if (!visible(element) || $(element).hasClass('select2-hidden-accessible')) return;
+            prepararOpciones(element);
             $(element).select2({
                 theme: 'bootstrap-5',
                 width: '100%',
@@ -917,20 +927,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 $('.dotacion-personal-dropdown .select2-search__field').attr('aria-label', 'Buscar: ' + label);
             });
         };
-        document.querySelectorAll('.js-dotacion-docente-select:not(.js-personal-cobertura)').forEach(initPersonalSelect);
-        document.addEventListener('shown.bs.collapse', function (event) {
-            event.target.querySelectorAll('.js-dotacion-docente-select').forEach(initPersonalSelect);
-        });
-        document.addEventListener('dotacion:visibility', function (event) {
-            event.target.querySelectorAll('.js-dotacion-docente-select').forEach(initPersonalSelect);
-        });
-        document.addEventListener('toggle', function (event) {
-            if (event.target.matches('[data-dotacion-editor]') && event.target.open) {
-                event.target.querySelectorAll('.js-dotacion-docente-select').forEach(initPersonalSelect);
-            }
-        }, true);
     }
-    document.querySelectorAll('[data-dotacion-asignacion-form]').forEach(function (form) {
+    const initCoverageForm = function (form) {
+        if (!visible(form) || form.dataset.personalInitialized) return;
         const estamento = form.querySelector('.js-estamento-cobertura');
         const personal = form.querySelector('.js-personal-cobertura');
         const contratoAaee = form.querySelector('.js-horas-contrato-aaee');
@@ -939,7 +938,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!estamento || !personal) {
             return;
         }
-
+        prepararOpciones(personal);
+        form.dataset.personalInitialized = '1';
         const personalOptions = Array.from(personal.querySelectorAll('option[data-estamento]'), function (option) {
             return option.cloneNode(true);
         });
@@ -981,11 +981,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     ayudaAaee.classList.toggle('d-none', !isAaee);
                 }
             }
+            personal.dispatchEvent(new Event('change', { bubbles: true }));
         };
 
         estamento.addEventListener('change', sync);
         sync();
-    });
+    };
+    const initVisible = function (scope) {
+        scope.querySelectorAll('[data-dotacion-asignacion-form]').forEach(initCoverageForm);
+        scope.querySelectorAll('.js-dotacion-docente-select:not(.js-personal-cobertura)').forEach(initPersonalSelect);
+    };
+    const root = document.querySelector('[data-dotacion-asignacion]');
+    if (!root) return;
+    initVisible(root);
+    root.addEventListener('shown.bs.collapse', event => initVisible(event.target));
+    root.addEventListener('dotacion:visibility', event => initVisible(event.target));
+    root.addEventListener('toggle', function (event) {
+        if (event.target.matches('[data-dotacion-editor]') && event.target.open) initVisible(event.target);
+    }, true);
 });
 </script>
 @endpush
