@@ -77,6 +77,8 @@ class DotacionProceso2027Calculator
             'asignadas_plan_obligatorias' => 0.0,
             'asignadas_no_normativas' => 0.0,
             'reservadas_no_normativas' => 0.0,
+            'titulares_otras_funciones_global' => 0.0,
+            'titulares_otras_funciones_por_asignacion' => [],
             'asignadas_acompanamiento' => 0.0,
             'asignadas_libre_disposicion_nt_otro_docente' => 0.0,
             'horas_aula_libre_disposicion_nt_otro_docente' => 0.0,
@@ -214,7 +216,13 @@ class DotacionProceso2027Calculator
         $docentesPorRut = $docentes->keyBy('rut_normalizado');
         $asignaciones = DotacionContratoPlanCalculator::consolidar(collect(data_get($data, 'asignacion.asignaciones', [])))
             ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row))
-            ->sortBy(fn ($row) => (string) data_get($row, 'tipo_asignacion') === 'reserva_no_normativa' ? 0 : 1);
+            ->sortBy(fn ($row) => match (true) {
+                DotacionReservaNoNormativa::esVinculacionTitularParvularia($row),
+                (string) data_get($row, 'tipo_asignacion') === 'reserva_no_normativa'
+                    && (string) data_get($row, 'subtipo_asignacion') === 'titular' => 0,
+                (string) data_get($row, 'tipo_asignacion') === 'reserva_no_normativa' => 1,
+                default => 2,
+            });
         $horasClasificadasPorRut = [];
         $horasParvulariaPorRut = [];
         foreach ($asignaciones as $asignacion) {
@@ -274,6 +282,18 @@ class DotacionProceso2027Calculator
                     min((float) $docente['horas_planta'], (float) $docente['horas_contrato']) - $horasPrevias
                 );
                 $titular = min($horas, $titularDisponible);
+                if ($bloque === 'bloque_2'
+                    && ((string) data_get($asignacion, 'tipo_asignacion') !== 'reserva_no_normativa'
+                        || (string) data_get($asignacion, 'subtipo_asignacion') === 'titular')
+                    && ((int) data_get($asignacion, 'dotacion_funcion_id', 0) > 0
+                        || in_array((string) data_get($asignacion, 'tipo_asignacion'), ['otra_funcion', 'reserva_no_normativa'], true))) {
+                    // Conserva el bloque contractual de la educadora. Estas
+                    // horas titulares consumen el cupo no normativo global.
+                    $bloques[$bloque]['titulares_otras_funciones_global'] += $titular;
+                    if ($asignacionId > 0) {
+                        $bloques[$bloque]['titulares_otras_funciones_por_asignacion'][$asignacionId] = $titular;
+                    }
+                }
                 $bloques[$bloque]['titulares_asignadas'] += $titular;
                 $bloques[$bloque]['contrata_asignadas'] += max(0.0, $horas - $titular);
                 $horasClasificadasPorRut[$rut] = $horasPrevias + $horas;
@@ -335,6 +355,7 @@ class DotacionProceso2027Calculator
             $bloque['asignadas_plan_obligatorias'] = round((float) $bloque['asignadas_plan_obligatorias'], 2);
             $bloque['asignadas_no_normativas'] = round((float) $bloque['asignadas_no_normativas'], 2);
             $bloque['reservadas_no_normativas'] = round((float) $bloque['reservadas_no_normativas'], 2);
+            $bloque['titulares_otras_funciones_global'] = round((float) $bloque['titulares_otras_funciones_global'], 2);
             $bloque['asignadas_acompanamiento'] = round((float) $bloque['asignadas_acompanamiento'], 2);
             $bloque['asignadas_libre_disposicion_nt_otro_docente'] = round((float) $bloque['asignadas_libre_disposicion_nt_otro_docente'], 2);
             $bloque['ajuste_cobertura_plan'] = round((float) $bloque['ajuste_cobertura_plan'], 2);
@@ -350,8 +371,8 @@ class DotacionProceso2027Calculator
             $bloque['pendientes'] = max(0.0, round($bloque['requeridas'] - $bloque['asignadas_obligatorias'], 2));
             $bloque['contrato_comprometido'] = self::contratoComprometidoParaMaximo(
                 $bloque['requeridas'],
-                max(0.0, $bloque['asignadas'] - $bloque['asignadas_acompanamiento']),
-                $bloque['asignadas_no_normativas']
+                max(0.0, $bloque['asignadas'] - $bloque['asignadas_acompanamiento'] - $bloque['titulares_otras_funciones_global']),
+                max(0.0, $bloque['asignadas_no_normativas'] - $bloque['titulares_otras_funciones_global'])
             );
             $bloque['saldo_maximo'] = $bloque['maximo'] === null ? null : round(max(0.0, $bloque['maximo'] - $bloque['contrato_comprometido']), 2);
             $bloque['maximo_insuficiente'] = $bloque['maximo'] !== null && $bloque['maximo'] + 0.01 < $bloque['requeridas'];
@@ -376,7 +397,8 @@ class DotacionProceso2027Calculator
             && $combinacionDeclarada && $funcionesNormativasDefinidas && $maximosConfigurados && $topesSuficientes;
         $horasDisponiblesDocentes = round((float) $docentes->sum('horas_disponibles'), 2);
         $capacidadNoNormativas = min(
-            (float) collect($bloques)->sum(fn (array $bloque) => max(0.0, (float) ($bloque['saldo_maximo'] ?? 0))),
+            max(0.0, (float) collect($bloques)->sum(fn (array $bloque) => max(0.0, (float) ($bloque['saldo_maximo'] ?? 0)))
+                - (float) collect($bloques)->sum('titulares_otras_funciones_global')),
             $horasDisponiblesDocentes
         );
         $capacidadReservaNoNormativa = min(

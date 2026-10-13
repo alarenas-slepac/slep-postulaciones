@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.13.598',
+    'current_version' => '2026.10.13.599',
     'entries' => [
+        [
+            'version' => '2026.10.13.599',
+            'title' => 'Parvularia: reserva de horas titulares para otras funciones',
+            'summary' => 'Permite reservar el saldo titular de Educadoras de Párvulos aunque su bloque curricular no tenga margen, dentro del cupo no normativo del establecimiento.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'El selector y la validación al guardar permiten reservar horas titulares de Parvularia hasta el menor entre el saldo individual y el cupo no normativo disponible del establecimiento.',
+                'Mantiene las horas en el bloque contractual de la educadora y descuenta una sola vez su consumo del cupo global, sin acreditar cobertura del plan ni de PIE.',
+                'La vinculación completa o parcial a una función conserva el consumo y registra su origen titular al editar, también en contratos mixtos; liberar la reserva recupera los saldos. Las reservas no impiden continuar asignando horas curriculares dentro del saldo individual.',
+                'Conserva el mínimo de una hora, las etapas previas, los permisos y las restricciones de margen para los demás bloques y para la contrata protegida.',
+                'Incluye pruebas aisladas de límites individuales y globales, acumulación, liberación, vinculación, edición y habilitación del selector.',
+            ],
+            'published_at' => '2026-10-13',
+        ],
         [
             'version' => '2026.10.13.598',
             'title' => 'Parvularia: acompañamiento en libre disposición de cursos combinados',

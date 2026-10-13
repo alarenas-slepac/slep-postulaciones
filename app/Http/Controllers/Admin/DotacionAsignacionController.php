@@ -156,6 +156,11 @@ class DotacionAsignacionController extends Controller
             'estamento_cobertura' => $estamentoCobertura,
         ]);
         $payload = $this->buildPayload($request, $establecimiento, $persona, array_merge($asignacion->toArray(), $data), $asignacion);
+        if (DotacionReservaNoNormativa::esVinculacionTitularParvularia($asignacion)
+            && DotacionEstablecimientoCalculator::normalizeRut((string) $asignacion->docente_rut_normalizado)
+                === $payload['docente_rut_normalizado']) {
+            $payload['fuente_calculo'] = DotacionReservaNoNormativa::FUENTE_VINCULACION_TITULAR_PARVULARIA;
+        }
         $payload['updated_by'] = $request->user()?->id;
         DB::transaction(function () use ($establecimiento, $persona, $payload, $asignacion): void {
             Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
@@ -295,7 +300,10 @@ class DotacionAsignacionController extends Controller
                 throw ValidationException::withMessages(['docente_rut' => 'El docente de la reserva ya no tiene contrato vigente.']);
             }
             $payload = $this->buildPayload($request, $establecimiento, $persona, $campos, $esTraspasoCompleto ? $reserva : null);
-            $payload['fuente_calculo'] = 'Vinculada desde reserva de horas para otras funciones';
+            $payload['fuente_calculo'] = $reserva->subtipo_asignacion === 'titular'
+                && DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos']
+                ? DotacionReservaNoNormativa::FUENTE_VINCULACION_TITULAR_PARVULARIA
+                : 'Vinculada desde reserva de horas para otras funciones';
             $payload['_desde_reserva'] = true;
             $this->validateProceso2027Assignment($establecimiento, $persona, $payload, $esTraspasoCompleto ? $reserva : null);
             unset($payload['_desde_reserva']);
@@ -1195,6 +1203,15 @@ class DotacionAsignacionController extends Controller
         $noNormativas = (float) ($bloqueProceso['asignadas_no_normativas'] ?? 0);
         $esNoNormativa = (int) ($payload['dotacion_funcion_id'] ?? 0) > 0
             || (string) ($payload['tipo_asignacion'] ?? '') === 'otra_funcion';
+        $titularesGlobales = (float) ($bloqueProceso['titulares_otras_funciones_global'] ?? 0);
+        $titularesGlobalesLiberadas = 0.0;
+        $asignadasPersona = max(0.0, (float) ($persona['horas_asignadas_total'] ?? 0));
+        if ($current && DotacionEstablecimientoCalculator::normalizeRut((string) $current->docente_rut_normalizado)
+            === DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? ''))) {
+            $asignadasPersona = max(0.0, $asignadasPersona - DotacionContratoPlanCalculator::horasLiberadas(
+                collect($persona['asignaciones'] ?? []), $current
+            ));
+        }
         if ($current) {
             $rutActual = DotacionEstablecimientoCalculator::normalizeRut((string) ($current->docente_rut_normalizado ?: $current->docente_rut));
             $personaActual = collect($proceso['docentes'] ?? [])->first(fn (array $docente) =>
@@ -1206,6 +1223,8 @@ class DotacionAsignacionController extends Controller
                 ?: $bloqueNecesidadActual
                 ?: DotacionProceso2027Calculator::bloqueParaAsignacion($current);
             if ($bloqueActual === $bloque) {
+                $titularesGlobalesLiberadas = (float) data_get($bloqueProceso, 'titulares_otras_funciones_por_asignacion.'.$current->id, 0);
+                $titularesGlobales = max(0.0, $titularesGlobales - $titularesGlobalesLiberadas);
                 $asignadasMaximo = max(0.0, $asignadasMaximo - DotacionProceso2027Calculator::horasImputablesAlMaximo(
                     (string) $current->tipo_asignacion,
                     DotacionContratoPlanCalculator::horasLiberadas(collect($personaActual['asignaciones'] ?? []), $current)
@@ -1216,6 +1235,26 @@ class DotacionAsignacionController extends Controller
                 }
             }
         }
+        $titularesRestituidas = $current
+            && DotacionEstablecimientoCalculator::normalizeRut((string) $current->docente_rut_normalizado)
+                === DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? ''))
+            ? $titularesGlobalesLiberadas : 0.0;
+        $titularesGlobalesNuevas = $bloque === 'bloque_2' && $esNoNormativa
+            ? min($horas, $titularesRestituidas + max(0.0,
+                min((float) ($persona['horas_planta'] ?? 0), (float) ($persona['horas_contrato'] ?? 0))
+                    - (float) ($persona['horas_asignadas_total'] ?? 0)))
+            : 0.0;
+        $noNormativasLiberadas = $current && ($current->estamento_cobertura ?? 'docente') === 'docente'
+            && ((int) ($current->dotacion_funcion_id ?? 0) > 0
+                || in_array((string) $current->tipo_asignacion, ['otra_funcion', 'reserva_no_normativa'], true))
+            ? (float) $current->horas_contrato : 0.0;
+        if ($esNoNormativa && $horas > (float) ($proceso['capacidad_no_normativas'] ?? 0) + $noNormativasLiberadas + 0.01) {
+            throw ValidationException::withMessages([
+                'horas_contrato' => 'Las horas para otras funciones superan el saldo no normativo disponible del establecimiento.',
+            ]);
+        }
+        $asignadasMaximo = max(0.0, $asignadasMaximo - $titularesGlobales);
+        $noNormativas = max(0.0, $noNormativas - $titularesGlobales);
         $maximo = $bloqueProceso['maximo'] ?? null;
         // Las horas aula completas acreditan el plan consolidado, aunque las
         // asignaciones históricas conserven un contrato menor por asignatura.
@@ -1227,7 +1266,7 @@ class DotacionAsignacionController extends Controller
             : $asignadasMaximo;
         $horasMaximo = DotacionProceso2027Calculator::horasImputablesAlMaximo(
             (string) ($payload['tipo_asignacion'] ?? ''), $horas
-        );
+        ) - $titularesGlobalesNuevas;
         if ($maximo !== null && $horasMaximo > 0.01
             && $contratoComprometido + $horasMaximo > (float) $maximo + 0.01) {
             throw ValidationException::withMessages([
@@ -1235,13 +1274,6 @@ class DotacionAsignacionController extends Controller
             ]);
         }
 
-        $asignadasPersona = max(0.0, (float) ($persona['horas_asignadas_total'] ?? 0));
-        if ($current && DotacionEstablecimientoCalculator::normalizeRut((string) $current->docente_rut_normalizado)
-            === DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? ''))) {
-            $asignadasPersona = max(0.0, $asignadasPersona - DotacionContratoPlanCalculator::horasLiberadas(
-                collect($persona['asignaciones'] ?? []), $current
-            ));
-        }
         $disponibles = max(0.0, (float) ($persona['horas_contrato'] ?? 0) - $asignadasPersona);
         if (($seleccionLibreParvularia || $seleccionLibreReligion) && $disponibles < 1.0) {
             throw ValidationException::withMessages([

@@ -1,6 +1,6 @@
 # Asignación de horas y prelación en Dotación 2027
 
-Reglas actualizadas en el parche `2026.10.13.596`, sobre la base de `2026.10.12.594`. Se aplican al proceso 2027 y reutilizan el orden de prelación, tramo y antigüedad calculado por el SGA.
+Reglas actualizadas en el parche `2026.10.13.599`. Se aplican al proceso 2027 y reutilizan el orden de prelación, tramo y antigüedad calculado por el SGA.
 
 ## Reglas por destino
 
@@ -17,7 +17,9 @@ Reglas actualizadas en el parche `2026.10.13.596`, sobre la base de `2026.10.12.
 
 La prelación curricular utiliza los mismos candidatos que muestra el selector: docentes asociados, restricciones del curso y fase titular o contrata. También utiliza el saldo de esa fase, descontando asignaciones y reservas y omitiendo saldos individuales menores a una hora. Un docente mixto cuya reserva agotó el saldo titular deja de participar en la fase titular aunque conserve horas a contrata. Cuando se habilita la fase contrata, se compara el saldo a contrata de los candidatos que aparecen entonces.
 
-La reserva utiliza primero el saldo titular asignable de cada docente. Sólo quien tenga una situación registrada de `fuero_maternal` o `horas_gremiales` puede reservar saldo a contrata cuando ya no tenga al menos una hora titular asignable. También se reconoce `horas_lactancia` con fuero maternal expresamente registrado; lactancia sola no habilita la excepción. Cada opción muestra su origen y máximo, respetando el saldo no normativo, el margen del bloque y las reservas anteriores. La autorización se verifica en el servidor; no basta enviar una situación desde el formulario.
+La reserva utiliza primero el saldo titular asignable de cada docente. Sólo quien tenga una situación registrada de `fuero_maternal` o `horas_gremiales` puede reservar saldo a contrata cuando ya no tenga al menos una hora titular asignable. También se reconoce `horas_lactancia` con fuero maternal expresamente registrado; lactancia sola no habilita la excepción. Cada opción muestra su origen y máximo, respetando el saldo no normativo y las reservas anteriores. La autorización se verifica en el servidor; no basta enviar una situación desde el formulario.
+
+Las Educadoras de Párvulos pueden reservar su saldo titular aunque Educación Parvularia no tenga margen en su máximo curricular. El límite es el menor entre su saldo titular disponible y el cupo no normativo restante del establecimiento, conservando el mínimo de una hora y las etapas previas. Las horas permanecen identificadas en el bloque contractual de Parvularia, descuentan el contrato de la educadora y consumen una sola vez el cupo global para otras funciones. Al vincularlas, incluso parcialmente, el consumo se mantiene; al liberarlas se recuperan ambos saldos. No acreditan cobertura del plan ni de PIE. Para los demás bloques y las reservas a contrata se conserva la exigencia de margen del bloque.
 
 ### Religión y PIE colaborativo
 
@@ -49,7 +51,7 @@ Permanecen las validaciones de saldo, bloque contractual, máximo individual, ho
 
 Se mantienen las asignaciones guardadas y los datos históricos. No se realizan migraciones ni correcciones automáticas. Al editar una asignación 2027 se comprueba su elegibilidad actual.
 
-Archivos del parche, conservando sus rutas:
+Archivos de los parches de prelación anteriores, conservando sus rutas:
 
 - `app/Http/Controllers/Admin/DotacionAsignacionController.php`
 - `app/Support/DotacionAsignacionElegibilidad2027.php`
@@ -85,6 +87,14 @@ Para revisar visualmente el HTML real de los selectores con datos ficticios, la 
 Se ejecutaron 66 pruebas específicas (321 aserciones) de selección libre, prelación del plan y reservas. Después de ampliar la comprobación de los selectores se ejecutó un conjunto de 92 pruebas (658 aserciones) de regresión, que incluye esos nuevos casos, contratos consolidados, cupos virtuales, suspensión de asignaciones, situaciones protegidas, asociación de docentes, usabilidad y changelog. Ambos conjuntos pasaron; comparten el caso de reserva titular agotada.
 
 Todas las ejecuciones usan SQLite en memoria, almacenamiento simulado y una ruta de configuración de pruebas distinta de la cacheada antes de arrancar Laravel. Pasan `php -l` en los once archivos PHP/Blade modificados, la comprobación de sintaxis JavaScript del selector y `git diff --check`. No hay nuevas rutas ni assets compilados y no se requieren migraciones. La revisión visual en navegador de este parche queda pendiente; las referencias visuales anteriores corresponden al parche 594.
+
+## Validación del parche 2026.10.13.599
+
+Se ejecutaron **162 pruebas de regresión, 1.042 aserciones**, aprobadas en SQLite en memoria, con discos simulados y una ruta de configuración de pruebas distinta de la cacheada. Se comprobaron reservas titulares de Parvularia sin margen curricular, límites individuales y globales, acumulación, liberación, continuidad de las asignaciones curriculares, vinculación completa y parcial, edición en contratos mixtos y conservación de las restricciones de contrata protegida. Otro bloque no puede volver a utilizar el cupo ya reservado por Parvularia.
+
+Las pruebas de la vista verifican que la opción de Parvularia y el botón quedan habilitados con margen cero y muestran el máximo correcto. La revisión manual en navegador de este parche queda pendiente. Pasan `php -l` en los siete PHP/Blade modificados, `artisan optimize:clear` y `git diff --check`. No se modifican rutas ni assets compilados, y no se requieren migraciones.
+
+Este parche modifica el controlador de asignaciones, el resumen del proceso 2027, el cálculo de reservas, la vista de reservas, las dos pruebas de Parvularia y saldos titulares, esta guía y el changelog. Mantiene los registros históricos; las nuevas vinculaciones desde reservas titulares de Parvularia identifican su origen en `fuente_calculo`, generado por el servidor y conservado al editar para la misma persona.
 
 ## Despliegue en cPanel
 
