@@ -10,6 +10,7 @@ class DotacionAsignacionViewTest extends TestCase
     {
         $source = file_get_contents(resource_path('views/admin/dotacion-establecimiento/partials/_asignacion.blade.php'));
         $assets = file_get_contents(resource_path('views/admin/dotacion-establecimiento/partials/_personal_select_assets.blade.php'));
+        $option = file_get_contents(resource_path('views/admin/dotacion-establecimiento/partials/_personal_select_opcion.blade.php'));
 
         $this->assertIsString($source);
         $this->assertIsString($assets);
@@ -17,8 +18,8 @@ class DotacionAsignacionViewTest extends TestCase
         $this->assertStringContainsString('minimumResultsForSearch: 0', $source);
         $this->assertStringContainsString('templateResult: templateResult', $source);
         $this->assertStringContainsString('Buscar por nombre o RUT...', $source);
-        $this->assertStringContainsString('data-prioridad-label=', $source);
-        $this->assertStringContainsString('data-titular-disponible=', $source);
+        $this->assertStringContainsString('data-prioridad-label=', $option);
+        $this->assertStringContainsString('data-titular-disponible=', $option);
         $this->assertStringContainsString('dotacion-selector-guide', $source);
         $this->assertStringContainsString('dotacion-assignment-form', $source);
     }

@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use ReflectionProperty;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\IsolatedSecurityTestCase;
 
 class DotacionDocentesRendimientoTest extends IsolatedSecurityTestCase
@@ -132,6 +133,74 @@ class DotacionDocentesRendimientoTest extends IsolatedSecurityTestCase
         $this->assertSame(json_encode($full), json_encode($light));
         $this->assertCount(1, $light['asistentes']);
         $this->assertCount(3, $light['asignacion']['docentes']);
+    }
+
+    public static function assignmentYears(): array
+    {
+        return ['histórico' => [2026], 'proceso 2027' => [2027]];
+    }
+
+    #[DataProvider('assignmentYears')]
+    public function test_asignacion_grande_conserva_necesidades_y_datos(int $year): void
+    {
+        $ee = $this->dataset(year: $year);
+        $user = $this->testUser(1, 3);
+        $request = Request::create('/admin/dotacion-establecimiento/'.$ee->id, 'GET', ['anio' => $year, 'tab' => 'asignacion']);
+        $request->setUserResolver(fn () => $user);
+        $request->setLaravelSession(app('session')->driver());
+        $this->app->instance('request', $request);
+        $this->actingAs($user);
+        $this->app['view']->share('errors', new \Illuminate\Support\ViewErrorBag);
+        $snapshot = DB::table('dotacion_docente_asignaciones')->orderBy('id')->get()->toJson();
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $start = hrtime(true);
+        $data = app(DotacionEstablecimientoController::class)->show($request, $ee)->getData();
+        $calculation = (hrtime(true) - $start) / 1e9;
+        $calculationQueries = count(DB::getQueryLog());
+        $renderStart = hrtime(true);
+        $html = view('admin.dotacion-establecimiento.partials._asignacion', $data)->render(function ($view, string $content) use ($year): string {
+            if (getenv('SGA_ASIGNACION_PREVIEW') === '1') {
+                $manifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);
+                $styles = $this->app['view']->yieldPushContent('styles');
+                $scripts = $this->app['view']->yieldPushContent('scripts');
+                $preview = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Asignación '.$year.' · 24 cursos y 90 docentes ficticios</title>'
+                    .'<link rel="stylesheet" href="/build/'.$manifest['resources/scss/app.scss']['file'].'">'
+                    .'<link rel="stylesheet" href="/build/'.$manifest['resources/css/dotacion-establecimiento.css']['file'].'">'.$styles.'</head><body>'
+                    .'<main class="container-fluid p-3"><p class="text-muted">Prueba local · 24 cursos y 90 docentes ficticios · Año '.$year.'</p><div class="dotacion-workspace">'.$content.'</div></main>'
+                    .'<script>document.addEventListener("submit",event=>{event.preventDefault();event.stopImmediatePropagation();},true);</script>'
+                    .'<script type="module" src="/build/'.$manifest['resources/js/app.js']['file'].'"></script>'
+                    .'<script type="module" src="/build/'.$manifest['resources/js/dotacion-asignacion.js']['file'].'"></script>'.$scripts.'</body></html>';
+                file_put_contents(storage_path('framework/testing/asignacion-'.$year.'-grande-595.html'), $preview);
+            }
+            return $content;
+        });
+        $render = (hrtime(true) - $renderStart) / 1e9;
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+        $needCount = collect($data['asignacion']['necesidades'])->sum(fn ($items) => count($items));
+        $this->assertSame($needCount, substr_count($html, 'data-dotacion-need='));
+        $this->assertCount(90, $data['docentes']);
+        $this->assertSame(24, $data['resumen']['cursos_total']);
+        $this->assertSame($snapshot, DB::table('dotacion_docente_asignaciones')->orderBy('id')->get()->toJson());
+        $this->assertSame(0, count($queries) - $calculationQueries);
+        $this->assertLessThan(6000000, strlen($html), 'Los selectores no deben repetir el padrón en cada formulario cerrado.');
+        $this->assertLessThan(1600, substr_count($html, '<option '));
+        preg_match_all('/data-personal-catalogo="([^"]+)"/', $html, $references);
+        $this->assertNotEmpty($references[1]);
+        foreach (array_unique($references[1]) as $id) {
+            $this->assertSame(1, substr_count($html, 'id="'.$id.'" data-dotacion-personal-catalogo'));
+        }
+        if (getenv('SGA_ASIGNACION_BENCHMARK') === '1') {
+            fwrite(STDOUT, "\nASIGNACION_BENCHMARK ".json_encode([
+                'year' => $year, 'calculation_seconds' => round($calculation, 4), 'render_seconds' => round($render, 4),
+                'queries' => count($queries), 'render_queries' => count($queries) - $calculationQueries,
+                'html_bytes' => strlen($html), 'options' => substr_count($html, '<option '),
+                'forms' => substr_count($html, '<form '), 'peak_mb' => memory_get_peak_usage(true) / 1048576,
+                'summary_hash' => hash('sha256', json_encode($data['resumen'])),
+                'query_shapes' => collect($queries)->countBy('query')->sortDesc()->take(8)->all(),
+            ], JSON_UNESCAPED_UNICODE)."\n");
+        }
     }
 
     public function test_cache_de_asignaciones_aisla_instancias_anios_y_siguientes_consultas(): void

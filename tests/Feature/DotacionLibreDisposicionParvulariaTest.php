@@ -279,7 +279,8 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
                     .'<link rel="stylesheet" href="/build/'.$manifest['resources/css/dotacion-establecimiento.css']['file'].'">'.$styles.'</head><body>'
                     .'<main class="container-fluid p-3"><p class="text-muted">Prueba con datos ficticios.</p><div class="dotacion-workspace">'.$content.'</div></main>'
                     .'<script>document.addEventListener("submit",function(event){event.preventDefault();event.stopImmediatePropagation();},true);</script>'
-                    .'<script type="module" src="/build/'.$manifest['resources/js/app.js']['file'].'"></script>'.$scripts.'</body></html>';
+                    .'<script type="module" src="/build/'.$manifest['resources/js/app.js']['file'].'"></script>'
+                    .'<script type="module" src="/build/'.$manifest['resources/js/dotacion-asignacion.js']['file'].'"></script>'.$scripts.'</body></html>';
                 file_put_contents(storage_path('framework/testing/prelacion-2027-preview.html'), $preview);
             }
             return $content;
@@ -289,7 +290,7 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $xpath = new \DOMXPath($dom);
         $bagForm = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$bag['key'].'"]]')->item(0);
         $this->assertNotNull($bagForm);
-        $options = $xpath->query('.//select[@name="docente_rut"]//option[@data-estamento="docente"]', $bagForm);
+        $options = $this->catalogOptions($xpath, $bagForm);
         $this->assertSame(2, $options->length);
         $this->assertSame('99000006-K', $options[0]->getAttribute('value'));
         $this->assertSame('99000005-K', $options[1]->getAttribute('value'));
@@ -297,8 +298,10 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertNotNull($functionForm);
         $this->assertStringContainsString('Orden informativo', $functionForm->textContent);
         $this->assertStringContainsString('no bloquea', $functionForm->textContent);
-        $this->assertSame(1, $xpath->query('.//option[@value="99000001-K"][@data-prioridad-label]', $functionForm)->length);
-        $this->assertSame(1, $xpath->query('.//option[@value="99000002-K"][@data-prioridad-label]', $functionForm)->length);
+        $functionOptions = $this->catalogOptions($xpath, $functionForm);
+        $this->assertSame('99000001-K', $functionOptions[0]->getAttribute('value'));
+        $this->assertSame('99000002-K', $functionOptions[4]->getAttribute('value'));
+        $this->assertTrue($functionOptions[4]->hasAttribute('data-prioridad-label'));
     }
 
     private function coverPlan(): void
@@ -382,16 +385,23 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $select = $xpath->query('.//select[@name="docente_rut"]', $form)->item(0);
         $this->assertFalse($select->hasAttribute('multiple'));
         $this->assertSame('', $select->getAttribute('data-fase-plan'));
-        $this->assertSame(1, $xpath->query('.//option[@value="99000002-K"]', $select)->length);
-        $this->assertSame(1, $xpath->query('.//option[@value="99000001-K"]', $select)->length);
-        $this->assertSame(0, $xpath->query('.//option[@value="99000003-K"]', $select)->length);
         $this->assertSame(0, $xpath->query('.//input[@name="excepcion_prelacion"]', $form)->length);
         $this->assertStringContainsString('Elija un docente asociado a esta asignatura', $form->textContent);
         $this->assertStringContainsString('No se exige prelación ni justificación', $form->textContent);
-        $options = $xpath->query('.//option[@data-estamento="docente"]', $select);
+        $this->assertSame(0, $xpath->query('.//option[@data-estamento="docente"]', $select)->length);
+        $options = $this->catalogOptions($xpath, $select);
         $this->assertSame(2, $options->length);
         $this->assertSame('99000001-K', $options->item(0)->getAttribute('value'));
         $this->assertSame('99000002-K', $options->item(1)->getAttribute('value'));
+    }
+
+    private function catalogOptions(\DOMXPath $xpath, \DOMNode $scope): \DOMNodeList
+    {
+        $paths = [];
+        foreach ($xpath->query('.//optgroup[@data-personal-catalogo]', $scope) as $reference) {
+            $paths[] = '//template[@id="'.$reference->getAttribute('data-personal-catalogo').'"]//option[@data-estamento="docente"]';
+        }
+        return $xpath->query(implode(' | ', $paths), $scope);
     }
 
     public function test_libre_disposicion_rechaza_docente_no_asociado_a_la_asignatura(): void
