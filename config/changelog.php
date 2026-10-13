@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.12.595',
+    'current_version' => '2026.10.13.596',
     'entries' => [
+        [
+            'version' => '2026.10.13.596',
+            'title' => 'Dotación 2027: Religión, PIE colaborativo y reservas protegidas',
+            'summary' => 'Permite seleccionar sin prelación en Religión y trabajo colaborativo PIE, y concilia la validación del plan con el saldo visible después de reservar horas.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Religión permite elegir un docente asociado con saldo titular o a contrata, sin prelación ni justificación. La excepción se determina por la necesidad vigente del plan y no por el nombre enviado en el formulario.',
+                'Trabajo colaborativo PIE conserva el orden informativo y permite elegir o reasignar sin prelación, manteniendo restricciones de perfil, saldo individual y máximo del bloque.',
+                'En el resto del plan, la validación compara sólo docentes y saldos de la fase visible del selector. Si una reserva agota las horas titulares, las horas a contrata de ese docente no bloquean la fase titular; los saldos menores a una hora siguen excluidos.',
+                'Habilita reservas a contrata sólo con fuero maternal u horas gremiales registrados, después del saldo titular asignable del propio docente. El selector indica el origen y máximo por persona y conserva límites y reservas anteriores.',
+                'Incluye pruebas aisladas de creación, edición, reservas mixtas, situaciones protegidas, manipulación de formularios y candidatos visibles. No modifica contratos ni asignaciones históricas.',
+            ],
+            'published_at' => '2026-10-13',
+        ],
         [
             'version' => '2026.10.12.595',
             'title' => 'Dotación: carga más liviana de Asignación de horas',

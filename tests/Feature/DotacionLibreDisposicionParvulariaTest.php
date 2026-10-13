@@ -115,6 +115,222 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertEquals(0, $after['bloques']['bloque_2']['asignadas']);
     }
 
+    public function test_religion_permite_contrata_asociada_sin_prelar_al_crear_y_reasignar(): void
+    {
+        $need = $this->basicSubject('Religión Católica');
+        $this->store([], $need);
+        $saved = DotacionDocenteAsignacion::sole();
+        $this->assertSame('99000002K', $saved->docente_rut_normalizado);
+        $this->assertNull($saved->excepcion_prelacion);
+        app(DotacionAsignacionController::class)->update($this->request([
+            'docente_rut' => '99000003-K', 'estamento_cobertura' => 'docente', 'horas_plan_pedagogicas' => 2,
+        ]), $this->ee, $saved);
+        $this->assertSame('99000003K', $saved->fresh()->docente_rut_normalizado);
+    }
+
+    public function test_nombre_religion_en_formulario_no_exime_otra_asignatura(): void
+    {
+        $need = $this->basicSubject('Matemática');
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Esta asignatura aún tiene docentes');
+        $this->store(['asignatura_nombre' => 'Religión'], $need);
+    }
+
+    public function test_pie_colaborativo_permite_elegir_sin_prelar_al_crear_y_editar(): void
+    {
+        $this->differentialNeed();
+        $need = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.pie_colaborativo'))->sole();
+        app(DotacionAsignacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => 'pie_colaborativo', 'subtipo_asignacion' => $need['subtipo_asignacion'],
+            'necesidad_key' => $need['key'], 'establecimiento_curso_id' => $need['establecimiento_curso_id'], 'horas_contrato' => 3,
+        ]), $this->ee);
+        $saved = DotacionDocenteAsignacion::sole();
+        $this->assertSame('99000002K', $saved->docente_rut_normalizado);
+        $this->assertNull($saved->excepcion_prelacion);
+        app(DotacionAsignacionController::class)->update($this->request([
+            'docente_rut' => '99000003-K', 'estamento_cobertura' => 'docente', 'horas_contrato' => 3,
+        ]), $this->ee, $saved);
+        $this->assertSame('99000003K', $saved->fresh()->docente_rut_normalizado);
+    }
+
+    public function test_reserva_titular_agotada_no_bloquea_otro_titular_por_saldo_contrata(): void
+    {
+        $need = $this->basicSubject('Matemática');
+        $this->mixedContract();
+        $this->protectedSituation('horas_gremiales');
+        DB::table('reemplazos_personal')->where('rut', '99000003-K')->update(['tipocontrato' => 'PLANTA']);
+        try {
+            $this->store(['docente_rut' => '99000003-K'], $need);
+            $this->fail('Antes de reservar, el docente protegido con saldo titular debe tener prioridad.');
+        } catch (ValidationException $error) { $this->assertStringContainsString('prioridad superior', $error->getMessage()); }
+        app(DotacionAsignacionController::class)->storeReserva($this->request([
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'horas_contrato' => 8,
+        ]), $this->ee);
+        $protected = collect(DotacionProceso2027Calculator::resumen($this->ee, 2027)['docentes'])->firstWhere('rut_normalizado', '99000002K');
+        $this->assertEquals(0, $protected['horas_titulares_disponibles']);
+        $this->assertEquals(36, $protected['horas_contrata_disponibles']);
+        $xpath = $this->assignmentXpath();
+        $form = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$need['key'].'"]]')->item(0);
+        $visibleRuts = [];
+        foreach ($this->catalogOptions($xpath, $form) as $option) { $visibleRuts[] = $option->getAttribute('value'); }
+        $this->assertNotContains('99000002-K', $visibleRuts);
+        $this->assertContains('99000003-K', $visibleRuts);
+        $this->store(['docente_rut' => '99000003-K'], $need);
+        $this->assertSame('99000003K', DotacionDocenteAsignacion::where('tipo_asignacion', 'plan_estudio')->sole()->docente_rut_normalizado);
+        $this->assertEquals(8, DotacionDocenteAsignacion::where('tipo_asignacion', 'reserva_no_normativa')->sole()->horas_contrato);
+    }
+
+    public static function protectedReasons(): array
+    {
+        return [['fuero_maternal'], ['horas_gremiales'], ['horas_lactancia', true]];
+    }
+
+    #[DataProvider('protectedReasons')]
+    public function test_reserva_contrata_con_situacion_registrada_y_limite_de_saldo(string $motivo, bool $fuero = false): void
+    {
+        $this->protectedSituation($motivo, $fuero);
+        app(DotacionAsignacionController::class)->storeReserva($this->request([
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'horas_contrato' => 4,
+        ]), $this->ee);
+        $saved = DotacionDocenteAsignacion::sole();
+        $this->assertSame('contrata', $saved->subtipo_asignacion);
+        $this->assertEquals(4, $saved->horas_contrato);
+        $this->expectException(ValidationException::class);
+        app(DotacionAsignacionController::class)->storeReserva($this->request([
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'horas_contrato' => 41,
+        ]), $this->ee);
+    }
+
+    public function test_reserva_no_puede_simular_fuero_en_el_formulario(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('La contrata sólo se permite');
+        app(DotacionAsignacionController::class)->storeReserva($this->request([
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'horas_contrato' => 4,
+            'motivo' => 'fuero_maternal', 'posee_fuero_maternal' => true,
+        ]), $this->ee);
+    }
+
+    public function test_reserva_mixta_consume_primero_titulares_del_docente_y_luego_contrata_protegida(): void
+    {
+        $this->mixedContract();
+        $this->protectedSituation('fuero_maternal');
+        foreach ([8, 4] as $horas) {
+            app(DotacionAsignacionController::class)->storeReserva($this->request([
+                'anio' => 2027, 'docente_rut' => '99000002-K', 'horas_contrato' => $horas,
+            ]), $this->ee);
+        }
+        $this->assertSame(['titular', 'contrata'], DotacionDocenteAsignacion::orderBy('id')->pluck('subtipo_asignacion')->all());
+        $docente = collect(DotacionProceso2027Calculator::resumen($this->ee, 2027)['docentes'])->firstWhere('rut_normalizado', '99000002K');
+        $this->assertEquals(32, $docente['horas_disponibles']);
+        $this->assertEquals(32, $docente['horas_contrata_disponibles']);
+    }
+
+    public function test_selector_religion_y_pie_colaborativo_muestran_seleccion_sin_prelacion(): void
+    {
+        $religion = $this->basicSubject('Religión');
+        $this->differentialNeed();
+        $pie = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.pie_colaborativo'))->sole();
+        $xpath = $this->assignmentXpath();
+        foreach ([$religion, $pie] as $need) {
+            $form = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$need['key'].'"]]')->item(0);
+            $this->assertNotNull($form);
+            $this->assertStringContainsString('sin prelación', $form->textContent);
+            $this->assertSame(0, $xpath->query('.//input[@name="excepcion_prelacion"]', $form)->length);
+            $ruts = [];
+            foreach ($this->catalogOptions($xpath, $form) as $option) { $ruts[] = $option->getAttribute('value'); }
+            $this->assertContains('99000001-K', $ruts);
+            $this->assertContains('99000002-K', $ruts);
+        }
+        $form = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$religion['key'].'"]]')->item(0);
+        $this->assertSame('', $xpath->query('.//select[@name="docente_rut"]', $form)->item(0)->getAttribute('data-fase-plan'));
+    }
+
+    public function test_religion_conserva_asociacion_y_saldo_contractual(): void
+    {
+        $need = $this->basicSubject('Religión');
+        DB::table('reemplazos_personal')->where('rut', '99000002-K')->update(['jornada' => 1, 'jornada_basica' => 1]);
+        try {
+            $this->store([], $need);
+            $this->fail('Religión debe conservar el saldo contractual.');
+        } catch (ValidationException $error) { $this->assertStringContainsString('dispone de 1 hora(s)', $error->getMessage()); }
+        DB::table('dotacion_docente_subsectores')->where('asignatura_key', DotacionDocentesSubsector::keyParaNecesidad($need))->where('docente_rut_normalizado', '99000002K')->delete();
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('El docente no está asociado');
+        $this->store([], $need);
+    }
+
+    public function test_pie_colaborativo_sin_prelacion_conserva_restriccion_de_coordinador_pie(): void
+    {
+        $this->differentialNeed();
+        $need = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.pie_colaborativo'))->sole();
+        DB::table('declaracion_sostenedores')->where('rut', '99000002-K')->update(['nombre_funcion' => 'COORDINADOR PIE']);
+        $response = app(DotacionAsignacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => 'pie_colaborativo', 'necesidad_key' => $need['key'],
+            'establecimiento_curso_id' => $need['establecimiento_curso_id'], 'horas_contrato' => 3,
+        ]), $this->ee);
+        $this->assertTrue($response->getSession()->get('errors')->has('docente_rut'));
+        $this->assertSame(0, DotacionDocenteAsignacion::count());
+    }
+
+    private function assignmentXpath(): \DOMXPath
+    {
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $this->app['view']->share('errors', new ViewErrorBag);
+        $html = view('admin.dotacion-establecimiento.partials._asignacion', [
+            'establecimiento' => $this->ee, 'anio' => 2027, 'docentes' => $data['docentes'],
+            'asignacion' => $data['asignacion'], 'proceso2027' => DotacionProceso2027Calculator::resumen($this->ee, 2027, $data),
+        ])->render();
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+        return new \DOMXPath($dom);
+    }
+
+    private function basicSubject(string $nombre): array
+    {
+        $course = $this->createCourse('1B');
+        DB::table('planes_estudio_asignaturas')->where('plan_estudio_id', $course->plan_estudio_id)
+            ->where('tipo_bloque', 'plan_comun_formacion_general')->update(['asignatura' => $nombre]);
+        $this->configureStages();
+        $need = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.plan_estudio'))->firstWhere('titulo', $nombre);
+        foreach (['99000002K', '99000003K'] as $rut) {
+            DB::table('dotacion_docente_subsectores')->insert([
+                'establecimiento_id' => $this->ee->id, 'anio' => 2027,
+                'asignatura_key' => DotacionDocentesSubsector::keyParaNecesidad($need), 'nivel' => 'basica',
+                'asignatura_nombre' => $nombre, 'docente_rut_normalizado' => $rut,
+            ]);
+        }
+        return $need;
+    }
+
+    private function mixedContract(): void
+    {
+        $original = (array) DB::table('reemplazos_personal')->where('rut', '99000002-K')->sole();
+        DB::table('reemplazos_personal')->where('id', $original['id'])->update(['tipocontrato' => 'PLANTA', 'jornada' => 8, 'jornada_basica' => 8]);
+        unset($original['id']);
+        $original['jornada'] = $original['jornada_basica'] = 36;
+        $original['row_hash'] = 'synthetic-mixed-contract';
+        DB::table('reemplazos_personal')->insert($original);
+    }
+
+    private function protectedSituation(string $motivo, bool $fuero = false): void
+    {
+        Schema::create('dotacion_docente_exclusiones', function (Blueprint $t): void {
+            $t->id(); $t->unsignedBigInteger('establecimiento_id'); $t->integer('anio');
+            $t->string('docente_rut'); $t->string('docente_rut_normalizado'); $t->string('docente_nombre');
+            $t->string('motivo'); $t->decimal('horas', 8, 2)->default(0); $t->boolean('posee_fuero_maternal')->default(false);
+            $t->timestamps();
+        });
+        DB::table('dotacion_docente_exclusiones')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'docente_rut' => '99000002-K',
+            'docente_rut_normalizado' => '99000002K', 'docente_nombre' => 'Especialista sintético B',
+            'motivo' => $motivo, 'posee_fuero_maternal' => $fuero, 'horas' => 0,
+        ]);
+        $this->resetCalculators();
+    }
+
     public function test_reasignacion_admite_otro_especialista_asociado(): void
     {
         $this->store();

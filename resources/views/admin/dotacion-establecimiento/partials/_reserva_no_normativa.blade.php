@@ -1,11 +1,10 @@
 @php
     $asignacionesSoloConsulta = \App\Support\DotacionAsignacionSuspension::bloqueada((int) ($anio ?? 2027), $activeRole ?? auth()->user()?->activeRoleName());
     $docentesReserva = \App\Support\DotacionReservaNoNormativa::candidatos($proceso2027Asignacion);
-    $faseReserva = \App\Support\DotacionReservaNoNormativa::fase($docentesReserva);
     $opcionesReserva = \App\Support\DotacionReservaNoNormativa::opciones($docentesReserva);
     $capacidadReserva = (float) ($proceso2027Asignacion['capacidad_reserva_no_normativa'] ?? 0);
     $habilitadosReserva = $opcionesReserva->filter(fn (array $docente) =>
-        \App\Support\DotacionReservaNoNormativa::maximoParaDocente($proceso2027Asignacion, $docente, $faseReserva) >= 1
+        \App\Support\DotacionReservaNoNormativa::maximoParaDocente($proceso2027Asignacion, $docente, \App\Support\DotacionReservaNoNormativa::faseParaDocente($docente)) >= 1
     )->count();
     $labelsBloquesReserva = ['bloque_1' => 'Plan general', 'bloque_2' => 'Educación Parvularia', 'bloque_3' => 'PIE especializado'];
     $reservasActivas = collect($asignaciones)->where('tipo_asignacion', 'reserva_no_normativa')->values();
@@ -28,7 +27,7 @@
         <div class="row g-3 mb-3">
             <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Saldo no normativo por traspasar</div><strong class="h4 mb-0">{{ $fmt($capacidadReserva) }} h</strong></div></div>
             <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Horas reservadas sin función</div><strong class="h4 mb-0">{{ $fmt($reservasActivas->sum(fn ($row) => (float) $row->horas_contrato)) }} h</strong></div></div>
-            <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Origen permitido</div><strong>Horas titulares</strong><div class="small text-muted">No se traspasan horas a contrata ni saldos titulares menores a 1 h.</div></div></div>
+            <div class="col-md-4"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Origen permitido</div><strong>Primero, horas titulares del docente</strong><div class="small text-muted">Contrata sólo para docentes con fuero maternal u horas gremiales. Los saldos menores a 1 h se omiten.</div></div></div>
         </div>
 
         @if ($asignacionesSoloConsulta)
@@ -39,12 +38,13 @@
             <input type="hidden" name="anio" value="2027">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-7">
-                    <label class="form-label fw-semibold" for="docente-reserva-no-normativa">Docente con saldo titular <span class="text-danger">*</span></label>
-                    <div class="dotacion-reserva-picker" data-reserva-picker data-fase="{{ $faseReserva }}" data-maximo-global="{{ $capacidadReserva }}">
+                    <label class="form-label fw-semibold" for="docente-reserva-no-normativa">Docente con saldo reservable <span class="text-danger">*</span></label>
+                    <div class="dotacion-reserva-picker" data-reserva-picker data-maximo-global="{{ $capacidadReserva }}">
                         <select id="docente-reserva-no-normativa" name="docente_rut" class="form-select" aria-describedby="ayuda-reserva-no-normativa" required>
                             <option value="">Seleccione docente...</option>
                             @foreach ($opcionesReserva as $docente)
                                 @php
+                                    $faseReserva = \App\Support\DotacionReservaNoNormativa::faseParaDocente($docente);
                                     $maximoDocente = \App\Support\DotacionReservaNoNormativa::maximoParaDocente($proceso2027Asignacion, $docente, $faseReserva);
                                     $saldoDocente = \App\Support\DotacionPlanTitularPrimero::disponibles($docente, $faseReserva);
                                     $bloqueDocente = \App\Support\DotacionReservaNoNormativa::bloque($docente);
@@ -53,7 +53,7 @@
                                         ? 'No queda al menos 1 h de saldo no normativo para reservar.'
                                         : 'El bloque '.$labelBloque.' no tiene al menos 1 h de margen autorizado para reservar.');
                                 @endphp
-                                <option value="{{ $docente['rut'] }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ $docente['prioridad_2027_label'] ?? '' }}" data-bloque="{{ $labelBloque }}" data-motivo="{{ $motivoNoReservable }}" data-saldo="{{ $fmt($saldoDocente) }}" data-maximo="{{ $fmt($maximoDocente) }}" data-maximo-numero="{{ $maximoDocente }}" @disabled($maximoDocente < 1)>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · {{ $labelBloque }} · {{ ucfirst($faseReserva) }}: {{ $fmt($saldoDocente) }} h · Máximo: {{ $fmt($maximoDocente) }} h{{ $motivoNoReservable ? ' · '.$motivoNoReservable : '' }}</option>
+                                <option value="{{ $docente['rut'] }}" data-fase="{{ $faseReserva }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ $docente['prioridad_2027_label'] ?? '' }}" data-bloque="{{ $labelBloque }}" data-motivo="{{ $motivoNoReservable }}" data-saldo="{{ $fmt($saldoDocente) }}" data-maximo="{{ $fmt($maximoDocente) }}" data-maximo-numero="{{ $maximoDocente }}" @disabled($maximoDocente < 1)>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · {{ $labelBloque }} · {{ ucfirst($faseReserva) }}: {{ $fmt($saldoDocente) }} h · Máximo: {{ $fmt($maximoDocente) }} h{{ $motivoNoReservable ? ' · '.$motivoNoReservable : '' }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -66,9 +66,9 @@
                     <button class="btn btn-primary rounded-pill w-100" type="submit" @disabled(!$asignacion2027Habilitada || !$habilitadosReserva)><i class="bi bi-arrow-left-right"></i> Traspasar horas</button>
                 </div>
             </div>
-            <div id="ayuda-reserva-no-normativa" class="form-text">{{ $opcionesReserva->count() }} docente(s) con saldo titular de al menos 1 h; {{ $habilitadosReserva }} habilitado(s) para reservar. Se incluyen los tres bloques. El saldo descuenta asignaciones y reservas previas; los saldos menores a 1 h se omiten. No se habilitan horas a contrata después de las titulares.</div>
+            <div id="ayuda-reserva-no-normativa" class="form-text">{{ $opcionesReserva->count() }} docente(s) con saldo reservable de al menos 1 h; {{ $habilitadosReserva }} habilitado(s) para reservar. Se incluyen los tres bloques. El saldo descuenta asignaciones y reservas previas; los saldos menores a 1 h se omiten. Primero se reserva el saldo titular del docente. Las horas a contrata sólo se habilitan con fuero maternal u horas gremiales registrados.</div>
             @if ($habilitadosReserva < $opcionesReserva->count())
-                <div class="alert alert-info small mt-3 mb-0" role="status">Las opciones no reservables muestran su saldo, máximo y motivo. Tener saldo titular no implica que exista margen autorizado en su bloque o saldo no normativo en el establecimiento.</div>
+                <div class="alert alert-info small mt-3 mb-0" role="status">Las opciones no reservables muestran su saldo, máximo y motivo. Tener saldo contractual no implica que exista margen autorizado en su bloque o saldo no normativo en el establecimiento.</div>
             @endif
             @if (!$asignacion2027Habilitada)
                 <div class="form-text">Complete las etapas previas y configure máximos suficientes para habilitar el traspaso.</div>
@@ -79,9 +79,9 @@
                 @if ($capacidadReserva < 1)
                     No queda saldo no normativo para nuevos traspasos.
                 @else
-                    No hay docentes con al menos 1 h titular disponible para traspasar.
+                    No hay docentes con al menos 1 h reservable disponible para traspasar.
                 @endif
-                Las horas a contrata no se pueden reservar en este bloque.
+                Las horas a contrata no se pueden reservar sin fuero maternal u horas gremiales registrados.
             </div>
         @endif
 
@@ -181,7 +181,7 @@
                 if (!picker) return;
                 const select = picker.querySelector('select');
                 const hours = document.getElementById('horas-reserva-no-normativa');
-                const phase = picker.dataset.fase === 'contrata' ? 'Contrata' : 'Titular';
+                const phaseFor = option => option?.dataset.fase === 'contrata' ? 'Contrata' : 'Titular';
                 const options = Array.from(select.options).filter(option => option.value);
                 const trigger = document.createElement('button');
                 trigger.type = 'button';
@@ -218,6 +218,7 @@
 
                 const normalize = value => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
                 const rows = options.map(option => {
+                    const phase = phaseFor(option);
                     const row = document.createElement('button');
                     row.type = 'button';
                     row.className = 'dotacion-reserva-picker__option';
@@ -265,6 +266,7 @@
 
                 function update() {
                     const option = select.options[select.selectedIndex];
+                    const phase = phaseFor(option);
                     selected.textContent = option?.value ? `${option.dataset.nombre} · ${option.dataset.rut}` : 'Buscar y seleccionar docente...';
                     selected.classList.toggle('is-placeholder', !option?.value);
                     summary.textContent = option?.value ? `${phase}: ${option.dataset.saldo} h · Máx.: ${option.dataset.maximo} h` : '';

@@ -1,6 +1,6 @@
 # Asignación de horas y prelación en Dotación 2027
 
-Parche `2026.10.12.594`. Estas reglas se aplican al proceso 2027 y reutilizan el orden de prelación, tramo y antigüedad calculado por el SGA.
+Reglas actualizadas en el parche `2026.10.13.596`, sobre la base de `2026.10.12.594`. Se aplican al proceso 2027 y reutilizan el orden de prelación, tramo y antigüedad calculado por el SGA.
 
 ## Reglas por destino
 
@@ -9,7 +9,21 @@ Parche `2026.10.12.594`. Estas reglas se aplican al proceso 2027 y reutilizan el
 | Libre disposición de NT1/NT2 Con JEC, incluida la agrupación de cursos | Docentes asociados a la asignatura que tengan saldo suficiente | Orden informativo: se puede elegir un especialista aunque una Educadora de Párvulos aparezca primero. |
 | Bolsa Educadoras Diferenciales PIE, cobertura docente | Educación Diferencial y personas sin título declarado | Obligatoria, calculada sólo entre los candidatos elegibles para esta bolsa. Un título de otra especialidad no bloquea a una Educadora Diferencial. |
 | Funciones directivas, técnico-pedagógicas, planes normativos y otras funciones | Docentes con saldo para el bloque seleccionado; conserva los cupos existentes | Orden informativo: un docente de menor prioridad puede recibir la función, tanto al crear como al editar. |
-| Otras asignaciones curriculares, trabajo colaborativo PIE y acompañamiento | Candidatos según las reglas existentes | Conserva la prelación y los requisitos existentes. |
+| Religión, incluidas variantes Católica y Evangélica | Docentes asociados a la asignatura con al menos 1 h de saldo contractual | Orden informativo; permite titular o contrata sin prelación ni justificación. |
+| Trabajo colaborativo PIE | Candidatos con saldo según los requisitos de perfil existentes | Orden informativo al crear y editar, sin justificación. |
+| Otras asignaciones curriculares y acompañamiento | Candidatos según las reglas existentes | Conserva la prelación y los requisitos existentes. |
+
+### Reservas y saldo visible en el plan
+
+La prelación curricular utiliza los mismos candidatos que muestra el selector: docentes asociados, restricciones del curso y fase titular o contrata. También utiliza el saldo de esa fase, descontando asignaciones y reservas y omitiendo saldos individuales menores a una hora. Un docente mixto cuya reserva agotó el saldo titular deja de participar en la fase titular aunque conserve horas a contrata. Cuando se habilita la fase contrata, se compara el saldo a contrata de los candidatos que aparecen entonces.
+
+La reserva utiliza primero el saldo titular asignable de cada docente. Sólo quien tenga una situación registrada de `fuero_maternal` o `horas_gremiales` puede reservar saldo a contrata cuando ya no tenga al menos una hora titular asignable. También se reconoce `horas_lactancia` con fuero maternal expresamente registrado; lactancia sola no habilita la excepción. Cada opción muestra su origen y máximo, respetando el saldo no normativo, el margen del bloque y las reservas anteriores. La autorización se verifica en el servidor; no basta enviar una situación desde el formulario.
+
+### Religión y PIE colaborativo
+
+La excepción de Religión se evalúa con la asignatura del plan vigente. Si existe nombre oficial, éste es la referencia; escribir Religión en el formulario de Matemática no elimina las restricciones. Se conservan la asociación previa del docente, el saldo individual, la conversión aula/contrato y los máximos. El selector conserva el orden como referencia y permite elegir sin exigir una justificación.
+
+El trabajo colaborativo PIE también permite elegir y reasignar sin bloqueo de prelación. Conserva la restricción para Educadora Diferencial y Coordinador/a PIE, las reglas de NT Sin JEC y los límites contractuales. Esta excepción no afecta la Bolsa Educadoras Diferenciales.
 
 ### Libre disposición de Parvularia
 
@@ -39,13 +53,18 @@ Archivos del parche, conservando sus rutas:
 
 - `app/Http/Controllers/Admin/DotacionAsignacionController.php`
 - `app/Support/DotacionAsignacionElegibilidad2027.php`
+- `app/Support/DotacionPlanTitularPrimero.php`
+- `app/Support/DotacionReservaNoNormativa.php`
 - `resources/views/admin/dotacion-establecimiento/partials/_asignacion.blade.php`
+- `resources/views/admin/dotacion-establecimiento/partials/_reserva_no_normativa.blade.php`
 - `tests/Feature/DotacionLibreDisposicionParvulariaTest.php`
+- `tests/Feature/DotacionReservaSaldosTitularesTest.php`
 - `tests/Unit/DotacionAsignacionElegibilidad2027Test.php`
+- `tests/Unit/DotacionPlanTitularPrimeroTest.php`
 - `config/changelog.php`
 - `docs/DOTACION_ASIGNACION_PRELACION_2027.md`
 
-## Validación
+## Validación anterior: parche 2026.10.12.594
 
 Las pruebas usan SQLite en memoria y personas ficticias. Cubren un profesor de Inglés tercero en el orden, creación y reasignación de los cuatro tipos de funciones, límites de funciones normativas, filtrado por título, prioridad dentro de la bolsa y rechazo de títulos ajenos tanto al crear como al editar. También mantienen las regresiones de titularidad primero, Sin JEC, horas disponibles y selección libre en cursos combinados.
 
@@ -60,6 +79,12 @@ Resultado local con PHP 8.3: **47 pruebas específicas, 210 aserciones**, y **54
 También pasan `php -l` en los seis archivos PHP/Blade y `git diff --check`; se ejecutó `artisan optimize:clear` localmente. La revisión en Chrome confirmó el filtro de dos candidatos PIE, selección por teclado de un docente de menor prioridad en funciones y selección de un especialista en libre disposición. La vista móvil de 390 × 844 conserva los selectores y no desborda el ancho de la página. Se usó una vista previa con datos ficticios y envíos de formularios bloqueados; el servidor temporal y la vista previa se retiraron al finalizar.
 
 Para revisar visualmente el HTML real de los selectores con datos ficticios, la prueba `test_selector_bolsa_filtra_perfiles_y_funcion_conserva_orden_informativo` permite exportar una vista previa a `storage/framework/testing/prelacion-2027-preview.html` definiendo `SGA_PRELACION_PREVIEW=1` sólo durante esa prueba. La vista previa impide enviar los formularios. Es un archivo de diagnóstico ignorado por Git que debe eliminarse después de la revisión.
+
+## Validación del parche 2026.10.13.596
+
+Se ejecutaron 66 pruebas específicas (321 aserciones) de selección libre, prelación del plan y reservas. Después de ampliar la comprobación de los selectores se ejecutó un conjunto de 92 pruebas (658 aserciones) de regresión, que incluye esos nuevos casos, contratos consolidados, cupos virtuales, suspensión de asignaciones, situaciones protegidas, asociación de docentes, usabilidad y changelog. Ambos conjuntos pasaron; comparten el caso de reserva titular agotada.
+
+Todas las ejecuciones usan SQLite en memoria, almacenamiento simulado y una ruta de configuración de pruebas distinta de la cacheada antes de arrancar Laravel. Pasan `php -l` en los once archivos PHP/Blade modificados, la comprobación de sintaxis JavaScript del selector y `git diff --check`. No hay nuevas rutas ni assets compilados y no se requieren migraciones. La revisión visual en navegador de este parche queda pendiente; las referencias visuales anteriores corresponden al parche 594.
 
 ## Despliegue en cPanel
 
