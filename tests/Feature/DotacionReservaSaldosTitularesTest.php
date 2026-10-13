@@ -10,7 +10,7 @@ use Tests\Support\IsolatedSecurityTestCase;
 
 class DotacionReservaSaldosTitularesTest extends IsolatedSecurityTestCase
 {
-    public function test_muestra_saldos_de_todos_los_bloques_sin_cambiar_la_autorizacion(): void
+    public function test_muestra_saldos_de_todos_los_bloques_y_parvularia_utiliza_el_cupo_global(): void
     {
         $proceso = $this->proceso();
         $original = $proceso;
@@ -18,7 +18,7 @@ class DotacionReservaSaldosTitularesTest extends IsolatedSecurityTestCase
         $this->assertSame(['99000001-K', '99000002-K', '99000003-K'], $candidatos->pluck('rut')->all());
         $this->assertSame(['99000001-K', '99000002-K'], DotacionReservaNoNormativa::elegibles($proceso)->pluck('rut')->all());
         $this->assertSame(5.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $candidatos[0], 'titular'));
-        $this->assertSame(2.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $candidatos[1], 'titular'));
+        $this->assertSame(4.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $candidatos[1], 'titular'));
         $this->assertSame(0.4, DotacionReservaNoNormativa::maximoParaDocente($proceso, $candidatos[2], 'titular'));
         $this->assertSame(0.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $candidatos[0], 'contrata'));
         $this->assertSame($original, $proceso);
@@ -64,13 +64,33 @@ class DotacionReservaSaldosTitularesTest extends IsolatedSecurityTestCase
             $bloque['saldo_maximo'] = 0;
         }
         unset($bloque);
-        $this->assertTrue(DotacionReservaNoNormativa::elegibles($proceso)->isEmpty());
+        $this->assertSame(['99000002-K'], DotacionReservaNoNormativa::elegibles($proceso)->pluck('rut')->all());
         $html = $this->render($proceso);
         $xpath = $this->xpath($html);
-        $this->assertSame(3, $xpath->query('//select[@name="docente_rut"]/option[@value!=""][@disabled]')->length);
-        $this->assertSame(1, $xpath->query('//button[@type="submit"][@disabled]')->length);
-        $this->assertSame(1, $xpath->query('//input[@name="horas_contrato"][@disabled]')->length);
-        $this->assertStringContainsString('0 habilitado(s)', $html);
+        $this->assertSame(2, $xpath->query('//select[@name="docente_rut"]/option[@value!=""][@disabled]')->length);
+        $this->assertSame(0, $xpath->query('//button[@type="submit"][@disabled]')->length);
+        $this->assertSame(0, $xpath->query('//input[@name="horas_contrato"][@disabled]')->length);
+        $this->assertStringContainsString('1 habilitado(s)', $html);
+        $parvularia = $xpath->query('//select[@name="docente_rut"]/option[@value="99000002-K"]')->item(0);
+        $this->assertFalse($parvularia->hasAttribute('disabled'));
+        $this->assertSame('4', $parvularia->getAttribute('data-maximo-numero'));
+        $this->assertStringContainsString('aunque el bloque no tenga margen', $html);
+    }
+
+    public function test_parvularia_limita_reserva_por_titular_y_saldo_global_sin_habilitar_contrata(): void
+    {
+        $proceso = $this->proceso();
+        $proceso['bloques']['bloque_2']['saldo_maximo'] = 0;
+        $proceso['capacidad_reserva_no_normativa'] = 2;
+        $docente = $proceso['docentes'][1];
+        $this->assertSame(2.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $docente, 'titular'));
+        $docente['horas_titulares_disponibles'] = $docente['horas_disponibles'] = 1;
+        $this->assertSame(1.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $docente, 'titular'));
+        $docente['horas_titulares_disponibles'] = 0;
+        $docente['horas_contrata_disponibles'] = $docente['horas_disponibles'] = 4;
+        $docente['exclusion_docente'] = ['motivo' => 'fuero_maternal'];
+        $this->assertSame('contrata', DotacionReservaNoNormativa::faseParaDocente($docente));
+        $this->assertSame(0.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $docente, 'contrata'));
     }
 
     public function test_saldo_global_agotado_no_oculta_el_saldo_individual_ni_habilita_traspasos(): void

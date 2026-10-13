@@ -7,6 +7,14 @@ use Illuminate\Support\Collection;
 
 class DotacionReservaNoNormativa
 {
+    public const FUENTE_VINCULACION_TITULAR_PARVULARIA = 'Vinculada desde reserva titular de Educación Parvularia para otras funciones';
+
+    public static function esVinculacionTitularParvularia(object|array $asignacion): bool
+    {
+        return (int) data_get($asignacion, 'dotacion_funcion_id', 0) > 0
+            && data_get($asignacion, 'fuente_calculo') === self::FUENTE_VINCULACION_TITULAR_PARVULARIA;
+    }
+
     public static function permiteContrata(array $docente): bool
     {
         $situacion = $docente['exclusion_docente'] ?? null;
@@ -43,12 +51,9 @@ class DotacionReservaNoNormativa
     /** @return Collection<int, array<string, mixed>> */
     public static function elegibles(array $proceso): Collection
     {
-        return self::candidatos($proceso)->filter(function (array $docente) use ($proceso): bool {
-            $bloque = self::bloque($docente);
-
-            return (float) data_get($proceso, 'bloques.'.$bloque.'.saldo_maximo', 0) >= 1.0
-                && self::faseParaDocente($docente) !== null;
-        })->values();
+        return self::candidatos($proceso)->filter(fn (array $docente) =>
+            self::maximoParaDocente($proceso, $docente, self::faseParaDocente($docente)) >= 1.0
+        )->values();
     }
 
     /** @param Collection<int, array<string, mixed>> $docentes */
@@ -74,10 +79,16 @@ class DotacionReservaNoNormativa
             return 0.0;
         }
 
-        return max(0.0, round(min(
+        $limites = [
             (float) ($proceso['capacidad_reserva_no_normativa'] ?? 0),
-            (float) data_get($proceso, 'bloques.'.self::bloque($docente).'.saldo_maximo', 0),
-            DotacionPlanTitularPrimero::disponibles($docente, $fase)
-        ), 2));
+            DotacionPlanTitularPrimero::disponibles($docente, $fase),
+        ];
+        // El saldo titular de Parvularia puede destinarse al cupo no normativo
+        // del establecimiento aunque su bloque curricular esté sin margen.
+        if ($fase !== 'titular' || ! DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos']) {
+            $limites[] = (float) data_get($proceso, 'bloques.'.self::bloque($docente).'.saldo_maximo', 0);
+        }
+
+        return max(0.0, round(min($limites), 2));
     }
 }

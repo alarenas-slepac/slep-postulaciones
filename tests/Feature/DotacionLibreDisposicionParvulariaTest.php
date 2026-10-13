@@ -186,6 +186,179 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         return [['fuero_maternal'], ['horas_gremiales'], ['horas_lactancia', true]];
     }
 
+    public function test_reserva_titular_parvularia_sin_margen_descuenta_cupo_global_y_se_libera(): void
+    {
+        $initial = $this->reserveParvulariaLimits(5);
+        $this->assertEquals(0, $initial['bloques']['bloque_2']['saldo_maximo']);
+        $this->reserveEducadora(3);
+        $reserva = DotacionDocenteAsignacion::sole();
+        $this->assertSame('titular', $reserva->subtipo_asignacion);
+        $after = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertEquals(2, $after['capacidad_reserva_no_normativa']);
+        $this->assertEquals(3, $after['bloques']['bloque_2']['reservadas_no_normativas']);
+        $this->assertEquals(3, $after['bloques']['bloque_2']['titulares_otras_funciones_global']);
+        $this->assertEquals(41, collect($after['docentes'])->firstWhere('rut_normalizado', '99000001K')['horas_titulares_disponibles']);
+        $this->assertEquals($initial['bloques']['bloque_2']['pendientes'], $after['bloques']['bloque_2']['pendientes']);
+        app(DotacionAsignacionController::class)->destroy($this->request([]), $this->ee, $reserva);
+        $released = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertEquals(5, $released['capacidad_reserva_no_normativa']);
+        $this->assertEquals(44, collect($released['docentes'])->firstWhere('rut_normalizado', '99000001K')['horas_titulares_disponibles']);
+    }
+
+    public function test_reservas_parvularia_acumuladas_no_superan_cupo_global(): void
+    {
+        $this->reserveParvulariaLimits(5);
+        $this->reserveEducadora(3);
+        try {
+            $this->reserveEducadora(3);
+            $this->fail('El segundo traspaso debe respetar las dos horas restantes.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('horas_contrato', $error->errors()); }
+        $this->reserveEducadora(2);
+        $this->assertEquals(5, DotacionDocenteAsignacion::sum('horas_contrato'));
+        $this->assertEquals(0, DotacionProceso2027Calculator::resumen($this->ee, 2027)['capacidad_reserva_no_normativa']);
+        try {
+            $this->reserveEducadora(1);
+            $this->fail('Sin cupo global no se puede seguir reservando.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('docente_rut', $error->errors()); }
+    }
+
+    public function test_reserva_parvularia_conserva_limite_individual_y_etapas_previas(): void
+    {
+        $this->reserveParvulariaLimits(50);
+        try {
+            $this->reserveEducadora(45);
+            $this->fail('No puede reservar más que las 44 horas de la educadora.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('horas_contrato', $error->errors()); }
+        DotacionProceso2027Configuracion::first()->update(['decision_combinacion' => null]);
+        try {
+            $this->reserveEducadora(1);
+            $this->fail('La excepción no permite omitir las etapas del proceso.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('anio', $error->errors()); }
+        $this->assertSame(0, DotacionDocenteAsignacion::count());
+    }
+
+    public function test_reserva_contrata_parvularia_protegida_conserva_margen_de_bloque(): void
+    {
+        DB::table('declaracion_sostenedores')->where('rut', '99000002-K')->update(['nombre_titulo' => 'Pedagogía en Educación de Párvulos']);
+        $this->protectedSituation('fuero_maternal');
+        $this->reserveParvulariaLimits(5);
+        try {
+            app(DotacionAsignacionController::class)->storeReserva($this->request([
+                'anio' => 2027, 'docente_rut' => '99000002-K', 'horas_contrato' => 1,
+            ]), $this->ee);
+            $this->fail('La contrata protegida no tiene la excepción de margen del saldo titular.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('docente_rut', $error->errors()); }
+        $settings = DotacionProceso2027Configuracion::first();
+        $settings->update(['max_horas_bloque_2' => $settings->max_horas_bloque_2 + 2]);
+        app(DotacionAsignacionController::class)->storeReserva($this->request([
+            'anio' => 2027, 'docente_rut' => '99000002-K', 'horas_contrato' => 2,
+        ]), $this->ee);
+        $after = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertEquals(0, $after['bloques']['bloque_2']['titulares_otras_funciones_global']);
+        $this->assertEquals(0, $after['bloques']['bloque_2']['saldo_maximo']);
+        $this->assertEquals(5, $after['capacidad_reserva_no_normativa']);
+        $this->assertSame('contrata', DotacionDocenteAsignacion::sole()->subtipo_asignacion);
+    }
+
+    public function test_reserva_parvularia_no_bloquea_asignacion_curricular_con_saldo_individual(): void
+    {
+        $this->reserveParvulariaLimits(5);
+        $this->reserveEducadora(5);
+        $this->store(['docente_rut' => '99000001-K', 'horas_plan_pedagogicas' => 2], $this->need(false));
+        $this->assertEquals(2, DotacionDocenteAsignacion::where('tipo_asignacion', 'plan_estudio')->sole()->horas_plan_pedagogicas);
+        $this->assertEquals(0, DotacionProceso2027Calculator::resumen($this->ee, 2027)['capacidad_reserva_no_normativa']);
+    }
+
+    #[DataProvider('parvulariaReservationLinkHours')]
+    public function test_vincula_reserva_parvularia_sin_margen_sin_duplicar_y_permite_editar(float $hours): void
+    {
+        $this->coverPlan();
+        $need = $this->declaredFunction('otras_funciones_docentes');
+        $this->reserveParvulariaLimits(5);
+        $this->reserveEducadora(4);
+        $reserva = DotacionDocenteAsignacion::where('tipo_asignacion', 'reserva_no_normativa')->sole();
+        app(DotacionAsignacionController::class)->vincularReserva($this->request([
+            'necesidad_key' => $need['key'], 'horas_contrato' => $hours,
+        ]), $this->ee, $reserva);
+        $after = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertEquals(1, $after['capacidad_reserva_no_normativa']);
+        $this->assertEquals(4, $after['bloques']['bloque_2']['titulares_otras_funciones_global']);
+        $this->assertEquals(4 - $hours, $after['bloques']['bloque_2']['reservadas_no_normativas']);
+        $saved = DotacionDocenteAsignacion::where('dotacion_funcion_id', $need['dotacion_funcion_id'])->sole();
+        app(DotacionAsignacionController::class)->update($this->request([
+            'docente_rut' => '99000001-K', 'horas_contrato' => $hours,
+        ]), $this->ee, $saved);
+        $this->assertEquals(1, DotacionProceso2027Calculator::resumen($this->ee, 2027)['capacidad_reserva_no_normativa']);
+    }
+
+    public static function parvulariaReservationLinkHours(): array
+    {
+        return ['completa' => [4], 'parcial' => [2]];
+    }
+
+    public function test_edicion_de_funcion_vinculada_conserva_titularidad_en_educadora_mixta(): void
+    {
+        $this->mixedContract('99000001-K');
+        $this->coverPlan();
+        $need = $this->declaredFunction('otras_funciones_docentes');
+        $this->reserveParvulariaLimits(5);
+        $this->reserveEducadora(4);
+        $reserva = DotacionDocenteAsignacion::where('tipo_asignacion', 'reserva_no_normativa')->sole();
+        app(DotacionAsignacionController::class)->vincularReserva($this->request([
+            'necesidad_key' => $need['key'], 'horas_contrato' => 4,
+        ]), $this->ee, $reserva);
+        app(DotacionAsignacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => '99000001-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => 'acompanamiento_parvularia', 'necesidad_key' => $this->need()['key'],
+            'horas_plan_pedagogicas' => 6,
+        ]), $this->ee);
+        $before = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertEquals(0, collect($before['docentes'])->firstWhere('rut_normalizado', '99000001K')['horas_titulares_disponibles']);
+        $this->assertEquals(4, $before['bloques']['bloque_2']['titulares_otras_funciones_por_asignacion'][$reserva->id]);
+        app(DotacionAsignacionController::class)->update($this->request([
+            'docente_rut' => '99000001-K', 'horas_contrato' => 4,
+        ]), $this->ee, $reserva->fresh());
+        $after = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertEquals($before['capacidad_reserva_no_normativa'], $after['capacidad_reserva_no_normativa']);
+        $this->assertEquals(4, $after['bloques']['bloque_2']['titulares_otras_funciones_global']);
+    }
+
+    public function test_otras_funciones_de_otro_bloque_no_reutilizan_cupo_reservado_por_parvularia(): void
+    {
+        $this->coverPlan();
+        $need = $this->declaredFunction('otras_funciones_docentes');
+        $this->reserveParvulariaLimits(5);
+        $this->reserveEducadora(5);
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('saldo no normativo disponible');
+        app(DotacionAsignacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => '99000003-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => $need['tipo_asignacion'], 'subtipo_asignacion' => $need['subtipo_asignacion'],
+            'necesidad_key' => $need['key'], 'dotacion_funcion_id' => $need['dotacion_funcion_id'], 'horas_contrato' => 1,
+        ]), $this->ee);
+    }
+
+    private function reserveParvulariaLimits(float $capacity): array
+    {
+        $initial = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $limits = [];
+        foreach ($initial['bloques'] as $key => $block) {
+            $limits['max_horas_'.$key] = $block['contrato_comprometido'] + ($key === 'bloque_1' ? $capacity : 0);
+        }
+        DotacionProceso2027Configuracion::first()->update($limits);
+        $process = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertTrue($process['asignacion_habilitada']);
+        $this->assertEquals($capacity, $process['capacidad_reserva_no_normativa']);
+        return $process;
+    }
+
+    private function reserveEducadora(float $hours): void
+    {
+        app(DotacionAsignacionController::class)->storeReserva($this->request([
+            'anio' => 2027, 'docente_rut' => '99000001-K', 'horas_contrato' => $hours,
+        ]), $this->ee);
+    }
+
     #[DataProvider('protectedReasons')]
     public function test_reserva_contrata_con_situacion_registrada_y_limite_de_saldo(string $motivo, bool $fuero = false): void
     {
@@ -305,12 +478,13 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         return $need;
     }
 
-    private function mixedContract(): void
+    private function mixedContract(string $rut = '99000002-K'): void
     {
-        $original = (array) DB::table('reemplazos_personal')->where('rut', '99000002-K')->sole();
+        $original = (array) DB::table('reemplazos_personal')->where('rut', $rut)->sole();
         DB::table('reemplazos_personal')->where('id', $original['id'])->update(['tipocontrato' => 'PLANTA', 'jornada' => 8, 'jornada_basica' => 8]);
         unset($original['id']);
         $original['jornada'] = $original['jornada_basica'] = 36;
+        $original['tipocontrato'] = 'CONTRATA';
         $original['row_hash'] = 'synthetic-mixed-contract';
         DB::table('reemplazos_personal')->insert($original);
     }

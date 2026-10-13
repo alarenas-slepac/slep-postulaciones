@@ -67,8 +67,9 @@
                 </div>
             </div>
             <div id="ayuda-reserva-no-normativa" class="form-text">{{ $opcionesReserva->count() }} docente(s) con saldo reservable de al menos 1 h; {{ $habilitadosReserva }} habilitado(s) para reservar. Se incluyen los tres bloques. El saldo descuenta asignaciones y reservas previas; los saldos menores a 1 h se omiten. Primero se reserva el saldo titular del docente. Las horas a contrata sólo se habilitan con fuero maternal u horas gremiales registrados.</div>
+            <div class="form-text"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>En Educación Parvularia puede reservar horas titulares aunque el bloque no tenga margen: el máximo depende del saldo titular de la educadora y del saldo no normativo disponible del establecimiento. La reserva se descuenta una sola vez, incluso al vincularla a una función.</div>
             @if ($habilitadosReserva < $opcionesReserva->count())
-                <div class="alert alert-info small mt-3 mb-0" role="status">Las opciones no reservables muestran su saldo, máximo y motivo. Tener saldo contractual no implica que exista margen autorizado en su bloque o saldo no normativo en el establecimiento.</div>
+                <div class="alert alert-info small mt-3 mb-0" role="status">Las opciones no reservables muestran su saldo, máximo y motivo. Se requiere saldo no normativo en el establecimiento; para los demás bloques y las reservas a contrata también se exige margen en el bloque.</div>
             @endif
             @if (!$asignacion2027Habilitada)
                 <div class="form-text">Complete las etapas previas y configure máximos suficientes para habilitar el traspaso.</div>
