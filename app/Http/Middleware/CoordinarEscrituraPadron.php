@@ -12,6 +12,7 @@ class CoordinarEscrituraPadron
 {
     /** Entradas HTTP identificadas; no sustituye el inventario de SQL/CLI externos. */
     public const CONTROLADORES = [
+        'Admin\\DotacionContrataHabilitacionController',
         'Admin\\DotacionAsignacionController', 'Admin\\DotacionDocenteExclusionController',
         'Admin\\DotacionFuncionesController', 'Admin\\DotacionCursoCombinadoController',
         'Admin\\DotacionProporcionExcepcionController', 'Admin\\DotacionEstablecimientoController',

@@ -520,6 +520,47 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertTrue($functionOptions[4]->hasAttribute('data-prioridad-label'));
     }
 
+    public function test_cupo_general_por_no_renovacion_debe_asociarse_y_puede_asignarse_y_editarse(): void
+    {
+        foreach (['2026_09_28_140000_create_dotacion_contrata_habilitaciones_table.php', '2026_10_13_200000_add_dotacion_no_renovaciones.php'] as $file) {
+            (require database_path('migrations/'.$file))->up();
+        }
+        $need = $this->basicSubject('Religión');
+        $this->store([], $need);
+        $previous = DotacionDocenteAsignacion::sole();
+        app(\App\Services\Dotacion\NoRenovacionService::class)->reemplazar($this->ee, 2027, 'plan_estudio', '99000002-K', 'No renovación sintética justificada.', auth()->id());
+        $cupo = DB::table('dotacion_contrata_habilitaciones')->sole();
+        $rut = 'VACANTE-'.$cupo->id;
+        $this->assertSame('no_renovada', $previous->fresh()->estado);
+        $this->assertFalse(DB::table('dotacion_docente_subsectores')->where('docente_rut_normalizado', 'VACANTE_'.$cupo->id)->exists());
+        try {
+            $this->store(['docente_rut' => $rut], $need);
+            $this->fail('Debe asociar expresamente el cupo a la asignatura.');
+        } catch (ValidationException $error) { $this->assertStringContainsString('no está asociado', $error->getMessage()); }
+        app(\App\Http\Controllers\Admin\DotacionProceso2027Controller::class)->syncDocentesSubsector($this->request([
+            'anio' => 2027, 'asignatura_key' => DotacionDocentesSubsector::keyParaNecesidad($need), 'docentes' => [$rut],
+        ]), $this->ee);
+        $this->store(['docente_rut' => $rut], $need);
+        $saved = DotacionDocenteAsignacion::where('estado', 'activa')->sole();
+        $this->assertSame('VACANTE_'.$cupo->id, $saved->docente_rut_normalizado);
+        $this->assertEquals(2, $saved->horas_plan_pedagogicas);
+        $this->assertGreaterThan(0, $saved->horas_contrato);
+        $virtual = app(\App\Services\Dotacion\ContratacionHabilitacionService::class)->docenteVirtual($this->ee, 2027, $rut);
+        $this->assertSame('Pedagogía en Educación Física', $virtual['titulo']);
+        $this->assertGreaterThan(0, $virtual['horas_asignadas_total']);
+        app(DotacionAsignacionController::class)->update($this->request([
+            'docente_rut' => $rut, 'horas_plan_pedagogicas' => 3,
+        ]), $this->ee, $saved);
+        $this->assertEquals(3, $saved->fresh()->horas_plan_pedagogicas);
+        $xpath = $this->assignmentXpath();
+        $form = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$need['key'].'"]]')->item(0);
+        $options = $this->catalogOptions($xpath, $form);
+        $values = [];
+        foreach ($options as $option) { $values[] = $option->getAttribute('value'); }
+        $this->assertContains($rut, $values);
+        $this->assertNotContains('99000002-K', $values);
+    }
+
     private function coverPlan(): void
     {
         $this->personal('99000007-K', 'Titular sintético de cobertura', 'PLANTA', 'Pedagogía en Educación Básica');

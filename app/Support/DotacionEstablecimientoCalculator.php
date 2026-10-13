@@ -6,6 +6,7 @@ use App\Models\AlumnoPrioritarioPorcentaje;
 use App\Models\DeclaracionSostenedor;
 use App\Models\DotacionDocenteAsignacion;
 use App\Models\DotacionDocenteExclusion;
+use App\Models\DotacionNoRenovacion;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
@@ -932,6 +933,11 @@ class DotacionEstablecimientoCalculator
             ->get();
 
         $personalConsolidado = self::consolidarPersonalUltimoPeriodo($personal);
+        $retirados = DotacionLecturaCache::recordar('no-renovaciones:'.$establecimiento->id.':'.$anio,
+            fn () => DotacionNoRenovacion::rutsRetirados((int) $establecimiento->id, $anio));
+        $personalConsolidado = $personalConsolidado->reject(fn (array $grupo) =>
+            in_array(self::normalizeRut($grupo['representante']->rut), $retirados, true)
+        )->values();
         // Mientras 2027 use el padrón vigente de 2026, una situación marcada
         // como "no continúa" no puede reincorporar a la persona en la nómina
         // del año proyectado. Al existir padrón propio del año, éste es la fuente
