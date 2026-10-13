@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.13.597',
+    'current_version' => '2026.10.13.598',
     'entries' => [
+        [
+            'version' => '2026.10.13.598',
+            'title' => 'Parvularia: acompañamiento en libre disposición de cursos combinados',
+            'summary' => 'Reconoce la parte de libre disposición cuando una asignatura personalizada se consolida con el plan común de NT1/NT2.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Conserva las horas y los nombres personalizados de libre disposición al consolidar una asignatura asociada al plan común, manteniendo las claves existentes y sus asignaciones históricas.',
+                'Habilita el formulario de acompañamiento en NT1/NT2 con JEC y limita sus horas a la parte de libre disposición y a la cobertura del otro docente, descontando el acompañamiento ya asignado.',
+                'Mantiene el subtipo libre_disposicion al crear o editar el acompañamiento combinado y conserva la conversión especial de Parvularia con redondeo hacia arriba.',
+                'Las filas que mezclan plan común y libre disposición conservan las reglas de prelación del plan. El acompañamiento no vuelve a cubrir el aula ni ocupa un segundo cupo del máximo del bloque.',
+                'Incluye pruebas aisladas para modalidades conjunta, separada, personalizada y mixta, controles de edición y eliminación de cobertura, títulos registrados y manipulación del formulario.',
+            ],
+            'published_at' => '2026-10-13',
+        ],
         [
             'version' => '2026.10.13.597',
             'title' => 'Dotación: vacantes por no renovación de contrata',

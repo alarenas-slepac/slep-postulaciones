@@ -626,6 +626,192 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertNull($assignment->excepcion_prelacion);
     }
 
+    public function test_acompanamiento_combinado_reconoce_libre_personalizada_asociada_a_plan_comun(): void
+    {
+        $need = $this->combinedCustomNeed();
+        $this->seedCombinedExternal($need, 12);
+        $before = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $current = DotacionAsignacionCalculator::planNeedForKey($this->ee, 2027, $need['key']);
+        $this->assertFalse($current['curso_combinado_libre_disposicion']);
+        $this->assertSame(6.0, $current['curso_combinado_horas_libre_disposicion']);
+        $this->assertSame(['Taller de Inglés sintético'], $current['curso_combinado_libre_disposicion_nombres']);
+        $this->assertFalse(DotacionPlanTitularPrimero::permiteSeleccionLibre($current));
+        $xpath = $this->assignmentXpath();
+        $form = $xpath->query('//form[input[@name="tipo_asignacion" and @value="acompanamiento_parvularia"] and input[@name="necesidad_key" and @value="'.$need['key'].'"]]')->item(0);
+        $this->assertNotNull($form);
+        $this->assertSame('6', $xpath->query('.//input[@name="horas_plan_pedagogicas"]', $form)->item(0)->getAttribute('max'));
+        $this->assignCombinedAcompanamiento($need, 6);
+        $saved = DotacionDocenteAsignacion::where('tipo_asignacion', 'acompanamiento_parvularia')->sole();
+        $this->assertSame('libre_disposicion', $saved->subtipo_asignacion);
+        $this->assertSame($need['dotacion_curso_combinado_id'], $saved->dotacion_curso_combinado_id);
+        $this->assertEquals(6, $saved->horas_plan_pedagogicas);
+        $this->assertEquals(9, $saved->horas_contrato);
+        $this->assertStringContainsString('NT Con JEC', $saved->proporcion_aplicada);
+        $this->assertSame($need['key'], $saved->necesidad_key);
+        $after = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $this->assertEquals($before['asignacion']['resumen']['horas_aula_asignadas'], $after['asignacion']['resumen']['horas_aula_asignadas']);
+        app(DotacionAsignacionController::class)->update($this->request([
+            'docente_rut' => '99000001-K', 'horas_plan_pedagogicas' => 4,
+        ]), $this->ee, $saved);
+        $this->assertEquals(4, $saved->fresh()->horas_plan_pedagogicas);
+        $this->assertSame('libre_disposicion', $saved->fresh()->subtipo_asignacion);
+    }
+
+    public function test_acompanamiento_mixto_no_usa_horas_comunes_ni_acepta_limite_enviado(): void
+    {
+        $need = $this->combinedCustomNeed();
+        $this->seedCombinedExternal($need, 12);
+        try {
+            $this->assignCombinedAcompanamiento($need, 7, ['curso_combinado_horas_libre_disposicion' => 12]);
+            $this->fail('No debe usar las horas del plan común como acompañamiento.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('horas_plan_pedagogicas', $error->errors()); }
+        $this->assignCombinedAcompanamiento($need, 4);
+        try {
+            $this->assignCombinedAcompanamiento($need, 3);
+            $this->fail('Debe descontar el acompañamiento ya asignado.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('horas_plan_pedagogicas', $error->errors()); }
+        $this->assertSame(1, DotacionDocenteAsignacion::where('tipo_asignacion', 'acompanamiento_parvularia')->count());
+    }
+
+    public function test_reducir_cobertura_externa_conserva_acompanamiento_solo_si_queda_cobertura_suficiente(): void
+    {
+        $need = $this->combinedCustomNeed();
+        $source = $this->seedCombinedExternal($need, 12);
+        $this->assignCombinedAcompanamiento($need, 6);
+        $second = $this->seedCombinedExternal($need, 6);
+        app(DotacionAsignacionController::class)->destroy($this->request([]), $this->ee, $source);
+        $this->assertNull($source->fresh());
+        try {
+            app(DotacionAsignacionController::class)->destroy($this->request([]), $this->ee, $second);
+            $this->fail('No debe eliminar la cobertura externa que sostiene el acompañamiento.');
+        } catch (ValidationException $error) { $this->assertStringContainsString('Reduzca primero el acompañamiento', $error->getMessage()); }
+        $this->assertNotNull($second->fresh());
+    }
+
+    public static function combinedAcompanamientoModes(): array
+    {
+        return [['conjunta', 38, 6], ['separada', 76, 12], ['personalizada', 30, 6], ['mixta', 42, 10]];
+    }
+
+    public function test_plan_comun_combinado_sin_libre_no_admite_acompanamiento_ni_campos_falsificados(): void
+    {
+        $need = $this->combinedCustomNeed();
+        DB::table('establecimiento_planes_estudio_asignaturas')->delete();
+        $current = DotacionAsignacionCalculator::planNeedForKey($this->ee, 2027, $need['key']);
+        $this->assertEquals(0, $current['curso_combinado_horas_libre_disposicion']);
+        $this->seedCombinedExternal($need, 6);
+        try {
+            $this->assignCombinedAcompanamiento($need, 2, [
+                'subtipo_asignacion' => 'libre_disposicion', 'curso_combinado_libre_disposicion' => true,
+                'curso_combinado_horas_libre_disposicion' => 6,
+            ]);
+            $this->fail('El nombre y los campos enviados no habilitan acompañamiento sin libre disposición configurada.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('necesidad_key', $error->errors()); }
+        $this->assertSame(0, DotacionDocenteAsignacion::where('tipo_asignacion', 'acompanamiento_parvularia')->count());
+    }
+
+    public function test_acompanamiento_personalizado_exige_otro_docente_y_titulo_de_parvulos(): void
+    {
+        $need = $this->combinedCustomNeed();
+        try {
+            $this->assignCombinedAcompanamiento($need, 2);
+            $this->fail('Se necesita cobertura externa antes de acompañar.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('horas_plan_pedagogicas', $error->errors()); }
+        $this->seedCombinedExternal($need, 6);
+        try {
+            $this->assignCombinedAcompanamiento($need, 2, ['docente_rut' => '99000002-K', 'titulo' => 'Pedagogía en Educación de Párvulos']);
+            $this->fail('Sólo el título registrado habilita a la educadora.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('docente_rut', $error->errors()); }
+        $this->assertSame(0, DotacionDocenteAsignacion::where('tipo_asignacion', 'acompanamiento_parvularia')->count());
+    }
+
+    #[DataProvider('combinedAcompanamientoModes')]
+    public function test_limite_libre_del_grupo_respeta_modalidad_y_no_marca_todo_como_libre(string $mode, float $total, float $libre): void
+    {
+        $need = $this->combinedCustomNeed($mode);
+        $this->assertEquals($total, $need['horas_plan_requeridas']);
+        $this->assertEquals($libre, $need['curso_combinado_horas_libre_disposicion']);
+        $this->assertFalse($need['curso_combinado_libre_disposicion']);
+        $this->assertSame('Núcleo sintético', $need['titulo']);
+    }
+
+    private function combinedCustomNeed(string $mode = 'conjunta'): array
+    {
+        $second = $this->createCourse('NT2');
+        // Esquema aislado: no se ejecuta la migración histórica que borra tablas.
+        Schema::create('asignaturas', function (Blueprint $t): void {
+            $t->id(); $t->string('nombre');
+        });
+        Schema::create('establecimiento_planes_estudio', function (Blueprint $t): void {
+            $t->id(); $t->unsignedBigInteger('establecimiento_id'); $t->unsignedBigInteger('establecimiento_curso_id');
+            $t->unsignedBigInteger('plan_estudio_id'); $t->unsignedBigInteger('curso_id');
+            $t->integer('anio'); $t->string('estado'); $t->timestamps();
+        });
+        Schema::create('establecimiento_planes_estudio_asignaturas', function (Blueprint $t): void {
+            $t->id(); $t->unsignedBigInteger('establecimiento_plan_estudio_id'); $t->unsignedBigInteger('plan_estudio_bloque_id');
+            $t->unsignedBigInteger('asignatura_id'); $t->unsignedBigInteger('asignatura_plan_comun_id');
+            $t->string('nombre_asignatura_personalizada'); $t->decimal('horas_semanales', 8, 2);
+            $t->decimal('horas_anuales', 8, 2)->nullable(); $t->string('origen'); $t->string('observacion')->nullable();
+            $t->integer('orden'); $t->timestamps();
+        });
+        $comun = DB::table('asignaturas')->insertGetId(['nombre' => 'Núcleo sintético']);
+        $ld = DB::table('asignaturas')->insertGetId(['nombre' => 'Horas de libre disposición']);
+        foreach ([$this->course, $second] as $course) {
+            $block = DB::table('planes_estudio_bloques')->insertGetId([
+                'plan_estudio_id' => $course->plan_estudio_id, 'nombre' => 'Libre disposición',
+                'tipo_bloque' => 'libre_disposicion', 'horas_semanales' => 6,
+                'permite_asignaturas_establecimiento' => true, 'permite_asignaturas_personalizadas' => true,
+            ]);
+            $config = DB::table('establecimiento_planes_estudio')->insertGetId([
+                'establecimiento_id' => $this->ee->id, 'establecimiento_curso_id' => $course->id,
+                'plan_estudio_id' => $course->plan_estudio_id, 'curso_id' => $course->curso_id, 'anio' => 2027, 'estado' => 'enviado',
+            ]);
+            DB::table('establecimiento_planes_estudio_asignaturas')->insert([
+                'establecimiento_plan_estudio_id' => $config, 'plan_estudio_bloque_id' => $block,
+                'asignatura_id' => $ld, 'asignatura_plan_comun_id' => $comun,
+                'nombre_asignatura_personalizada' => 'Taller de Inglés sintético', 'horas_semanales' => 6, 'origen' => 'personalizado', 'orden' => 1,
+            ]);
+        }
+        $group = DB::table('dotacion_cursos_combinados')->insertGetId([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'nombre' => 'NT1 + NT2 sintético', 'proporcion' => 'auto', 'activo' => true,
+        ]);
+        foreach ([$this->course->id, $second->id] as $id) {
+            DB::table('dotacion_curso_combinado_miembros')->insert(['dotacion_curso_combinado_id' => $group, 'establecimiento_curso_id' => $id]);
+        }
+        $subjectKey = DotacionCursoCombinadoCalculator::subjectKey(['titulo' => 'Núcleo sintético']);
+        DB::table('dotacion_curso_combinado_asignaturas')->insert([
+            'dotacion_curso_combinado_id' => $group, 'asignatura_key' => $subjectKey, 'asignatura_nombre' => 'Núcleo sintético',
+            'modalidad' => $mode, 'horas_conjuntas' => 38, 'horas_personalizadas' => 30,
+            'horas_exclusivas' => json_encode([$this->course->id => 4, $second->id => 0]),
+        ]);
+        $this->resetCalculators();
+        DotacionProceso2027Configuracion::first()->update(['decision_combinacion' => 'combinaciones_configuradas']);
+        $this->configureStages();
+        return DotacionAsignacionCalculator::planNeedForKey($this->ee, 2027, DotacionCursoCombinadoCalculator::needKey($group, $subjectKey));
+    }
+
+    private function seedCombinedExternal(array $need, float $hours): DotacionDocenteAsignacion
+    {
+        return DotacionDocenteAsignacion::create([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'docente_rut' => '99000002-K', 'docente_rut_normalizado' => '99000002K',
+            'docente_nombre' => 'Especialista sintético B', 'estamento_cobertura' => 'docente',
+            'declaracion_sostenedor_id' => DB::table('declaracion_sostenedores')->where('rut', '99000002-K')->value('id'),
+            'tipo_asignacion' => 'plan_estudio', 'subtipo_asignacion' => 'curso_combinado', 'necesidad_key' => $need['key'],
+            'establecimiento_curso_id' => $need['establecimiento_curso_id'], 'dotacion_curso_combinado_id' => $need['dotacion_curso_combinado_id'],
+            'asignatura_nombre' => $need['titulo'], 'horas_plan_pedagogicas' => $hours, 'horas_contrato' => $hours,
+            'proporcion_aplicada' => '65/35', 'estado' => 'activa',
+        ]);
+    }
+
+    private function assignCombinedAcompanamiento(array $need, float $hours, array $extra = []): void
+    {
+        app(DotacionAsignacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => '99000001-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => 'acompanamiento_parvularia', 'necesidad_key' => $need['key'],
+            'horas_plan_pedagogicas' => $hours, ...$extra,
+        ]), $this->ee);
+    }
+
     public function test_selector_es_individual_y_muestra_solo_docentes_asociados(): void
     {
         $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);

@@ -84,6 +84,7 @@ class DotacionCursoCombinadoCalculator
                 $rawHours = round((float) $courseTotals->sum(), 2);
                 $maxHours = round((float) ($courseTotals->max() ?? 0), 2);
                 $hours = self::resolvedHours($mode, $courseTotals, $rule, $maxHours);
+                $libreDisposicion = self::libreDisposicionConsolidada($subjectItems, $mode, $rule, $hours);
                 $proportion = self::resolvedProportion($grupo->proporcion, $subjectItems);
                 $conversion = self::conversionForProportion($proportion['key'], $hours);
                 $baseParvularia = str_starts_with($proportion['key'], 'parvularia_')
@@ -142,6 +143,10 @@ class DotacionCursoCombinadoCalculator
                     'curso_combinado' => true,
                     'parvularia_base_contrato' => $baseParvularia,
                     'curso_combinado_libre_disposicion' => $subjectItems->every(fn ($item) => ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion'),
+                    'curso_combinado_horas_libre_disposicion' => $libreDisposicion,
+                    'curso_combinado_libre_disposicion_nombres' => $subjectItems
+                        ->where('subtipo_asignacion', 'libre_disposicion')->pluck('nombre_personalizado')
+                        ->filter()->unique()->values()->all(),
                     'curso_combinado_nombre' => $grupo->nombre,
                     'curso_combinado_modalidad' => $mode,
                     'curso_combinado_asignatura_key' => $subjectKey,
@@ -518,6 +523,32 @@ class DotacionCursoCombinadoCalculator
         // necesidad del grupo y se redondea una sola vez hacia arriba para no
         // inflar el resultado por cada asignatura o bloque del plan.
         return $contract > 0 ? (float) ceil($contract) : 0.0;
+    }
+
+    private static function libreDisposicionConsolidada(Collection $items, string $mode, ?DotacionCursoCombinadoAsignatura $rule, float $total): float
+    {
+        if ($items->every(fn ($item) => ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion')) {
+            return $total;
+        }
+
+        $porCurso = $items->groupBy('establecimiento_curso_id')->map(fn (Collection $rows) =>
+            round((float) $rows->sum(fn ($row) => ($row['subtipo_asignacion'] ?? '') === 'libre_disposicion'
+                ? max(0.0, (float) ($row['horas_plan_requeridas'] ?? 0))
+                : max(0.0, (float) ($row['horas_libre_disposicion_consolidada'] ?? 0))), 2)
+        );
+        $maximo = (float) ($porCurso->max() ?? 0);
+        $suma = (float) $porCurso->sum();
+        // En filas mixtas, personalizar el total curricular no convierte las
+        // horas del plan común en libre disposición. Sólo se conserva su parte.
+        $horas = match ($mode) {
+            'separada' => $suma,
+            'mixta' => min($suma, $maximo + (float) $porCurso->map(fn ($horas, $cursoId) =>
+                min((float) $horas, max(0.0, (float) ($rule?->horas_exclusivas[$cursoId] ?? 0)))
+            )->sum()),
+            default => $maximo,
+        };
+
+        return round(min(max(0.0, $total), $horas), 2);
     }
 
     private static function resolvedHours(

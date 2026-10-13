@@ -14,6 +14,7 @@ use App\Models\EstablecimientoCurso;
 use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Services\Dotacion\NoRenovacionService;
 use App\Support\DocenteHorasNoLectivasCalculator;
+use App\Support\DotacionAcompanamientoParvularia;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionAsignacionElegibilidad2027;
 use App\Support\DotacionContratoPlanCalculator;
@@ -568,7 +569,7 @@ class DotacionAsignacionController extends Controller
                 $cursoCombinadoAsignaturaIdValidado = ! empty($necesidadCombinada['dotacion_curso_combinado_asignatura_id'])
                     ? (int) $necesidadCombinada['dotacion_curso_combinado_asignatura_id']
                     : null;
-                $subtipo = ! empty($necesidadCombinada['curso_combinado_libre_disposicion'])
+                $subtipo = $tipo === 'acompanamiento_parvularia' || ! empty($necesidadCombinada['curso_combinado_libre_disposicion'])
                     ? 'libre_disposicion' : 'curso_combinado';
                 $planEstudioId = $necesidadCombinada['plan_estudio_id'] ?? null;
                 $planBloqueId = null;
@@ -840,8 +841,8 @@ class DotacionAsignacionController extends Controller
         }
 
         $curso = $need['curso'] ?? null;
-        $esLibreDisposicion = ($need['subtipo_asignacion'] ?? '') === 'libre_disposicion'
-            || (bool) ($need['curso_combinado_libre_disposicion'] ?? false);
+        $limiteLibreDisposicion = DotacionAcompanamientoParvularia::horasLibreDisposicion($need);
+        $esLibreDisposicion = $limiteLibreDisposicion > 0;
         $esNtJec = $curso instanceof EstablecimientoCurso
             && DotacionProfesionDocenteResolver::esCursoNt($curso)
             && \App\Support\DotacionParvulariaCalculator::conJec($curso, $need['proporcion_key'] ?? null);
@@ -859,7 +860,7 @@ class DotacionAsignacionController extends Controller
         }
         if ($tipo === 'acompanamiento_parvularia' && $payload !== null) {
             $horas = (float) ($payload['horas_plan_pedagogicas'] ?? 0);
-            if ($horas <= 0 || $acompanadas + $horas > $externas + 0.01) {
+            if ($horas <= 0 || $acompanadas + $horas > min($externas, $limiteLibreDisposicion) + 0.01) {
                 throw ValidationException::withMessages(['horas_plan_pedagogicas' => 'Las horas de acompañamiento no pueden superar las horas de libre disposición impartidas por otro docente en esta asignatura.']);
             }
             return;
@@ -882,7 +883,7 @@ class DotacionAsignacionController extends Controller
                 $externas += (float) ($payload['horas_plan_pedagogicas'] ?? 0);
             }
         }
-        if ($acompanadas > $externas + 0.01) {
+        if ($acompanadas > min(max(0.0, $externas), $limiteLibreDisposicion) + 0.01) {
             throw ValidationException::withMessages(['horas_plan_pedagogicas' => 'Reduzca primero el acompañamiento de la Educadora de Párvulos antes de disminuir o eliminar las horas del otro docente.']);
         }
     }
