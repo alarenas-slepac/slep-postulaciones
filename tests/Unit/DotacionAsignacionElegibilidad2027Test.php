@@ -55,4 +55,15 @@ class DotacionAsignacionElegibilidad2027Test extends TestCase
             $this->assertFalse(DotacionAsignacionElegibilidad2027::esFuncionSinPrelacion(['tipo_asignacion' => $type]));
         }
     }
+
+    public function test_religion_usa_la_asignatura_real_y_pie_colaborativo_no_exime_bolsa_diferencial(): void
+    {
+        foreach (['Religión', 'RELIGION CATÓLICA', 'Religión Evangélica'] as $name) {
+            $this->assertTrue(DotacionAsignacionElegibilidad2027::esReligion(['tipo_asignacion' => 'plan_estudio', 'titulo' => $name]));
+        }
+        $this->assertFalse(DotacionAsignacionElegibilidad2027::esReligion(['tipo_asignacion' => 'plan_estudio', 'titulo' => 'Religión', 'asignatura_oficial' => 'Matemática']));
+        $this->assertFalse(DotacionAsignacionElegibilidad2027::esReligion(['tipo_asignacion' => 'otra_funcion', 'titulo' => 'Religión']));
+        $this->assertTrue(DotacionAsignacionElegibilidad2027::esTrabajoColaborativoSinPrelacion(['tipo_asignacion' => 'pie_colaborativo']));
+        $this->assertFalse(DotacionAsignacionElegibilidad2027::esTrabajoColaborativoSinPrelacion(['tipo_asignacion' => 'pie_educadora_diferencial']));
+    }
 }

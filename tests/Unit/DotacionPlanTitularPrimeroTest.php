@@ -105,6 +105,30 @@ class DotacionPlanTitularPrimeroTest extends TestCase
         ];
     }
 
+    public function test_contrata_de_docente_protegido_sin_saldo_titular_no_bloquea_fase_titular(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('111111111', 8, 36, 8) + ['exclusion_docente' => ['motivo' => 'fuero_maternal']],
+            $this->docente('222222222', 44, 0, 0),
+        ]));
+        $original = $docentes->all();
+        $candidatos = DotacionPlanTitularPrimero::candidatosParaPrelacion($docentes);
+        $this->assertSame(['222222222'], $candidatos->pluck('rut_normalizado')->all());
+        $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($candidatos, $candidatos->first(), 2));
+        $this->assertSame($original, $docentes->all());
+    }
+
+    public function test_fase_contrata_compara_saldo_contrata_y_no_saldo_titular_agotado(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('111111111', 8, 6, 8) + ['fecha_antiguedad' => '2000-01-01'],
+            $this->docente('222222222', 0, 6, 0),
+        ]));
+        $this->assertSame('contrata', DotacionPlanTitularPrimero::fase($docentes));
+        $candidatos = DotacionPlanTitularPrimero::candidatosParaPrelacion($docentes);
+        $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($candidatos, $candidatos->last(), 2));
+    }
+
     private function assertInvalidAssignment($docentes, ?array $seleccionado, float $horas, bool $asistente = false): void
     {
         try {

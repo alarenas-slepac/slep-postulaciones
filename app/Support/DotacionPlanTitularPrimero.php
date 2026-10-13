@@ -90,6 +90,20 @@ class DotacionPlanTitularPrimero
         return $docentes->filter(fn (array $docente) => self::disponibles($docente, $fase) >= self::MINIMO_SALDO_ASIGNABLE)->values();
     }
 
+    /** Compara sólo las opciones y el saldo de la fase que muestra el selector. */
+    public static function candidatosParaPrelacion(Collection $docentes): Collection
+    {
+        $fase = self::fase($docentes);
+
+        return self::opciones($docentes)->map(function (array $docente) use ($fase): array {
+            $saldo = self::disponibles($docente, $fase);
+            // Proyección para la comparación de prioridad; no altera el saldo original.
+            $docente['horas_disponibles'] = $saldo;
+            $docente['horas_titulares_disponibles'] = $saldo;
+            return $docente;
+        });
+    }
+
     /** @param Collection<int, array<string, mixed>> $docentes */
     public static function validar(Collection $docentes, ?array $seleccionado, float $horasContrato, bool $esAsistente): void
     {

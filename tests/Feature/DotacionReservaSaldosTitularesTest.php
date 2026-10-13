@@ -35,7 +35,7 @@ class DotacionReservaSaldosTitularesTest extends IsolatedSecurityTestCase
         $this->assertStringContainsString('PIE especializado', $options[2]->getAttribute('data-motivo'));
         $this->assertStringContainsString('3 docente(s)', $html);
         $this->assertStringContainsString('2 habilitado(s)', $html);
-        $this->assertStringContainsString('No se habilitan horas a contrata', $html);
+        $this->assertStringContainsString('Las horas a contrata sólo se habilitan con fuero maternal u horas gremiales registrados', $html);
         $this->assertSame(0, $xpath->query('//button[@type="submit"][@disabled]')->length);
 
         if (getenv('DOTACION_UI_PREVIEW') === '1') {
@@ -115,6 +115,27 @@ class DotacionReservaSaldosTitularesTest extends IsolatedSecurityTestCase
                 $this->docente(3, 'Pedagogía en Educación Diferencial', 5),
             ],
         ];
+    }
+
+    public function test_selector_reserva_muestra_origen_por_docente_y_contrata_solo_con_proteccion(): void
+    {
+        $proceso = $this->proceso();
+        $proceso['docentes'][] = $this->docente(4, 'Pedagogía en Educación Básica', 0, [
+            'horas_disponibles' => 6, 'horas_contrata_disponibles' => 6, 'exclusion_docente' => ['motivo' => 'horas_gremiales'],
+        ]);
+        $proceso['docentes'][] = $this->docente(5, 'Pedagogía en Educación Básica', 0, [
+            'horas_disponibles' => 6, 'horas_contrata_disponibles' => 6, 'exclusion_docente' => ['motivo' => 'horas_lactancia', 'posee_fuero_maternal' => true],
+        ]);
+        $proceso['docentes'][] = $this->docente(6, 'Pedagogía en Educación Básica', 0, [
+            'horas_disponibles' => 6, 'horas_contrata_disponibles' => 6, 'exclusion_docente' => ['motivo' => 'horas_lactancia'],
+        ]);
+        $xpath = $this->xpath($this->render($proceso));
+        $this->assertSame(2, $xpath->query('//select[@name="docente_rut"]/option[@data-fase="contrata"]')->length);
+        $this->assertSame(3, $xpath->query('//select[@name="docente_rut"]/option[@data-fase="titular"]')->length);
+        $this->assertSame(0, $xpath->query('//select[@name="docente_rut"]/option[@value="99000006-K"]')->length);
+        $this->assertSame(5.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $proceso['docentes'][3], 'contrata'));
+        $this->assertSame(0.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $proceso['docentes'][0], 'contrata'));
+        $this->assertSame(0.0, DotacionReservaNoNormativa::maximoParaDocente($proceso, $proceso['docentes'][5], 'contrata'));
     }
 
     private function docente(int $id, string $titulo, float $titular, array $extra = []): array

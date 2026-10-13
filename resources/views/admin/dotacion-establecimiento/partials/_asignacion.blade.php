@@ -354,6 +354,8 @@
                                             $bloqueActual = $item['bloque'] ?? 'Sin bloque';
                                             $cursoNt = $item['curso'] ?? null;
                                             $seleccionLibreParvularia = \App\Support\DotacionPlanTitularPrimero::permiteSeleccionLibre($item);
+                                            $seleccionLibreReligion = $anio === 2027 && \App\Support\DotacionAsignacionElegibilidad2027::esReligion($item);
+                                            $seleccionLibrePlan = $seleccionLibreParvularia || $seleccionLibreReligion;
                                             $opcionesDocentesPlan = $docenteOptions;
                                             $soloParvularia = $cursoNt instanceof \App\Models\EstablecimientoCurso
                                                 && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)
@@ -362,12 +364,12 @@
                                             $docentesPermitidosSubsector = $anio === 2027
                                                 ? ($subsectoresAsignacion->get($subsectorKey)['docentes'] ?? [])
                                                 : null;
-                                            $docentesPlanElegibles = $anio === 2027 && !$seleccionLibreParvularia
+                                            $docentesPlanElegibles = $anio === 2027 && !$seleccionLibrePlan
                                                 ? \App\Support\DotacionPlanTitularPrimero::elegibles(
                                                     collect($proceso2027Asignacion['docentes'] ?? []), $docentesPermitidosSubsector ?? [], $item
                                                 )
                                                 : collect();
-                                            $fasePlan = $anio === 2027 && !$seleccionLibreParvularia
+                                            $fasePlan = $anio === 2027 && !$seleccionLibrePlan
                                                 ? \App\Support\DotacionPlanTitularPrimero::fase($docentesPlanElegibles)
                                                 : null;
                                             $rutsFasePlan = $fasePlan !== null
@@ -453,7 +455,7 @@
                                                     <input type="hidden" name="asignatura_nombre" value="{{ $item['asignatura_nombre'] ?? $item['titulo'] }}">
                                                     <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                                     <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
-                                                    @if ($seleccionLibreParvularia)
+                                                    @if ($seleccionLibrePlan)
                                                         <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Selección sin prelación.</strong> Elija un docente asociado a esta asignatura, incluido uno de especialidad, con al menos 1 h de contrato disponible. No se exige prelación ni justificación. El orden se muestra como referencia. Se mantienen los límites del contrato y del bloque autorizado.</span></div>
                                                     @elseif ($proceso2027Asignacion['aplica'] ?? false)
                                                         <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>{{ $fasePlan === 'titular' ? 'Primero, horas titulares.' : 'Sin saldo titular asignable: sigue contrata.' }}</strong> Solo se muestran docentes asociados a esta asignatura con al menos 1 h {{ $fasePlan === 'titular' ? 'titular' : 'a contrata' }} disponible, en orden de prelación. Los saldos menores a 1 h se omiten. Si el saldo de un docente no cubre todas las horas pendientes, asigne primero una fracción del aula.</span></div>
@@ -469,7 +471,7 @@
                                                         @include('admin.dotacion-establecimiento.partials._personal_select_referencia', [
                                                             'opcionesPersonal' => $opcionesDocentesPlan->filter(fn ($doc) =>
                                                                 ($docentesPermitidosSubsector === null || in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
-                                                                && (!$seleccionLibreParvularia || $doc['saldo'] >= 1)
+                                                                && (!$seleccionLibrePlan || $doc['saldo'] >= 1)
                                                                 && ($fasePlan === null || in_array($doc['rut_normalizado'], $rutsFasePlan, true))
                                                                 && (!$doc['virtual'] || ($doc['cupo_bloque'] === 'parvularia' && (($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2')))
                                                                 && (!$soloParvularia || $doc['es_parvularia'])
@@ -730,6 +732,8 @@
                                         @if ($proceso2027Asignacion['aplica'] ?? false)
                                             @if (\App\Support\DotacionAsignacionElegibilidad2027::esFuncionSinPrelacion($item))
                                                 <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Orden informativo.</strong> La lista conserva la prelación y la antigüedad, pero la prioridad no bloquea la elección. Se validan el saldo individual, las horas de la función y el máximo del bloque.</span></div>
+                                            @elseif (\App\Support\DotacionAsignacionElegibilidad2027::esTrabajoColaborativoSinPrelacion($item))
+                                                <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Trabajo colaborativo PIE sin prelación.</strong> Puede elegir un docente habilitado con saldo contractual suficiente, sin justificación. El orden es informativo; se conservan las restricciones de perfil y el máximo del bloque.</span></div>
                                             @elseif ($groupKey === 'pie_educadora_diferencial')
                                                 <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Bolsa de Educación Diferencial.</strong> Para cobertura docente se muestran sólo Educación Diferencial y personas sin título declarado. La prelación se aplica entre estos candidatos con saldo disponible.</span></div>
                                             @else
