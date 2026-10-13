@@ -7,6 +7,8 @@ use App\Exports\DotacionSobredotacionEstablecimientosExport;
 use App\Exports\DotacionResumenSobredotacionExport;
 use App\Http\Controllers\Controller;
 use App\Models\DotacionDocenteExclusion;
+use App\Models\DotacionNoRenovacion;
+use App\Services\Dotacion\NoRenovacionService;
 use App\Models\DotacionProporcionExcepcion;
 use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
@@ -342,6 +344,7 @@ class DotacionEstablecimientoController extends Controller
         $docentesVirtualesPorCupo = collect(data_get($data, 'asignacion.docentes', []))
             ->filter(fn (array $docente) => isset($docente['cupo_contrata_id']))
             ->keyBy('cupo_contrata_id');
+        $noRenovacionesDisponible = DotacionNoRenovacion::disponible();
 
         $asignaturasFiltros = [
             'q' => trim((string) $request->query('asignatura_q', '')),
@@ -387,6 +390,13 @@ class DotacionEstablecimientoController extends Controller
             'contrataHabilitacionesTableReady' => $contrataHabilitacionesTableReady,
             'contrataHabilitaciones' => $contrataHabilitaciones,
             'docentesVirtualesPorCupo' => $docentesVirtualesPorCupo,
+            'noRenovacionesDisponible' => $noRenovacionesDisponible,
+            'candidatosNoRenovacion' => $anio >= 2027 && $noRenovacionesDisponible
+                ? collect($data['docentes'])->filter(fn (array $docente) => NoRenovacionService::elegible($docente))
+                    ->groupBy(fn (array $docente) => NoRenovacionService::bloqueDocente($docente)) : collect(),
+            'noRenovaciones' => $noRenovacionesDisponible
+                ? DotacionNoRenovacion::query()->where('establecimiento_id', $establecimiento->id)
+                    ->where('anio', $anio)->orderByDesc('id')->get() : collect(),
             'canManageContrataHabilitaciones' => in_array($activeRole, ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'], true),
             'canManageDocenteExclusiones' => in_array($activeRole, DotacionDocenteExclusionController::ROLES_GESTION, true),
             'situacionesDocentesAnteriores' => $tab === 'docentes'

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Services\Dotacion\ContratacionHabilitacionService;
+use App\Services\Dotacion\NoRenovacionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -16,6 +17,21 @@ class DotacionContrataHabilitacionController extends Controller
     {
         $this->authorizeRequest($request, $establecimiento);
         abort_unless(Schema::hasTable('dotacion_contrata_habilitaciones'), 503, 'Debe ejecutar las migraciones para habilitar contrataciones.');
+        if ($request->input('accion') === 'reemplazar') {
+            $data = $request->validate([
+                'anio' => ['required', 'integer', 'between:2027,2100'],
+                'bloque' => ['required', Rule::in(array_keys(NoRenovacionService::BLOQUES))],
+                'docente_rut' => ['required', 'string', 'max:32'],
+                'justificacion' => ['required', 'string', 'min:10', 'max:3000'],
+            ]);
+            app(NoRenovacionService::class)->reemplazar($establecimiento, (int) $data['anio'],
+                $data['bloque'], $data['docente_rut'], $data['justificacion'], $request->user()?->id);
+            $mensaje = 'No renovación registrada. Se crearon los cupos Docente por contratar sin asignaciones ni asociaciones a asignaturas; conservan el título y el total de horas del contrato reemplazado.';
+
+            return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
+                ->withFragment('habilitaciones-contrata')
+                ->with('success', $mensaje)->with('contrata_success', $mensaje);
+        }
         $data = $request->validate([
             'anio' => ['required', 'integer', 'min:2020', 'max:2100'],
             'bloque' => ['required', Rule::in(ContratacionHabilitacionService::BLOQUES)],
@@ -24,10 +40,11 @@ class DotacionContrataHabilitacionController extends Controller
         ]);
 
         $service->habilitar($establecimiento, (int) $data['anio'], $data['bloque'], (int) $data['cantidad'], (float) $data['horas'], $request->user()?->id);
+        $mensaje = 'Docentes provisionales creados para el bloque seleccionado. Ya puede asignarles horas.';
 
         return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
             ->withFragment('habilitaciones-contrata')
-            ->with('success', 'Docentes provisionales creados para el bloque seleccionado. Ya puede asignarles horas.');
+            ->with('success', $mensaje)->with('contrata_success', $mensaje);
     }
 
     public function destroy(Request $request, Establecimiento $establecimiento, int $habilitacion, ContratacionHabilitacionService $service): RedirectResponse
@@ -35,10 +52,11 @@ class DotacionContrataHabilitacionController extends Controller
         $this->authorizeRequest($request, $establecimiento);
         $data = $request->validate(['anio' => ['required', 'integer', 'min:2020', 'max:2100']]);
         abort_unless($service->revocar($establecimiento, (int) $data['anio'], $habilitacion), 404);
+        $mensaje = 'Cupo retirado. Si correspondía a un reemplazo, la no renovación quedó anulada y el docente vuelve a la dotación sin reactivar las asignaciones anteriores.';
 
         return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
             ->withFragment('habilitaciones-contrata')
-            ->with('success', 'Habilitación a contrata retirada.');
+            ->with('success', $mensaje)->with('contrata_success', $mensaje);
     }
 
     private function authorizeRequest(Request $request, Establecimiento $establecimiento): void

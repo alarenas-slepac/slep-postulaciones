@@ -8,9 +8,11 @@ use App\Models\DotacionDocenteAsignacion;
 use App\Models\DotacionEstablecimientoConfiguracion;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionFuncionRegla;
+use App\Models\DotacionNoRenovacion;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
 use App\Services\Dotacion\ContratacionHabilitacionService;
+use App\Services\Dotacion\NoRenovacionService;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionAsignacionElegibilidad2027;
@@ -87,6 +89,7 @@ class DotacionAsignacionController extends Controller
         $this->validatePlanHoursAvailable($establecimiento, $data);
         $payload = $this->buildPayload($request, $establecimiento, $persona, $data);
         DB::transaction(function () use ($establecimiento, $persona, $payload): void {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
             $this->validateAcompanamientoParvularia($establecimiento, $payload);
             $this->validateLimiteAulaParvularia($establecimiento, $payload);
             $this->validateVirtualAssignment($establecimiento, $persona, $payload);
@@ -154,6 +157,12 @@ class DotacionAsignacionController extends Controller
         $payload = $this->buildPayload($request, $establecimiento, $persona, array_merge($asignacion->toArray(), $data), $asignacion);
         $payload['updated_by'] = $request->user()?->id;
         DB::transaction(function () use ($establecimiento, $persona, $payload, $asignacion): void {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            $rutAnterior = $asignacion->docente_rut_normalizado;
+            $asignacion->refresh();
+            if ($asignacion->docente_rut_normalizado !== $rutAnterior || $asignacion->estado !== 'activa') {
+                throw ValidationException::withMessages(['docente_rut' => 'La asignación cambió de docente o dejó de estar activa. Actualice la página antes de editarla.']);
+            }
             $rutAnterior = (string) $asignacion->docente_rut_normalizado;
             $this->validateAcompanamientoParvularia($establecimiento, $payload, $asignacion);
             $this->validateLimiteAulaParvularia($establecimiento, $payload, $asignacion);
@@ -306,6 +315,11 @@ class DotacionAsignacionController extends Controller
         $this->authorizeScope($request, $establecimiento);
         abort_unless((int) $asignacion->establecimiento_id === (int) $establecimiento->id, 404);
         DB::transaction(function () use ($establecimiento, $asignacion): void {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            $asignacion->refresh();
+            if ($asignacion->estado === 'no_renovada') {
+                throw ValidationException::withMessages(['asignacion' => 'Esta asignación pertenece al historial de no renovación y no se puede eliminar desde Asignación de horas.']);
+            }
             $this->validateAcompanamientoParvularia($establecimiento, null, $asignacion);
             $asignacion->delete();
             $this->recalcularContratoAulaParvularia($establecimiento, (int) $asignacion->anio, (string) $asignacion->docente_rut_normalizado);
@@ -393,6 +407,7 @@ class DotacionAsignacionController extends Controller
     private function deleteCourseBlockAssignments(Establecimiento $establecimiento, int $anio, Collection $asignaciones): int
     {
         return DB::transaction(function () use ($establecimiento, $anio, $asignaciones): int {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
             $rows = DotacionDocenteAsignacion::query()
                 ->where('establecimiento_id', $establecimiento->id)
                 ->where('anio', $anio)
@@ -1073,6 +1088,9 @@ class DotacionAsignacionController extends Controller
         ?DotacionDocenteAsignacion $current = null
     ): void {
         $anio = (int) ($payload['anio'] ?? 0);
+        if (DotacionNoRenovacion::estaRetirado((int) $establecimiento->id, $anio, (string) ($payload['docente_rut'] ?? ''))) {
+            throw ValidationException::withMessages(['docente_rut' => 'El docente fue retirado de esta dotación por no renovación. Seleccione el Docente por contratar.']);
+        }
         if (! DotacionProceso2027Calculator::aplica($anio)) {
             if (($payload['tipo_asignacion'] ?? '') === 'funcion_tecnico_pedagogica'
                 && \App\Support\DotacionConvivenciaAnual::horas($establecimiento->id, $anio) !== null) {
@@ -1367,21 +1385,13 @@ class DotacionAsignacionController extends Controller
             throw ValidationException::withMessages(['horas_contrato' => 'Asigne horas mayores que cero al docente por contratar.']);
         }
 
-        $tipo = (string) ($payload['tipo_asignacion'] ?? '');
-        $bloqueFuncion = DotacionProceso2027Calculator::bloqueFuncionPorDocente($payload, $persona);
         $curso = (int) ($payload['establecimiento_curso_id'] ?? 0) > 0
             ? EstablecimientoCurso::query()->with('curso')->find((int) $payload['establecimiento_curso_id'])
             : null;
-        $bloqueAsignacion = match (true) {
-            $bloqueFuncion !== null => $bloqueFuncion,
-            in_array($tipo, ['plan_estudio', 'pie_colaborativo', 'acompanamiento_parvularia'], true) => $curso && DotacionProfesionDocenteResolver::esCursoNt($curso) ? 'bloque_2' : 'bloque_1',
-            $tipo === 'pie_educadora_diferencial' => 'bloque_3',
-            default => DotacionProceso2027Calculator::bloqueParaAsignacion($payload),
-        };
-        $bloquePermitido = $cupo->bloque === 'parvularia' ? 'bloque_2' : 'bloque_3';
-        if ($bloqueAsignacion !== $bloquePermitido) {
+        $bloqueAsignacion = NoRenovacionService::bloqueAsignacion([...$payload, 'establecimientoCurso' => $curso], $persona);
+        if ($bloqueAsignacion !== $cupo->bloque) {
             throw ValidationException::withMessages([
-                'docente_rut' => 'El docente por contratar solo puede cubrir necesidades de su bloque '.($cupo->bloque === 'parvularia' ? 'Parvularia' : 'PIE').'.',
+                'docente_rut' => 'El docente por contratar solo puede cubrir necesidades de su bloque '.(NoRenovacionService::BLOQUES[$cupo->bloque] ?? $cupo->bloque).'.',
             ]);
         }
 

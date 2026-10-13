@@ -473,7 +473,7 @@
                                                                 ($docentesPermitidosSubsector === null || in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
                                                                 && (!$seleccionLibrePlan || $doc['saldo'] >= 1)
                                                                 && ($fasePlan === null || in_array($doc['rut_normalizado'], $rutsFasePlan, true))
-                                                                && (!$doc['virtual'] || ($doc['cupo_bloque'] === 'parvularia' && (($cursoNt instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2')))
+                                                                && (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'tipo_asignacion' => 'plan_estudio', 'establecimientoCurso' => $cursoNt], $doc))
                                                                 && (!$soloParvularia || $doc['es_parvularia'])
                                                             ),
                                                             'grupoPersonal' => $fasePlan === 'titular' ? 'Docentes con horas titulares disponibles' : ($fasePlan === 'contrata' ? 'Docentes con horas a contrata disponibles' : 'Docentes vigentes y por contratar'),
@@ -632,13 +632,6 @@
                                 $esNormativa2027 = ($proceso2027Asignacion['aplica'] ?? false)
                                     && ($item['necesidad_condicionada_por_asignacion_docente'] ?? false);
                                 $cursoItem = $item['curso'] ?? null;
-                                $cuposPermitidos = match (true) {
-                                    $groupKey === 'pie_educadora_diferencial' => ['pie'],
-                                    $groupKey === 'pie_colaborativo' && (($cursoItem instanceof \App\Models\EstablecimientoCurso && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoItem)) || data_get($proceso2027Asignacion, 'need_blocks.'.($item['key'] ?? '')) === 'bloque_2') => ['parvularia'],
-                                    ($item['subtipo_asignacion'] ?? null) === 'pie' => ['pie'],
-                                    ($item['tipo_asignacion'] ?? null) === 'otra_funcion' || (int) ($item['dotacion_funcion_id'] ?? 0) > 0 => ['parvularia', 'pie'],
-                                    default => [],
-                                };
                             @endphp
                             <tr role="row" data-dotacion-need="{{ sha1($item['key']) }}" data-section="{{ $groupKey }}" data-course="{{ $item['curso_label'] ?? 'Establecimiento' }}" data-search="{{ $item['curso_label'] ?? 'Establecimiento' }} {{ $item['titulo'] ?? '' }} {{ collect($item['asignaciones'] ?? [])->map(fn ($fila) => data_get($fila, 'docente_nombre').' '.data_get($fila, 'docente_rut'))->implode(' ') }}" data-pending="{{ (float) $pendingContrato > 0.01 || $asignacionAutomatica ? '1' : '0' }}">
                                 <td role="cell" data-label="Necesidad">
@@ -750,7 +743,7 @@
                                             <option value="">Seleccione persona...</option>
                                             @include('admin.dotacion-establecimiento.partials._personal_select_referencia', [
                                                 'opcionesPersonal' => $docenteOptions->filter(fn ($doc) =>
-                                                    (!$doc['virtual'] || in_array($doc['cupo_bloque'], $cuposPermitidos, true))
+                                                    (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'establecimientoCurso' => $cursoItem, 'asignatura_nombre' => $item['asignatura_nombre'] ?? $item['titulo'] ?? ''], $doc))
                                                     && (!(($proceso2027Asignacion['aplica'] ?? false) && $groupKey === 'pie_educadora_diferencial') || $doc['elegible_bolsa_diferencial'])
                                                 ),
                                                 'grupoPersonal' => 'Docentes vigentes y por contratar', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', ''),

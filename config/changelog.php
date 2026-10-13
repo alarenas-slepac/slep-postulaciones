@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.13.596',
+    'current_version' => '2026.10.13.597',
     'entries' => [
+        [
+            'version' => '2026.10.13.597',
+            'title' => 'Dotación: vacantes por no renovación de contrata',
+            'summary' => 'Permite reemplazar contratos íntegramente a contrata por cupos vacíos en Plan general, Parvularia y PIE, aunque no exista brecha de contratación.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Exige seleccionar un docente a contrata del bloque y fundamentar su no renovación. Copia su título, función y horas de contrato a Docente por contratar, sin asignaciones ni asociaciones a asignaturas.',
+                'Retira al docente sólo de la dotación del establecimiento y año elegidos. Conserva el padrón, las declaraciones y las asignaciones históricas; archiva las asignaciones activas y reservas del año en una transacción con trazabilidad.',
+                'Conserva los controles de perfil, asociación a asignaturas, prelación y saldo individual al asignar los nuevos cupos. Mantiene compatibilidad con los cupos anteriores a la migración.',
+                'Muestra la justificación en el historial y permite anular un reemplazo sólo si su cupo no tiene asignaciones activas. La anulación no reactiva automáticamente las asignaciones archivadas.',
+                'Incluye migración aditiva, aislamiento por año y establecimiento, bloqueo contra solicitudes repetidas y validación de formularios abiertos antes de la no renovación.',
+            ],
+            'published_at' => '2026-10-13',
+        ],
         [
             'version' => '2026.10.13.596',
             'title' => 'Dotación 2027: Religión, PIE colaborativo y reservas protegidas',

@@ -61,7 +61,8 @@ class DotacionDocentesSubsector
             return true;
         }
 
-        return $nivel === 'parvularia' && ($docente['cupo_bloque'] ?? null) === 'parvularia';
+        return ($docente['cupo_bloque'] ?? null) === 'plan_estudio'
+            || ($nivel === 'parvularia' && ($docente['cupo_bloque'] ?? null) === 'parvularia');
     }
 
     /** @return array<string, mixed> */

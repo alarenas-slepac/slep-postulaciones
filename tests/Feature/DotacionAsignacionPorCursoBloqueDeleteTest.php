@@ -17,6 +17,10 @@ class DotacionAsignacionPorCursoBloqueDeleteTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Schema::create('establecimientos', function (Blueprint $table): void {
+            $table->id();
+        });
+        DB::table('establecimientos')->insert([['id' => 10], ['id' => 20]]);
         Schema::create('dotacion_docente_asignaciones', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('establecimiento_id');
@@ -36,6 +40,7 @@ class DotacionAsignacionPorCursoBloqueDeleteTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('dotacion_docente_asignaciones');
+        Schema::dropIfExists('establecimientos');
         parent::tearDown();
     }
 
