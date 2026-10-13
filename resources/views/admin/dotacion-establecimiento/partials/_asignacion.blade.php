@@ -8,6 +8,9 @@
     $subvenciones = $asignacion['subvenciones'] ?? collect();
     $docentesAsignacion = $asignacion['docentes'] ?? $docentes;
     $proceso2027Asignacion = $proceso2027 ?? ['aplica' => false];
+    if ($proceso2027Asignacion['aplica'] ?? false) {
+        $docentesAsignacion = $proceso2027Asignacion['docentes'] ?? $docentesAsignacion;
+    }
     $asignacionesSoloConsulta = \App\Support\DotacionAsignacionSuspension::bloqueada((int) $anio, $activeRole ?? auth()->user()?->activeRoleName());
     $subsectoresAsignacion = collect($proceso2027Asignacion['docentes_subsector']['asignaturas'] ?? [])->keyBy('key');
     $asignacion2027Habilitada = !($proceso2027Asignacion['aplica'] ?? false) || ($proceso2027Asignacion['asignacion_habilitada'] ?? false);
@@ -44,6 +47,7 @@
                 'cupo_bloque' => $persona['cupo_bloque'] ?? null,
                 'titulo' => $titulo,
                 'es_parvularia' => \App\Support\DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos'],
+                'elegible_bolsa_diferencial' => \App\Support\DotacionAsignacionElegibilidad2027::puedeRecibirBolsaDiferencial($persona),
                 'saldo' => $saldo,
                 'prioridad' => $prioridad,
                 'prioridad_label' => $prioridadLabel,
@@ -342,9 +346,7 @@
                                             $bloqueActual = $item['bloque'] ?? 'Sin bloque';
                                             $cursoNt = $item['curso'] ?? null;
                                             $seleccionLibreParvularia = \App\Support\DotacionPlanTitularPrimero::permiteSeleccionLibre($item);
-                                            $opcionesDocentesPlan = $seleccionLibreParvularia
-                                                ? $docenteOptions->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)->values()
-                                                : $docenteOptions;
+                                            $opcionesDocentesPlan = $docenteOptions;
                                             $soloParvularia = $cursoNt instanceof \App\Models\EstablecimientoCurso
                                                 && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)
                                                 && ! \App\Support\DotacionParvulariaCalculator::conJec($cursoNt, $item['proporcion_key'] ?? null);
@@ -444,7 +446,7 @@
                                                     <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                                     <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
                                                     @if ($seleccionLibreParvularia)
-                                                        <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Selección sin prelación.</strong> Elija un docente asociado a esta asignatura, incluido uno de especialidad, con al menos 1 h de contrato disponible. No se exige prelación ni justificación. Se mantienen los límites del contrato y del bloque autorizado.</span></div>
+                                                        <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Selección sin prelación.</strong> Elija un docente asociado a esta asignatura, incluido uno de especialidad, con al menos 1 h de contrato disponible. No se exige prelación ni justificación. El orden se muestra como referencia. Se mantienen los límites del contrato y del bloque autorizado.</span></div>
                                                     @elseif ($proceso2027Asignacion['aplica'] ?? false)
                                                         <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>{{ $fasePlan === 'titular' ? 'Primero, horas titulares.' : 'Sin saldo titular asignable: sigue contrata.' }}</strong> Solo se muestran docentes asociados a esta asignatura con al menos 1 h {{ $fasePlan === 'titular' ? 'titular' : 'a contrata' }} disponible, en orden de prelación. Los saldos menores a 1 h se omiten. Si el saldo de un docente no cubre todas las horas pendientes, asigne primero una fracción del aula.</span></div>
                                                     @endif
@@ -691,7 +693,7 @@
                                             <input type="hidden" name="subvencion" value="General">
                                             <input type="hidden" name="horas_contrato" value="{{ $item['horas_contrato_requeridas'] ?? 44 }}">
                                             <label class="form-label small mb-0" for="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}">Docente directivo</label>
-                                            <div class="dotacion-selector-guide"><i class="bi bi-search"></i><span>Busque por nombre o RUT. La lista muestra la prelación 2027 y las horas disponibles antes de confirmar la asignación.</span></div>
+                                            <div class="dotacion-selector-guide"><i class="bi bi-search"></i><span><strong>Orden informativo.</strong> Busque por nombre o RUT. La lista muestra la prelación 2027 y las horas disponibles; la prioridad no bloquea la elección del docente directivo.</span></div>
                                             <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar docente por nombre o RUT..." required>
                                                 <option value="">Seleccione docente...</option>
                                                 @foreach ($docenteOptions as $doc)
@@ -724,7 +726,13 @@
                                         <input type="hidden" name="dotacion_funcion_id" value="{{ $item['dotacion_funcion_id'] ?? '' }}">
                                         <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
                                         @if ($proceso2027Asignacion['aplica'] ?? false)
-                                            <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; cada grupo titular se ordena por antigüedad y muestra el saldo contractual disponible.</span></div>
+                                            @if (\App\Support\DotacionAsignacionElegibilidad2027::esFuncionSinPrelacion($item))
+                                                <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Orden informativo.</strong> La lista conserva la prelación y la antigüedad, pero la prioridad no bloquea la elección. Se validan el saldo individual, las horas de la función y el máximo del bloque.</span></div>
+                                            @elseif ($groupKey === 'pie_educadora_diferencial')
+                                                <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Bolsa de Educación Diferencial.</strong> Para cobertura docente se muestran sólo Educación Diferencial y personas sin título declarado. La prelación se aplica entre estos candidatos con saldo disponible.</span></div>
+                                            @else
+                                                <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; cada grupo titular se ordena por antigüedad y muestra el saldo contractual disponible.</span></div>
+                                            @endif
                                         @endif
                                         <label class="form-label small mb-0" for="estamento-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Tipo de cobertura</label>
                                         <select id="estamento-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
@@ -737,6 +745,7 @@
                                             <optgroup label="Docentes vigentes y por contratar">
                                                 @foreach ($docenteOptions as $doc)
                                                 @continue($doc['virtual'] && ! in_array($doc['cupo_bloque'], $cuposPermitidos, true))
+                                                @continue(($proceso2027Asignacion['aplica'] ?? false) && $groupKey === 'pie_educadora_diferencial' && !$doc['elegible_bolsa_diferencial'])
                                                 <option value="{{ $doc['rut'] }}" @selected($valorFormulario($item, 'docente_rut', '') === $doc['rut']) data-estamento="docente" data-nombre="{{ $doc['nombre'] }}" data-rut="{{ $doc['rut'] }}" data-titulo="{{ $doc['titulo'] }}" data-funcion="{{ $doc['funcion'] }}" data-prioridad="{{ $doc['prioridad'] }}" data-prioridad-label="{{ $doc['prioridad_label'] }}" data-antiguedad="{{ $doc['antiguedad'] }}" data-titular-disponible="{{ $fmt($doc['titular_disponible']) }}" data-contrata-disponible="{{ $fmt($doc['contrata_disponible']) }}">{{ $doc['label'] }}</option>
                                                 @endforeach
                                             </optgroup>

@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.12.593',
+    'current_version' => '2026.10.12.594',
     'entries' => [
+        [
+            'version' => '2026.10.12.594',
+            'title' => 'Dotación 2027: prelación según el tipo de asignación',
+            'summary' => 'Permite elegir especialistas en libre disposición Con JEC y docentes en funciones sin bloqueo de prioridad; limita la bolsa PIE a Educación Diferencial o ausencia de título.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Conserva el orden de prelación y antigüedad en libre disposición de NT1/NT2 Con JEC, permitiendo elegir un especialista asociado a la asignatura aunque existan educadoras de mayor prioridad.',
+                'Filtra la cobertura docente de Bolsa Educadoras Diferenciales por el título declarado y aplica la prelación únicamente entre Educación Diferencial y docentes sin título declarado; valida la misma regla al crear o editar.',
+                'Las funciones directivas, técnico-pedagógicas, planes normativos y otras funciones muestran el orden como referencia y permiten asignar o reasignar a docentes de menor prioridad.',
+                'Conserva permisos, etapas, saldos contractuales, máximos y horas definidas de funciones normativas, sin modificar asignaciones históricas ni extender libre disposición a Sin JEC.',
+                'Incluye pruebas aisladas de selección de especialistas, creación y edición de funciones, títulos elegibles, prelación dentro de PIE y selectores; documenta las reglas y el despliegue sin migraciones.',
+            ],
+            'published_at' => '2026-10-12',
+        ],
         [
             'version' => '2026.10.12.593',
             'title' => 'Dotación: carga más rápida de la pestaña Docentes',
