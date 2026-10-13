@@ -511,16 +511,19 @@
                                                 @endcomponent
                                             </td>
                                         </tr>
-                                        @if (($cursoNt instanceof \App\Models\EstablecimientoCurso)
-                                            && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)
-                                            && \App\Support\DotacionParvulariaCalculator::conJec($cursoNt, $item['proporcion_key'] ?? null)
-                                            && (($item['subtipo_asignacion'] ?? '') === 'libre_disposicion' || ($item['curso_combinado_libre_disposicion'] ?? false))
+                                        @php
+                                            $acompanamientoDisponible = \App\Support\DotacionAcompanamientoParvularia::disponibles($item);
+                                        @endphp
+                                        @if (\App\Support\DotacionAcompanamientoParvularia::aplica($item)
                                             && ($item['horas_externas_libre_disposicion'] ?? 0) > 0)
                                             <tr data-dotacion-related="{{ sha1($item['key']) }}">
                                                 <td colspan="7" class="bg-light">
                                                     <div class="fw-semibold small mb-1">Acompañamiento de Educadora de Párvulos</div>
-                                                    <div class="small text-muted mb-2">Otro docente imparte {{ $fmt($item['horas_externas_libre_disposicion']) }} h de libre disposición. Puede asignar hasta {{ $fmt($item['horas_acompanamiento_disponibles'] ?? 0) }} h adicionales a la Educadora que permanece en aula. Estas horas cuentan en su contrato, sin duplicar la cobertura del plan.</div>
-                                                    @if (($item['horas_acompanamiento_disponibles'] ?? 0) > 0.01)
+                                                    @if (!empty($item['curso_combinado_libre_disposicion_nombres']))
+                                                        <div class="small text-primary mb-1">Libre disposición: {{ implode(', ', $item['curso_combinado_libre_disposicion_nombres']) }} · {{ $fmt(\App\Support\DotacionAcompanamientoParvularia::horasLibreDisposicion($item)) }} h aula en el grupo.</div>
+                                                    @endif
+                                                    <div class="small text-muted mb-2">Otro docente imparte {{ $fmt($item['horas_externas_libre_disposicion']) }} h aula en esta asignatura. Puede asignar hasta {{ $fmt($acompanamientoDisponible) }} h de acompañamiento a la Educadora que permanece en aula, dentro de la libre disposición configurada. Estas horas cuentan en su contrato, sin duplicar la cobertura del plan.</div>
+                                                    @if ($acompanamientoDisponible > 0.01)
                                                         @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['soloConsulta' => $asignacionesSoloConsulta, 'editorId' => 'dotacion-editor-'.sha1($item['key'].'acompanamiento_parvularia'), 'abierto' => $esFormularioFallido($item, 'acompanamiento_parvularia'), 'accion' => 'Asignar acompañamiento', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
                                                         @unless ($asignacionesSoloConsulta)
                                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.asignaciones.store', $establecimiento) }}" class="vstack gap-2 dotacion-assignment-form">
@@ -542,7 +545,7 @@
                                                             <div class="row g-2 align-items-end">
                                                                 <div class="col-md-4">
                                                                     <label class="form-label small mb-1" for="acompanamiento-horas-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Horas aula de acompañamiento</label>
-                                                                    <input id="acompanamiento-horas-{{ $cursoCollapseId }}-{{ $loop->iteration }}" type="number" name="horas_plan_pedagogicas" step="0.25" min="0.25" max="{{ $item['horas_acompanamiento_disponibles'] }}" value="{{ $valorFormulario($item, 'horas_plan_pedagogicas', $item['horas_acompanamiento_disponibles'], 'acompanamiento_parvularia') }}" class="form-control form-control-sm" required>
+                                                                    <input id="acompanamiento-horas-{{ $cursoCollapseId }}-{{ $loop->iteration }}" type="number" name="horas_plan_pedagogicas" step="0.25" min="0.25" max="{{ $acompanamientoDisponible }}" value="{{ $valorFormulario($item, 'horas_plan_pedagogicas', $acompanamientoDisponible, 'acompanamiento_parvularia') }}" class="form-control form-control-sm" required>
                                                                 </div>
                                                                 <div class="col-md-8">
                                                                     <button class="btn btn-sm btn-outline-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-plus-circle"></i> Asignar acompañamiento</button>
