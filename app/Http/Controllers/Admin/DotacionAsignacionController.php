@@ -1130,6 +1130,16 @@ class DotacionAsignacionController extends Controller
         }
 
         $proceso = DotacionProceso2027Calculator::resumen($establecimiento, $anio);
+        $rutSeleccionado = DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? ''));
+        $docenteProceso = collect($proceso['docentes'] ?? [])->first(fn (array $docente) =>
+            DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) === $rutSeleccionado
+        );
+        if (($payload['estamento_cobertura'] ?? 'docente') === 'docente'
+            && DotacionAsignacionElegibilidad2027::excluidoDeOtrasFunciones($docenteProceso ?? [], $payload)) {
+            throw ValidationException::withMessages([
+                'docente_rut' => 'El docente tiene una justificación de horas de contrato sin asignación en Sobredotación para este año y establecimiento. No puede recibir horas de otras funciones.',
+            ]);
+        }
         if (! ($proceso['asignacion_habilitada'] ?? false)) {
             throw ValidationException::withMessages([
                 'anio' => 'Para asignar horas en 2027 debe completar planes de estudio, asociar docentes a las asignaturas, declarar la combinación de cursos y configurar máximos suficientes para los tres bloques.',
