@@ -36,8 +36,9 @@ class DotacionSobredotacionCalculator
      */
     public static function build(iterable $docentes, array $resumen, iterable $necesidadesFunciones = []): array
     {
+        $docentes = collect($docentes);
         $clasificacionFunciones = self::clasificacionFunciones($necesidadesFunciones);
-        $base = collect($docentes)
+        $base = $docentes
             ->map(fn (array $docente) => self::prepararDocente(
                 $docente,
                 $clasificacionFunciones,
@@ -75,7 +76,7 @@ class DotacionSobredotacionCalculator
                 'contrato_pie_necesario' => $necesidadPie,
                 'contrato_docente_pie' => $pieObjetivo,
             ]),
-            'vacantes_por_bloque' => self::vacantesPorBloque($base, $aula['items']),
+            'vacantes_por_bloque' => self::vacantesPorBloque($base, $aula['items'], $docentes),
         ];
     }
 
@@ -320,7 +321,7 @@ class DotacionSobredotacionCalculator
     }
 
     /** @return array<string, array<string, mixed>> */
-    private static function vacantesPorBloque(Collection $base, Collection $vacantesAula): array
+    private static function vacantesPorBloque(Collection $base, Collection $vacantesAula, Collection $docentes): array
     {
         $grupos = [
             'plan_estudio' => collect(),
@@ -373,11 +374,22 @@ class DotacionSobredotacionCalculator
             }
         }
 
-        return collect($grupos)->map(function (Collection $items): array {
-            $items = $items->sortBy([
-                ['horas_sobredotacion_total', 'desc'],
-                ['nombre', 'asc'],
-            ])->values();
+        // Se reutiliza la prelación del módulo sólo para presentar la nómina:
+        // el cálculo y la distribución de necesidades conservan su orden original.
+        $ordenPrelacion = DotacionProceso2027Calculator::docentesPriorizados($docentes->map(function (array $docente): array {
+            [$planta, $contrata] = self::contratoPorCalidad($docente, max(0.0, (float) ($docente['horas_contrato'] ?? 0)));
+            $docente['horas_planta'] = $planta;
+            $docente['horas_contrata'] = $contrata;
+
+            return $docente;
+        }))->mapWithKeys(fn (array $docente, int $posicion) => [
+            DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut'] ?? '')) => $posicion,
+        ]);
+
+        return collect($grupos)->map(function (Collection $items) use ($ordenPrelacion): array {
+            $items = $items->sortBy(fn (array $item) => $ordenPrelacion->get(
+                DotacionEstablecimientoCalculator::normalizeRut($item['rut']), PHP_INT_MAX
+            ))->values();
 
             return [
                 'items' => $items,

@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.13.599',
+    'current_version' => '2026.10.14.600',
     'entries' => [
+        [
+            'version' => '2026.10.14.600',
+            'title' => 'Sobredotación: nómina de contrato sin asignación en orden de prelación',
+            'summary' => 'Ordena la nómina de Contrato sin asignación registrada por la prelación vigente dentro de cada bloque.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_gdp', 'supervisor_plani', 'coordinador_uatp'],
+            'items' => [
+                'Plan de estudio, Educación Parvularia y PIE muestran los docentes con saldo según la misma categoría de prelación, antigüedad y nombre utilizadas por el módulo.',
+                'Conserva las exclusiones de contratos protegidos, las reservas y el neteo de fracciones de Parvularia. El orden de presentación no modifica los saldos, totales ni la distribución de necesidades PIE.',
+                'Incluye pruebas del orden de los tres bloques y de las filas renderizadas, con contratos mixtos, fechas ausentes, lactancia sin fuero y datos históricos.',
+            ],
+            'published_at' => '2026-10-14',
+        ],
         [
             'version' => '2026.10.13.599',
             'title' => 'Parvularia: reserva de horas titulares para otras funciones',
