@@ -25,7 +25,8 @@ class DotacionReservaNoNormativa
     /** Primero el saldo titular del docente; contrata sólo con situación protegida. */
     public static function faseParaDocente(array $docente): ?string
     {
-        if (! empty($docente['cupo_contrata_id'])) { return null; }
+        if (! empty($docente['cupo_contrata_id'])
+            || DotacionAsignacionElegibilidad2027::excluidoDeOtrasFunciones($docente, ['tipo_asignacion' => 'reserva_no_normativa'])) { return null; }
         if (DotacionPlanTitularPrimero::disponibles($docente, 'titular') >= 1.0) { return 'titular'; }
         return self::permiteContrata($docente) && DotacionPlanTitularPrimero::disponibles($docente, 'contrata') >= 1.0
             ? 'contrata' : null;

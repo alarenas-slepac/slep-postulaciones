@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.14.600',
+    'current_version' => '2026.10.14.601',
     'entries' => [
+        [
+            'version' => '2026.10.14.601',
+            'title' => 'Sobredotación: excluir docentes justificados de otras funciones',
+            'summary' => 'La justificación registrada en Sobredotación excluye al docente de la asignación y reserva de horas de otras funciones en la dotación 2027.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_gdp', 'supervisor_plani', 'coordinador_uatp'],
+            'items' => [
+                'Aplica a justificaciones de supresión de horas titulares o no renovación de contrata de cualquiera de los tres bloques, sólo en el mismo establecimiento y año.',
+                'Retira al docente de los selectores y candidatos de otras funciones y de nuevas reservas. Valida también al crear, editar o vincular reservas desde formularios abiertos previamente.',
+                'Conserva la nómina de sobredotación, sus justificaciones, las asignaciones existentes, los cálculos contractuales y las reglas de plan de estudios y PIE.',
+                'Incluye pruebas aisladas de los selectores, validaciones de guardado, reversión de cambios y alcance por año y establecimiento.',
+            ],
+            'published_at' => '2026-10-14',
+        ],
         [
             'version' => '2026.10.14.600',
             'title' => 'Sobredotación: nómina de contrato sin asignación en orden de prelación',

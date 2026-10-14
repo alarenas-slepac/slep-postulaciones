@@ -3,15 +3,18 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Admin\DotacionAsignacionController;
+use App\Http\Controllers\Admin\DotacionSobredotacionJustificacionController;
 use App\Models\Curso;
 use App\Models\DotacionDocenteAsignacion;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionProceso2027Configuracion;
+use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
 use App\Models\PlanEstudio;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
+use App\Support\DotacionAsignacionElegibilidad2027;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionDocentesSubsector;
 use App\Support\DotacionEstablecimientoCalculator;
@@ -733,6 +736,171 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         foreach ($options as $option) { $values[] = $option->getAttribute('value'); }
         $this->assertContains($rut, $values);
         $this->assertNotContains('99000002-K', $values);
+    }
+
+    public static function justificacionesPorBloqueYCalidad(): array
+    {
+        return [
+            'general contrata directiva' => ['plan_estudio', 'contrata', 'directiva'],
+            'general titular otras' => ['plan_estudio', 'titular', 'otras_funciones_docentes'],
+            'parvularia titular técnica' => ['parvularia', 'titular', 'tecnico_pedagogica'],
+            'parvularia contrata otras' => ['parvularia', 'contrata', 'otras_funciones_docentes'],
+            'PIE contrata plan' => ['pie', 'contrata', 'planes_programas'],
+            'PIE titular otras' => ['pie', 'titular', 'otras_funciones_docentes'],
+        ];
+    }
+
+    #[DataProvider('justificacionesPorBloqueYCalidad')]
+    public function test_sobredotacion_justificada_excluye_selector_y_bloquea_creacion_y_reasignacion(string $block, string $quality, string $category): void
+    {
+        $rut = $block === 'parvularia' && $quality === 'titular' ? '99000001-K' : '99000002-K';
+        if ($block === 'pie') {
+            $rut = '99000005-K';
+            $this->personal($rut, 'Diferencial sintética justificada', $quality === 'titular' ? 'PLANTA' : 'CONTRATA', 'Pedagogía en Educación Diferencial');
+        } elseif ($block === 'plan_estudio' && $quality === 'titular') {
+            DB::table('reemplazos_personal')->where('rut', $rut)->update(['tipocontrato' => 'PLANTA']);
+        } elseif ($block === 'parvularia' && $quality === 'contrata') {
+            DB::table('declaracion_sostenedores')->where('rut', $rut)->update(['nombre_titulo' => 'Pedagogía en Educación de Párvulos']);
+        }
+        $this->coverPlan();
+        $need = $this->declaredFunction($category);
+        $fields = [
+            'anio' => 2027, 'docente_rut' => '99000003-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => $need['tipo_asignacion'], 'subtipo_asignacion' => $need['subtipo_asignacion'],
+            'necesidad_key' => $need['key'], 'dotacion_funcion_id' => $need['dotacion_funcion_id'], 'horas_contrato' => 2,
+        ];
+        $controller = app(DotacionAsignacionController::class);
+        $controller->store($this->request($fields), $this->ee);
+        $saved = DotacionDocenteAsignacion::where('dotacion_funcion_id', $need['dotacion_funcion_id'])->sole();
+        $before = $saved->getAttributes();
+        $processBefore = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->justify($rut, $block, $quality);
+        $processAfter = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertSame($processBefore['bloques'], $processAfter['bloques']);
+        $this->assertSame($processBefore['capacidad_no_normativas'], $processAfter['capacidad_no_normativas']);
+        $normalized = DotacionEstablecimientoCalculator::normalizeRut($rut);
+        $this->assertTrue(collect($processAfter['docentes'])->firstWhere('rut_normalizado', $normalized)['sobredotacion_justificada']);
+        $this->assertNotContains($rut, DotacionAsignacionElegibilidad2027::candidatosParaPrelacion(collect($processAfter['docentes']), $fields)->pluck('rut')->all());
+
+        $xpath = $this->assignmentXpath();
+        $form = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$need['key'].'"]]')->item(0);
+        $this->assertNotNull($form);
+        $values = [];
+        foreach ($this->catalogOptions($xpath, $form) as $option) { $values[] = $option->getAttribute('value'); }
+        $this->assertNotContains($rut, $values);
+        $this->assertContains('99000003-K', $values);
+        $this->assertStringContainsString('justificación registrada en Sobredotación', $form->textContent);
+        $count = DotacionDocenteAsignacion::count();
+        $fields['docente_rut'] = $rut;
+        // No se acepta un indicador falso enviado por un formulario anterior.
+        $fields['sobredotacion_justificada'] = false;
+        foreach (['crear', 'reasignar'] as $action) {
+            try {
+                $request = $this->request($fields);
+                $action === 'crear' ? $controller->store($request, $this->ee) : $controller->update($request, $this->ee, $saved);
+                $this->fail('Un docente justificado no debe recibir horas de otras funciones.');
+            } catch (ValidationException $error) {
+                $this->assertArrayHasKey('docente_rut', $error->errors());
+                $this->assertStringContainsString('justificación de horas de contrato sin asignación', $error->getMessage());
+            }
+            $this->assertSame($before, $saved->fresh()->getAttributes());
+            $this->assertSame($count, DotacionDocenteAsignacion::count());
+        }
+        $fields['docente_rut'] = '99000003-K';
+        $controller->update($this->request($fields), $this->ee, $saved);
+        $this->assertSame('99000003K', $saved->fresh()->docente_rut_normalizado);
+    }
+
+    public function test_sobredotacion_justificada_no_permite_nuevas_reservas_pero_conserva_plan(): void
+    {
+        $this->justify('99000001-K', 'parvularia', 'titular');
+        $process = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertNotContains('99000001-K', \App\Support\DotacionReservaNoNormativa::candidatos($process)->pluck('rut')->all());
+        $xpath = $this->assignmentXpath();
+        $this->assertSame(0, $xpath->query('//select[@id="docente-reserva-no-normativa"]/option[@value="99000001-K"]')->length);
+        try {
+            $this->reserveEducadora(2);
+            $this->fail('No debe reservar contrato del docente ya justificado.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('docente_rut', $error->errors()); }
+        $this->assertSame(0, DotacionDocenteAsignacion::count());
+        $this->store(['docente_rut' => '99000001-K'], $this->need(false));
+        $this->assertSame('plan_estudio', DotacionDocenteAsignacion::sole()->tipo_asignacion);
+        $this->differentialNeed();
+        $pie = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.pie_colaborativo'))->sole();
+        app(DotacionAsignacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => '99000001-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => 'pie_colaborativo', 'necesidad_key' => $pie['key'],
+            'establecimiento_curso_id' => $pie['establecimiento_curso_id'], 'horas_contrato' => 3,
+        ]), $this->ee);
+        $this->assertSame(1, DotacionDocenteAsignacion::where('tipo_asignacion', 'pie_colaborativo')->count());
+    }
+
+    public function test_justificaciones_se_acotan_por_anio_y_establecimiento_y_normalizan_rut(): void
+    {
+        $this->assertSame([], DotacionSobredotacionJustificacion::rutsJustificados((int) $this->ee->id, 2027));
+        (require database_path('migrations/2026_09_29_190000_create_dotacion_sobredotacion_justificaciones_table.php'))->up();
+        $otro = Establecimiento::create(['rbd' => 99998, 'cod_estab' => 'SYNTHETIC-OTHER', 'nombre_establecimiento' => 'Otro establecimiento sintético']);
+        $base = [
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'docente_rut_normalizado' => '99000002K',
+            'bloque' => 'plan_estudio', 'tipo_horas' => 'contrata', 'horas_detectadas' => 10,
+            'justificacion' => 'Fundamento sintético de otro contexto.',
+        ];
+        foreach ([['anio' => 2026], ['establecimiento_id' => $otro->id], ['justificacion' => '   '],
+            ['bloque' => 'pie', 'horas_detectadas' => 0]] as $changes) {
+            DotacionSobredotacionJustificacion::create(array_replace($base, $changes));
+        }
+        $process = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertFalse(collect($process['docentes'])->firstWhere('rut_normalizado', '99000002K')['sobredotacion_justificada']);
+        $this->assertSame([], DotacionSobredotacionJustificacion::rutsJustificados((int) $this->ee->id, 2027));
+        DotacionSobredotacionJustificacion::create(array_replace($base, [
+            'docente_rut_normalizado' => '99.000.002-k', 'bloque' => 'parvularia',
+        ]));
+        DotacionSobredotacionJustificacion::create(array_replace($base, ['bloque' => 'parvularia']));
+        $this->assertSame(['99000002K'], DotacionSobredotacionJustificacion::rutsJustificados((int) $this->ee->id, 2027));
+        DB::enableQueryLog();
+        $process = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $queries = collect(DB::getQueryLog())->filter(fn ($query) => str_contains($query['query'], 'from "dotacion_sobredotacion_justificaciones"'));
+        DB::disableQueryLog();
+        $this->assertCount(1, $queries);
+        $this->assertTrue(collect($process['docentes'])->firstWhere('rut_normalizado', '99000002K')['sobredotacion_justificada']);
+        $this->assertFalse(collect($process['docentes'])->firstWhere('rut_normalizado', '99000001K')['sobredotacion_justificada']);
+    }
+
+    #[DataProvider('parvulariaReservationLinkHours')]
+    public function test_justificacion_posterior_a_reserva_impide_vincular_sin_perder_reserva(float $hours): void
+    {
+        $this->coverPlan();
+        $need = $this->declaredFunction('otras_funciones_docentes');
+        $this->reserveEducadora(4);
+        $reserva = DotacionDocenteAsignacion::where('tipo_asignacion', 'reserva_no_normativa')->sole();
+        $before = $reserva->getAttributes();
+        $count = DotacionDocenteAsignacion::count();
+        $this->justify('99000001-K', 'parvularia', 'titular');
+        try {
+            app(DotacionAsignacionController::class)->vincularReserva($this->request([
+                'necesidad_key' => $need['key'], 'horas_contrato' => $hours,
+            ]), $this->ee, $reserva);
+            $this->fail('La vinculación tampoco puede omitir la justificación.');
+        } catch (ValidationException $error) {
+            $this->assertStringContainsString('justificación de horas de contrato sin asignación', $error->getMessage());
+        }
+        $this->assertSame($before, $reserva->fresh()->getAttributes());
+        $this->assertSame($count, DotacionDocenteAsignacion::count());
+        app(DotacionAsignacionController::class)->destroy($this->request([]), $this->ee, $reserva);
+        $this->assertNull($reserva->fresh());
+        $this->assertSame(1, DotacionSobredotacionJustificacion::count());
+    }
+
+    private function justify(string $rut, string $block, string $quality): void
+    {
+        if (! Schema::hasTable('dotacion_sobredotacion_justificaciones')) {
+            (require database_path('migrations/2026_09_29_190000_create_dotacion_sobredotacion_justificaciones_table.php'))->up();
+        }
+        $response = app(DotacionSobredotacionJustificacionController::class)->store($this->request([
+            'anio' => 2027, 'docente_rut' => $rut, 'bloque' => $block, 'tipo_horas' => $quality,
+            'justificacion' => 'Fundamento sintético de contrato sin asignación para esta prueba.',
+        ]), $this->ee);
+        $this->assertNotNull($response->getSession()->get('success'));
     }
 
     private function coverPlan(): void

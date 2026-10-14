@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionFuncionEstablecimiento;
 use App\Models\DotacionProceso2027Configuracion;
+use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
 use Illuminate\Support\Collection;
@@ -206,8 +207,11 @@ class DotacionProceso2027Calculator
             $bloques['bloque_2']['requeridas'] += max(0.0, (float) $resumenContractual['contrato_educacion_parvularia_mas_trabajo_colaborativo_pie']);
         }
 
+        $rutsJustificados = array_fill_keys(DotacionSobredotacionJustificacion::rutsJustificados((int) $establecimiento->id, $anio), true);
         $docentes = self::docentesPriorizados(collect(data_get($data, 'asignacion.docentes', $data['docentes'] ?? [])))
-            ->map(function (array $docente): array {
+            ->map(function (array $docente) use ($rutsJustificados): array {
+                $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? ''));
+                $docente['sobredotacion_justificada'] = isset($rutsJustificados[$rut]);
                 $docente['redondeo_parvularia'] = isset($docente['cupo_contrata_id'])
                     ? 0.0 : DotacionSobredotacionCalculator::redondeoParvulariaDocente($docente);
 

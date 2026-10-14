@@ -54,6 +54,7 @@
                 'antiguedad' => $antiguedad,
                 'titular_disponible' => $titularDisponible,
                 'contrata_disponible' => $contrataDisponible,
+                'sobredotacion_justificada' => (bool) ($persona['sobredotacion_justificada'] ?? false),
             ];
         })->filter(fn ($persona) => $estamento !== 'docente' || $persona['saldo'] > 0.01)->values();
     };
@@ -699,7 +700,7 @@
                                             <div class="dotacion-selector-guide"><i class="bi bi-search"></i><span><strong>Orden informativo.</strong> Busque por nombre o RUT. La lista muestra la prelación 2027 y las horas disponibles; la prioridad no bloquea la elección del docente directivo.</span></div>
                                             <select id="director_adp_docente_{{ $item['dotacion_funcion_regla_id'] }}" name="docente_rut" class="form-select form-select-sm js-dotacion-docente-select" data-placeholder="Buscar docente por nombre o RUT..." required>
                                                 <option value="">Seleccione docente...</option>
-                                                @include('admin.dotacion-establecimiento.partials._personal_select_referencia', ['opcionesPersonal' => $docenteOptions->reject(fn ($doc) => $doc['virtual']), 'grupoPersonal' => 'Docentes vigentes', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', '', 'funcion_directiva')])
+                                                @include('admin.dotacion-establecimiento.partials._personal_select_referencia', ['opcionesPersonal' => \App\Support\DotacionAsignacionElegibilidad2027::candidatosParaPrelacion($docenteOptions, ['tipo_asignacion' => 'funcion_directiva'])->reject(fn ($doc) => $doc['virtual']), 'grupoPersonal' => 'Docentes vigentes', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', '', 'funcion_directiva')])
                                             </select>
                                             <div class="small text-muted">Contrato definido: {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas.</div>
                                             <button class="btn btn-sm btn-primary rounded-pill" type="submit" @disabled(!$asignacion2027Habilitada)><i class="bi bi-person-check"></i> Asignar docente directivo</button>
@@ -736,6 +737,9 @@
                                                 <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>Selección priorizada.</strong> Busque por nombre o RUT; cada grupo titular se ordena por antigüedad y muestra el saldo contractual disponible.</span></div>
                                             @endif
                                         @endif
+                                        @if (\App\Support\DotacionAsignacionElegibilidad2027::esFuncionSinPrelacion($item) && ($proceso2027Asignacion['aplica'] ?? false))
+                                            <div class="form-text"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Los docentes con justificación registrada en Sobredotación para este año y establecimiento quedan excluidos de otras funciones.</div>
+                                        @endif
                                         <label class="form-label small mb-0" for="estamento-necesidad-{{ $groupKey }}-{{ $loop->iteration }}">Tipo de cobertura</label>
                                         <select id="estamento-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                             <option value="docente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'docente')>Cubierto por docente</option>
@@ -745,7 +749,7 @@
                                         <select id="personal-necesidad-{{ $groupKey }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre o RUT..." required>
                                             <option value="">Seleccione persona...</option>
                                             @include('admin.dotacion-establecimiento.partials._personal_select_referencia', [
-                                                'opcionesPersonal' => $docenteOptions->filter(fn ($doc) =>
+                                                'opcionesPersonal' => $docenteOptions->reject(fn ($doc) => \App\Support\DotacionAsignacionElegibilidad2027::excluidoDeOtrasFunciones($doc, $item))->filter(fn ($doc) =>
                                                     (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'establecimientoCurso' => $cursoItem, 'asignatura_nombre' => $item['asignatura_nombre'] ?? $item['titulo'] ?? ''], $doc))
                                                     && (!(($proceso2027Asignacion['aplica'] ?? false) && $groupKey === 'pie_educadora_diferencial') || $doc['elegible_bolsa_diferencial'])
                                                 ),
