@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.604',
+    'current_version' => '2026.10.15.605',
     'entries' => [
+        [
+            'version' => '2026.10.15.605',
+            'title' => 'EPJA 2026 y 2027: asistentes asociados a asignaturas',
+            'summary' => 'Permite asociar asistentes de la educación a asignaturas EPJA y asignarles horas desde su tipo de cobertura.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Incluye asistentes vigentes del establecimiento en Docentes por asignatura para EPJA 2027 y añade el bloque de asociaciones EPJA en Asignación de horas de 2026. Las asociaciones se guardan por establecimiento, año y asignatura consolidada.',
+                'Al elegir Cubierto por Asistente de la Educación sólo muestra asistentes asociados a esa asignatura EPJA. Identifica su estamento, título y saldo de contrato en el selector con búsqueda y conserva las asociaciones históricas.',
+                'La cobertura AAEE de EPJA no exige prelación docente y registra las horas de contrato indicadas sin conversión 65/35. Valida asociación, vigencia, saldo del asistente, horas pendientes del plan y las etapas previas de 2027 también al guardar o editar.',
+                'Conserva las reglas de docentes y de los demás niveles. Incorpora pruebas aisladas de ambos años, selectores, asociaciones, guardado, edición, límites y permisos por establecimiento.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.15.604',
             'title' => 'Despliegue cPanel: comprobar Git sin procesamiento paralelo',

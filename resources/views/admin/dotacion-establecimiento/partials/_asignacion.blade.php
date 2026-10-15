@@ -12,7 +12,7 @@
         $docentesAsignacion = $proceso2027Asignacion['docentes'] ?? $docentesAsignacion;
     }
     $asignacionesSoloConsulta = \App\Support\DotacionAsignacionSuspension::bloqueada((int) $anio, $activeRole ?? auth()->user()?->activeRoleName());
-    $subsectoresAsignacion = collect($proceso2027Asignacion['docentes_subsector']['asignaturas'] ?? [])->keyBy('key');
+    $subsectoresAsignacion = collect(($anio === 2026 ? ($subsectoresEpja2026 ?? []) : ($proceso2027Asignacion['docentes_subsector'] ?? []))['asignaturas'] ?? [])->keyBy('key');
     $asignacion2027Habilitada = !($proceso2027Asignacion['aplica'] ?? false) || ($proceso2027Asignacion['asignacion_habilitada'] ?? false);
     $asistentesAsignacion = collect($asignacion['asistentes'] ?? []);
     $subvencionesOptions = ['General', 'SEP', 'PIE', 'Libre disposición', 'Otra', 'Sin clasificar'];
@@ -42,7 +42,8 @@
                 'nombre' => $persona['nombre'],
                 'funcion' => $persona['funcion'] ?? 'Sin función',
                 'estamento' => $estamento,
-                'label' => $persona['nombre'].' · '.$persona['rut'].($virtual ? ' · Cupo provisional' : $detallePrioridad.$detalleAntiguedad).$detalleTitulo.' · Disponible: '.$fmt($titularDisponible).' titular + '.$fmt($contrataDisponible).' contrata',
+                'label' => $persona['nombre'].' · '.$persona['rut'].($virtual ? ' · Cupo provisional' : $detallePrioridad.$detalleAntiguedad).$detalleTitulo
+                    .($estamento === 'asistente' ? ' · Asistente de la Educación · Contrato AAEE disponible: '.$fmt(max(0, $saldo)).' h' : ' · Disponible: '.$fmt($titularDisponible).' titular + '.$fmt($contrataDisponible).' contrata'),
                 'virtual' => $virtual,
                 'cupo_bloque' => $persona['cupo_bloque'] ?? null,
                 'titulo' => $titulo,
@@ -140,6 +141,10 @@
         </style>
     @endpush
 @endonce
+
+@if ($anio === 2026 && ($subsectoresEpja2026['total'] ?? 0) > 0)
+    @include('admin.dotacion-establecimiento.partials._docentes_subsector', ['proceso' => ['pasos' => ['planes' => ['completo' => true]], 'docentes_subsector' => $subsectoresEpja2026]])
+@endif
 
 <div id="dotacion-asignacion" data-dotacion-asignacion data-process-blocked="{{ $asignacion2027Habilitada ? '0' : '1' }}">
 @if ($asignacionesSoloConsulta)
@@ -362,9 +367,13 @@
                                                 && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoNt)
                                                 && ! \App\Support\DotacionParvulariaCalculator::conJec($cursoNt, $item['proporcion_key'] ?? null);
                                             $subsectorKey = \App\Support\DotacionDocentesSubsector::keyParaNecesidad($item);
-                                            $docentesPermitidosSubsector = $anio === 2027
+                                            $esEpja = \App\Support\DotacionDocentesSubsector::admiteAsistentes((int) $anio, $item);
+                                            $docentesPermitidosSubsector = $anio === 2027 || $esEpja
                                                 ? ($subsectoresAsignacion->get($subsectorKey)['docentes'] ?? [])
                                                 : null;
+                                            $asistentesPlan = $esEpja
+                                                ? $asistenteOptions->filter(fn ($persona) => in_array($persona['rut_normalizado'], $docentesPermitidosSubsector, true))
+                                                : $asistenteOptions;
                                             $docentesPlanElegibles = $anio === 2027 && !$seleccionLibrePlan
                                                 ? \App\Support\DotacionPlanTitularPrimero::elegibles(
                                                     collect($proceso2027Asignacion['docentes'] ?? []), $docentesPermitidosSubsector ?? [], $item
@@ -461,10 +470,13 @@
                                                     @elseif ($proceso2027Asignacion['aplica'] ?? false)
                                                         <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>{{ $fasePlan === 'titular' ? 'Primero, horas titulares.' : 'Sin saldo titular asignable: sigue contrata.' }}</strong> Solo se muestran docentes asociados a esta asignatura con al menos 1 h {{ $fasePlan === 'titular' ? 'titular' : 'a contrata' }} disponible, en orden de prelación. Los saldos menores a 1 h se omiten. Si el saldo de un docente no cubre todas las horas pendientes, asigne primero una fracción del aula.</span></div>
                                                     @endif
+                                                    @if ($esEpja)
+                                                        <div class="form-text">En EPJA, seleccione el tipo de cobertura para ver sus docentes o asistentes asociados. Los asistentes pueden asignarse sin prelación docente; indique sus horas aula y de contrato AAEE.</div>
+                                                    @endif
                                                     <label class="form-label small mb-0" for="estamento-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Tipo de cobertura</label>
                                                     <select id="estamento-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                                         <option value="docente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'docente')>Cubierto por docente</option>
-                                                        @unless ($soloParvularia || $fasePlan === 'titular')<option value="asistente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'asistente')>Cubierto por Asistente de la Educación</option>@endunless
+                                                        @unless ($soloParvularia || ($fasePlan === 'titular' && !$esEpja))<option value="asistente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'asistente')>Cubierto por Asistente de la Educación</option>@endunless
                                                     </select>
                                                     <label class="form-label small mb-0" for="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Docente asociado o asistente</label>
                                                     <select id="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre, RUT o título..." data-fase-plan="{{ $fasePlan }}" required>
@@ -481,8 +493,8 @@
                                                             'fasePersonal' => $fasePlan,
                                                             'seleccionPersonal' => $valorFormulario($item, 'docente_rut', ''),
                                                         ])
-                                                        @unless ($fasePlan === 'titular')
-                                                            @include('admin.dotacion-establecimiento.partials._personal_select_referencia', ['opcionesPersonal' => $soloParvularia ? collect() : $asistenteOptions, 'grupoPersonal' => 'Asistentes de la Educación', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', '')])
+                                                        @unless ($fasePlan === 'titular' && !$esEpja)
+                                                            @include('admin.dotacion-establecimiento.partials._personal_select_referencia', ['opcionesPersonal' => $soloParvularia ? collect() : $asistentesPlan, 'grupoPersonal' => 'Asistentes de la Educación', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', '')])
                                                         @endunless
                                                     </select>
                                                     @if ($fasePlan !== null && $rutsFasePlan === [])
@@ -889,7 +901,9 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (data.funcion) {
                 meta.append($('<span>').text(data.funcion));
             }
-            const disponible = data.fase === 'titular'
+            const disponible = data.estamento === 'asistente'
+                ? 'Contrato AAEE disponible: ' + (data.contrata || '0') + ' h'
+                : data.fase === 'titular'
                 ? 'Titular disponible: ' + (data.titular || '0') + ' h'
                 : (data.fase === 'contrata'
                     ? 'Contrata disponible: ' + (data.contrata || '0') + ' h'

@@ -10,8 +10,8 @@
 <section id="dotacion-docentes-subsector" class="border rounded-4 p-3 mb-4" aria-labelledby="dotacion-docentes-subsector-titulo" data-dotacion-catalog="subsectores">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <div>
-            <h3 id="dotacion-docentes-subsector-titulo" class="h6 fw-bold mb-1">Docentes por asignatura del plan de estudio</h3>
-            <p class="small text-muted mb-0">Asocie uno o varios docentes a cada asignatura consolidada por nivel. En la asignación de horas del plan solo aparecerán los docentes asociados, ordenados por prelación.</p>
+            <h3 id="dotacion-docentes-subsector-titulo" class="h6 fw-bold mb-1">{{ (int) $anio === 2026 ? 'Docentes y asistentes por asignatura EPJA' : 'Docentes por asignatura del plan de estudio' }}</h3>
+            <p class="small text-muted mb-0">Asocie funcionarios a cada asignatura consolidada por nivel. En EPJA puede seleccionar docentes y asistentes de la educación. Al asignar horas, cada tipo de cobertura mostrará únicamente sus funcionarios asociados; los docentes mantienen su prelación.</p>
         </div>
         <span class="badge rounded-pill {{ ($subsectores['completo'] ?? false) ? 'text-bg-success' : 'text-bg-warning' }}">
             {{ $subsectores['completas'] ?? 0 }} de {{ $subsectores['total'] ?? 0 }} asignaturas
@@ -54,7 +54,7 @@
                             @endphp
                             <form id="subsector-form-{{ $asignatura['key'] }}" method="POST" action="{{ route('admin.dotacion-establecimiento.docentes-subsector.sync', $establecimiento) }}" class="border rounded-3 p-3 bg-white" data-dotacion-save data-catalog-row data-catalog-search="{{ $asignatura['nombre'] }} {{ implode(' ', $asignatura['cursos']) }} {{ $personalAsociado->map(fn ($d) => ($d['nombre'] ?? '').' '.($d['rut'] ?? '').' '.($d['titulo'] ?? ''))->implode(' ') }}" data-catalog-state="{{ $asignatura['completo'] ? 'completo' : 'pendiente' }}" data-catalog-error="{{ $errorAsignatura ? '1' : '0' }}">
                                 @csrf
-                                <input type="hidden" name="anio" value="2027">
+                                <input type="hidden" name="anio" value="{{ $anio }}">
                                 <input type="hidden" name="asignatura_key" value="{{ $asignatura['key'] }}">
                                 <div class="row g-3 align-items-center">
                                     <div class="col-lg-4">
@@ -63,18 +63,23 @@
                                         @if ($asignatura['cursos'] !== [])
                                             <div class="small text-secondary mt-1"><span class="fw-semibold">Cursos:</span> {{ implode(' · ', $asignatura['cursos']) }}</div>
                                         @endif
-                                        <span class="badge rounded-pill {{ $asignatura['completo'] ? 'text-bg-success' : 'text-bg-warning' }} mt-1">{{ $asignatura['completo'] ? 'Docentes asociados' : 'Pendiente' }}</span>
+                                        <span class="badge rounded-pill {{ $asignatura['completo'] ? 'text-bg-success' : 'text-bg-warning' }} mt-1">{{ $asignatura['completo'] ? ($asignatura['nivel'] === 'epja' ? 'Funcionarios asociados' : 'Docentes asociados') : 'Pendiente' }}</span>
                                     </div>
                                     <div class="col-lg-6">
-                                        <label class="form-label fw-semibold" for="subsector-docentes-{{ $asignatura['key'] }}">Docentes habilitados para {{ $asignatura['nombre'] }} <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-semibold" for="subsector-docentes-{{ $asignatura['key'] }}">{{ $asignatura['nivel'] === 'epja' ? 'Docentes y asistentes habilitados' : 'Docentes habilitados' }} para {{ $asignatura['nombre'] }} <span class="text-danger">*</span></label>
                                         <select id="subsector-docentes-{{ $asignatura['key'] }}" name="docentes[]" class="form-select js-subsector-docentes {{ $errorAsignatura ? 'is-invalid' : '' }}" aria-describedby="subsector-ayuda-{{ $asignatura['key'] }}" @if ($errorAsignatura) aria-invalid="true" @endif multiple required>
                                             @foreach ($docentesSubsector as $docente)
                                                 @continue(! \App\Support\DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel']))
-                                                @php $rutDocente = \App\Support\DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')); @endphp
-                                                <option value="{{ $rutDocente }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }}" data-antiguedad="{{ $docente['fecha_antiguedad'] ?? '' }}" data-titular-disponible="{{ $fmtProceso($docente['horas_titulares_disponibles'] ?? 0) }}" data-contrata-disponible="{{ $fmtProceso($docente['horas_contrata_disponibles'] ?? 0) }}" @selected(in_array($rutDocente, $errorAsignatura ? old('docentes', []) : $asignatura['docentes'], true))>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · Título: {{ $docente['titulo'] ?? 'Sin título declarado' }} · {{ !empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente') }} · Disponible: {{ $fmtProceso($docente['horas_disponibles'] ?? 0) }} h</option>
+                                                @php
+                                                    $rutDocente = \App\Support\DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? ''));
+                                                    $esAsistente = ($docente['estamento_cobertura'] ?? 'docente') === 'asistente';
+                                                    $estamentoLabel = $esAsistente ? 'Asistente de la Educación' : (!empty($docente['cupo_contrata_id']) ? 'Cupo por contratar' : ($docente['prioridad_2027_label'] ?? 'Docente'));
+                                                    $disponible = $esAsistente ? max(0, ($docente['horas_contrato'] ?? 0) - ($docente['horas_asignadas_total'] ?? 0)) : ($docente['horas_disponibles'] ?? 0);
+                                                @endphp
+                                                <option value="{{ $rutDocente }}" data-estamento="{{ $esAsistente ? 'asistente' : 'docente' }}" data-disponible="{{ $fmtProceso($disponible) }}" data-nombre="{{ $docente['nombre'] }}" data-rut="{{ $docente['rut'] }}" data-titulo="{{ $docente['titulo'] ?? 'Sin título declarado' }}" data-prioridad-label="{{ $estamentoLabel }}" data-antiguedad="{{ $esAsistente ? '' : ($docente['fecha_antiguedad'] ?? '') }}" data-titular-disponible="{{ $fmtProceso($docente['horas_titulares_disponibles'] ?? 0) }}" data-contrata-disponible="{{ $fmtProceso($docente['horas_contrata_disponibles'] ?? 0) }}" @selected(in_array($rutDocente, $errorAsignatura ? old('docentes', []) : $asignatura['docentes'], true))>{{ $docente['nombre'] }} · {{ $docente['rut'] }} · Título: {{ $docente['titulo'] ?? 'Sin título declarado' }} · {{ $estamentoLabel }} · Disponible: {{ $fmtProceso($disponible) }} h</option>
                                             @endforeach
                                         </select>
-                                        <div id="subsector-ayuda-{{ $asignatura['key'] }}" class="form-text">Puede seleccionar varios docentes; la lista respeta la prelación y antigüedad vigentes. Asociar docentes no asigna horas ni modifica contratos.</div>
+                                        <div id="subsector-ayuda-{{ $asignatura['key'] }}" class="form-text">{{ $asignatura['nivel'] === 'epja' ? 'Puede seleccionar docentes y asistentes. Las horas de los asistentes se registran como contrato AAEE.' : 'Puede seleccionar varios docentes; la lista respeta la prelación y antigüedad vigentes.' }} Asociar funcionarios no asigna horas ni modifica contratos.</div>
                                         @if ($errorAsignatura)<div class="invalid-feedback d-block">{{ $errors->first('docentes') ?: $errors->first('docentes.*') ?: $errors->first('asignatura_key') }}</div>@endif
                                     </div>
                                     <div class="col-lg-2">
@@ -143,7 +148,9 @@
                         meta.append($('<span>', { class: 'dotacion-subsector-option__priority' }).text(option.data('prioridad-label')));
                         if (option.data('antiguedad')) meta.append($('<span>').text('Antigüedad: ' + option.data('antiguedad')));
                         meta.append($('<span>', { class: 'dotacion-subsector-option__availability' })
-                            .text('Disponible: ' + option.data('titular-disponible') + ' titular + ' + option.data('contrata-disponible') + ' contrata'));
+                            .text(option.data('estamento') === 'asistente'
+                                ? 'Contrato AAEE disponible: ' + option.data('disponible') + ' h'
+                                : 'Disponible: ' + option.data('titular-disponible') + ' titular + ' + option.data('contrata-disponible') + ' contrata'));
                         return result.append(name, meta);
                     },
                     templateSelection: function (item) {
@@ -151,15 +158,15 @@
                         const option = $(item.element);
                         return option.data('nombre') + ' · ' + option.data('rut') + ' · ' + option.data('titulo');
                     },
-                    language: { noResults: function () { return 'No se encontraron docentes.'; } }
+                    language: { noResults: function () { return 'No se encontraron funcionarios.'; } }
                 });
                         const native = this;
                         const accessibleName = native.labels[0]?.textContent.trim() || 'Docentes por asignatura';
                         const updateLabels = function () {
                             const container = $(native).next('.select2-container');
                             container.find('.select2-selection').attr({ 'aria-label': accessibleName, 'aria-describedby': native.getAttribute('aria-describedby') });
-                            container.find('.select2-search__field').attr('aria-label', 'Buscar docentes: ' + accessibleName);
-                            container.find('.select2-selection__choice__remove').attr({ 'aria-label': 'Quitar docente asociado', title: 'Quitar docente asociado' });
+                            container.find('.select2-search__field').attr('aria-label', 'Buscar funcionarios: ' + accessibleName);
+                            container.find('.select2-selection__choice__remove').attr({ 'aria-label': 'Quitar funcionario asociado', title: 'Quitar funcionario asociado' });
                         };
                         updateLabels();
                         $(native).on('change.dotacionLabels', updateLabels);
