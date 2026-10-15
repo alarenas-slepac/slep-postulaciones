@@ -224,11 +224,20 @@ class PlanEstudioController extends Controller
                     'activo' => $this->normalizeBoolean($this->cell($row, $planHeader, 'activo'), true),
                 ];
 
-                $plan = PlanEstudio::query()
+                $planesCoincidentes = PlanEstudio::query()
                     ->where('curso_id', $curso->id)
                     ->where('anio', $anio)
                     ->where('regimen_jec', $regimen)
-                    ->first();
+                    ->when($this->cell($row, $planHeader, 'nombre_plan') !== null,
+                        fn ($query) => $query->where('nombre_plan', $payload['nombre_plan']))
+                    ->limit(2)->get();
+                if ($planesCoincidentes->count() > 1) {
+                    $skipped++; $errors[] = "Fila {$line}: existen variantes para {$curso->nombre} {$anio} {$regimen}. Indique NOMBRE_PLAN."; continue;
+                }
+                $plan = $planesCoincidentes->first();
+                if ($plan && $this->cell($row, $planHeader, 'nombre_plan') === null) {
+                    $payload['nombre_plan'] = $plan->nombre_plan;
+                }
 
                 if ($plan) {
                     $plan->update($payload);
@@ -264,6 +273,7 @@ class PlanEstudioController extends Controller
         }
 
         $header = $this->mapHeader($rows[0] ?? [], [
+            'nombre_plan' => ['NOMBRE_PLAN', 'PLAN'],
             'anio' => ['ANIO', 'AÑO', 'ANO'],
             'curso' => ['CURSO', 'NIVEL'],
             'regimen_jec' => ['REGIMEN_JEC', 'REGIMEN', 'JEC'],
@@ -301,15 +311,11 @@ class PlanEstudioController extends Controller
                 continue;
             }
 
-            $plan = PlanEstudio::query()
-                ->where('curso_id', $curso->id)
-                ->where('anio', $anio)
-                ->where('regimen_jec', $regimen)
-                ->first();
+            $plan = $this->planParaDetalleImportado($curso->id, $anio, $regimen, $this->cell($row, $header, 'nombre_plan'), $touchedPlanIds);
 
             if (! $plan) {
                 $skipped++;
-                $errors[] = "Bloques fila {$line}: no existe plan para {$curso->nombre} {$anio} {$regimen}.";
+                $errors[] = "Bloques fila {$line}: no se identificó un plan único para {$curso->nombre} {$anio} {$regimen}. Indique NOMBRE_PLAN si existen variantes.";
                 continue;
             }
 
@@ -346,6 +352,7 @@ class PlanEstudioController extends Controller
         }
 
         $header = $this->mapHeader($detailRows[0] ?? [], [
+            'nombre_plan' => ['NOMBRE_PLAN', 'PLAN'],
             'anio' => ['ANIO', 'AÑO', 'ANO'],
             'curso' => ['CURSO', 'NIVEL'],
             'regimen_jec' => ['REGIMEN_JEC', 'REGIMEN', 'JEC'],
@@ -380,15 +387,11 @@ class PlanEstudioController extends Controller
                 continue;
             }
 
-            $plan = PlanEstudio::query()
-                ->where('curso_id', $curso->id)
-                ->where('anio', $anio)
-                ->where('regimen_jec', $regimen)
-                ->first();
+            $plan = $this->planParaDetalleImportado($curso->id, $anio, $regimen, $this->cell($row, $header, 'nombre_plan'), $touchedPlanIds);
 
             if (! $plan) {
                 $skipped++;
-                $errors[] = "Detalle fila {$line}: no existe plan para {$curso->nombre} {$anio} {$regimen}.";
+                $errors[] = "Detalle fila {$line}: no se identificó un plan único para {$curso->nombre} {$anio} {$regimen}. Indique NOMBRE_PLAN si existen variantes.";
                 continue;
             }
 
@@ -407,6 +410,23 @@ class PlanEstudioController extends Controller
                 $this->syncAsignaturas($plan, $rows);
             }
         }
+    }
+
+    private function planParaDetalleImportado(int $cursoId, int $anio, string $regimen, ?string $nombre, array $touchedPlanIds): ?PlanEstudio
+    {
+        $query = PlanEstudio::query()->where('curso_id', $cursoId)->where('anio', $anio)->where('regimen_jec', $regimen);
+        if ($nombre !== null && trim($nombre) !== '') {
+            return $query->where('nombre_plan', trim($nombre))->first();
+        }
+        // Las plantillas anteriores no identifican el plan en las hojas de detalle.
+        // Se puede resolver si Resumen planes identifica una sola variante de esa combinación.
+        $importados = (clone $query)->whereIn('id', $touchedPlanIds)->limit(2)->get();
+        if ($importados->isNotEmpty()) {
+            return $importados->count() === 1 ? $importados->first() : null;
+        }
+        $planes = $query->limit(2)->get();
+
+        return $planes->count() === 1 ? $planes->first() : null;
     }
 
     private function validatedData(Request $request, ?PlanEstudio $plan = null): array
@@ -447,11 +467,14 @@ class PlanEstudioController extends Controller
             ->where('curso_id', (int) $data['curso_id'])
             ->where('anio', (int) $data['anio'])
             ->where('regimen_jec', $data['regimen_jec'])
+            ->where('nombre_plan', $data['nombre_plan'])
             ->when($plan, fn ($query) => $query->where('id', '<>', $plan->id))
             ->exists();
 
         if ($exists) {
-            abort(422, 'Ya existe un plan de estudio para el curso, año y régimen JEC seleccionados.');
+            throw ValidationException::withMessages([
+                'nombre_plan' => 'Ya existe un plan con ese nombre para el curso, año y régimen JEC seleccionados. Use un nombre distinto para identificar la variante o edite el plan existente.',
+            ]);
         }
 
         $curso = Curso::find($data['curso_id']);

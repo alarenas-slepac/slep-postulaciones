@@ -32,8 +32,10 @@
         </select>
     </div>
     <div class="col-md-4">
-        <label class="form-label">Nombre del plan <span class="text-danger">*</span></label>
-        <input type="text" name="nombre_plan" class="form-control" value="{{ old('nombre_plan', $plan->nombre_plan) }}" required>
+        <label class="form-label" for="nombre-plan">Nombre del plan <span class="text-danger">*</span></label>
+        <input id="nombre-plan" type="text" name="nombre_plan" maxlength="180" class="form-control @error('nombre_plan') is-invalid @enderror" value="{{ old('nombre_plan', $plan->nombre_plan) }}" aria-describedby="nombre-plan-ayuda @error('nombre_plan') nombre-plan-error @enderror" required>
+        <div id="nombre-plan-ayuda" class="form-text">Puede registrar variantes para el mismo curso, año y régimen con nombres distintos. Ejemplo: «Plan regular» y «Plan 43 horas».</div>
+        @error('nombre_plan')<div id="nombre-plan-error" class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-3">

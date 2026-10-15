@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.14.601',
+    'current_version' => '2026.10.15.602',
     'entries' => [
+        [
+            'version' => '2026.10.15.602',
+            'title' => 'Planes de estudio: variantes por curso, año y régimen JEC',
+            'summary' => 'Permite registrar y asociar variantes con nombres y horas diferentes, incluido un plan de 43 horas para un establecimiento.',
+            'roles' => ['admin', 'coordinador_uatp', 'supervisor_plani'],
+            'items' => [
+                'La unicidad pasa a curso, año, régimen y nombre del plan mediante una migración de índices que conserva los registros y asociaciones existentes. Los nombres repetidos vuelven al formulario con los datos ingresados.',
+                'El selector del curso distingue las variantes por nombre y horas semanales, filtra las opciones por curso, año y régimen y requiere elegir cuando hay más de un plan activo.',
+                'La carga masiva actualiza por NOMBRE_PLAN. Identifica las hojas de detalle por nombre o por la única variante del resumen; los detalles ambiguos se omiten y se informan.',
+                'Conserva las asociaciones explícitas y evita seleccionar arbitrariamente un plan al importar cursos o calcular referencias. Incluye pruebas de variantes de 43 horas, migración, importación, edición y asignación al establecimiento.',
+                'Protege las configuraciones existentes de Planes EE: para cambiar de variante deben revisarse y retirarse previamente. La reimportación conserva también los planes históricos asociados aunque estén inactivos.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.14.601',
             'title' => 'Sobredotación: excluir docentes justificados de otras funciones',

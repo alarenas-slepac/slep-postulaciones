@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Curso;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
+use App\Models\EstablecimientoPlanEstudio;
 use App\Models\PlanEstudio;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use ZipArchive;
 
 class EstablecimientoCursoController extends Controller
@@ -128,7 +130,7 @@ class EstablecimientoCursoController extends Controller
             'establecimientoCurso' => $establecimiento_curso,
             'establecimientos' => $this->establecimientosAgrupados(),
             'cursos' => Curso::query()->where('activo', true)->orderBy('orden')->orderBy('nombre')->get(),
-            'planes' => $this->planesDisponibles(),
+            'planes' => $this->planesDisponibles($establecimiento_curso->plan_estudio_id),
         ]);
     }
 
@@ -136,6 +138,7 @@ class EstablecimientoCursoController extends Controller
     {
         $data = $this->validatedData($request, $establecimiento_curso);
         $data = $this->completeDerivedFields($data);
+        $this->validatePlanChange($establecimiento_curso, $data['plan_estudio_id'] ?? null);
         $establecimiento_curso->update($data);
 
         return redirect()->route('admin.establecimiento-cursos.index')->with('status', 'Curso del establecimiento actualizado correctamente.');
@@ -245,10 +248,14 @@ class EstablecimientoCursoController extends Controller
                     $skipped++; $errors[] = "Fila {$line}: curso '{$cursoRaw}' no existe en el mantenedor Cursos."; continue;
                 }
 
-                $plan = $this->findMatchingPlan($curso->id, $anio, $regimen);
+                $item = EstablecimientoCurso::query()->where('establecimiento_id', $establecimiento->id)
+                    ->where('curso_id', $curso->id)->where('anio', $anio)
+                    ->when($letra === null, fn ($query) => $query->whereNull('letra'), fn ($query) => $query->where('letra', $letra))
+                    ->first();
+                $plan = $this->findMatchingPlan($curso->id, $anio, $regimen, $item?->plan_estudio_id);
                 if (! $plan) {
                     $withoutPlan++;
-                    $errors[] = "Fila {$line}: no se encontró plan para {$curso->nombre}, año {$anio}, régimen {$regimen}. Se importó sin plan asociado.";
+                    $errors[] = "Fila {$line}: no se identificó un único plan activo para {$curso->nombre}, año {$anio}, régimen {$regimen}. Seleccione el plan correspondiente en Cursos por establecimiento.";
                 }
 
                 $payload = [
@@ -265,20 +272,14 @@ class EstablecimientoCursoController extends Controller
                     'activo' => true,
                 ];
 
-                $item = EstablecimientoCurso::query()
-                    ->where('establecimiento_id', $establecimiento->id)
-                    ->where('curso_id', $curso->id)
-                    ->where('anio', $anio)
-                    ->where(function ($query) use ($letra) {
-                        if ($letra === null) {
-                            $query->whereNull('letra');
-                        } else {
-                            $query->where('letra', $letra);
-                        }
-                    })
-                    ->first();
-
                 if ($item) {
+                    try {
+                        $this->validatePlanChange($item, $plan?->id);
+                    } catch (ValidationException $error) {
+                        $skipped++;
+                        $errors[] = "Fila {$line}: ".$error->validator->errors()->first('plan_estudio_id');
+                        continue;
+                    }
                     $item->update($payload);
                     $updated++;
                 } else {
@@ -324,7 +325,9 @@ class EstablecimientoCursoController extends Controller
         $data = $request->validate([
             'establecimiento_id' => ['required', 'integer', 'exists:establecimientos,id'],
             'curso_id' => ['required', 'integer', 'exists:cursos,id'],
-            'plan_estudio_id' => ['nullable', 'integer', 'exists:planes_estudio,id'],
+            'plan_estudio_id' => ['nullable', 'integer', Rule::exists('planes_estudio', 'id')->where(fn ($query) => $query
+                ->where('curso_id', $request->input('curso_id'))->where('anio', $request->input('anio'))
+                ->where('regimen_jec', $request->input('regimen_jec') === 'No aplica' ? 'Sin JEC' : $request->input('regimen_jec')))],
             'anio' => ['required', 'integer', 'min:2020', 'max:2100'],
             'letra' => [
                 'nullable', 'string', 'max:20',
@@ -361,21 +364,39 @@ class EstablecimientoCursoController extends Controller
 
         if (empty($data['plan_estudio_id']) && $curso) {
             $data['plan_estudio_id'] = $this->findMatchingPlan($curso->id, (int) $data['anio'], $data['regimen_jec'])?->id;
+            $regimen = $data['regimen_jec'] === 'No aplica' ? 'Sin JEC' : $data['regimen_jec'];
+            if ($data['plan_estudio_id'] === null && PlanEstudio::query()->where('curso_id', $curso->id)
+                ->where('anio', (int) $data['anio'])->where('regimen_jec', $regimen)->where('activo', true)->limit(2)->count() > 1) {
+                throw ValidationException::withMessages(['plan_estudio_id' => 'Existen varias variantes para este curso, año y régimen. Seleccione el plan de estudio que corresponde al establecimiento.']);
+            }
         }
 
         return $data;
     }
 
-    private function findMatchingPlan(int $cursoId, int $anio, string $regimen): ?PlanEstudio
+    private function findMatchingPlan(int $cursoId, int $anio, string $regimen, ?int $planAnteriorId = null): ?PlanEstudio
     {
         $regimenBusqueda = $regimen === 'No aplica' ? 'Sin JEC' : $regimen;
 
-        return PlanEstudio::query()
-            ->where('curso_id', $cursoId)
-            ->where('anio', $anio)
-            ->where('regimen_jec', $regimenBusqueda)
-            ->where('activo', true)
-            ->first();
+        if ($planAnteriorId !== null) {
+            $anterior = PlanEstudio::query()->whereKey($planAnteriorId)->where('curso_id', $cursoId)
+                ->where('anio', $anio)->where('regimen_jec', $regimenBusqueda)->first();
+            if ($anterior) {
+                return $anterior;
+            }
+        }
+
+        return PlanEstudio::unicoActivoParaCurso($cursoId, $anio, $regimenBusqueda);
+    }
+
+    private function validatePlanChange(EstablecimientoCurso $curso, ?int $planId): void
+    {
+        if ((int) $curso->plan_estudio_id !== (int) $planId
+            && EstablecimientoPlanEstudio::query()->where('establecimiento_curso_id', $curso->id)->exists()) {
+            throw ValidationException::withMessages([
+                'plan_estudio_id' => 'El curso ya tiene una configuración en Configurar planes EE. Revise y retire esa configuración antes de cambiar la variante del plan. Se conservan el plan y las asignaturas actuales.',
+            ]);
+        }
     }
 
     private function findCursoByName(string $name): ?Curso
@@ -431,15 +452,17 @@ class EstablecimientoCursoController extends Controller
             ->groupBy(fn ($establecimiento) => $establecimiento->comuna ?: 'Sin comuna');
     }
 
-    private function planesDisponibles()
+    private function planesDisponibles(?int $planActualId = null)
     {
         return PlanEstudio::query()
             ->with('curso')
             ->join('cursos', 'cursos.id', '=', 'planes_estudio.curso_id')
-            ->where('planes_estudio.activo', true)
+            ->where(fn ($query) => $query->where('planes_estudio.activo', true)
+                ->when($planActualId !== null, fn ($query) => $query->orWhere('planes_estudio.id', $planActualId)))
             ->orderByDesc('planes_estudio.anio')
             ->orderBy('cursos.orden')
             ->orderBy('planes_estudio.regimen_jec')
+            ->orderBy('planes_estudio.nombre_plan')
             ->select('planes_estudio.*')
             ->get();
     }
