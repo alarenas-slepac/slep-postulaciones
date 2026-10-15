@@ -40,6 +40,10 @@ class DotacionEstablecimientoController extends Controller
         $activeRole = $this->authorizeDotacionAccess($request);
         $user = $request->user();
 
+        if ($request->boolean('informe_funciones')) {
+            return app(DotacionInformeFuncionesController::class)->index($request);
+        }
+
         if ($request->boolean('informe_avance')) {
             return $this->informeAvance($request, $activeRole);
         }
