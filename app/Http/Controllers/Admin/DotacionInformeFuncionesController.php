@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\DotacionInformeFuncionesExport;
 use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Support\DotacionInformeFunciones;
+use App\Support\DotacionLecturaCache;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -18,23 +20,27 @@ class DotacionInformeFuncionesController extends Controller
             'anio' => ['sometimes', 'required', 'integer', Rule::in([2026, 2027])],
             'q' => ['nullable', 'string', 'max:150'],
             'comuna' => ['nullable', 'string', 'max:100'],
+            'export_excel' => ['sometimes', 'boolean'],
         ]);
         $anio = (int) ($data['anio'] ?? (now()->year === 2026 ? 2026 : 2027));
         $q = trim((string) ($data['q'] ?? ''));
         $comuna = trim((string) ($data['comuna'] ?? ''));
         $base = Establecimiento::query()->where(fn ($query) => $query->whereNull('sala_cuna')->orWhere('sala_cuna', false));
-        $establecimientos = (clone $base)
+        $filtrados = (clone $base)
             ->when($q !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('nombre_establecimiento', 'like', "%{$q}%")
                 ->orWhere('rbd', 'like', "%{$q}%")
                 ->orWhere('comuna', 'like', "%{$q}%")))
             ->when($comuna !== '', fn ($query) => $query->where('comuna', $comuna))
-            ->orderBy('comuna')->orderBy('nombre_establecimiento')->orderBy('id')
-            ->paginate(10)->withQueryString();
+            ->orderBy('comuna')->orderBy('nombre_establecimiento')->orderBy('id');
+        if ($request->boolean('export_excel')) {
+            return app(DotacionInformeFuncionesExport::class)->download($filtrados, $anio, ['q' => $q, 'comuna' => $comuna]);
+        }
+        $establecimientos = $filtrados->paginate(10)->withQueryString();
         $calculador = app(DotacionInformeFunciones::class);
         $establecimientos->setCollection($establecimientos->getCollection()->map(function (Establecimiento $ee) use ($calculador, $anio): array {
             try {
-                return $calculador->fila($ee, $anio);
+                return DotacionLecturaCache::ejecutar(fn () => $calculador->fila($ee, $anio));
             } catch (\Throwable $exception) {
                 report($exception);
                 // No presentar ceros como un resultado válido si falla el cálculo.

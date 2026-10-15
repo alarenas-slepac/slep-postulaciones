@@ -14,9 +14,14 @@
                 <h1 class="h2 fw-bold mb-2">Dotación por funciones {{ $anio }}</h1>
                 <p class="text-muted mb-0">Docentes y horas de contrato por establecimiento, con reservas y horas sin asignar identificadas.</p>
             </div>
-            <a class="btn btn-outline-secondary rounded-pill" href="{{ route('admin.dotacion-establecimiento.index', ['anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Volver a dotación</a>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-primary rounded-pill" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'export_excel' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}" aria-describedby="informe-excel-ayuda"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i> Descargar Excel</a>
+                <a class="btn btn-outline-secondary rounded-pill" href="{{ route('admin.dotacion-establecimiento.index', ['anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Volver a dotación</a>
+            </div>
         </div>
     </header>
+
+    <p id="informe-excel-ayuda" class="small text-muted mb-4">El Excel incluye todos los establecimientos de los filtros aplicados, con las hojas «Dotación por funciones» y «Conciliación», aunque no estén en esta página.</p>
 
     @if ($errors->any())
         <div class="alert alert-danger" role="alert"><strong>Revise los filtros:</strong><ul class="mb-0">@foreach ($errors->all() as $mensaje)<li>{{ $mensaje }}</li>@endforeach</ul></div>
