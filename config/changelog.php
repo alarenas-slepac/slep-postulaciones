@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.603',
+    'current_version' => '2026.10.15.604',
     'entries' => [
+        [
+            'version' => '2026.10.15.604',
+            'title' => 'Despliegue cPanel: comprobar Git sin procesamiento paralelo',
+            'summary' => 'Reduce el uso de hilos de Git y distingue errores de recursos de modificaciones locales reales antes de actualizar.',
+            'roles' => ['admin'],
+            'items' => [
+                'Ejecuta las comprobaciones, fetch y pull con core.preloadIndex=false, index.threads=1 y pack.threads=1, sin cambiar la configuración persistente de Git.',
+                'Sólo el código 1 de git diff se informa como modificaciones locales. Los demás errores conservan su código e indican que no se pudo completar la comprobación.',
+                'Mantiene la obligación de usar main, el avance rápido y la detención antes de desplegar cuando hay cambios o fallos. Incorpora pruebas con Git y despliegue simulados en directorios temporales.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.15.603',
             'title' => 'Coordinación PIE: horas configurables por Administración',
