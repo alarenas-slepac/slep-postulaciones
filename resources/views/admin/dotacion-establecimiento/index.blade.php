@@ -40,6 +40,10 @@
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}">
                         <i class="bi bi-table" aria-hidden="true"></i> Informe de dotación por funciones
                     </a>
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'export_planes' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}"
+                       title="Consolidado por establecimiento: horas plan, contrato equivalente, trabajo colaborativo PIE y modalidad JEC">
+                        <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Excel planes de estudio
+                    </a>
                 @endif
                 @if (in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true))
                     <a class="btn btn-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_avance' => 1, 'anio' => $anio]) }}">
@@ -74,6 +78,9 @@
     @endif
     @error('export_resumen_sobredotacion')
         <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
+    @error('export_planes')
+        <div class="alert alert-danger" role="alert">{{ $message }}</div>
     @enderror
 
     <div class="row g-3 mb-4">
