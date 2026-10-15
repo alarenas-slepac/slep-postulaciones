@@ -32,6 +32,13 @@ class DotacionEstablecimientoController extends Controller
 
     public function index(Request $request)
     {
+        if ($request->boolean('informe_funciones')) {
+            $this->authorizeDotacionAccess($request);
+            // El informe mantiene sus referencias de lectura por establecimiento,
+            // sin retener las nóminas de todo el territorio durante una descarga.
+            return app(DotacionInformeFuncionesController::class)->index($request);
+        }
+
         return DotacionLecturaCache::ejecutar(fn () => $this->listado($request));
     }
 
@@ -39,10 +46,6 @@ class DotacionEstablecimientoController extends Controller
     {
         $activeRole = $this->authorizeDotacionAccess($request);
         $user = $request->user();
-
-        if ($request->boolean('informe_funciones')) {
-            return app(DotacionInformeFuncionesController::class)->index($request);
-        }
 
         if ($request->boolean('informe_avance')) {
             return $this->informeAvance($request, $activeRole);

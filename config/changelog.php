@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.606',
+    'current_version' => '2026.10.15.607',
     'entries' => [
+        [
+            'version' => '2026.10.15.607',
+            'title' => 'Descarga Excel del informe de dotación por funciones',
+            'summary' => 'Exporta todos los establecimientos filtrados en las hojas Dotación por funciones y Conciliación para 2026 y 2027.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade Descargar Excel en el informe, conservando el año, búsqueda y comuna aplicados e incluyendo todos los resultados, sin limitarse a la página visible.',
+                'La hoja principal conserva docentes y horas por función, contrato completo y SEP complementario. Conciliación identifica el período contractual, exclusiones, asignaciones, reservas, saldos, sobreasignaciones y redondeos, con fórmulas de conciliación y totales de todos los establecimientos exportados.',
+                'Mantiene la autorización por rol activo y escribe identificadores, nombres, comunas y filtros como texto explícito. Conserva las horas como números con formato Excel y agrega filtros, encabezados legibles y paneles inmovilizados.',
+                'Procesa establecimientos en lotes de diez y libera las referencias de lectura de cada cálculo. Si falla un establecimiento, informa su RBD y no entrega un archivo parcial con datos ficticios. La descarga no crea archivos persistentes ni modifica asignaciones.',
+                'Incluye pruebas aisladas de descarga, permisos, filtros, paginación, contenido de ambas hojas, fórmulas, errores de cálculo y conservación de datos.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.15.606',
             'title' => 'Informe de dotación por funciones para 2026 y 2027',
