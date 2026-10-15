@@ -505,7 +505,8 @@ class DotacionAsignacionCalculator
             $establecimiento,
             $anio,
             self::assignmentsFor($establecimiento, $anio)
-        )->first(fn ($item) => ($item['key'] ?? null) === $key);
+        )->first(fn ($item) => ($item['key'] ?? null) === $key
+            || in_array($key, $item['necesidad_keys_historicas'] ?? [], true));
     }
 
     public static function necesidades(Establecimiento $establecimiento, int $anio, array $cursos, array $bloques, Collection $asignaciones): array
@@ -555,7 +556,12 @@ class DotacionAsignacionCalculator
             $planEsReferencial = DotacionPlanEstudioResolver::isReferential($curso, $plan);
             $fuentePlan = $planEsReferencial ? 'plan referencial estimado' : 'plan asociado';
             $oficiales = $plan->asignaturas ?? collect();
-            $personalizadas = self::asignaturasPersonalizadas($curso, (int) $plan->id, $configuracionesPersonalizadas);
+            $personalizadas = self::asignaturasPersonalizadas($curso, (int) $plan->id, $configuracionesPersonalizadas)
+                ->filter(fn ($custom) => (float) ($custom['horas_semanales'] ?? 0) > 0
+                    && ! self::esFilaResumenPlan($custom['nombre'] ?? null, $custom['tipo_bloque'] ?? null))->values();
+            $organizadas = DotacionPlanConfiguracionResolver::resolver($oficiales, $personalizadas, (int) $curso->id);
+            $oficiales = $organizadas['oficiales'];
+            $personalizadas = $organizadas['configuradas'];
             $tieneLibreDisposicionPersonalizada = $personalizadas
                 ->filter(fn ($custom) => ($custom['tipo_bloque'] ?? null) === 'libre_disposicion')
                 ->isNotEmpty();
@@ -565,7 +571,12 @@ class DotacionAsignacionCalculator
                     && self::esOrientacion($custom['nombre'] ?? null)
             );
             $horasLibreDisposicionOrientacion = (float) $libreDisposicionOrientacion->sum(fn ($custom) => (float) ($custom['horas_semanales'] ?? 0));
-            $orientacionOficialConsolidada = false;
+            $orientacionConsolidada = false;
+            $tieneOrientacionBaseConfigurada = $personalizadas->contains(fn ($custom) => ($custom['tipo_bloque'] ?? null) !== 'libre_disposicion'
+                && self::esOrientacion($custom['nombre'] ?? null));
+            $keysOrientacionLd = $libreDisposicionOrientacion->flatMap(fn ($custom) => [
+                $custom['key'], ...($custom['necesidad_keys_historicas'] ?? []),
+            ])->unique()->values()->all();
 
             foreach ($oficiales as $asig) {
                 $horas = (float) ($asig->horas_semanales ?? 0);
@@ -597,13 +608,14 @@ class DotacionAsignacionCalculator
                     // Para asignacion docente debe tratarse como una sola necesidad asignable de Orientacion,
                     // evitando filas separadas de 0,5 h que no representan una hora de contrato practicable.
                     $horas = round($horas + $horasLibreDisposicionOrientacion, 2);
-                    $orientacionOficialConsolidada = true;
+                    $orientacionConsolidada = true;
                     $bloque = 'Plan de estudios + libre disposición';
                     $fuente = 'Asignatura oficial del plan consolidada con libre disposición: '.$horasPlanOriginal.' h plan + '.$horasLibreDisposicionOrientacion.' h libre disposición';
                 }
 
                 $calc = DotacionEstablecimientoCalculator::contratoEquivalenteAsignacion($curso, $horas, $porcentaje, $subtipo);
                 $key = self::key('plan', [$curso->id, $subtipo, $asig->asignatura]);
+                $keysHistoricas = $esOrientacionOficial && $horasLibreDisposicionOrientacion > 0 ? $keysOrientacionLd : [];
                 $items->push(self::needRow($key, 'plan_estudio', $subtipo, [
                     'curso' => $curso,
                     'establecimiento_curso_id' => $curso->id,
@@ -624,11 +636,12 @@ class DotacionAsignacionCalculator
                     'fuente' => $fuente,
                     'horas_plan_oficial' => $esOrientacionOficial && $horasLibreDisposicionOrientacion > 0 ? $horasPlanOriginal : null,
                     'horas_libre_disposicion_consolidada' => $esOrientacionOficial && $horasLibreDisposicionOrientacion > 0 ? $horasLibreDisposicionOrientacion : null,
-                ], $asignacionesPorKey->get($key, collect())));
+                    'necesidad_keys_historicas' => $keysHistoricas,
+                ], self::asignacionesParaKeys($asignacionesPorKey, [$key, ...$keysHistoricas])));
             }
 
             foreach ($personalizadas as $custom) {
-                if ($orientacionOficialConsolidada
+                if (($orientacionConsolidada || $tieneOrientacionBaseConfigurada)
                     && ($custom['tipo_bloque'] ?? null) === 'libre_disposicion'
                     && self::esOrientacion($custom['nombre'] ?? null)) {
                     continue;
@@ -641,14 +654,31 @@ class DotacionAsignacionCalculator
                 if (self::esFilaResumenPlan($custom['nombre'] ?? null, $subtipo)) {
                     continue;
                 }
+                $horasPlanOriginal = $horas;
+                $consolidarOrientacion = ! $orientacionConsolidada && $subtipo !== 'libre_disposicion'
+                    && self::esOrientacion($custom['nombre'] ?? null) && $horasLibreDisposicionOrientacion > 0;
+                $keysHistoricas = $custom['necesidad_keys_historicas'] ?? [];
+                if ($consolidarOrientacion) {
+                    $horas = round($horas + $horasLibreDisposicionOrientacion, 2);
+                    $orientacionConsolidada = true;
+                    $keysHistoricas = array_values(array_unique([...$keysHistoricas, ...$keysOrientacionLd]));
+                }
                 $calc = DotacionEstablecimientoCalculator::contratoEquivalenteAsignacion($curso, $horas, $porcentaje, $subtipo);
-                $key = self::key('plan', [$curso->id, $subtipo, $custom['nombre']]);
+                $key = $custom['key'];
+                $fuente = $subtipo === 'libre_disposicion'
+                    ? ($custom['plan_comun_asociado']
+                        ? 'Libre disposición configurada · Plan común asociado: '.$custom['plan_comun_asociado']
+                        : 'Libre disposición configurada por establecimiento')
+                    : 'Bloque del plan configurado por establecimiento';
+                if ($consolidarOrientacion) {
+                    $fuente .= ' · Orientación consolidada: '.$horasPlanOriginal.' h plan + '.$horasLibreDisposicionOrientacion.' h libre disposición';
+                }
                 $items->push(self::needRow($key, 'plan_estudio', $subtipo, [
                     'curso' => $curso,
                     'establecimiento_curso_id' => $curso->id,
                     'curso_label' => self::cursoLabel($curso),
                     'titulo' => $custom['nombre'],
-                    'bloque' => $custom['bloque'] ?: self::bloqueLabel($subtipo),
+                    'bloque' => $consolidarOrientacion ? 'Plan de estudios + libre disposición' : ($custom['bloque'] ?: self::bloqueLabel($subtipo)),
                     'horas_plan' => $horas,
                     'horas_contrato' => (float) ($calc['horas_contrato_equivalente_redondeado'] ?? 0),
                     'horas_aula_cronologicas' => (float) ($calc['horas_aula_cronologicas'] ?? 0),
@@ -665,10 +695,11 @@ class DotacionAsignacionCalculator
                     'nombre_personalizado' => $custom['nombre_personalizado'] ?? null,
                     'plan_comun_asociado' => $custom['plan_comun_asociado'] ?? null,
                     'asignatura_oficial' => $custom['asignatura_oficial'] ?? null,
-                    'fuente' => $custom['plan_comun_asociado']
-                        ? 'Libre disposición configurada · Plan común asociado: '.$custom['plan_comun_asociado']
-                        : 'Libre disposición configurada por establecimiento',
-                ], $asignacionesPorKey->get($key, collect())));
+                    'fuente' => $fuente,
+                    'horas_plan_oficial' => $consolidarOrientacion ? $horasPlanOriginal : null,
+                    'horas_libre_disposicion_consolidada' => $consolidarOrientacion ? $horasLibreDisposicionOrientacion : null,
+                    'necesidad_keys_historicas' => $keysHistoricas,
+                ], self::asignacionesParaKeys($asignacionesPorKey, [$key, ...$keysHistoricas])));
             }
 
             if ($oficiales->isEmpty() && $items->where('establecimiento_curso_id', $curso->id)->isEmpty()) {
@@ -888,6 +919,11 @@ class DotacionAsignacionCalculator
                         ->where('config.anio', $contexto->anio);
                 });
         })->get();
+    }
+
+    private static function asignacionesParaKeys(Collection $porKey, array $keys): Collection
+    {
+        return collect($keys)->unique()->flatMap(fn ($key) => $porKey->get($key, collect()))->values();
     }
 
     private static function asignaturasPersonalizadas(EstablecimientoCurso $curso, int $planEstudioId, Collection $configuraciones): Collection
@@ -1189,7 +1225,8 @@ class DotacionAsignacionCalculator
         }
 
         $key = trim((string) ($row->necesidad_key ?? ''));
-        if ($key !== '' && $necesidadesPlanEstudio->contains(fn ($item) => (string) ($item['key'] ?? '') === $key)) {
+        if ($key !== '' && $necesidadesPlanEstudio->contains(fn ($item) => (string) ($item['key'] ?? '') === $key
+            || in_array($key, $item['necesidad_keys_historicas'] ?? [], true))) {
             return true;
         }
 
@@ -1437,7 +1474,8 @@ class DotacionAsignacionCalculator
     {
         $dotacionFuncionId = (int) ($data['dotacion_funcion_id'] ?? 0);
         $dotacionFuncionReglaId = (int) ($data['dotacion_funcion_regla_id'] ?? 0);
-        $assigned = $asignaciones->filter(function ($row) use ($key, $dotacionFuncionId, $dotacionFuncionReglaId) {
+        $keys = [$key, ...($data['necesidad_keys_historicas'] ?? [])];
+        $assigned = $asignaciones->filter(function ($row) use ($key, $keys, $dotacionFuncionId, $dotacionFuncionReglaId) {
             // El identificador de la función declarada es estable aunque una
             // asignación histórica conserve una necesidad_key generada antes
             // de reordenar o renombrar los bloques del establecimiento. Cuando
@@ -1450,7 +1488,7 @@ class DotacionAsignacionCalculator
                     || ($asignacionFuncionId === 0 && (string) ($row->necesidad_key ?? '') === $key);
             }
 
-            if ((string) ($row->necesidad_key ?? '') === $key) {
+            if (in_array((string) ($row->necesidad_key ?? ''), $keys, true)) {
                 return true;
             }
 
