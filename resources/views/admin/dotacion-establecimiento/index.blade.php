@@ -44,6 +44,10 @@
                        title="Consolidado por establecimiento: horas plan, contrato equivalente, trabajo colaborativo PIE y modalidad JEC">
                         <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Excel planes de estudio
                     </a>
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'export_planes_niveles' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}"
+                       title="Un libro con el global y hojas de Parvularia, Básica, Media (1.º y 2.º), Media HC, Media TP, EPJA y Especial">
+                        <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Excel por niveles
+                    </a>
                 @endif
                 @if (in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true))
                     <a class="btn btn-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_avance' => 1, 'anio' => $anio]) }}">
@@ -80,6 +84,9 @@
         <div class="alert alert-danger">{{ $message }}</div>
     @enderror
     @error('export_planes')
+        <div class="alert alert-danger" role="alert">{{ $message }}</div>
+    @enderror
+    @error('export_planes_niveles')
         <div class="alert alert-danger" role="alert">{{ $message }}</div>
     @enderror
 

@@ -11,22 +11,29 @@ class DotacionInformePlanes
 {
     public function fila(Establecimiento $establecimiento, int $anio): array
     {
+        return $this->resumir($this->datos($establecimiento, $anio)['cursos']) + [
+            'rbd' => (string) $establecimiento->rbd,
+            'nombre' => (string) $establecimiento->nombre_establecimiento,
+            'comuna' => (string) $establecimiento->comuna,
+        ];
+    }
+
+    protected function datos(Establecimiento $establecimiento, int $anio): array
+    {
         if (DotacionCursoCombinadoCalculator::tablesReady()
             && DotacionCursoCombinado::query()->where('establecimiento_id', $establecimiento->id)
                 ->where('anio', $anio)->where('activo', true)->exists()) {
             // Las combinaciones requieren las necesidades por asignatura para
             // respetar sus modalidades conjuntas/separadas y su redondeo.
-            $cursos = DotacionEstablecimientoCalculator::build($establecimiento, $anio, false, false)['cursos'];
+            $datos = DotacionEstablecimientoCalculator::build($establecimiento, $anio, false, false);
+
+            return ['cursos' => $datos['cursos'], 'grupos' => $datos['cursos_combinados']['grupos']];
         } else {
             $cursos = DotacionEstablecimientoCalculator::cursosPorNivel($establecimiento, $anio);
             $cursos['resumen_cursos_planes'] = DotacionCursosPlanesResumenCalculator::build($cursos, []);
         }
 
-        return $this->resumir($cursos) + [
-            'rbd' => (string) $establecimiento->rbd,
-            'nombre' => (string) $establecimiento->nombre_establecimiento,
-            'comuna' => (string) $establecimiento->comuna,
-        ];
+        return ['cursos' => $cursos, 'grupos' => []];
     }
 
     public function resumir(array $cursos): array

@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.608',
+    'current_version' => '2026.10.15.609',
     'entries' => [
+        [
+            'version' => '2026.10.15.609',
+            'title' => 'Excel de planes de estudio segregado por niveles de enseñanza',
+            'summary' => 'Añade un libro descargable con el global por establecimiento y hojas independientes de Parvularia, Básica, Media, Media HC, Media TP, EPJA y Especial.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Incorpora Excel por niveles en Dotación Establecimiento y en el informe por funciones para 2026 y 2027, respetando filtros y autorización por rol activo.',
+                'Cada hoja incluye una fila por establecimiento que tiene ese nivel, con modalidad JEC propia, matrícula, cursos, horas plan, contrato equivalente, colaboración PIE y totales. Media contiene sólo formación común de 1.º y 2.º medio; HC y TP se clasifican desde el catálogo de cursos. EPJA y Especial tienen prioridad sobre grados y modalidades regulares.',
+                'Reutiliza las unidades consolidadas y redondeos del cuadro Cursos y planes sin recalcular conversiones por nivel. Los grupos del mismo nivel y la libre disposición NT1/NT2 se suman una sola vez; se verifica la conciliación de todos los niveles con el global.',
+                'Si existen cursos sin clasificación o grupos entre niveles, una hoja adicional Sin desglose conserva las horas sin inventar prorrateos; las observaciones identifican los grupos y su matrícula y cursos se mantienen en sus niveles. El global incluye siempre el total completo.',
+                'Comparte el formato con el consolidado simple, calcula cada establecimiento una sola vez, conserva lotes y caché de lectura acotada, y agrega pruebas aisladas de clasificación, permisos, filtros, hojas, consolidación y conciliación.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.15.608',
             'title' => 'Excel consolidado de planes de estudio por establecimiento',
