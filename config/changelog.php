@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.609',
+    'current_version' => '2026.10.15.610',
     'entries' => [
+        [
+            'version' => '2026.10.15.610',
+            'title' => 'Evita duplicar el plan común configurado por el establecimiento',
+            'summary' => 'Corrige la suma simultánea de asignaturas oficiales y configuradas en 1.º y 2.º medio y Media EPJA, conservando sus horas y asignaciones previas.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'La configuración de un bloque sustituye su detalle oficial. Reconoce como equivalentes los tipos históricos asignatura, tiempo mínimo, obligatoria y plan común formación general; los demás bloques conservan su identidad y los bloques no configurados mantienen el respaldo oficial.',
+                'Un plan de 36 h mínimas y 6 h de libre disposición vuelve a generar 42 h asignables, sin sumar nuevamente las 36 h del catálogo. Mantiene nombres personalizados y la libre disposición asociada como necesidades independientes, con Orientación consolidada entre base y libre disposición.',
+                'Conserva claves oficiales cuando existe un vínculo inequívoco con la asignatura configurada y reconoce claves históricas de configuración y Orientación. Sus asignaciones previas se muestran y validan juntas, sin modificar registros ni esconder sobreasignaciones reales.',
+                'Corrige la descripción de las filas de tiempo mínimo para identificarlas como bloque configurado por el establecimiento. Conserva el respaldo de horas sin desglose cuando la configuración está incompleta.',
+                'Añade pruebas aisladas de Media y Media EPJA en ambos años, nombres personalizados, Orientación, saldos y asignaciones históricas, bloques no configurados y diferencias de plan, sin migraciones ni modificaciones de documentos o datos reales.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.15.609',
             'title' => 'Excel de planes de estudio segregado por niveles de enseñanza',
