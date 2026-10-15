@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.607',
+    'current_version' => '2026.10.15.608',
     'entries' => [
+        [
+            'version' => '2026.10.15.608',
+            'title' => 'Excel consolidado de planes de estudio por establecimiento',
+            'summary' => 'Añade un informe descargable para 2026 y 2027 con los totales del cuadro Cursos y planes y la modalidad JEC de cada establecimiento.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Incorpora Excel planes de estudio en el listado de dotación y en el informe por funciones, conservando año, búsqueda y comuna e incluyendo todos los resultados filtrados.',
+                'Exporta una fila por establecimiento con RBD, nombre, comuna, modalidad JEC, matrícula, cursos, horas plan, contrato equivalente, trabajo colaborativo PIE y contrato total. Si existen cursos con y sin JEC se indican ambas modalidades.',
+                'Reutiliza Total establecimiento del cuadro Cursos y planes, respetando combinaciones activas, reglas de conversión, redondeos y libre disposición NT1/NT2 sin duplicar cursos ni colaboración PIE. Las funciones normativas y el PIE especializado no forman parte de este total de planes.',
+                'Mantiene permisos por rol activo y descarga por lotes, con caché de lectura por establecimiento, textos explícitos, horas numéricas y totales. Advierte cursos sin plan o régimen informado; ante errores de cálculo cancela la descarga e identifica el RBD.',
+                'Agrega pruebas aisladas de permisos, filtros, ambos años, modalidades mixtas, combinaciones, refuerzos, archivo Excel, totales y errores, sin modificar datos históricos.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.15.607',
             'title' => 'Descarga Excel del informe de dotación por funciones',
