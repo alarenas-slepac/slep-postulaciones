@@ -13,6 +13,7 @@ class DotacionEstablecimientoConfiguracion extends Model
         'establecimiento_id',
         'anio',
         'director_adp',
+        'horas_coordinacion_pie',
         'observacion',
         'created_by',
         'updated_by',
@@ -22,6 +23,7 @@ class DotacionEstablecimientoConfiguracion extends Model
         'establecimiento_id' => 'integer',
         'anio' => 'integer',
         'director_adp' => 'boolean',
+        'horas_coordinacion_pie' => 'integer',
         'created_by' => 'integer',
         'updated_by' => 'integer',
     ];

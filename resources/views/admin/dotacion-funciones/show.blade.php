@@ -65,14 +65,17 @@
             <div class="card shadow-sm border-0 h-100"><div class="card-body">
                 <div class="text-muted small">Cursos con estudiantes NEE</div>
                 <div class="fs-3 fw-bold text-success">{{ number_format((int) $contexto['cursos_nee'], 0, ',', '.') }}</div>
-                <div class="small text-muted">Coordinación PIE = 2 hrs por curso.</div>
+                <div class="small text-muted">Cálculo automático de coordinación PIE: {{ (int) $contexto['cursos_nee'] * 2 }} h (2 h por curso).</div>
+                @if ($config->horas_coordinacion_pie !== null)
+                    <div class="small fw-semibold text-primary">Definidas por Administración: {{ $config->horas_coordinacion_pie }} h para {{ $anio }}.</div>
+                @endif
             </div></div>
         </div>
         <div class="{{ $mostrarMatricula ? 'col-md-4' : 'col-md-6' }}">
             <div class="card shadow-sm border-0 h-100"><div class="card-body">
                 <div class="text-muted small">Total horas estimadas</div>
                 <div class="fs-3 fw-bold text-primary">{{ number_format((int) $resumen['horas_totales'], 0, ',', '.') }}</div>
-                <div class="small text-muted">Automáticas + declaradas/aprobadas.</div>
+                <div class="small text-muted">Calculadas o definidas + declaradas/aprobadas.</div>
             </div></div>
         </div>
     </div>
@@ -96,6 +99,14 @@
                                 <input class="form-check-input" type="checkbox" role="switch" id="director_adp" name="director_adp" value="1" @checked(old('formulario') === 'parametros' ? old('director_adp') : $config->director_adp)>
                                 <label class="form-check-label fw-semibold" for="director_adp">Director(a) ADP</label>
                                 <div class="form-text">Habilita 44 horas como función directiva normativa sólo para este establecimiento y año.</div>
+                            </div>
+                        @endif
+                        @if (($canConfigureCoordinacionPie ?? false) && ($activeRole ?? null) === 'admin')
+                            <div id="coordinacion-pie-config" class="border rounded-4 bg-light p-3 mb-3">
+                                <label class="form-label fw-semibold" for="horas-coordinacion-pie"><i class="bi bi-universal-access me-1" aria-hidden="true"></i>Horas de coordinación PIE · {{ $anio }}</label>
+                                <input id="horas-coordinacion-pie" type="number" name="horas_coordinacion_pie" class="form-control rounded-3 @error('horas_coordinacion_pie') is-invalid @enderror" min="0" max="9999" step="1" value="{{ old('formulario') === 'parametros' ? old('horas_coordinacion_pie', $config->horas_coordinacion_pie) : $config->horas_coordinacion_pie }}" placeholder="Automático: {{ (int) $contexto['cursos_nee'] * 2 }} h" aria-describedby="coordinacion-pie-ayuda @error('horas_coordinacion_pie') coordinacion-pie-error @enderror">
+                                @error('horas_coordinacion_pie')<div id="coordinacion-pie-error" class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div id="coordinacion-pie-ayuda" class="form-text">Ingrese horas enteras para este establecimiento y año. Puede aumentar, reducir o indicar 0. Deje el campo vacío y presione «Guardar parámetros» para volver al cálculo automático de 2 h por curso con estudiantes NEE. El ajuste actualiza la necesidad PIE; las asignaciones registradas se conservan.</div>
                             </div>
                         @endif
                         <label class="form-label" for="funciones-observacion-config">Observación</label>
@@ -132,7 +143,7 @@
     <div class="alert alert-info shadow-sm">
         <div class="fw-semibold"><i class="bi bi-info-circle"></i> Criterios aplicados</div>
         <div class="small">
-            Coordinación PIE se calcula a <strong>2 horas por curso con estudiantes NEE</strong>, sin máximo; si supera 44 horas, la diferencia debe asignarse a otro/a docente diferencial. Orientador(a) no es obligatorio y queda como función declarable. Coordinadores de Ciclo, TP, Especialidad u otros pueden declararse múltiples veces por establecimiento, con 3 o 5 horas sugeridas según matrícula.
+            Coordinación PIE utiliza <strong>2 horas por curso con estudiantes NEE</strong>, salvo que Administración defina otra cantidad para el establecimiento y año. Si supera 44 horas, la diferencia debe asignarse a otro/a docente diferencial. Orientador(a) no es obligatorio y queda como función declarable. Coordinadores de Ciclo, TP, Especialidad u otros pueden declararse múltiples veces por establecimiento, con 3 o 5 horas sugeridas según matrícula.
         </div>
     </div>
 
@@ -213,12 +224,12 @@
                                         @endif
                                     @endif
                                 </td>
-                                <td><span class="badge text-bg-light border">Automática</span></td>
+                                <td><span class="badge text-bg-light border">{{ ($item['ajuste_administrativo'] ?? false) ? 'Administración' : 'Automática' }}</span></td>
                                 <td class="small text-muted">{{ $detalleSugerencia }}</td>
                                 <td class="text-end fw-semibold">{{ number_format((int) $item['horas_sugeridas'], 0, ',', '.') }}</td>
                                 <td class="text-end">—</td>
                                 <td class="text-end">—</td>
-                                <td><span class="badge text-bg-primary">Calculado</span></td>
+                                <td><span class="badge text-bg-primary">{{ ($item['ajuste_administrativo'] ?? false) ? 'Definido' : 'Calculado' }}</span></td>
                                 <td class="text-end text-muted small">Sin acción</td>
                             </tr>
                         @endforeach

@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.602',
+    'current_version' => '2026.10.15.603',
     'entries' => [
+        [
+            'version' => '2026.10.15.603',
+            'title' => 'Coordinación PIE: horas configurables por Administración',
+            'summary' => 'Permite ajustar las horas de coordinación PIE por establecimiento y año, manteniendo el cálculo automático como valor predeterminado.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade un campo exclusivo del rol activo Administrador en Parámetros del establecimiento de Dotación funciones y planes, con acceso desde el proceso guiado 2027.',
+                'Acepta horas enteras entre 0 y 9999, tanto superiores como inferiores al cálculo. El campo vacío restablece las 2 horas por curso con estudiantes NEE y los datos históricos conservan ese cálculo.',
+                'Aplica las horas definidas a los consolidados, necesidades de asignación y cobertura PIE. Las asignaciones ya registradas se conservan para revisión si exceden la nueva necesidad.',
+                'Protege la actualización también en el servidor y conserva el ajuste al guardar otros parámetros. Incluye migración aditiva y pruebas aisladas de permisos, validaciones, año, establecimiento, totales y retorno al cálculo automático.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.15.602',
             'title' => 'Planes de estudio: variantes por curso, año y régimen JEC',

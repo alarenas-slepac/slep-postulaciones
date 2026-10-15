@@ -15,7 +15,12 @@
                 <h2 class="h5 fw-bold mb-1">Avance de dotación por establecimiento</h2>
                 <div class="small text-muted">Complete las etapas en orden. Las funciones no normativas se habilitan al finalizar la cobertura obligatoria.</div>
             </div>
-            <span class="badge rounded-pill text-bg-primary">Año 2027</span>
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                @if (($activeRole ?? auth()->user()?->activeRoleName()) === 'admin')
+                    <a class="btn btn-outline-primary btn-sm rounded-pill" data-dotacion-contexto-salida href="{{ route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => $anio, 'desde_dotacion' => 1, 'tab_origen' => $tab ?? 'resumen']).'#coordinacion-pie-config' }}"><i class="bi bi-sliders me-1" aria-hidden="true"></i>Ajustar coordinación PIE</a>
+                @endif
+                <span class="badge rounded-pill text-bg-primary">Año 2027</span>
+            </div>
         </div>
         <div class="card-body">
             @include('admin.dotacion-establecimiento.partials._docentes_subsector')
