@@ -45,6 +45,7 @@ class DotacionFuncionesCalculator
         $items = collect();
         $horasConfiguradas = DotacionFuncionesNormativas2027::horasConfiguradas($establecimiento, $anio);
         $horasConvivencia = DotacionConvivenciaAnual::horas($establecimiento->id, $anio);
+        $horasCoordinacionPie = $contexto['config']?->horas_coordinacion_pie;
 
         foreach ($rules as $rule) {
             if ($rule->declarable || ! self::reglaAplica($rule)) {
@@ -56,6 +57,7 @@ class DotacionFuncionesCalculator
                 continue;
             }
             $usaCargaConvivencia = $rule->codigo === DotacionConvivenciaAnual::CODIGO && $horasConvivencia !== null;
+            $usaAjustePie = $rule->codigo === 'coordinador_pie' && $horasCoordinacionPie !== null;
             $horasDefinidas = array_key_exists($rule->codigo, $horasConfiguradas)
                 ? DotacionFuncionesNormativas2027::horasDefinidas($rule->codigo, $horas, $horasConfiguradas) : $horas;
 
@@ -65,10 +67,12 @@ class DotacionFuncionesCalculator
                 'categoria' => $rule->categoria,
                 'nombre_funcion' => $rule->nombre,
                 'horas_potenciales' => $horas,
-                'horas_sugeridas' => $usaCargaConvivencia ? $horasConvivencia : $horasDefinidas,
+                'horas_sugeridas' => $usaAjustePie ? $horasCoordinacionPie : ($usaCargaConvivencia ? $horasConvivencia : $horasDefinidas),
+                'ajuste_administrativo' => $usaAjustePie,
                 'estado' => 'calculado',
-                'detalle' => $usaCargaConvivencia
-                    ? 'Horas definidas mediante carga masiva para el año '.$anio.'.' : self::detalleRegla($rule, $contexto, $horas),
+                'detalle' => $usaAjustePie
+                    ? 'Horas de coordinación PIE definidas por Administración para '.$anio.': '.$horasCoordinacionPie.' h. Cálculo automático: '.$horas.' h (2 horas por curso con estudiantes NEE).'
+                    : ($usaCargaConvivencia ? 'Horas definidas mediante carga masiva para el año '.$anio.'.' : self::detalleRegla($rule, $contexto, $horas)),
             ]);
         }
 

@@ -124,6 +124,8 @@ class DotacionFuncionesController extends Controller
             'canEdit' => in_array($activeRole, $this->editableRoles, true),
             'canValidate' => in_array($activeRole, $this->validatorRoles, true),
             'canConfigureDirectorAdp' => in_array($activeRole, $this->directorAdpRoles, true),
+            'canConfigureCoordinacionPie' => $activeRole === 'admin'
+                && Schema::hasColumn('dotacion_establecimiento_configuraciones', 'horas_coordinacion_pie'),
             'bloquesConsolidados' => $this->bloquesConsolidados(),
             'proceso2027' => $proceso2027,
             'accionesContexto' => $this->accionesContexto($request),
@@ -142,11 +144,18 @@ class DotacionFuncionesController extends Controller
         $this->authorizeEstablecimientoScope($request, $establecimiento);
         abort_unless(in_array($activeRole, [...$this->editableRoles, ...$this->directorAdpRoles], true), 403);
 
+        if ($request->has('horas_coordinacion_pie')) {
+            abort_unless($activeRole === 'admin', 403);
+            abort_unless(Schema::hasColumn('dotacion_establecimiento_configuraciones', 'horas_coordinacion_pie'), 503,
+                'Debe ejecutar la migración de horas de coordinación PIE antes de configurarlas.');
+        }
+
         $data = $request->validate([
             'anio' => ['required', 'integer', 'min:2020', 'max:2100'],
             'director_adp' => ['nullable', 'boolean'],
+            'horas_coordinacion_pie' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'observacion' => ['nullable', 'string', 'max:2000'],
-        ]);
+        ], [], ['horas_coordinacion_pie' => 'horas de coordinación PIE']);
 
         $configExistente = DotacionEstablecimientoConfiguracion::query()
             ->where('establecimiento_id', $establecimiento->id)
@@ -163,17 +172,24 @@ class DotacionFuncionesController extends Controller
             ? (trim((string) $data['observacion']) ?: null)
             : $configExistente?->observacion;
 
+        $valores = [
+            'director_adp' => $directorAdp,
+            'observacion' => $observacion,
+            'created_by' => $configExistente?->created_by ?? $request->user()?->id,
+            'updated_by' => $request->user()?->id,
+        ];
+        // Omitir el campo (por ejemplo al guardar otro parámetro) conserva el ajuste.
+        // Enviarlo vacío restablece el cálculo automático; 0 es un ajuste válido.
+        if ($request->has('horas_coordinacion_pie')) {
+            $valores['horas_coordinacion_pie'] = $data['horas_coordinacion_pie'] ?? null;
+        }
+
         DotacionEstablecimientoConfiguracion::updateOrCreate(
             [
                 'establecimiento_id' => $establecimiento->id,
                 'anio' => (int) $data['anio'],
             ],
-            [
-                'director_adp' => $directorAdp,
-                'observacion' => $observacion,
-                'created_by' => $request->user()?->id,
-                'updated_by' => $request->user()?->id,
-            ]
+            $valores
         );
 
         return redirect()->route('admin.dotacion-funciones.show', [$establecimiento, 'anio' => (int) $data['anio'], ...$this->accionesContexto($request)])
