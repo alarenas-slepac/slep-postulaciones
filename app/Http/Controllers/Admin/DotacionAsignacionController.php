@@ -1101,6 +1101,7 @@ class DotacionAsignacionController extends Controller
             throw ValidationException::withMessages(['docente_rut' => 'El docente fue retirado de esta dotación por no renovación. Seleccione el Docente por contratar.']);
         }
         if (! DotacionProceso2027Calculator::aplica($anio)) {
+            $this->validateEpjaAssociation($establecimiento, $persona, $payload, $current);
             if (($payload['tipo_asignacion'] ?? '') === 'funcion_tecnico_pedagogica'
                 && \App\Support\DotacionConvivenciaAnual::horas($establecimiento->id, $anio) !== null) {
                 $necesidad = DotacionAsignacionCalculator::funcionNormativaParaAsignacion($establecimiento, $anio, $payload);
@@ -1174,9 +1175,12 @@ class DotacionAsignacionController extends Controller
                     'docente_rut' => 'El docente no está asociado a esta asignatura. Asócielo primero en la etapa Docentes por asignatura.',
                 ]);
             }
+            $this->validateEpjaAssociation($establecimiento, $persona, $payload, $current, $necesidadPlan, $docentesPermitidosSubsector);
         }
 
-        if (($payload['tipo_asignacion'] ?? '') === 'plan_estudio' && $necesidadPlan !== null && ! $seleccionLibreParvularia && ! $seleccionLibreReligion) {
+        $esAsistenteEpja = ($payload['estamento_cobertura'] ?? 'docente') === 'asistente'
+            && $necesidadPlan !== null && DotacionDocentesSubsector::admiteAsistentes($anio, $necesidadPlan);
+        if (($payload['tipo_asignacion'] ?? '') === 'plan_estudio' && $necesidadPlan !== null && ! $seleccionLibreParvularia && ! $seleccionLibreReligion && ! $esAsistenteEpja) {
             $docentesPlan = DotacionPlanTitularPrimero::elegibles(
                 collect($proceso['docentes'] ?? []), $docentesPermitidosSubsector ?? [], $necesidadPlan, $current
             );
@@ -1332,6 +1336,47 @@ class DotacionAsignacionController extends Controller
             && ! ($proceso['funciones_no_normativas_habilitadas'] ?? false)) {
             throw ValidationException::withMessages([
                 'dotacion_funcion_id' => 'Las funciones no normativas se habilitan sólo cuando todas las necesidades obligatorias estén cubiertas.',
+            ]);
+        }
+    }
+
+    private function validateEpjaAssociation(
+        Establecimiento $establecimiento,
+        array $persona,
+        array $payload,
+        ?DotacionDocenteAsignacion $current,
+        ?array $necesidad = null,
+        ?array $rutsPermitidos = null
+    ): void
+    {
+        $anio = (int) ($payload['anio'] ?? 0);
+        if (! in_array($anio, [2026, 2027], true) || ($payload['tipo_asignacion'] ?? '') !== 'plan_estudio') {
+            return;
+        }
+        $necesidad ??= DotacionAsignacionCalculator::planNeedForKey($establecimiento, $anio, (string) ($payload['necesidad_key'] ?? ''));
+        if (! $necesidad || ! DotacionDocentesSubsector::admiteAsistentes($anio, $necesidad)) {
+            return;
+        }
+        $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut_normalizado'] ?? $persona['rut'] ?? ''));
+        $rutsPermitidos ??= DotacionDocentesSubsector::rutsParaNecesidad($establecimiento, $anio, $necesidad);
+        if (! in_array($rut, $rutsPermitidos, true)) {
+            throw ValidationException::withMessages([
+                'docente_rut' => 'El funcionario no está asociado a esta asignatura EPJA. Asócielo primero en Docentes y asistentes por asignatura.',
+            ]);
+        }
+        if (($payload['estamento_cobertura'] ?? 'docente') !== 'asistente') {
+            return;
+        }
+        $liberadas = $current && ($current->estamento_cobertura ?? 'docente') === 'asistente'
+            && DotacionEstablecimientoCalculator::normalizeRut((string) $current->docente_rut_normalizado) === $rut
+                ? (float) $current->horas_contrato : 0.0;
+        // Se consulta dentro del bloqueo del establecimiento, no desde el saldo
+        // capturado antes de entrar a la transacción de guardado.
+        $asignadas = DotacionAsignacionCalculator::assistantAssignmentsByRut($establecimiento, $anio)[$rut]['total'] ?? 0;
+        $disponibles = max(0.0, round((float) ($persona['horas_contrato'] ?? 0) - (float) $asignadas + $liberadas, 2));
+        if ((float) ($payload['horas_contrato'] ?? 0) > $disponibles + 0.01) {
+            throw ValidationException::withMessages([
+                'horas_contrato' => 'El asistente dispone de '.DotacionEstablecimientoCalculator::formatHoras($disponibles).' h de contrato para asignar.',
             ]);
         }
     }

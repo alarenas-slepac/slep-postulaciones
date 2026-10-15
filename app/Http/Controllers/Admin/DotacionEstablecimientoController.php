@@ -15,6 +15,7 @@ use App\Models\Establecimiento;
 use App\Support\DotacionAsignaturaResumenCalculator;
 use App\Support\DotacionEstablecimientoAvanceCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionDocentesSubsector;
 use App\Support\DotacionLecturaCache;
 use App\Support\DotacionProyeccionCalculator;
 use App\Support\DotacionProceso2027Calculator;
@@ -379,6 +380,8 @@ class DotacionEstablecimientoController extends Controller
             'justificacionesSobredotacionTableReady' => $justificacionesSobredotacionTableReady,
             'canManageJustificacionesSobredotacion' => in_array($activeRole, ['admin', 'funcionario_directivo_estab', 'supervisor_plani'], true),
             'asignacion' => $data['asignacion'] ?? [],
+            'subsectoresEpja2026' => $anio === 2026 && $tab === 'asignacion'
+                ? DotacionDocentesSubsector::resumenEpja2026($establecimiento, $data) : null,
             'asignaturas' => $asignaturas,
             'asignaturasFiltros' => $asignaturasFiltros,
             'cursosCombinados' => $data['cursos_combinados'] ?? [],

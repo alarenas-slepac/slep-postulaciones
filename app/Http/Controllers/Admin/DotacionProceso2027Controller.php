@@ -29,21 +29,24 @@ class DotacionProceso2027Controller extends Controller
         $this->authorizeScope($request, $establecimiento);
         abort_unless(DotacionDocentesSubsector::disponible(), 503, 'Debe ejecutar la migración de docentes por asignatura.');
         $data = $request->validate([
-            'anio' => ['required', 'integer', Rule::in([2027])],
+            'anio' => ['required', 'integer', Rule::in([2026, 2027])],
             'asignatura_key' => ['required', 'string', 'size:40'],
             'docentes' => ['required', 'array', 'min:1', 'max:500'],
             'docentes.*' => ['required', 'string', 'max:32', 'distinct'],
         ]);
-        $proceso = DotacionProceso2027Calculator::resumen($establecimiento, 2027);
-        if (! ($proceso['pasos']['planes']['completo'] ?? false)) {
+        $anio = (int) $data['anio'];
+        $proceso = $anio === 2027 ? DotacionProceso2027Calculator::resumen($establecimiento, $anio) : null;
+        if ($anio === 2027 && ! ($proceso['pasos']['planes']['completo'] ?? false)) {
             throw ValidationException::withMessages(['asignatura_key' => 'Configure primero los planes de estudio del establecimiento.']);
         }
-        $asignatura = collect($proceso['docentes_subsector']['asignaturas'])
+        $subsectores = $anio === 2027 ? $proceso['docentes_subsector']
+            : DotacionDocentesSubsector::resumenEpja2026($establecimiento, DotacionEstablecimientoCalculator::build($establecimiento, $anio));
+        $asignatura = collect($subsectores['asignaturas'])
             ->firstWhere('key', $data['asignatura_key']);
         if (! $asignatura) {
             throw ValidationException::withMessages(['asignatura_key' => 'La asignatura ya no forma parte del plan vigente. Actualice la página.']);
         }
-        $vigentes = collect($proceso['docentes_subsector']['docentes'])
+        $vigentes = collect($subsectores['docentes'])
             ->filter(fn (array $docente) => DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel']))
             ->mapWithKeys(fn (array $docente) => [
                 DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) => true,
@@ -52,17 +55,17 @@ class DotacionProceso2027Controller extends Controller
             ->map(fn ($rut) => DotacionEstablecimientoCalculator::normalizeRut((string) $rut))
             ->filter()->unique()->values();
         if ($ruts->count() !== count($data['docentes']) || $ruts->contains(fn ($rut) => ! $vigentes->has($rut))) {
-            throw ValidationException::withMessages(['docentes' => 'Seleccione únicamente docentes vigentes o cupos habilitados del establecimiento.']);
+            throw ValidationException::withMessages(['docentes' => 'Seleccione únicamente docentes vigentes, cupos habilitados o asistentes del establecimiento en asignaturas EPJA.']);
         }
 
-        DB::transaction(function () use ($establecimiento, $asignatura, $ruts, $request): void {
+        DB::transaction(function () use ($establecimiento, $asignatura, $ruts, $request, $anio): void {
             Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
             DB::table('dotacion_docente_subsectores')
-                ->where('establecimiento_id', $establecimiento->id)->where('anio', 2027)
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
                 ->where('asignatura_key', $asignatura['key'])->delete();
             DB::table('dotacion_docente_subsectores')->insert($ruts->map(fn ($rut) => [
                 'establecimiento_id' => $establecimiento->id,
-                'anio' => 2027,
+                'anio' => $anio,
                 'asignatura_key' => $asignatura['key'],
                 'nivel' => $asignatura['nivel'],
                 'asignatura_nombre' => $asignatura['nombre'],
@@ -73,7 +76,7 @@ class DotacionProceso2027Controller extends Controller
             ])->all());
         });
 
-        return back()->with('subsector_success', 'Docentes de la asignatura guardados correctamente.');
+        return back()->with('subsector_success', 'Funcionarios asociados a la asignatura guardados correctamente.');
     }
 
     public function update(Request $request, Establecimiento $establecimiento): RedirectResponse
