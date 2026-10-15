@@ -40,6 +40,15 @@ class PlanEstudio extends Model
         return $this->belongsTo(Curso::class);
     }
 
+    /** Sólo permite inferir el plan cuando no hay variantes activas que distinguir. */
+    public static function unicoActivoParaCurso(int $cursoId, int $anio, string $regimen): ?self
+    {
+        $planes = self::query()->where('curso_id', $cursoId)->where('anio', $anio)
+            ->where('regimen_jec', $regimen)->where('activo', true)->limit(2)->get();
+
+        return $planes->count() === 1 ? $planes->first() : null;
+    }
+
     public function asignaturas(): HasMany
     {
         return $this->hasMany(PlanEstudioAsignatura::class, 'plan_estudio_id')->orderBy('orden')->orderBy('id');

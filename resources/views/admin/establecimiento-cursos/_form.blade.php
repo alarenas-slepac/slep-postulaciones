@@ -75,16 +75,17 @@
     </div>
 
     <div class="col-lg-6">
-        <label class="form-label">Plan de estudio asociado</label>
-        <select class="form-select" name="plan_estudio_id">
-            <option value="">Asignar automáticamente según curso, año y régimen</option>
+        <label class="form-label" for="plan-estudio-asociado">Plan de estudio asociado</label>
+        <select id="plan-estudio-asociado" class="form-select @error('plan_estudio_id') is-invalid @enderror" name="plan_estudio_id" aria-describedby="plan-estudio-ayuda @error('plan_estudio_id') plan-estudio-error @enderror">
+            <option value="">Asignar automáticamente si hay un único plan coincidente</option>
             @foreach ($planes as $plan)
-                <option value="{{ $plan->id }}" @selected((string) $selectedPlan === (string) $plan->id)>
-                    {{ $plan->anio }} · {{ $plan->curso?->nombre }} · {{ $plan->regimen_jec }} · {{ $plan->nombre_plan }}
+                <option value="{{ $plan->id }}" data-curso="{{ $plan->curso_id }}" data-anio="{{ $plan->anio }}" data-regimen="{{ $plan->regimen_jec }}" @selected((string) $selectedPlan === (string) $plan->id)>
+                    {{ $plan->anio }} · {{ $plan->curso?->nombre }} · {{ $plan->regimen_jec }} · {{ $plan->nombre_plan }} · {{ number_format((float) $plan->horas_semanales_total, 2, ',', '.') }} h/semana{{ $plan->activo ? '' : ' · Inactivo (asociado)' }}
                 </option>
             @endforeach
         </select>
-        <div class="form-text">Si no se selecciona, el sistema buscará un plan activo coincidente. Para “No aplica”, intentará asociar el plan Sin JEC.</div>
+        <div id="plan-estudio-ayuda" class="form-text">Seleccione la variante del establecimiento, por ejemplo «Plan 43 horas». La asociación automática se aplica sólo si hay un único plan activo coincidente. Para «No aplica», se busca Sin JEC.</div>
+        @error('plan_estudio_id')<div id="plan-estudio-error" class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-4">
@@ -92,3 +93,29 @@
         <input type="text" class="form-control" name="fuente" maxlength="120" value="{{ old('fuente', $establecimientoCurso->fuente ?: 'manual') }}">
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const select = document.getElementById('plan-estudio-asociado');
+    if (!select) return;
+    const form = select.closest('form');
+    const curso = form?.querySelector('[name="curso_id"]');
+    const anio = form?.querySelector('[name="anio"]');
+    const regimen = form?.querySelector('[name="regimen_jec"]');
+    if (!curso || !anio || !regimen) return;
+    const options = Array.from(select.options).filter(option => option.value).map(option => option.cloneNode(true));
+    const sync = function () {
+        const previous = select.value;
+        const actualRegimen = regimen.value === 'No aplica' ? 'Sin JEC' : regimen.value;
+        const matches = options.filter(option => option.dataset.curso === curso.value && option.dataset.anio === anio.value && option.dataset.regimen === actualRegimen);
+        select.replaceChildren(new Option(matches.length > 1 ? 'Seleccione la variante del plan...' : 'Asignar automáticamente si hay un único plan coincidente', ''));
+        matches.forEach(option => select.appendChild(option.cloneNode(true)));
+        select.value = matches.some(option => option.value === previous) ? previous : '';
+        select.required = matches.length > 1;
+    };
+    [curso, anio, regimen].forEach(field => field.addEventListener('change', sync));
+    sync();
+});
+</script>
+@endpush

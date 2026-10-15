@@ -46,13 +46,8 @@ class DotacionPlanEstudioResolver
             return null;
         }
 
-        return PlanEstudio::query()
-            ->with(['asignaturas', 'bloques'])
-            ->where('curso_id', $curso->curso_id)
-            ->where('anio', $curso->anio)
-            ->where('regimen_jec', self::normalizeRegimen($curso->regimen_jec))
-            ->where('activo', true)
-            ->first();
+        return PlanEstudio::unicoActivoParaCurso((int) $curso->curso_id, (int) $curso->anio, self::normalizeRegimen($curso->regimen_jec))
+            ?->loadMissing(['asignaturas', 'bloques']);
     }
 
     public static function isReferential(EstablecimientoCurso $curso, ?PlanEstudio $plan): bool
