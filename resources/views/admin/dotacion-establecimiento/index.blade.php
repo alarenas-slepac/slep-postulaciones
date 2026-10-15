@@ -36,6 +36,11 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
+                @if (\App\Support\DotacionInformeFunciones::puedeVer($activeRole) && in_array((int) $anio, [2026, 2027], true))
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}">
+                        <i class="bi bi-table" aria-hidden="true"></i> Informe de dotación por funciones
+                    </a>
+                @endif
                 @if (in_array($activeRole, ['admin', 'coordinador_uatp', 'supervisor_plani'], true))
                     <a class="btn btn-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_avance' => 1, 'anio' => $anio]) }}">
                         <i class="bi bi-bar-chart-line"></i> Informe de avance

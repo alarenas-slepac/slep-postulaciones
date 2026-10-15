@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.605',
+    'current_version' => '2026.10.15.606',
     'entries' => [
+        [
+            'version' => '2026.10.15.606',
+            'title' => 'Informe de dotación por funciones para 2026 y 2027',
+            'summary' => 'Añade una vista territorial con docentes, horas por función y conciliación del contrato completo de cada establecimiento.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Incorpora el botón Informe de dotación por funciones en el listado de Dotación establecimiento. Restringe también la consulta del servidor a los cuatro roles autorizados, según el rol activo.',
+                'Presenta funciones directivas, técnico-pedagógicas, aula con planes normativos y otras funciones PIE. Cuenta cada docente una sola vez por función y establecimiento; el total de personas no duplica a quienes cumplen varias funciones.',
+                'Conserva el contrato original completo de la nómina de dotación e identifica otras funciones, reservas, horas sin asignar, exclusiones por situaciones y sobreasignaciones por docente sin compensar saldos entre personas. Reutiliza la conversión consolidada de aula y el redondeo de Parvularia.',
+                'Muestra SEP como dato complementario del padrón de respaldo, sin sumarlo nuevamente ni atribuir horas mixtas sin desglose. Identifica el período contractual utilizado para cada año y respeta las situaciones, continuidad y retiros de la nómina de dotación.',
+                'Incluye filtros de año, RBD o nombre y comuna, paginación de diez establecimientos y totales de página. Los fallos se identifican sin presentarlos como ceros y la consulta no modifica datos históricos. Añade pruebas aisladas de permisos, cálculos y filtros.',
+            ],
+            'published_at' => '2026-10-15',
+        ],
         [
             'version' => '2026.10.15.605',
             'title' => 'EPJA 2026 y 2027: asistentes asociados a asignaturas',
