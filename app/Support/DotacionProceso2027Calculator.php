@@ -73,6 +73,7 @@ class DotacionProceso2027Calculator
             'label' => $label,
             'requeridas' => 0.0,
             'asignadas' => 0.0,
+            'asignadas_para_maximo' => 0.0,
             'asignadas_obligatorias' => 0.0,
             'asignadas_asistentes_obligatorias' => 0.0,
             'asignadas_plan_obligatorias' => 0.0,
@@ -229,7 +230,8 @@ class DotacionProceso2027Calculator
             });
         $horasClasificadasPorRut = [];
         $horasParvulariaPorRut = [];
-        foreach ($asignaciones as $asignacion) {
+        $asignacionesParaMaximo = DotacionContratoParvulariaCalculator::consolidarParaMaximo($asignaciones);
+        foreach ($asignaciones as $indice => $asignacion) {
             $rut = DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($asignacion, 'docente_rut_normalizado') ?: data_get($asignacion, 'docente_rut', '')));
             $docente = $docentesPorRut->get($rut);
             $keyNecesidad = (string) data_get($asignacion, 'necesidad_key', '');
@@ -250,7 +252,11 @@ class DotacionProceso2027Calculator
                 continue;
             }
             $horas = max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
+            $horasCurso = max(0.0, (float) data_get($asignacionesParaMaximo->get($indice), 'horas_contrato', $horas));
             $bloques[$bloque]['asignadas'] += $horas;
+            $bloques[$bloque]['asignadas_para_maximo'] += self::horasImputablesAlMaximo(
+                (string) data_get($asignacion, 'tipo_asignacion', ''), $horasCurso
+            );
             if ($bloque === 'bloque_2' && $docente) {
                 $horasParvulariaPorRut[$rut] = ($horasParvulariaPorRut[$rut] ?? 0.0) + $horas;
             }
@@ -273,9 +279,9 @@ class DotacionProceso2027Calculator
                 && ! isset($needIdsConCoberturaCalculada[$asignacionId])) {
                 // La cobertura de la necesidad conserva su bloque de origen;
                 // las horas de contrato respetan el estamento del docente.
-                $bloques[$bloqueObligatorio]['asignadas_obligatorias'] += $horas;
+                $bloques[$bloqueObligatorio]['asignadas_obligatorias'] += $horasCurso;
                 if ((string) data_get($asignacion, 'tipo_asignacion', '') === 'plan_estudio') {
-                    $bloques[$bloqueObligatorio]['asignadas_plan_obligatorias'] += $horas;
+                    $bloques[$bloqueObligatorio]['asignadas_plan_obligatorias'] += $horasCurso;
                 }
             }
             if ($docente) {
@@ -354,6 +360,7 @@ class DotacionProceso2027Calculator
         foreach ($bloques as &$bloque) {
             $bloque['requeridas'] = round((float) $bloque['requeridas'], 2);
             $bloque['asignadas'] = round((float) $bloque['asignadas'], 2);
+            $bloque['asignadas_para_maximo'] = round((float) $bloque['asignadas_para_maximo'], 2);
             $bloque['asignadas_obligatorias'] = round((float) $bloque['asignadas_obligatorias'], 2);
             $bloque['asignadas_asistentes_obligatorias'] = round((float) $bloque['asignadas_asistentes_obligatorias'], 2);
             $bloque['asignadas_plan_obligatorias'] = round((float) $bloque['asignadas_plan_obligatorias'], 2);
@@ -375,7 +382,7 @@ class DotacionProceso2027Calculator
             $bloque['pendientes'] = max(0.0, round($bloque['requeridas'] - $bloque['asignadas_obligatorias'], 2));
             $bloque['contrato_comprometido'] = self::contratoComprometidoParaMaximo(
                 $bloque['requeridas'],
-                max(0.0, $bloque['asignadas'] - $bloque['asignadas_acompanamiento'] - $bloque['titulares_otras_funciones_global']),
+                max(0.0, $bloque['asignadas_para_maximo'] - $bloque['titulares_otras_funciones_global']),
                 max(0.0, $bloque['asignadas_no_normativas'] - $bloque['titulares_otras_funciones_global'])
             );
             $bloque['saldo_maximo'] = $bloque['maximo'] === null ? null : round(max(0.0, $bloque['maximo'] - $bloque['contrato_comprometido']), 2);

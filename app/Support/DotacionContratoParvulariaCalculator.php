@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\EstablecimientoCurso;
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
@@ -12,6 +13,35 @@ class DotacionContratoParvulariaCalculator
     public const MOTIVO_REDONDEO = 'Redondeo hacia arriba del contrato acumulado por docente; las fracciones no quedan como saldo disponible.';
 
     public static function consolidar(Collection $asignaciones): Collection
+    {
+        return self::convertirAsignaciones($asignaciones, true);
+    }
+
+    /** El cupo del curso usa su base proporcional, sin el redondeo personal. */
+    public static function consolidarParaMaximo(Collection $asignaciones): Collection
+    {
+        // El cast decimal:2 del modelo no debe redondear cada asignatura.
+        $filas = $asignaciones->map(fn ($row) => is_array($row) ? $row
+            : ($row instanceof Arrayable ? $row->toArray() : get_object_vars($row)));
+
+        return self::convertirAsignaciones($filas, false);
+    }
+
+    public static function horasParaMaximo(object|array $asignacion, ?float $horasAlternativas = null): float
+    {
+        $fila = is_array($asignacion) ? $asignacion : clone $asignacion;
+        if ($horasAlternativas !== null) {
+            if (is_array($fila)) {
+                $fila['horas_contrato'] = $horasAlternativas;
+            } else {
+                $fila->horas_contrato = $horasAlternativas;
+            }
+        }
+
+        return (float) self::consolidarParaMaximo(collect([$fila]))->sum('horas_contrato');
+    }
+
+    private static function convertirAsignaciones(Collection $asignaciones, bool $redondearPorDocente): Collection
     {
         $candidatas = $asignaciones->filter(fn ($row) => self::aplica($row));
         if ($candidatas->isEmpty()) {
@@ -71,9 +101,11 @@ class DotacionContratoParvulariaCalculator
             $docente = $porDocente[$docenteKey] ?? ['exactas' => 0.0, 'contrato' => 0.0];
             $totalExactas = $docente['exactas'] - $previas['exactas'] + $exactas;
             // Evita que residuos binarios conviertan, por ejemplo, 55 en 56.
-            $contrato = (float) ceil(round($totalExactas, 8));
+            $contrato = $redondearPorDocente
+                ? (float) ceil(round($totalExactas, 8))
+                : round($totalExactas, 8);
             $conversiones[$indice] = [
-                'horas_contrato' => round($contrato - $docente['contrato'], 2),
+                'horas_contrato' => round($contrato - $docente['contrato'], $redondearPorDocente ? 2 : 8),
                 'proporcion_aplicada' => $calculo['proporcion_label'],
             ];
             if (data_get($row, 'proporcion_aplicada') === 'NT JEC · CPEIP 65/35') {
