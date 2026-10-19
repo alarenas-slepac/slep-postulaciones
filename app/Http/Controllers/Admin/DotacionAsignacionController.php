@@ -18,6 +18,7 @@ use App\Support\DotacionAcompanamientoParvularia;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionAsignacionElegibilidad2027;
 use App\Support\DotacionContratoPlanCalculator;
+use App\Support\DotacionContratoParvulariaCalculator;
 use App\Support\DotacionAsignacionPorCursoBloque;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
@@ -1213,7 +1214,8 @@ class DotacionAsignacionController extends Controller
         $horas = max(0.0, (float) ($payload['horas_contrato'] ?? 0));
         $bloqueProceso = data_get($proceso, 'bloques.'.$bloque, []);
         $asignadas = (float) ($bloqueProceso['asignadas'] ?? 0);
-        $asignadasMaximo = max(0.0, $asignadas - (float) ($bloqueProceso['asignadas_acompanamiento'] ?? 0));
+        $asignadasMaximo = max(0.0, (float) ($bloqueProceso['asignadas_para_maximo']
+            ?? ($asignadas - (float) ($bloqueProceso['asignadas_acompanamiento'] ?? 0))));
         $noNormativas = (float) ($bloqueProceso['asignadas_no_normativas'] ?? 0);
         $esNoNormativa = (int) ($payload['dotacion_funcion_id'] ?? 0) > 0
             || (string) ($payload['tipo_asignacion'] ?? '') === 'otra_funcion';
@@ -1241,7 +1243,8 @@ class DotacionAsignacionController extends Controller
                 $titularesGlobales = max(0.0, $titularesGlobales - $titularesGlobalesLiberadas);
                 $asignadasMaximo = max(0.0, $asignadasMaximo - DotacionProceso2027Calculator::horasImputablesAlMaximo(
                     (string) $current->tipo_asignacion,
-                    DotacionContratoPlanCalculator::horasLiberadas(collect($personaActual['asignaciones'] ?? []), $current)
+                    DotacionContratoParvulariaCalculator::horasParaMaximo($current,
+                        DotacionContratoPlanCalculator::horasLiberadas(collect($personaActual['asignaciones'] ?? []), $current))
                 ));
                 if ((int) ($current->dotacion_funcion_id ?? 0) > 0
                     || in_array((string) $current->tipo_asignacion, ['otra_funcion', 'reserva_no_normativa'], true)) {
@@ -1279,7 +1282,7 @@ class DotacionAsignacionController extends Controller
             )
             : $asignadasMaximo;
         $horasMaximo = DotacionProceso2027Calculator::horasImputablesAlMaximo(
-            (string) ($payload['tipo_asignacion'] ?? ''), $horas
+            (string) ($payload['tipo_asignacion'] ?? ''), DotacionContratoParvulariaCalculator::horasParaMaximo($payload)
         ) - $titularesGlobalesNuevas;
         if ($maximo !== null && $horasMaximo > 0.01
             && $contratoComprometido + $horasMaximo > (float) $maximo + 0.01) {

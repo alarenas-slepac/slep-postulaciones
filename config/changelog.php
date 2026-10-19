@@ -6457,8 +6457,31 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.19.612',
+    'current_version' => '2026.10.19.613',
     'entries' => [
+        [
+            'version' => '2026.10.19.613',
+            'title' => 'Separa el cupo del curso del redondeo contractual de cada educadora',
+            'summary' => 'El redondeo individual de Educación Parvularia conserva su efecto en el contrato docente sin aumentar las horas necesarias ni consumir cupo adicional del curso.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'files' => [
+                'app/Http/Controllers/Admin/DotacionAsignacionController.php',
+                'app/Support/DotacionContratoParvulariaCalculator.php',
+                'app/Support/DotacionProceso2027Calculator.php',
+                'resources/views/admin/dotacion-establecimiento/partials/_proceso_2027.blade.php',
+                'tests/Feature/DotacionParvulariaCupoInstitucionalTest.php',
+                'tests/Unit/DotacionParvulariaCupoCalculatorTest.php',
+                'docs/DOTACION_USABILIDAD.md',
+                'config/changelog.php',
+            ],
+            'items' => [
+                'Conserva la base proporcional del curso para la cobertura, el máximo y el saldo no normativo de 2027. El contrato individual sigue redondeándose hacia arriba y respetando la jornada, la titularidad y los límites de aula de cada docente.',
+                'Al crear, editar o reasignar, libera y consume sólo el cupo proporcional de Parvularia. El PIE mantiene su costo contractual y el acompañamiento simultáneo conserva su tratamiento independiente.',
+                'Distingue las asignaciones computables para el máximo del contrato docente redondeado y evita que ese redondeo complete artificialmente una cobertura de aula pendiente.',
+                'Añade pruebas del bloqueo de cinco horas aula con máximo 116, edición, reasignación, eliminación, saldo personal, exceso de aula y PIE, precisión, bases con y sin JEC, cursos combinados e históricos. No aumenta máximos ni requiere migraciones.',
+            ],
+            'published_at' => '2026-10-19',
+        ],
         [
             'version' => '2026.10.19.612',
             'title' => 'Reconoce la colaboración PIE cubierta en cualquiera de los cursos combinados',

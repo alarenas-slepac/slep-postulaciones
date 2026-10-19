@@ -30,6 +30,14 @@ En asignación, los saldos por bloque se expresan en horas de contrato y el deta
 
 La explicación no cambia las reglas de completitud ni agrega consultas SQL. El detalle disponible de planes identifica los cursos pendientes y el número con libre disposición incompleta; los motivos de cada bloque se revisan en la configuración de planes. Pruebas: `DotacionEtapasPendientesTest` y `DotacionConfiguracionUsabilidadTest`.
 
+## Cupo institucional y redondeo docente · 2026.10.19.613
+
+En Educación Parvularia, el curso conserva su necesidad proporcional y el máximo autorizado. El contrato personal se redondea hacia arriba una vez por docente; ese redondeo consume su jornada, pero no agrega necesidad ni cupo al curso. La cobertura parcial también usa la base del curso, para que el redondeo personal no oculte horas aula pendientes.
+
+El proceso 2027 calcula `asignadas_para_maximo` con las bases de cada curso o grupo combinado, conserva las fracciones hasta sumar y excluye el acompañamiento simultáneo. Mantiene el contrato docente redondeado en `asignadas`, en el padrón y en los controles de disponibilidad, titularidad y límite de aula. La creación y edición utilizan el mismo criterio institucional; al editar se libera el cupo proporcional anterior. PIE y funciones conservan su costo contractual y las reservas sus reglas existentes. Las necesidades, máximos configurados e históricos no se modifican.
+
+La tabla muestra **Asignadas para el máximo** cuando esa cantidad difiere del contrato individual. La prueba sintética reproduce 33 de 38 horas aula cubiertas, 21 horas personales disponibles, 110 contractuales asignadas y máximo/necesidad 116. Completar las cinco horas puede llevar los contratos personales a 118, mientras el curso y PIE permanecen en 116. Pruebas: `DotacionParvulariaCupoInstitucionalTest` y `DotacionParvulariaCupoCalculatorTest`.
+
 ## Archivos principales
 
 - `resources/views/admin/dotacion-establecimiento/show.blade.php` e `index.blade.php`: estructura y navegación.

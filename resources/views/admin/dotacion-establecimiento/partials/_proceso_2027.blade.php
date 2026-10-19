@@ -158,6 +158,9 @@
                                 <td class="text-end text-primary">{{ $fmtProceso($bloque['contrata_con_redondeo'] ?? $bloque['contrata_asignadas']) }}</td>
                                 <td class="text-end {{ $bloque['sin_padron_asignadas'] > 0.01 ? 'text-warning fw-semibold' : '' }}">{{ $fmtProceso($bloque['sin_padron_asignadas']) }}</td>
                                 <td class="text-end fw-semibold">{{ $fmtProceso($bloque['asignadas_con_redondeo'] ?? $bloque['asignadas']) }}
+                                    @if (isset($bloque['asignadas_para_maximo']) && abs($bloque['asignadas'] - $bloque['asignadas_para_maximo']) > 0.01)
+                                        <div class="small text-muted fw-normal">Asignadas para el máximo: {{ $fmtProceso(max(0, $bloque['asignadas_para_maximo'] - ($bloque['titulares_otras_funciones_global'] ?? 0))) }} h</div>
+                                    @endif
                                     @if (($bloque['redondeo_parvularia'] ?? 0) > 0.01)
                                         <div class="small text-muted fw-normal">Registradas: {{ $fmtProceso($bloque['asignadas']) }} h · redondeo individual Parvularia: +{{ $fmtProceso($bloque['redondeo_parvularia']) }} h</div>
                                     @endif
@@ -187,7 +190,7 @@
                 </table>
             </div>
             <div class="small text-muted mt-2">Titulares y contrata provienen de las jornadas del padrón vigente; «Sin padrón vigente» identifica asignaciones que requieren revisión de su origen. La cobertura del plan se confirma con las horas aula de cada asignatura y su contrato necesario se calcula consolidado por curso. La libre disposición NT1/NT2 impartida por otros docentes se cuenta en Plan general; el acompañamiento simultáneo de Parvularia cuenta en el contrato de la Educadora, sin ocupar un segundo cupo del máximo del bloque. El redondeo individual de Parvularia sólo ajusta las cifras mostradas; no modifica asignaciones guardadas ni máximos. La cobertura AAEE de otras necesidades obligatorias se muestra por separado del contrato docente.</div>
-            <div class="alert alert-info small rounded-4 mt-3 mb-0" role="note"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>El contrato asignado del plan se calcula sumando primero las horas aula de cada docente y convirtiendo ese total según 65/35 o 60/40. Incluye libre disposición. Las funciones, el trabajo colaborativo PIE y las reservas ya son horas de contrato y se suman directamente. La cobertura por AAEE se informa aparte y no consume contrato docente.</div>
+            <div class="alert alert-info small rounded-4 mt-3 mb-0" role="note"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>El contrato asignado del plan se calcula sumando primero las horas aula de cada docente y convirtiendo ese total según 65/35, 60/40 o la base especial de Parvularia. Incluye libre disposición. En Parvularia, el redondeo se aplica al contrato individual del docente; las horas necesarias, la cobertura y el máximo del curso conservan su base proporcional sin ese redondeo. Las funciones, el trabajo colaborativo PIE y las reservas ya son horas de contrato y se suman directamente. La cobertura por AAEE se informa aparte y no consume contrato docente.</div>
             @if (!($proceso['funciones_no_normativas_habilitadas'] ?? false))
                 @php
                     $etapasPendientes = collect($proceso['pasos'] ?? [])->filter(fn ($paso) => ! $paso['completo'])->pluck('label');
