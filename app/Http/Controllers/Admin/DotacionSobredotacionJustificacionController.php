@@ -6,26 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
 use App\Support\DotacionEstablecimientoCalculator;
-use App\Support\DotacionSobredotacionCalculator;
 use App\Support\DotacionProceso2027Calculator;
+use App\Support\DotacionSobredotacionCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class DotacionSobredotacionJustificacionController extends Controller
 {
     public function store(Request $request, Establecimiento $establecimiento): RedirectResponse
     {
+        $this->authorizeRequest($request, $establecimiento);
         $usuario = $request->user();
-        $rol = $usuario?->activeRoleName();
-        abort_unless(in_array($rol, ['admin', 'supervisor_plani'], true)
-            || ($rol === 'funcionario_directivo_estab'
-                && (int) $usuario->establecimiento_id === (int) $establecimiento->id), 403);
-        abort_if((bool) $establecimiento->sala_cuna, 404);
-        abort_unless(Schema::hasTable('dotacion_sobredotacion_justificaciones'), 503,
-            'Debe ejecutar las migraciones antes de registrar justificaciones.');
 
         $datos = $request->validate([
             'anio' => ['required', 'integer', 'min:2020', 'max:2100'],
@@ -76,5 +70,42 @@ class DotacionSobredotacionJustificacionController extends Controller
         return redirect()->to(route('admin.dotacion-establecimiento.show', [
             $establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion',
         ]).'#vacantes-'.$datos['bloque'])->with('success', 'Justificación guardada para el docente y bloque seleccionados.');
+    }
+
+    public function destroy(Request $request, Establecimiento $establecimiento, int $justificacion): RedirectResponse
+    {
+        $this->authorizeRequest($request, $establecimiento);
+        $datos = $request->validate(['anio' => ['required', 'integer', 'min:2020', 'max:2100']]);
+        $anio = (int) $datos['anio'];
+        $registro = DotacionSobredotacionJustificacion::query()
+            ->whereKey($justificacion)
+            ->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)
+            ->firstOrFail();
+        $bloque = $registro->bloque;
+        $rut = DotacionEstablecimientoCalculator::normalizeRut($registro->docente_rut_normalizado);
+        $registro->delete();
+
+        $quedanJustificaciones = in_array($rut,
+            DotacionSobredotacionJustificacion::rutsJustificados((int) $establecimiento->id, $anio), true);
+        $mensaje = $quedanJustificaciones
+            ? 'Justificación eliminada. El docente conserva otras justificaciones en este establecimiento y año; sigue excluido de otras funciones.'
+            : 'Justificación eliminada. Se retiró la exclusión por justificación; el docente podrá seleccionarse según su saldo y los requisitos de la función.';
+
+        return redirect()->to(route('admin.dotacion-establecimiento.show', [
+            $establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion',
+        ]).'#vacantes-'.$bloque)->with('success', $mensaje);
+    }
+
+    private function authorizeRequest(Request $request, Establecimiento $establecimiento): void
+    {
+        $usuario = $request->user();
+        $rol = $usuario?->activeRoleName();
+        abort_unless(in_array($rol, ['admin', 'supervisor_plani'], true)
+            || ($rol === 'funcionario_directivo_estab'
+                && (int) $usuario->establecimiento_id === (int) $establecimiento->id), 403);
+        abort_if((bool) $establecimiento->sala_cuna, 404);
+        abort_unless(Schema::hasTable('dotacion_sobredotacion_justificaciones'), 503,
+            'Debe ejecutar las migraciones antes de gestionar justificaciones.');
     }
 }

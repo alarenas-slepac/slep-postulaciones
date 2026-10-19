@@ -6457,8 +6457,32 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.19.615',
+    'current_version' => '2026.10.19.616',
     'entries' => [
+        [
+            'version' => '2026.10.19.616',
+            'title' => 'Eliminar una justificación para volver a seleccionar al docente',
+            'summary' => 'Sobredotación permite retirar justificaciones guardadas y desactualizadas, levantando su exclusión de otras funciones cuando no quedan otros registros que la mantengan.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'supervisor_plani'],
+            'files' => [
+                'app/Http/Controllers/Admin/DotacionSobredotacionJustificacionController.php',
+                'routes/web.php',
+                'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion.blade.php',
+                'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion_eliminar_justificacion.blade.php',
+                'resources/views/admin/dotacion-establecimiento/partials/_sobredotacion_justificaciones_sin_saldo.blade.php',
+                'tests/Feature/DotacionEliminarJustificacionTest.php',
+                'tests/Feature/CoordinadorUatpDotacionAccessTest.php',
+                'docs/DOTACION_USABILIDAD.md',
+                'config/changelog.php',
+            ],
+            'items' => [
+                'Agrega Eliminar justificación junto al registro guardado, con confirmación y solicitud DELETE protegida por CSRF. Conserva los permisos de administrador, supervisor de Planificación y directivo del propio establecimiento.',
+                'Elimina exclusivamente el registro del establecimiento y año enviados, incluso si sus horas están desactualizadas. Advierte si otras justificaciones mantienen la exclusión del docente de Planes y programas u otras funciones.',
+                'Hace accesibles las justificaciones cuyo bloque o calidad ya no tiene saldo visible para evitar exclusiones sin una acción disponible. Mantiene los controles de contrato, cobertura y máximos, sin modificar horas ni asignaciones.',
+                'Añade pruebas HTTP y de catálogo PAE con 25 horas disponibles, permisos de escritura y consulta, contextos ajenos, registros múltiples, justificaciones antiguas y botones. No requiere migraciones ni recursos compilados.',
+            ],
+            'published_at' => '2026-10-19',
+        ],
         [
             'version' => '2026.10.19.615',
             'title' => 'Libre disposición configurada en NT1 y NT2 combinados',

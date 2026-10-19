@@ -680,6 +680,11 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|funcionario_directivo_estab|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.sobredotacion.justificaciones.store');
+        Route::delete('dotacion-establecimiento/{establecimiento}/sobredotacion/justificaciones/{justificacion}', [DotacionSobredotacionJustificacionController::class, 'destroy'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|supervisor_plani')
+            ->whereNumber('establecimiento')
+            ->whereNumber('justificacion')
+            ->name('dotacion-establecimiento.sobredotacion.justificaciones.destroy');
         Route::post('dotacion-establecimiento/{establecimiento}/contrata-habilitaciones', [DotacionContrataHabilitacionController::class, 'store'])
             ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
