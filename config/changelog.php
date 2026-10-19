@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.19.611',
+    'current_version' => '2026.10.19.612',
     'entries' => [
+        [
+            'version' => '2026.10.19.612',
+            'title' => 'Reconoce la colaboración PIE cubierta en cualquiera de los cursos combinados',
+            'summary' => 'Corrige el pendiente de tres horas que podía mostrar la etapa de asignación cuando la colaboración PIE estaba cubierta en el otro curso o en la clave del grupo.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'La cobertura usada por el proceso guiado se actualiza con las horas consolidadas del grupo, en lugar de conservar únicamente el valor del curso representante.',
+                'Conserva una sola necesidad de colaboración PIE por grupo, reconoce sus asignaciones históricas y muestra los saldos parciales y excesos reales. No modifica registros ni requiere volver a asignar horas ya cubiertas.',
+                'Añade pruebas aisladas con la construcción real de necesidades: cobertura en cada curso, clave combinada, horas repartidas, asistentes, ausencia o cobertura parcial, excesos y cursos ajenos al grupo.',
+            ],
+            'published_at' => '2026-10-19',
+        ],
         [
             'version' => '2026.10.19.611',
             'title' => 'Las etapas de dotación explican qué falta para completarlas',

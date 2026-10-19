@@ -270,7 +270,12 @@ class DotacionCursoCombinadoCalculator
                 'establecimiento_curso_id' => (int) data_get($representante, 'establecimiento_curso_id', 0),
                 'dotacion_curso_combinado_id' => $grupoId,
                 'horas_contrato_requeridas' => $horasRequeridas,
+                'horas_contrato_requeridas_calculo' => $horasRequeridas,
                 'horas_contrato_asignadas' => $horasAsignadas,
+                // La etapa y los indicadores leen este campo antes que el
+                // total visible. Debe acreditar el grupo completo, no heredar
+                // únicamente la cobertura del curso representante.
+                'horas_contrato_asignadas_calculo' => $horasAsignadas,
                 'horas_contrato_pendientes' => max(0.0, round($horasRequeridas - $horasAsignadas, 2)),
                 'estado' => self::status($horasRequeridas, $horasAsignadas),
                 'asignaciones' => $asignacionesGrupo,
