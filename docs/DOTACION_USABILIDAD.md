@@ -38,6 +38,12 @@ El proceso 2027 calcula `asignadas_para_maximo` con las bases de cada curso o gr
 
 La tabla muestra **Asignadas para el máximo** cuando esa cantidad difiere del contrato individual. La prueba sintética reproduce 33 de 38 horas aula cubiertas, 21 horas personales disponibles, 110 contractuales asignadas y máximo/necesidad 116. Completar las cinco horas puede llevar los contratos personales a 118, mientras el curso y PIE permanecen en 116. Pruebas: `DotacionParvulariaCupoInstitucionalTest` y `DotacionParvulariaCupoCalculatorTest`.
 
+## Planes TP y libre disposición restante · 2026.10.19.614
+
+La etapa de planes 2027 toma las horas requeridas de los bloques activos configurables que muestra el formulario. En TP, la cabecera puede registrar seis horas que se distribuyen en dos de electivo y cuatro de libre disposición restante; exigir seis de libre disposición además del electivo generaba un falso faltante de dos horas. Los bloques completos de formación general 14, electivo 2, especialidad TP 22 y libre disposición 4 conservan el total de 42 horas.
+
+Se valida cada bloque flexible por separado y se sigue exigiendo un estado enviado, aprobado o cerrado. La cabecera respalda la libre disposición sólo si no existe un bloque activo explícito; un bloque activo de cero horas no hereda otro valor de la cabecera. La consulta no modifica detalles, estados ni planes oficiales. `DotacionProceso2027TpPlanesTest` reproduce ambos grados TP y el caso de 27 cursos con 13 TP completos que aparecían pendientes.
+
 ## Archivos principales
 
 - `resources/views/admin/dotacion-establecimiento/show.blade.php` e `index.blade.php`: estructura y navegación.

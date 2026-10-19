@@ -6457,8 +6457,26 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.19.613',
+    'current_version' => '2026.10.19.614',
     'entries' => [
+        [
+            'version' => '2026.10.19.614',
+            'title' => 'Planes TP completos sin duplicar las horas del electivo',
+            'summary' => 'La etapa de planes 2027 valida la libre disposición restante definida por el bloque, evitando exigir nuevamente las horas destinadas al electivo de formación general.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'files' => [
+                'app/Support/DotacionProceso2027Calculator.php',
+                'tests/Feature/DotacionProceso2027TpPlanesTest.php',
+                'docs/DOTACION_USABILIDAD.md',
+                'config/changelog.php',
+            ],
+            'items' => [
+                'Respeta las cuatro horas restantes del bloque TP cuando la cabecera contiene seis horas de libre disposición y dos ya están destinadas al electivo que se valida por separado. Un plan completo de 42 horas no debe exigir 44.',
+                'Conserva la validación independiente de electivo, especialidad, libre disposición y estado enviado. La cabecera sigue siendo respaldo cuando no existe un bloque activo explícito; los bloques activos en cero conservan ese valor.',
+                'Añade pruebas de tercero y cuarto TP, del caso de 14 de 27 cursos listos con 13 TP completos, y de bloques incompletos, borradores y respaldo histórico. No modifica horas, asignaturas, estados guardados, planes oficiales ni datos productivos.',
+            ],
+            'published_at' => '2026-10-19',
+        ],
         [
             'version' => '2026.10.19.613',
             'title' => 'Separa el cupo del curso del redondeo contractual de cada educadora',

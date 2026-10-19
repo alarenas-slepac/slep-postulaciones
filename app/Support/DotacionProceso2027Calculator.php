@@ -639,18 +639,18 @@ class DotacionProceso2027Calculator
                 continue;
             }
 
-            $requeridosPorBloque = collect($plan->bloques ?? [])
-                ->filter(fn ($bloque) => (bool) $bloque->activo
-                    && ($bloque->permite_asignaturas_establecimiento || $bloque->permite_asignaturas_personalizadas)
+            $bloquesActivos = collect($plan->bloques ?? [])->filter(fn ($bloque) => (bool) $bloque->activo);
+            $requeridosPorBloque = $bloquesActivos
+                ->filter(fn ($bloque) => ($bloque->permite_asignaturas_establecimiento || $bloque->permite_asignaturas_personalizadas)
                     && (float) $bloque->horas_semanales > 0)
                 ->mapWithKeys(fn ($bloque) => [(string) $bloque->tipo_bloque => (float) $bloque->horas_semanales])
                 ->all();
             $libreRequerida = max(0.0, (float) ($plan->horas_semanales_libre_disposicion ?? 0));
-            if ($libreRequerida > 0) {
-                $requeridosPorBloque['libre_disposicion'] = max(
-                    $libreRequerida,
-                    (float) ($requeridosPorBloque['libre_disposicion'] ?? 0)
-                );
+            // En TP, la cabecera incluye el electivo ya exigido por separado.
+            // El bloque define la libre disposición restante, incluso en cero.
+            // La cabecera sólo respalda planes sin un bloque activo explícito.
+            if ($libreRequerida > 0 && ! $bloquesActivos->contains('tipo_bloque', 'libre_disposicion')) {
+                $requeridosPorBloque['libre_disposicion'] = $libreRequerida;
             }
 
             $bloquesIncompletos = collect($requeridosPorBloque)
