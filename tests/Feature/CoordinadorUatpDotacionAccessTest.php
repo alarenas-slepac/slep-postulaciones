@@ -49,7 +49,10 @@ class CoordinadorUatpDotacionAccessTest extends TestCase
                 ->first(fn (string $middleware) => str_starts_with($middleware, 'ensure.role:'));
 
             $this->assertNotNull($roleMiddleware, "La ruta {$routeName} no tiene middleware de rol.");
-            if ($routeName === 'admin.dotacion-establecimiento.sobredotacion.justificaciones.store') {
+            if (in_array($routeName, [
+                'admin.dotacion-establecimiento.sobredotacion.justificaciones.store',
+                'admin.dotacion-establecimiento.sobredotacion.justificaciones.destroy',
+            ], true)) {
                 // Esta acción ya estaba reservada a administrador y establecimiento.
                 // El parche agrega supervisor_plani sin ampliar otros perfiles.
                 $this->assertStringNotContainsString('coordinador_uatp', $roleMiddleware);

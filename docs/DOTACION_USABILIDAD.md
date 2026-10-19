@@ -54,6 +54,14 @@ Las claves curriculares anteriores con asignaciones activas o modalidades explí
 
 `DotacionCombinadoPlanConfiguradoTest` reproduce el plan compartido, talleres vinculados al mismo núcleo, nombres iguales en distintos bloques, modalidades independientes, guardado de 3 horas con un especialista a contrata frente a educadoras titulares, límites de cobertura, conservación histórica y vistas de edición/consulta.
 
+## Eliminar justificaciones de Sobredotación · 2026.10.19.616
+
+El detalle de cada justificación guardada ofrece **Eliminar justificación**, con confirmación, para administrador, supervisor de Planificación y directivo del propio establecimiento. La eliminación usa DELETE con CSRF y comprueba en el servidor el establecimiento, el año y el identificador del registro. Los perfiles de consulta conservan acceso de lectura sin botón ni permiso de eliminación.
+
+Se elimina sólo la justificación elegida; no se modifican contratos, asignaciones, reservas ni máximos. Al retirar la última justificación que causaba la exclusión, el docente vuelve a los candidatos de otras funciones si tiene saldo y cumple los requisitos habituales. Si conserva otra justificación del mismo establecimiento y año, el mensaje indica que la exclusión continúa.
+
+Las justificaciones que quedaron fuera de la nómina por cambios de bloque o calidad se muestran en una sección propia, con la misma acción y filtros, para poder retirar también registros antiguos sin saldo visible. No se exige que las horas originales coincidan con el saldo actual para eliminar. `DotacionEliminarJustificacionTest` verifica la solicitud HTTP, la reaparición en el catálogo PAE con contrato 35, asignadas 10 y saldo 25, los permisos, el aislamiento anual y por establecimiento, las justificaciones múltiples/desactualizadas y las vistas de edición/consulta.
+
 ## Archivos principales
 
 - `resources/views/admin/dotacion-establecimiento/show.blade.php` e `index.blade.php`: estructura y navegación.

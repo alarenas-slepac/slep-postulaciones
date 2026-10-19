@@ -87,6 +87,7 @@
 
     <div data-dotacion-revision="sobredotacion">
     @include('admin.dotacion-establecimiento.partials._revision_filtros', ['revisionId' => 'revision-sobredotacion', 'revisionTitulo' => 'Revisar saldos y funciones declaradas'])
+    @include('admin.dotacion-establecimiento.partials._sobredotacion_justificaciones_sin_saldo')
     @include('admin.dotacion-establecimiento.partials._revision_sobrecargas')
     <div class="card dotacion-section mb-4">
         <div class="dotacion-section-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -193,6 +194,7 @@
                                                                                     <button type="submit" class="btn btn-primary rounded-pill px-3"><i class="bi bi-check-circle me-1"></i>Guardar</button>
                                                                                 </div>
                                                                             </form>
+                                                                            @include('admin.dotacion-establecimiento.partials._sobredotacion_eliminar_justificacion')
                                                                         @else
                                                                             <p class="mb-0 text-break">{{ $registro?->justificacion ?? 'El establecimiento aún no registra el fundamento.' }}</p>
                                                                             @if ($registro)<div class="small text-muted mt-2">Actualizada: {{ $registro->updated_at?->format('d-m-Y H:i') }}</div>@endif
