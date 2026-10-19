@@ -22,6 +22,14 @@ Parche `2026.10.5.570`, rama `feat/dotacion-usabilidad-asignacion`.
 
 Las reglas de conversión, prelación, titularidad, límites, reservas, autorización y persistencia continúan en los servicios y controladores existentes. El parche no cambia el contrato del padrón ni requiere migraciones.
 
+## Detalle de etapas pendientes · 2026.10.19.611
+
+Las tarjetas incompletas incluyen **Qué falta para completar** usando exclusivamente el resumen y las necesidades ya calculadas. Identifican cursos con planes pendientes, asignaturas sin docentes asociados, decisiones y funciones sin definir, máximos ausentes o insuficientes y cobertura obligatoria pendiente por bloque. EPJA conserva la posibilidad de asociar asistentes habilitados.
+
+En asignación, los saldos por bloque se expresan en horas de contrato y el detalle del plan en horas aula; no se suman ambas unidades. Las necesidades no normativas o descartadas no se incluyen. Los enlaces al detalle conservan establecimiento y año y aplican los filtros existentes de curso, sección, búsqueda y pendientes. Las listas muestran tres elementos y un desplegable nativo accesible con el resto. Las tarjetas completas no muestran avisos pendientes.
+
+La explicación no cambia las reglas de completitud ni agrega consultas SQL. El detalle disponible de planes identifica los cursos pendientes y el número con libre disposición incompleta; los motivos de cada bloque se revisan en la configuración de planes. Pruebas: `DotacionEtapasPendientesTest` y `DotacionConfiguracionUsabilidadTest`.
+
 ## Archivos principales
 
 - `resources/views/admin/dotacion-establecimiento/show.blade.php` e `index.blade.php`: estructura y navegación.

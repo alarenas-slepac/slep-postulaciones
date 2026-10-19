@@ -30,7 +30,7 @@ class DotacionConfiguracionUsabilidadTest extends IsolatedSecurityTestCase
             $data['activeRole'] = $role;
             $html = view('admin.dotacion-establecimiento.partials._proceso_etapas', $data)->render();
             $xpath = $this->xpath($html);
-            $this->assertSame(6, $xpath->query('//nav//li')->length);
+            $this->assertSame(6, $xpath->query('//nav/ol/li')->length);
             $this->assertSame(1, $xpath->query('//*[@aria-current="step"]')->length);
             $this->assertStringContainsString('Planes de estudio', $xpath->query('//*[@aria-current="step"]')->item(0)->textContent);
             $this->assertSame(2, $xpath->query('//a[contains(@href,"establecimiento-planes")]')->length);

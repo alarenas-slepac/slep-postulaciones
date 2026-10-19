@@ -1,6 +1,7 @@
 @if ($proceso2027['aplica'] ?? false)
     @php
         $pasosNavegacion = collect($proceso2027['pasos'] ?? []);
+        $pendientesEtapas = \App\Support\DotacionEtapasPendientes::porEtapa($proceso2027, $asignacion ?? []);
         $etapaActual = $pasosNavegacion->keys()->first(fn ($key) => ! ($pasosNavegacion[$key]['completo'] ?? false));
         $rolProceso = $activeRole ?? auth()->user()?->activeRoleName();
         $accionesEtapas = [
@@ -35,8 +36,30 @@
                         <div class="fw-semibold mb-2">{{ $paso['label'] }}</div>
                         <span class="badge rounded-pill {{ $paso['completo'] ? 'text-bg-success' : ($etapaActual === $key ? 'text-bg-info' : 'text-bg-light border') }}">{{ $paso['completo'] ? 'Completada' : ($etapaActual === $key ? 'Por completar ahora' : 'Pendiente') }}</span>
                         @if (!empty($paso['detalle']))<p class="small text-muted mt-2 mb-0">{{ $paso['detalle'] }}</p>@endif
+                        @if (!empty($pendientesEtapas[$key]))
+                            <div class="small mt-2 text-break" data-dotacion-etapa-pendientes="{{ $key }}">
+                                <div class="fw-semibold">Qué falta para completar:</div>
+                                <ul class="ps-3 mb-0 mt-1">
+                                    @foreach (array_slice($pendientesEtapas[$key], 0, 3) as $pendiente)
+                                        @include('admin.dotacion-establecimiento.partials._etapa_pendiente')
+                                    @endforeach
+                                </ul>
+                                @if (count($pendientesEtapas[$key]) > 3)
+                                    <details class="mt-2">
+                                        <summary class="fw-semibold">Ver {{ count($pendientesEtapas[$key]) - 3 }} pendiente(s) más<span class="visually-hidden"> de {{ $paso['label'] }}</span></summary>
+                                        <ul class="ps-3 mb-0 mt-1">
+                                            @foreach (array_slice($pendientesEtapas[$key], 3) as $pendiente)
+                                                @include('admin.dotacion-establecimiento.partials._etapa_pendiente')
+                                            @endforeach
+                                        </ul>
+                                    </details>
+                                @endif
+                            </div>
+                        @endif
                         @if (!empty($accionesEtapas[$key]['url']))
                             <a class="d-block small fw-semibold mt-2" data-dotacion-contexto-salida href="{{ $accionesEtapas[$key]['url'] }}">{{ $accionesEtapas[$key]['label'] }}<span class="visually-hidden">: {{ $paso['label'] }}</span></a>
+                        @elseif (!($paso['completo'] ?? false) && !empty($accionesEtapas[$key]['ayuda']))
+                            <p class="small text-muted mt-2 mb-0">{{ $accionesEtapas[$key]['ayuda'] }}</p>
                         @endif
                     </li>
                 @endforeach
