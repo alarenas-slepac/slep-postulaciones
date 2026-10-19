@@ -44,6 +44,16 @@ La etapa de planes 2027 toma las horas requeridas de los bloques activos configu
 
 Se valida cada bloque flexible por separado y se sigue exigiendo un estado enviado, aprobado o cerrado. La cabecera respalda la libre disposición sólo si no existe un bloque activo explícito; un bloque activo de cero horas no hereda otro valor de la cabecera. La consulta no modifica detalles, estados ni planes oficiales. `DotacionProceso2027TpPlanesTest` reproduce ambos grados TP y el caso de 27 cursos con 13 TP completos que aparecían pendientes.
 
+## Libre disposición en cursos combinados · 2026.10.19.615
+
+La combinación conserva las actividades y bloques configurados. Un NT1 y NT2 con el mismo plan de 32 horas comunes y 6 de libre disposición muestran Lenguaje Verbal 6, Corporalidad y Movimiento 2, Inglés 3 y Educación Física 3, junto con los demás núcleos: 38 horas conjuntas, 76 brutas y 38 de reducción. El vínculo curricular de Inglés con Lenguaje Verbal y de Educación Física con Corporalidad se informa sin sumar ambas actividades en una sola fila.
+
+Las claves separan bloque y nombre configurado; cada actividad tiene su modalidad, saldo y asignaciones. La libre disposición NT con JEC conserva la selección libre entre docentes asociados y los controles de contrato, cupo y cobertura. Los núcleos comunes mantienen la prelación. El redondeo contractual no agrega horas al plan.
+
+Las claves curriculares anteriores con asignaciones activas o modalidades explícitas se conservan: no se puede inferir cómo repartir una carga conjunta ya registrada entre núcleo y taller. Esas filas muestran los nombres de sus componentes y mantienen sus horas y acompañamientos. Las reglas conjuntas sin valores manuales no impiden el nuevo desglose. La consulta no escribe ni migra datos históricos.
+
+`DotacionCombinadoPlanConfiguradoTest` reproduce el plan compartido, talleres vinculados al mismo núcleo, nombres iguales en distintos bloques, modalidades independientes, guardado de 3 horas con un especialista a contrata frente a educadoras titulares, límites de cobertura, conservación histórica y vistas de edición/consulta.
+
 ## Archivos principales
 
 - `resources/views/admin/dotacion-establecimiento/show.blade.php` e `index.blade.php`: estructura y navegación.

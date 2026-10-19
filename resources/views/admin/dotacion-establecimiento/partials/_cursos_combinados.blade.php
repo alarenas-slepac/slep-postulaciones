@@ -213,6 +213,7 @@
                                                     <input type="hidden" name="asignaturas[{{ $index }}][key]" value="{{ $subject['curso_combinado_asignatura_key'] }}">
                                                     <input type="hidden" name="asignaturas[{{ $index }}][nombre]" value="{{ $subject['titulo'] }}">
                                                     <div class="fw-semibold">{{ $subject['titulo'] }}</div>
+                                                    @include('admin.dotacion-establecimiento.partials._combinado_desglose', ['subject' => $subject])
                                                     <div class="small text-muted">Brutas {{ $fmt($subject['horas_plan_brutas'] ?? 0) }} · Reducción {{ $fmt($subject['horas_plan_reduccion'] ?? 0) }}</div>
                                                 </td>
                                                 <td class="small">
@@ -269,7 +270,7 @@
                             <thead><tr><th>Asignatura</th><th>Modalidad</th><th class="text-end">Horas aula</th><th class="text-end">Contrato</th><th class="text-end">Saldo</th></tr></thead>
                             <tbody>
                                 @forelse ($subjectRows as $subject)
-                                    <tr><td>{{ $subject['titulo'] }}</td><td>{{ ucfirst($subject['curso_combinado_modalidad'] ?? 'conjunta') }}</td><td class="text-end">{{ $fmt($subject['horas_plan_requeridas'] ?? 0) }}</td><td class="text-end">{{ $fmt($subject['horas_contrato_requeridas'] ?? 0) }}</td><td class="text-end">{{ $fmt($subject['horas_plan_pendientes'] ?? 0) }}</td></tr>
+                                    <tr><td>{{ $subject['titulo'] }} @include('admin.dotacion-establecimiento.partials._combinado_desglose', ['subject' => $subject])</td><td>{{ ucfirst($subject['curso_combinado_modalidad'] ?? 'conjunta') }}</td><td class="text-end">{{ $fmt($subject['horas_plan_requeridas'] ?? 0) }}</td><td class="text-end">{{ $fmt($subject['horas_contrato_requeridas'] ?? 0) }}</td><td class="text-end">{{ $fmt($subject['horas_plan_pendientes'] ?? 0) }}</td></tr>
                                 @empty
                                     <tr><td colspan="5" class="text-center text-muted">Sin asignaturas consolidadas.</td></tr>
                                 @endforelse
