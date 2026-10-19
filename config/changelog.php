@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.15.610',
+    'current_version' => '2026.10.19.611',
     'entries' => [
+        [
+            'version' => '2026.10.19.611',
+            'title' => 'Las etapas de dotación explican qué falta para completarlas',
+            'summary' => 'Muestra los pendientes concretos en cada etapa incompleta del proceso guiado 2027, con acceso a las necesidades de asignación filtradas.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Identifica cursos con planes pendientes, asignaturas sin docentes habilitados, decisiones de combinación y funciones normativas sin definir, y máximos ausentes o insuficientes.',
+                'La asignación obligatoria muestra la cobertura contractual pendiente por bloque y el detalle de necesidades, distinguiendo horas aula y horas de contrato. Sus enlaces conservan establecimiento y año y abren los filtros de curso, sección y asignatura.',
+                'Las listas extensas muestran tres pendientes y permiten desplegar los restantes. Conserva la siguiente etapa, los estados guardados y los permisos de configuración, sin modificar cálculos ni realizar consultas adicionales.',
+                'Añade pruebas aisladas de las seis etapas, estados completos, unidades, permisos, texto escapado, enlaces filtrados y listas extensas.',
+            ],
+            'published_at' => '2026-10-19',
+        ],
         [
             'version' => '2026.10.15.610',
             'title' => 'Evita duplicar el plan común configurado por el establecimiento',
