@@ -6457,8 +6457,29 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.19.614',
+    'current_version' => '2026.10.19.615',
     'entries' => [
+        [
+            'version' => '2026.10.19.615',
+            'title' => 'Libre disposición configurada en NT1 y NT2 combinados',
+            'summary' => 'Muestra Inglés y Educación Física como actividades de libre disposición del grupo combinado, sin absorber sus horas ni sus reglas de asignación en el núcleo común asociado.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'files' => [
+                'app/Support/DotacionCursoCombinadoCalculator.php',
+                'resources/views/admin/dotacion-establecimiento/partials/_cursos_combinados.blade.php',
+                'resources/views/admin/dotacion-establecimiento/partials/_combinado_desglose.blade.php',
+                'tests/Feature/DotacionCombinadoPlanConfiguradoTest.php',
+                'docs/DOTACION_USABILIDAD.md',
+                'config/changelog.php',
+            ],
+            'items' => [
+                'Conserva 32 horas comunes y 6 de libre disposición en el plan compartido NT1/NT2: Lenguaje Verbal 6, Corporalidad y Movimiento 2, Inglés 3 y Educación Física 3, manteniendo 38 horas conjuntas y sin duplicar las horas de cada curso.',
+                'Separa las claves por bloque y nombre configurado para guardar modalidades, coberturas y saldos independientes. La libre disposición con JEC admite al especialista asociado sin aplicar la prelación del núcleo obligatorio; mantiene máximos y disponibilidad individual.',
+                'Preserva claves y totales de asignaciones históricas y modalidades explícitas sin repartir sus horas automáticamente. Informa el desglose de esas filas y conserva acompañamientos. No modifica planes, contratos, configuraciones guardadas ni datos productivos.',
+                'Incluye pruebas aisladas del plan configurado, nombres y talleres, modalidades, persistencia, cobertura excesiva, guardado real con especialista y vistas de edición/consulta. No requiere migraciones ni cambios en recursos compilados.',
+            ],
+            'published_at' => '2026-10-19',
+        ],
         [
             'version' => '2026.10.19.614',
             'title' => 'Planes TP completos sin duplicar las horas del electivo',

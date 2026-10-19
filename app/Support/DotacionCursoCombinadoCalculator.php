@@ -66,8 +66,10 @@ class DotacionCursoCombinadoCalculator
                     (int) $miembro->establecimiento_curso_id => self::courseLabel($miembro->curso),
                 ]);
 
-            foreach ($groupItems->groupBy(fn (array $item) => self::subjectKey($item)) as $subjectKey => $subjectItems) {
+            foreach (self::subjectGroups($groupItems, $rules, $asignaciones, (int) $grupo->id) as $subjectKey => $subjectItems) {
                 $subjectItems = collect($subjectItems)->values();
+                $configuredDetail = str_starts_with($subjectKey, 'ld__') || str_starts_with($subjectKey, 'pc__');
+                $isLibreDisposicion = $subjectItems->every(fn ($item) => ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion');
                 $rule = $rules->get($subjectKey);
                 $courseTotals = $subjectItems
                     ->groupBy(fn (array $item) => (int) ($item['establecimiento_curso_id'] ?? 0))
@@ -101,7 +103,18 @@ class DotacionCursoCombinadoCalculator
                 $assignedContract = round((float) $assigned->sum(
                     fn ($row) => (float) ($row->horas_contrato ?? 0)
                 ), 2);
-                $title = self::subjectName($subjectItems);
+                $title = $configuredDetail
+                    ? trim((string) ($subjectItems->first()['asignatura_nombre'] ?? $subjectItems->first()['titulo']))
+                    : self::subjectName($subjectItems);
+                $detail = self::configuredDetail($subjectItems);
+                $source = 'Necesidad consolidada de cursos combinados';
+                if ($configuredDetail) {
+                    $source .= $isLibreDisposicion ? ' · Libre disposición configurada' : ' · Plan común';
+                } elseif (count($detail) > 1) {
+                    $source .= ' · Desglose del plan: '.collect($detail)->map(fn ($part) =>
+                        $part['nombre'].' ('.$part['bloque'].')'
+                    )->implode(' + ');
+                }
                 $representative = $subjectItems->first();
                 $ruleId = $rule?->id;
                 $planIds = $subjectItems->pluck('plan_estudio_id')->filter()->unique()->values();
@@ -112,7 +125,7 @@ class DotacionCursoCombinadoCalculator
                 $result->push(array_merge($representative, [
                     'key' => $needKey,
                     'tipo_asignacion' => 'plan_estudio',
-                    'subtipo_asignacion' => 'curso_combinado',
+                    'subtipo_asignacion' => $isLibreDisposicion ? 'libre_disposicion' : 'curso_combinado',
                     'titulo' => $title,
                     'curso_label' => $grupo->nombre,
                     'establecimiento_curso_id' => (int) ($courseIds->first() ?? 0),
@@ -134,7 +147,7 @@ class DotacionCursoCombinadoCalculator
                     'asignaciones' => $assigned,
                     'acompanamientos' => $allAssigned->where('tipo_asignacion', 'acompanamiento_parvularia')->values(),
                     'subvencion' => 'General',
-                    'fuente' => 'Necesidad consolidada de cursos combinados',
+                    'fuente' => $source,
                     'proporcion' => $proportion['label'],
                     'proporcion_key' => $proportion['key'],
                     'origen_proporcion' => $proportion['origin'],
@@ -142,7 +155,8 @@ class DotacionCursoCombinadoCalculator
                     'motivo_proporcion' => $proportion['reason'],
                     'curso_combinado' => true,
                     'parvularia_base_contrato' => $baseParvularia,
-                    'curso_combinado_libre_disposicion' => $subjectItems->every(fn ($item) => ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion'),
+                    'curso_combinado_libre_disposicion' => $isLibreDisposicion,
+                    'curso_combinado_desglose' => $detail,
                     'curso_combinado_horas_libre_disposicion' => $libreDisposicion,
                     'curso_combinado_libre_disposicion_nombres' => $subjectItems
                         ->where('subtipo_asignacion', 'libre_disposicion')->pluck('nombre_personalizado')
@@ -470,10 +484,9 @@ class DotacionCursoCombinadoCalculator
             ->squish()
             ->toString();
 
-        // La agrupación debe usar el nombre curricular normalizado y no el ID de
-        // una fila particular. Las asignaturas oficiales y las horas de libre
-        // disposición pueden provenir de tablas distintas y tener IDs diferentes,
-        // aun cuando ambas cubran la misma asignatura del plan común.
+        // Clave curricular histórica independiente de los IDs del catálogo.
+        // subjectGroups conserva esas claves cuando ya tienen cargas o reglas
+        // explícitas, y desglosa las actividades configuradas en los demás casos.
         if ($normalized === '') {
             $normalized = 'ASIGNATURA '.((int) ($item['asignatura_id'] ?? 0));
         }
@@ -481,6 +494,52 @@ class DotacionCursoCombinadoCalculator
         $base = 'nombre_'.Str::slug($normalized, '_');
 
         return Str::limit($base, 105, '').'_'.substr(sha1($normalized), 0, 10);
+    }
+
+    /** Separa la actividad configurada de su vínculo curricular, sin reinterpretar cargas históricas. */
+    private static function subjectGroups(Collection $items, Collection $rules, Collection $assignments, int $groupId): Collection
+    {
+        $groups = collect();
+        $assignedKeys = $assignments->pluck('necesidad_key')->filter()->flip();
+
+        foreach ($items->groupBy(fn (array $item) => self::subjectKey($item)) as $legacyKey => $rows) {
+            $parts = $rows->groupBy(fn (array $item) => self::configuredSubjectKey($item));
+            $rule = $rules->get($legacyKey);
+            $hasHistoricalHours = $assignedKeys->has(self::needKey($groupId, $legacyKey));
+            $hasCustomRule = $rule && ($rule->modalidad !== 'conjunta'
+                || $rule->horas_conjuntas !== null || $rule->horas_personalizadas !== null
+                || collect($rule->horas_exclusivas ?? [])->contains(fn ($value) => (float) $value > 0));
+            $hasConfiguredLibre = $rows->contains(fn (array $item) => ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion'
+                && trim((string) ($item['plan_comun_asociado'] ?? '')) !== '');
+            $wasSeparated = $parts->keys()->contains(fn ($key) => $rules->has($key)
+                || $assignedKeys->has(self::needKey($groupId, $key)));
+
+            // Una carga anterior puede cubrir conjuntamente núcleo y taller.
+            // No se reparte ni se duplica sin información sobre su distribución.
+            $separate = ! $hasHistoricalHours && ! $hasCustomRule
+                && ($parts->count() > 1 || $hasConfiguredLibre || $wasSeparated);
+            foreach (($separate ? $parts : collect([$legacyKey => $rows])) as $key => $part) {
+                $groups->put($key, $groups->get($key, collect())->concat($part)->values());
+            }
+        }
+
+        return $groups;
+    }
+
+    private static function configuredSubjectKey(array $item): string
+    {
+        $prefix = ($item['subtipo_asignacion'] ?? '') === 'libre_disposicion' ? 'ld__' : 'pc__';
+
+        return $prefix.self::subjectKey(array_merge($item, ['plan_comun_asociado' => null]));
+    }
+
+    private static function configuredDetail(Collection $items): array
+    {
+        return $items->groupBy(fn (array $item) => self::configuredSubjectKey($item))
+            ->map(fn (Collection $rows) => [
+                'nombre' => (string) ($rows->first()['asignatura_nombre'] ?? $rows->first()['titulo']),
+                'bloque' => ($rows->first()['subtipo_asignacion'] ?? '') === 'libre_disposicion' ? 'Libre disposición' : 'Plan común',
+            ])->values()->all();
     }
 
     public static function needKey(int $groupId, string $subjectKey): string
