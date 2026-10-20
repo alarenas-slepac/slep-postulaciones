@@ -62,6 +62,16 @@ Se elimina sólo la justificación elegida; no se modifican contratos, asignacio
 
 Las justificaciones que quedaron fuera de la nómina por cambios de bloque o calidad se muestran en una sección propia, con la misma acción y filtros, para poder retirar también registros antiguos sin saldo visible. No se exige que las horas originales coincidan con el saldo actual para eliminar. `DotacionEliminarJustificacionTest` verifica la solicitud HTTP, la reaparición en el catálogo PAE con contrato 35, asignadas 10 y saldo 25, los permisos, el aislamiento anual y por establecimiento, las justificaciones múltiples/desactualizadas y las vistas de edición/consulta.
 
+## Bloques HC y electivo sin duplicados · 2026.10.20.617
+
+En la asignación de 3.º y 4.º Medio HC, el desglose configurado sustituye al bloque oficial correspondiente. Tres materias diferenciadas de seis horas suman 18; Artes de dos horas cubre el electivo. Los totales oficiales de 18 y 2 horas dejan de aparecer como necesidades adicionales cuando existe el desglose de cada bloque. Un plan de 42 horas conserva 42, sin generar otras 20 pendientes.
+
+La equivalencia reconoce los títulos genéricos Humanístico-Científico/Científica y los tipos históricos o importados de esos bloques. Conserva los nombres personalizados y las asignaciones a sus claves. Cuando una materia oficial y una configurada coinciden inequívocamente, ambas claves continúan localizables y sus asignaciones se cuentan una sola vez.
+
+Si un bloque no tiene configuración, se mantiene su necesidad oficial; una configuración incompleta conserva las horas sin desglose pendientes. Los bloques de otras modalidades no se identifican como HC por compartir el tipo genérico `plan_diferenciado`. Una asignación antigua a un total de 18 horas no se distribuye automáticamente entre tres materias: permanece guardada y visible entre las asignaciones sin necesidad vigente para su revisión. La consulta no escribe ni migra datos y mantiene las reglas de redondeo individual y cupo del curso.
+
+`DotacionHcBloquesConfiguradosTest` verifica ambos niveles, importaciones con tipos distintos, asignaciones existentes, bloques sin configuración, faltantes reales y compatibilidad de claves históricas. No se requieren migraciones ni compilación de recursos.
+
 ## Archivos principales
 
 - `resources/views/admin/dotacion-establecimiento/show.blade.php` e `index.blade.php`: estructura y navegación.

@@ -6457,8 +6457,27 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.19.616',
+    'current_version' => '2026.10.20.617',
     'entries' => [
+        [
+            'version' => '2026.10.20.617',
+            'title' => 'Desglose HC y electivo sin duplicar los bloques oficiales',
+            'summary' => 'La asignación de horas de 3.º y 4.º Medio HC conserva las materias configuradas y retira el total genérico sustituido, sin sumar nuevamente las 18 horas diferenciadas ni las 2 del electivo.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'files' => [
+                'app/Support/DotacionPlanConfiguracionResolver.php',
+                'tests/Feature/DotacionHcBloquesConfiguradosTest.php',
+                'docs/DOTACION_USABILIDAD.md',
+                'config/changelog.php',
+            ],
+            'items' => [
+                'Reconoce los nombres genéricos del plan diferenciado Humanístico-Científico/Científica y del plan común de formación general electivo aunque el plan oficial use tipos históricos o importados diferentes a los bloques configurados.',
+                'Muestra las asignaturas personalizadas, como Biología Celular y Molecular, Economía y Sociedad y Artes, con sus horas y asignaciones existentes. Conserva las claves históricas cuando la correspondencia entre materias es inequívoca.',
+                'Mantiene el bloque oficial si todavía no existe desglose para ese bloque y conserva los faltantes reales de una configuración incompleta. No reparte automáticamente asignaciones antiguas de un total entre varias materias ni modifica planes, contratos, máximos o redondeos.',
+                'Incluye pruebas aisladas para ambos niveles, variantes de importación, configuración parcial, bloques independientes y compatibilidad de asignaciones. No requiere migraciones ni recursos compilados.',
+            ],
+            'published_at' => '2026-10-20',
+        ],
         [
             'version' => '2026.10.19.616',
             'title' => 'Eliminar una justificación para volver a seleccionar al docente',
