@@ -73,8 +73,7 @@ class DotacionAsignacionCalculator
             ));
         $totalRequeridas = round($totalRequeridasPlan + (float) $totalRequeridasOtros, 2);
         $totalAsignadas = $asignaciones
-            ->reject(fn ($item) => self::esAsignacionPorAsumir($item)
-                || $item->tipo_asignacion === 'reserva_no_normativa')
+            ->reject(fn ($item) => $item->tipo_asignacion === 'reserva_no_normativa')
             ->sum(fn ($item) => (float) $item->horas_contrato);
         $pendientes = max(0.0, round($totalRequeridas - $totalAsignadas, 2));
         $excedidas = max(0.0, round($totalAsignadas - $totalRequeridas, 2));
@@ -226,6 +225,46 @@ class DotacionAsignacionCalculator
             });
 
         return $asignaciones->concat($asignacionesAutomaticas)->values();
+    }
+
+    /** Contrato provisional separado del padrón y de los candidatos a asignación. */
+    public static function plazasPorAsumir(Establecimiento $establecimiento, int $anio, ?array $bloques = null, ?Collection $asignaciones = null): Collection
+    {
+        if ($asignaciones === null) {
+            if ($bloques === null && (! self::schemaHasTable('dotacion_establecimiento_configuraciones')
+                || ! DB::table('dotacion_establecimiento_configuraciones')
+                    ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
+                    ->where('director_adp', true)->exists())) {
+                return collect();
+            }
+            $bloques ??= DotacionEstablecimientoCalculator::bloquesDotacion($establecimiento, $anio);
+            if (! collect(data_get($bloques, 'directiva.items', []))->contains(
+                fn ($item) => ($item['codigo'] ?? null) === 'director_adp' && (float) ($item['horas'] ?? 0) > 0
+            )) {
+                return collect();
+            }
+            $asignaciones = self::asignacionesConDirectorAdpPorAsumir(
+                $establecimiento, $anio, $bloques, self::assignmentsFor($establecimiento, $anio)
+            );
+        }
+
+        return $asignaciones
+            ->filter(fn ($row) => (bool) data_get($row, 'asignacion_automatica', false)
+                && self::coverageEstamento($row) === 'docente'
+                && data_get($row, 'estado', 'activa') === 'activa')
+            ->unique(fn ($row) => data_get($row, 'dotacion_funcion_regla_id'))
+            ->map(fn ($row) => [
+                'es_plaza_por_asumir' => true,
+                'cupo_bloque' => 'plan_estudio',
+                'anio' => $anio,
+                'nombre' => data_get($row, 'docente_nombre'),
+                'estamento_cobertura' => 'docente',
+                'horas_contrato_base' => (float) data_get($row, 'horas_contrato', 0),
+                'horas_contrato' => (float) data_get($row, 'horas_contrato', 0),
+                'horas_asignadas_total' => (float) data_get($row, 'horas_contrato', 0),
+                'horas_funciones_total' => (float) data_get($row, 'horas_contrato', 0),
+                'asignaciones' => collect([$row]),
+            ])->values();
     }
 
     /**
@@ -480,8 +519,7 @@ class DotacionAsignacionCalculator
     public static function subvencionResumen(Collection $items): Collection
     {
         return $items
-            ->reject(fn ($item) => self::esAsignacionPorAsumir($item)
-                || $item->tipo_asignacion === 'reserva_no_normativa')
+            ->reject(fn ($item) => $item->tipo_asignacion === 'reserva_no_normativa')
             ->groupBy(fn ($item) => $item->subvencion ?: 'Sin clasificar')
             ->map(fn ($rows, $subvencion) => [
                 'subvencion' => $subvencion,
@@ -1518,7 +1556,7 @@ class DotacionAsignacionCalculator
         $estadoRequeridas = $esPlanEstudio ? $horasPlan : $horasContrato;
         $estadoAsignadas = $esPlanEstudio
             ? $assignedPlan
-            : ($plazaAutomaticaDirectorAdp ? 0.0 : $assignedContrato);
+            : $assignedContrato;
 
         return array_merge([
             'key' => $key,
@@ -1544,7 +1582,9 @@ class DotacionAsignacionCalculator
             'horas_contrato_asignadas_calculo' => $estadoAsignadas,
             'horas_plan_pendientes' => $horasPlan !== null ? max(0.0, round($horasPlan - $assignedPlan, 2)) : null,
             'horas_contrato_pendientes' => max(0.0, round($horasContrato - $estadoAsignadas, 2)),
-            'estado' => self::estadoNecesidad($estadoRequeridas, $estadoAsignadas),
+            'estado' => $plazaAutomaticaDirectorAdp
+                ? ['key' => 'cubierta', 'label' => 'Asumido provisionalmente', 'class' => 'text-bg-success']
+                : self::estadoNecesidad($estadoRequeridas, $estadoAsignadas),
             'asignaciones' => $assigned->values(),
             'acompanamientos' => $acompanamientos,
             'asignacion_automatica' => $assigned->contains(
@@ -1607,7 +1647,7 @@ class DotacionAsignacionCalculator
      * Las funciones directivas, técnico-pedagógicas y los planes normativos
      * aportan al cálculo sólo sus horas activamente asignadas, sin exceder las
      * horas disponibles. La plaza automática "por asumir" de Director(a) ADP
-     * mantiene sus 44 horas como una necesidad directiva vigente.
+     * cubre la necesidad con contrato provisional hasta asignar a una persona.
      */
     public static function horasContratoRequeridasParaCalculo(object|array $necesidad): float
     {

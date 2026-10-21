@@ -1,6 +1,7 @@
 @php
     $conciliacionGeneral = \App\Support\DotacionConciliacionGeneral::build(
-        $docentes ?? [], $resumen ?? [], $proceso2027 ?? [], $sobredotacion ?? []
+        collect($asignacion['docentes'] ?? $docentes ?? [])->concat($asignacion['plazas_por_asumir'] ?? []),
+        $resumen ?? [], $proceso2027 ?? [], $sobredotacion ?? []
     );
     $fmtConciliacion = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
     $terminoConciliacion = fn ($value) => ($value < 0 ? '− ' : '+ ').$fmtConciliacion(abs($value));
@@ -30,7 +31,7 @@
                 @endforeach
             </div>
             <p class="mt-3 mb-0"><strong>Cuadratura contractual:</strong> {{ $fmtConciliacion($conciliacionGeneral['contrato']) }} = {{ $fmtConciliacion($conciliacionGeneral['asignadas']) }} asignadas + {{ $fmtConciliacion($conciliacionGeneral['reservadas']) }} reservadas {{ $terminoConciliacion($conciliacionGeneral['saldo_neto']) }} de saldo.</p>
-            <p class="small text-muted mt-1 mb-0">Las asignadas incluyen plan convertido por docente, trabajo colaborativo PIE del bloque general y funciones normativas o declaradas. Las reservas se descuentan una sola vez.</p>
+            <p class="small text-muted mt-1 mb-0">Las asignadas incluyen plan convertido por docente, trabajo colaborativo PIE del bloque general y funciones normativas o declaradas, también cuando las cubre un docente por contratar o una plaza por asumir. El contrato incluye esos cupos; las reservas se descuentan una sola vez.</p>
             @if (abs($conciliacionGeneral['saldo_nomina'] - $conciliacionGeneral['saldo_neto']) > 0.01)
                 <p class="small text-muted mt-2 mb-0">La nómina revisable muestra {{ $fmtConciliacion($conciliacionGeneral['saldo_nomina']) }} h. Puede diferir del saldo neto porque excluye contratos protegidos y no compensa vacantes de un docente con sobreasignaciones de otro.</p>
             @endif

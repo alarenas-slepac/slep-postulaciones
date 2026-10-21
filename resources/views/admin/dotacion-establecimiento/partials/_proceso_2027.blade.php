@@ -158,6 +158,9 @@
                                 <td class="text-end text-primary">{{ $fmtProceso($bloque['contrata_con_redondeo'] ?? $bloque['contrata_asignadas']) }}</td>
                                 <td class="text-end {{ $bloque['sin_padron_asignadas'] > 0.01 ? 'text-warning fw-semibold' : '' }}">{{ $fmtProceso($bloque['sin_padron_asignadas']) }}</td>
                                 <td class="text-end fw-semibold">{{ $fmtProceso($bloque['asignadas_con_redondeo'] ?? $bloque['asignadas']) }}
+                                    @if (($bloque['por_asumir_asignadas'] ?? 0) > 0.01)
+                                        <div class="small text-muted fw-normal">Incluye {{ $fmtProceso($bloque['por_asumir_asignadas']) }} h de plaza por asumir, cubierta provisionalmente hasta asignar a una persona</div>
+                                    @endif
                                     @if (isset($bloque['asignadas_para_maximo']) && abs($bloque['asignadas'] - $bloque['asignadas_para_maximo']) > 0.01)
                                         <div class="small text-muted fw-normal">Asignadas para el máximo: {{ $fmtProceso(max(0, $bloque['asignadas_para_maximo'] - ($bloque['titulares_otras_funciones_global'] ?? 0))) }} h</div>
                                     @endif

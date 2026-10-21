@@ -69,6 +69,7 @@ class DotacionEstablecimientoCalculator
         $bloques = self::bloquesDotacion($establecimiento, $anio);
         $docentes = self::docentes($establecimiento, $anio, false);
         $cupos = app(ContratacionHabilitacionService::class)->docentesVirtuales($establecimiento, $anio, false);
+        $plazasPorAsumir = DotacionAsignacionCalculator::plazasPorAsumir($establecimiento, $anio, $bloques);
 
         return [
             'resumen' => [
@@ -76,7 +77,7 @@ class DotacionEstablecimientoCalculator
                 'cursos_total' => (int) ($cursos['totales']['cursos'] ?? 0),
                 'docentes_total' => $docentes->count(),
                 'horas_plan_total' => (float) ($cursos['totales']['horas'] ?? 0),
-                'horas_contrato_docentes' => round((float) $docentes->concat($cupos)->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0)), 2),
+                'horas_contrato_docentes' => round((float) $docentes->concat($cupos)->concat($plazasPorAsumir)->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0)), 2),
             ],
             'bloques' => $bloques,
         ];
@@ -98,8 +99,10 @@ class DotacionEstablecimientoCalculator
         // Los cupos aportan contrato al año y bloque de creación también en
         // lecturas sin consolidado. La nómina del padrón se conserva separada.
         $docentesVirtuales = app(ContratacionHabilitacionService::class)->docentesVirtuales($establecimiento, $anio);
-        $docentesContrato = $docentes->concat($docentesVirtuales)->values();
-        $asignacion['docentes'] = $docentesContrato;
+        $plazasPorAsumir = DotacionAsignacionCalculator::plazasPorAsumir($establecimiento, $anio, $bloques, $asignacion['asignaciones']);
+        $asignacion['docentes'] = $docentes->concat($docentesVirtuales)->values();
+        $asignacion['plazas_por_asumir'] = $plazasPorAsumir;
+        $docentesContrato = $asignacion['docentes']->concat($plazasPorAsumir)->values();
         $planNeeds = collect(data_get($asignacion, 'necesidades.plan_estudio', []));
         $cursosCombinados = DotacionCursoCombinadoCalculator::summary(
             $establecimiento,
@@ -211,7 +214,7 @@ class DotacionEstablecimientoCalculator
         $horasDotacionFuncionesNormativasDisponibles = (float) ($desgloseHorasDotacion['total_normativas_disponibles'] ?? 0);
         $contratoPlanMasTrabajoColaborativoPie = (float) ($horasContratoPlanAjustadas + ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0));
         $horasCuposPorBloque = collect(ContratacionHabilitacionService::BLOQUES)->mapWithKeys(fn ($bloque) => [
-            $bloque => round((float) $docentesVirtuales->where('cupo_bloque', $bloque)->sum('horas_contrato'), 2),
+            $bloque => round((float) $docentesVirtuales->concat($plazasPorAsumir)->where('cupo_bloque', $bloque)->sum('horas_contrato'), 2),
         ])->all();
         $horasContratoDocentesBase = round((float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0)), 2);
         $horasContratoDocentesExcluidas = $docentes->sum(fn ($docente) => (float) ($docente['horas_excluidas'] ?? 0));
@@ -290,6 +293,7 @@ class DotacionEstablecimientoCalculator
             'horas_contrato_docentes' => $horasContratoDocentes,
             'horas_contrato_docentes_padron' => round((float) $docentes->sum('horas_contrato'), 2),
             'horas_contrato_docentes_por_contratar' => round((float) $docentesVirtuales->sum('horas_contrato'), 2),
+            'horas_contrato_docentes_por_asumir' => round((float) $plazasPorAsumir->sum('horas_contrato'), 2),
             'horas_contrato_por_contratar_por_bloque' => $horasCuposPorBloque,
             'horas_contrato_docentes_aula' => $horasContratoDocentesAula,
             ...$contratoParvularia,

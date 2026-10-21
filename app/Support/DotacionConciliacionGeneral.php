@@ -16,12 +16,14 @@ class DotacionConciliacionGeneral
 
         $plan = $colaborativo = $funciones = $reservadas = 0.0;
         foreach ($docentes as $docente) {
-            if (isset($docente['cupo_contrata_id'])
-                || DotacionAsignacionCalculator::coverageEstamento($docente) !== 'docente') {
+            if (DotacionAsignacionCalculator::coverageEstamento($docente) !== 'docente') {
                 continue;
             }
             $asignaciones = collect($docente['asignaciones'] ?? [])
-                ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row));
+                ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row)
+                    || (! empty($docente['es_plaza_por_asumir'])
+                        && (bool) data_get($row, 'asignacion_automatica', false)
+                        && data_get($row, 'estado', 'activa') === 'activa'));
             $generales = $asignaciones->filter(function ($row) use ($docente, $proceso): bool {
                 $necesidad = data_get($proceso, 'need_blocks.'.data_get($row, 'necesidad_key', ''));
                 $bloque = DotacionProceso2027Calculator::bloqueFuncionPorDocente($row, $docente)

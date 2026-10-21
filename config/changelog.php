@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.21.618',
+    'current_version' => '2026.10.21.619',
     'entries' => [
+        [
+            'version' => '2026.10.21.619',
+            'title' => 'Plaza ADP cubierta y contratada mientras se encuentra por asumir',
+            'summary' => 'Contabiliza la cobertura y el contrato provisional de Director(a) ADP hasta asignar a una persona, conservando el aporte contractual de los cupos por contratar de los tres bloques.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Muestra Asumido provisionalmente, con horas asignadas y saldo cero, para la plaza automática ADP. Sus horas definidas suman al contrato del año y del bloque general, al listado y al proceso guiado.',
+                'Retira el contrato provisional cuando existe una asignación activa para la plaza. Al sustituirla, libera su cobertura del máximo para validar la asignación real sin exigir un segundo cupo. El contrato de la persona se cuenta desde su padrón; no se agrega una segunda jornada ni se ofrece la plaza automática como candidato o como docente que deba justificar sobredotación.',
+                'Mantiene las horas completas de los docentes por contratar en Plan general, Parvularia y PIE desde la creación del cupo, incluso sin asignaciones. La conciliación incorpora sus asignaciones y reservas, además de la cobertura ADP por asumir.',
+                'Añade pruebas aisladas para 2026 y 2027, horas definidas de 22 y 44, aislamiento por establecimiento y año, sustitución y retiro de asignaciones, conteo sin duplicación y presentación en la vista. No requiere migraciones ni altera datos del padrón.',
+            ],
+            'published_at' => '2026-10-21',
+        ],
         [
             'version' => '2026.10.21.618',
             'title' => 'Docentes por contratar en todos los bloques, con o sin sobredotación',

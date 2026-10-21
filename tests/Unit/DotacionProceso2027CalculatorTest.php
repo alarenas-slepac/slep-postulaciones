@@ -723,7 +723,7 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame(0.0, $resumen['bloques']['bloque_1']['pendientes']);
     }
 
-    public function test_no_acredita_la_plaza_automatica_de_director_por_asumir(): void
+    public function test_acredita_plaza_por_asumir_sin_presentarla_como_persona_del_padron(): void
     {
         $porAsumir = [
             'necesidad_key' => 'funcion:director', 'tipo_asignacion' => 'funcion_directiva',
@@ -735,7 +735,7 @@ class DotacionProceso2027CalculatorTest extends TestCase
                 'necesidades' => ['funciones' => [[
                     'key' => 'funcion:director', 'tipo_asignacion' => 'funcion_directiva',
                     'horas_contrato_requeridas' => 44, 'horas_contrato_asignadas' => 44,
-                    'horas_contrato_asignadas_calculo' => 0, 'asignacion_automatica' => true,
+                    'horas_contrato_asignadas_calculo' => 44, 'asignacion_automatica' => true,
                     'asignaciones' => [$porAsumir],
                 ]]],
                 'asignaciones' => [$porAsumir],
@@ -744,9 +744,15 @@ class DotacionProceso2027CalculatorTest extends TestCase
             'cursos_combinados' => ['resumen' => ['grupos_activos' => 0]],
         ]);
 
-        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['asignadas_obligatorias']);
-        $this->assertSame(44.0, $resumen['bloques']['bloque_1']['pendientes']);
-        $this->assertFalse($resumen['pasos']['asignacion']['completo']);
+        $this->assertSame(44.0, $resumen['bloques']['bloque_1']['asignadas_obligatorias']);
+        $this->assertSame(44.0, $resumen['bloques']['bloque_1']['asignadas']);
+        $this->assertSame(44.0, $resumen['bloques']['bloque_1']['contrato_comprometido']);
+        $this->assertSame(44.0, $resumen['bloques']['bloque_1']['por_asumir_asignadas']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['sin_padron_asignadas']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['titulares_asignadas']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['contrata_asignadas']);
+        $this->assertSame(0.0, $resumen['bloques']['bloque_1']['pendientes']);
+        $this->assertTrue($resumen['pasos']['asignacion']['completo']);
     }
 
     public function test_clasifica_titular_y_contrata_desde_el_padron_sin_descontar_dos_veces_las_asignaciones(): void

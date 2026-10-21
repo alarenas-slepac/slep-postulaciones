@@ -89,6 +89,7 @@ class DotacionProceso2027Calculator
             'titulares_asignadas' => 0.0,
             'contrata_asignadas' => 0.0,
             'sin_padron_asignadas' => 0.0,
+            'por_asumir_asignadas' => 0.0,
             'redondeo_parvularia' => 0.0,
             'redondeo_parvularia_titular' => 0.0,
             'redondeo_parvularia_contrata' => 0.0,
@@ -314,6 +315,23 @@ class DotacionProceso2027Calculator
             }
         }
 
+        // Las plazas automáticas cubren su función y comprometen contrato, pero
+        // no son personas del padrón ni acreditan horas titulares o a contrata.
+        foreach (collect(data_get($data, 'asignacion.asignaciones', [])) as $plaza) {
+            if (! (bool) data_get($plaza, 'asignacion_automatica', false)
+                || DotacionAsignacionCalculator::coverageEstamento($plaza) !== 'docente'
+                || data_get($plaza, 'estado', 'activa') !== 'activa') {
+                continue;
+            }
+            $bloque = self::bloqueParaAsignacion($plaza);
+            if ($bloque && isset($bloques[$bloque])) {
+                $horas = max(0.0, (float) data_get($plaza, 'horas_contrato', 0));
+                $bloques[$bloque]['asignadas'] += $horas;
+                $bloques[$bloque]['asignadas_para_maximo'] += $horas;
+                $bloques[$bloque]['por_asumir_asignadas'] += $horas;
+            }
+        }
+
         // Muestra la jornada NT completada por redondeo individual, sin sumar
         // horas ficticias a las asignaciones ni a los topes operativos.
         foreach ($docentes as $docente) {
@@ -424,6 +442,10 @@ class DotacionProceso2027Calculator
             'docentes_subsector' => $docentesSubsector,
             'bloques' => $bloques,
             'need_blocks' => $needBlocks,
+            'plazas_por_asumir' => collect(data_get($data, 'asignacion.asignaciones', []))
+                ->filter(fn ($row) => (bool) data_get($row, 'asignacion_automatica', false)
+                    && DotacionAsignacionCalculator::coverageEstamento($row) === 'docente'
+                    && data_get($row, 'estado', 'activa') === 'activa')->values(),
             'funciones_normativas' => $funcionesNormativas->values(),
             'docentes' => $docentes->values(),
             'pasos' => [
