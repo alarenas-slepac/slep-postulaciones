@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.21.619',
+    'current_version' => '2026.10.21.620',
     'entries' => [
+        [
+            'version' => '2026.10.21.620',
+            'title' => 'Eliminar retiro desde el historial de no renovaciones',
+            'summary' => 'Añade una acción para anular el retiro, reincorporar al docente y retirar sus cupos de reemplazo vacíos conservando el historial.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Ofrece Eliminar retiro en cada no renovación activa del historial, con confirmación de su efecto y sin habilitar la acción para usuarios de solo consulta o registros ya anulados.',
+                'Reincorpora al docente únicamente al establecimiento y año del retiro. Retira todos sus cupos de reemplazo vacíos, incluidas sus asociaciones a asignaturas, sin duplicar contrato ni reactivar asignaciones anteriores.',
+                'Conserva la justificación y el detalle de asignaciones archivadas, e identifica quién y cuándo anuló el retiro. Permite corregir retiros históricos que ya no conservan cupos.',
+                'Impide la anulación si cualquier cupo del reemplazo tiene asignaciones activas. Unifica esta protección con Anular reemplazo, aplica una transacción con bloqueo del establecimiento e incorpora pruebas aisladas de permisos, pertenencia, repetición, reversión y presentación.',
+            ],
+            'published_at' => '2026-10-21',
+        ],
         [
             'version' => '2026.10.21.619',
             'title' => 'Plaza ADP cubierta y contratada mientras se encuentra por asumir',

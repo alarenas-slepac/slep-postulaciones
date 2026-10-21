@@ -12,6 +12,7 @@ use App\Support\DotacionProceso2027Calculator;
 use App\Support\DotacionProfesionDocenteResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class NoRenovacionService
@@ -108,6 +109,43 @@ class NoRenovacionService
             }
 
             return $registro;
+        });
+    }
+
+    public function anular(Establecimiento $establecimiento, int $anio, int $id, ?int $userId): bool
+    {
+        if (! DotacionNoRenovacion::disponible()) {
+            throw ValidationException::withMessages(['habilitacion' => 'Aplique la migración de no renovaciones antes de anular un retiro.']);
+        }
+
+        return DB::transaction(function () use ($establecimiento, $anio, $id, $userId): bool {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            $registro = DotacionNoRenovacion::query()->whereKey($id)
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
+                ->whereNull('anulada_at')->lockForUpdate()->first();
+            if (! $registro) {
+                return false;
+            }
+            $cupos = DB::table('dotacion_contrata_habilitaciones')->where('no_renovacion_id', $registro->id)
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)->lockForUpdate()->get();
+            $ruts = $cupos->map(fn ($row) => DotacionEstablecimientoCalculator::normalizeRut(
+                ContratacionHabilitacionService::rutVirtual((int) $row->id)
+            ));
+            if (Schema::hasTable('dotacion_docente_asignaciones') && DB::table('dotacion_docente_asignaciones')
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
+                ->whereIn('docente_rut_normalizado', $ruts)->where('estado', 'activa')->exists()) {
+                throw ValidationException::withMessages(['habilitacion' => 'Retire las asignaciones de todos los cupos de este reemplazo antes de anular la no renovación.']);
+            }
+            if (Schema::hasTable('dotacion_docente_subsectores')) {
+                DB::table('dotacion_docente_subsectores')->where('establecimiento_id', $establecimiento->id)
+                    ->where('anio', $anio)->whereIn('docente_rut_normalizado', $ruts)->delete();
+            }
+            DB::table('dotacion_contrata_habilitaciones')->whereIn('id', $cupos->pluck('id'))->delete();
+            // Conserva la justificación y las asignaciones archivadas. Liberar
+            // la clave activa reincorpora al docente sin reactivar esas horas.
+            $registro->forceFill(['anulada_at' => now(), 'anulada_by' => $userId, 'clave_activa' => null])->save();
+
+            return true;
         });
     }
 
