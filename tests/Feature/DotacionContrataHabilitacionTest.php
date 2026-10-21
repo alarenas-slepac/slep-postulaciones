@@ -10,43 +10,28 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use Tests\TestCase;
+use Tests\Support\IsolatedSecurityTestCase;
 
-class DotacionContrataHabilitacionTest extends TestCase
+class DotacionContrataHabilitacionTest extends IsolatedSecurityTestCase
 {
-    public function test_habilita_cupos_sin_superar_brecha_ni_44_horas_y_permite_retirarlos(): void
+    public function test_habilita_cupos_sin_limite_de_brecha_y_conserva_maximo_individual_y_retiro(): void
     {
         $this->createTables();
 
         try {
             $establecimiento = Establecimiento::query()->create(['nombre_establecimiento' => 'Escuela de prueba']);
             $otro = Establecimiento::query()->create(['nombre_establecimiento' => 'Otra escuela']);
-            $service = new class extends ContratacionHabilitacionService
-            {
-                protected function resumen(Establecimiento $establecimiento, int $anio): array
-                {
-                    return [
-                        'contrato_educacion_parvularia_mas_trabajo_colaborativo_pie' => 116,
-                        'horas_contrato_docentes_parvularia' => 86,
-                        'horas_contrato_pie_necesarias' => 224,
-                        'horas_contrato_docente_pie' => 180,
-                    ];
-                }
-            };
+            $service = new ContratacionHabilitacionService;
 
             $service->habilitar($establecimiento, 2027, 'parvularia', 2, 15, 7);
             $this->assertSame(2, DB::table('dotacion_contrata_habilitaciones')->where('bloque', 'parvularia')->count());
             $this->assertSame(30.0, (float) DB::table('dotacion_contrata_habilitaciones')->where('bloque', 'parvularia')->sum('horas'));
 
-            try {
-                $service->habilitar($establecimiento, 2027, 'parvularia', 1, 0.01, 7);
-                $this->fail('No se debe superar la brecha de Parvularia.');
-            } catch (ValidationException $exception) {
-                $this->assertArrayHasKey('horas', $exception->errors());
-            }
+            $service->habilitar($establecimiento, 2027, 'parvularia', 1, 0.01, 7);
+            $this->assertSame(30.01, (float) DB::table('dotacion_contrata_habilitaciones')->where('bloque', 'parvularia')->sum('horas'));
 
             $service->habilitar($establecimiento, 2027, 'pie', 1, 44, 7);
-            $this->assertSame(3, DB::table('dotacion_contrata_habilitaciones')->count());
+            $this->assertSame(4, DB::table('dotacion_contrata_habilitaciones')->count());
             $this->assertSame(44.0, (float) DB::table('dotacion_contrata_habilitaciones')->where('bloque', 'pie')->value('horas'));
 
             try {
@@ -60,14 +45,14 @@ class DotacionContrataHabilitacionTest extends TestCase
             $this->assertFalse($service->revocar($otro, 2027, $id));
             $this->assertFalse($service->revocar($establecimiento, 2026, $id));
             $this->assertTrue($service->revocar($establecimiento, 2027, $id));
-            $this->assertSame(2, DB::table('dotacion_contrata_habilitaciones')->count());
+            $this->assertSame(3, DB::table('dotacion_contrata_habilitaciones')->count());
         } finally {
             Schema::dropIfExists('dotacion_contrata_habilitaciones');
             Schema::dropIfExists('establecimientos');
         }
     }
 
-    public function test_no_habilita_cupos_en_bloque_con_sobredotacion(): void
+    public function test_crea_en_los_tres_bloques_sin_consultar_brecha_y_sin_modificar_otros_anos(): void
     {
         $this->createTables();
 
@@ -77,7 +62,7 @@ class DotacionContrataHabilitacionTest extends TestCase
             {
                 protected function resumen(Establecimiento $establecimiento, int $anio): array
                 {
-                    return ['horas_contrato_pie_necesarias' => 224, 'horas_contrato_docente_pie' => 251];
+                    throw new \LogicException('Crear un cupo no debe exigir un cálculo de brecha.');
                 }
             };
 
@@ -86,15 +71,19 @@ class DotacionContrataHabilitacionTest extends TestCase
                 'horas_contrato_docente_pie' => 251,
             ], 'pie'));
 
-            $this->expectException(ValidationException::class);
-            $service->habilitar($establecimiento, 2027, 'pie', 1, 27, 7);
+            foreach (ContratacionHabilitacionService::BLOQUES as $bloque) {
+                $service->habilitar($establecimiento, 2027, $bloque, 2, 44, 7);
+            }
+            $this->assertSame(6, DB::table('dotacion_contrata_habilitaciones')->where('anio', 2027)->count());
+            $this->assertSame(264.0, (float) DB::table('dotacion_contrata_habilitaciones')->sum('horas'));
+            $this->assertSame(0, DB::table('dotacion_contrata_habilitaciones')->where('anio', 2026)->count());
         } finally {
             Schema::dropIfExists('dotacion_contrata_habilitaciones');
             Schema::dropIfExists('establecimientos');
         }
     }
 
-    public function test_la_interfaz_ofrece_habilitar_solo_con_brecha_y_rol_autorizado(): void
+    public function test_la_interfaz_ofrece_todos_los_bloques_con_o_sin_sobredotacion_solo_a_roles_autorizados(): void
     {
         $vars = [
             'establecimiento' => new Establecimiento(['nombre_establecimiento' => 'Escuela de prueba']),
@@ -110,8 +99,12 @@ class DotacionContrataHabilitacionTest extends TestCase
 
         $html = \Illuminate\Support\Facades\Blade::render("@include('admin.dotacion-establecimiento.partials._contrata_habilitaciones')", $vars);
         $this->assertStringContainsString('value="parvularia"', $html);
-        $this->assertStringNotContainsString('value="pie"', $html);
-        $this->assertStringContainsString('max="30"', $html);
+        $this->assertStringContainsString('value="pie"', $html);
+        $this->assertStringContainsString('value="plan_estudio"', $html);
+        $this->assertSame(3, substr_count($html, 'name="cantidad"'));
+        $this->assertSame(3, substr_count($html, 'max="44"'));
+        $this->assertStringContainsString('con o sin sobredotación', $html);
+        $this->assertStringContainsString('para 2027, desde su creación', $html);
 
         $htmlSoloLectura = \Illuminate\Support\Facades\Blade::render("@include('admin.dotacion-establecimiento.partials._contrata_habilitaciones')", [
             ...$vars,
@@ -134,6 +127,27 @@ class DotacionContrataHabilitacionTest extends TestCase
         $this->expectException(HttpException::class);
         app(\App\Http\Controllers\Admin\DotacionContrataHabilitacionController::class)
             ->store($request, new Establecimiento, app(ContratacionHabilitacionService::class));
+    }
+
+    public function test_rechaza_anos_bloques_cantidades_y_horas_invalidas_sin_crear_cupos(): void
+    {
+        $this->createTables();
+        $ee = Establecimiento::create(['nombre_establecimiento' => 'Escuela sintética']);
+        $service = new ContratacionHabilitacionService;
+        foreach ([
+            [2019, 'pie', 1, 44, 'anio'], [2101, 'pie', 1, 44, 'anio'],
+            [2027, 'inexistente', 1, 44, 'bloque'], [2027, 'pie', 0, 44, 'horas'],
+            [2027, 'pie', 101, 44, 'horas'], [2027, 'pie', 1, 0, 'horas'],
+            [2027, 'pie', 1, 44.01, 'horas'],
+        ] as [$anio, $bloque, $cantidad, $horas, $campo]) {
+            try {
+                $service->habilitar($ee, $anio, $bloque, $cantidad, $horas, null);
+                $this->fail('Los datos inválidos deben rechazarse.');
+            } catch (ValidationException $error) {
+                $this->assertArrayHasKey($campo, $error->errors());
+            }
+        }
+        $this->assertSame(0, DB::table('dotacion_contrata_habilitaciones')->count());
     }
 
     private function createTables(): void

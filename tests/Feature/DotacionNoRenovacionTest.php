@@ -315,7 +315,7 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
             $this->assertStringContainsString('value="'.$bloque.'"', $html);
         }
         $this->assertSame(3, substr_count($html, 'name="justificacion"'));
-        $this->assertSame(0, substr_count($html, 'name="cantidad"'));
+        $this->assertSame(3, substr_count($html, 'name="cantidad"'));
         $this->assertStringContainsString('sin asignaciones ni asociaciones', $html);
         $soloLectura = Blade::render("@include('admin.dotacion-establecimiento.partials._contrata_habilitaciones')", [...$vars, 'canManageContrataHabilitaciones' => false]);
         $this->assertStringNotContainsString('name="justificacion"', $soloLectura);

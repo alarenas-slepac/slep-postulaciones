@@ -48,6 +48,11 @@ class DotacionSobredotacionCalculator
 
         $declaradasObjetivo = self::numero($resumen, 'horas_dotacion_funciones_declaradas');
         $aulaObjetivo = self::numero($resumen, 'horas_contrato_docentes_aula');
+        // Los cupos ya suman al contrato anual, pero todavía no son personas
+        // del padrón a quienes solicitar una no renovación o una supresión.
+        $cupos = (array) ($resumen['horas_contrato_por_contratar_por_bloque'] ?? []);
+        $aulaObjetivo = max(0.0, round($aulaObjetivo - (float) ($cupos['plan_estudio'] ?? 0)
+            - (float) ($cupos['parvularia'] ?? 0), 2));
         $necesidadAula = round(
             self::numero($resumen, 'contrato_plan_mas_trabajo_colaborativo_pie')
             + self::numero($resumen, 'horas_dotacion_funciones_normativas'),
@@ -55,7 +60,7 @@ class DotacionSobredotacionCalculator
         );
 
         $pie = self::itemsPie($base);
-        $pieObjetivo = self::numero($resumen, 'horas_contrato_docente_pie');
+        $pieObjetivo = max(0.0, round(self::numero($resumen, 'horas_contrato_docente_pie') - (float) ($cupos['pie'] ?? 0), 2));
         $pie = self::conciliarDotacion($pie, $pieObjetivo, 'Horas de contrato docente PIE no asociadas a docente');
         $necesidadPie = self::numero($resumen, 'horas_contrato_pie_necesarias');
 

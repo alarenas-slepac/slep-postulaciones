@@ -63,4 +63,25 @@ class DotacionContratoVigentePorBloqueTest extends TestCase
         $this->assertSame(0.0, $resultado['contrato_vigente_bloque_3']);
         $this->assertSame('Sin contratos docentes vigentes', $resultado['periodo_contractual']);
     }
+
+    public function test_cupos_suman_una_vez_en_su_bloque_explicito_aunque_conserven_otro_titulo(): void
+    {
+        $virtual = fn (int $id, string $bloque, float $horas): array => [
+            ...$this->docente('VACANTE_'.$id, 'Pedagogía en Educación Diferencial', $horas),
+            'cupo_contrata_id' => $id, 'cupo_bloque' => $bloque, 'mes' => 0,
+        ];
+        $docentes = collect([
+            $this->docente('99000001K', 'Pedagogía en Educación Básica', 44),
+            $virtual(1, 'plan_estudio', 6), $virtual(2, 'parvularia', 12), $virtual(3, 'pie', 38),
+        ]);
+        $asignaciones = collect([['docente_rut_normalizado' => 'VACANTE_3', 'tipo_asignacion' => 'pie_educadora_diferencial', 'horas_contrato' => 10]]);
+        foreach ([false, true] as $especial) {
+            $resultado = (new DotacionContratoVigentePorBloque)->desdeDocentes($docentes, $asignaciones, $especial);
+            $this->assertSame(50.0, $resultado['contrato_vigente_bloque_1']);
+            $this->assertSame(12.0, $resultado['contrato_vigente_bloque_2']);
+            $this->assertSame(38.0, $resultado['contrato_vigente_bloque_3']);
+            $this->assertSame(100.0, array_sum(array_filter($resultado, 'is_float')));
+            $this->assertSame('08/2026 · Cupos por contratar 2026', $resultado['periodo_contractual']);
+        }
+    }
 }

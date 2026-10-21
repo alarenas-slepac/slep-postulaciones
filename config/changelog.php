@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.20.617',
+    'current_version' => '2026.10.21.618',
     'entries' => [
+        [
+            'version' => '2026.10.21.618',
+            'title' => 'Docentes por contratar en todos los bloques, con o sin sobredotación',
+            'summary' => 'Permite crear cupos sin exigir brecha de contratación e incorpora sus horas al contrato del establecimiento en el año seleccionado.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Ofrece crear docentes por contratar en Plan general, Educación Parvularia y PIE especializado aunque el bloque no tenga necesidad de contratación o presente sobredotación. Mantiene entre 1 y 100 docentes por operación y de 0,01 a 44 horas por docente.',
+                'Suma el contrato completo de cada cupo desde su creación, con independencia de sus asignaciones, al año y bloque registrados. Mantiene la misma base en el listado, detalle, resumen sin consolidado y referencia contractual por bloque.',
+                'Respeta el bloque explícito de los cupos que conservan el título del docente reemplazado. El contrato retirado por no renovación no se cuenta dos veces; anular el reemplazo restituye la nómina sin duplicar jornadas.',
+                'Distingue las horas del padrón y de docentes por contratar en los datos del resumen. Los cupos no generan personas ficticias en la nómina que requiere justificación de no renovación o supresión.',
+                'Conserva los roles autorizados y las validaciones de asignación, perfiles y máximos del bloque. Retirar un cupo vacío descuenta su contrato del año; los cupos con asignaciones permanecen protegidos. No requiere migraciones ni modifica el padrón histórico.',
+            ],
+            'published_at' => '2026-10-21',
+        ],
         [
             'version' => '2026.10.20.617',
             'title' => 'Desglose HC y electivo sin duplicar los bloques oficiales',
