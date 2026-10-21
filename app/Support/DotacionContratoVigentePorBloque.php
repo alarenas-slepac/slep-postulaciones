@@ -18,7 +18,8 @@ class DotacionContratoVigentePorBloque
             ->values();
         $asignaciones = $docentes->isEmpty() ? collect() : DotacionAsignacionCalculator::assignmentsFor($establecimiento, $anio);
         $docentes = $docentes->concat(app(ContratacionHabilitacionService::class)
-            ->docentesVirtuales($establecimiento, $anio, false))->values();
+            ->docentesVirtuales($establecimiento, $anio, false))
+            ->concat(DotacionAsignacionCalculator::plazasPorAsumir($establecimiento, $anio))->values();
 
         return $this->desdeDocentes($docentes, $asignaciones, (bool) $establecimiento->especial);
     }
@@ -27,8 +28,9 @@ class DotacionContratoVigentePorBloque
     {
         // El bloque explícito del cupo prevalece sobre su título: un reemplazo
         // puede conservar el título diferencial y tener horas en Plan general.
-        $cupos = $docentes->filter(fn (array $docente) => ! empty($docente['cupo_contrata_id']));
-        $docentes = $docentes->reject(fn (array $docente) => ! empty($docente['cupo_contrata_id']));
+        $esCupo = fn (array $docente) => ! empty($docente['cupo_contrata_id']) || ! empty($docente['es_plaza_por_asumir']);
+        $cupos = $docentes->filter($esCupo);
+        $docentes = $docentes->reject($esCupo);
         $horasCupos = fn (string $bloque): float => round((float) $cupos->where('cupo_bloque', $bloque)->sum('horas_contrato'), 2);
         $contratoTotal = (float) $docentes->sum(fn (array $docente) => (float) ($docente['horas_contrato'] ?? 0));
         $pie = (float) DotacionAsignacionCalculator::resumenContratoDocentePie($asignaciones, $docentes, $especial)['total'];
@@ -39,9 +41,13 @@ class DotacionContratoVigentePorBloque
             ->unique(fn (array $periodo) => $periodo['anio'] * 100 + $periodo['mes'])
             ->sortByDesc(fn (array $periodo) => $periodo['anio'] * 100 + $periodo['mes'])
             ->map(fn (array $periodo) => sprintf('%02d/%d', $periodo['mes'], $periodo['anio']))->implode(', ');
-        $aniosCupos = $cupos->pluck('anio')->filter()->unique()->sort()->implode(', ');
+        $aniosCupos = $cupos->filter(fn ($docente) => ! empty($docente['cupo_contrata_id']))->pluck('anio')->filter()->unique()->sort()->implode(', ');
         if ($aniosCupos !== '') {
             $periodos = ($periodos !== '' ? $periodos.' · ' : '').'Cupos por contratar '.$aniosCupos;
+        }
+        $aniosPorAsumir = $cupos->where('es_plaza_por_asumir', true)->pluck('anio')->filter()->unique()->sort()->implode(', ');
+        if ($aniosPorAsumir !== '') {
+            $periodos = ($periodos !== '' ? $periodos.' · ' : '').'Plazas por asumir '.$aniosPorAsumir;
         }
 
         return [

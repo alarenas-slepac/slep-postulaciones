@@ -8,7 +8,9 @@ use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Services\Dotacion\NoRenovacionService;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionContratoVigentePorBloque;
+use App\Support\DotacionConciliacionGeneral;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionProceso2027Calculator;
 use App\Support\DotacionSobredotacionCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -165,6 +167,168 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         $service->revocar($this->ee, 2027, $cupo->id);
         $this->assertSame($antes, DotacionEstablecimientoCalculator::build($this->ee, 2027)['resumen']['horas_contrato_docentes']);
         $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+    }
+
+    public static function plazasAdp(): array
+    {
+        return [[2026, 44.0], [2027, 44.0], [2026, 22.0], [2027, 22.0]];
+    }
+
+    #[DataProvider('plazasAdp')]
+    public function test_adp_cubre_y_suma_contrato_hasta_asignar_persona_sin_duplicar_cupos(int $anio, float $horas): void
+    {
+        $regla = DB::table('dotacion_funciones_reglas')->insertGetId([
+            'codigo' => 'director_adp', 'categoria' => 'directiva', 'nombre' => 'Director(a) ADP',
+            'tipo_regla' => 'director_adp', 'horas_fijas' => $horas, 'vigente' => true,
+        ]);
+        DB::table('dotacion_establecimiento_configuraciones')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => $anio, 'director_adp' => true,
+        ]);
+        foreach (ContratacionHabilitacionService::BLOQUES as $bloque) {
+            app(ContratacionHabilitacionService::class)->habilitar($this->ee, $anio, $bloque, 1, 10, null);
+        }
+        $data = DotacionEstablecimientoCalculator::build($this->ee, $anio);
+        $necesidad = $data['asignacion']['necesidades']['funciones']->firstWhere('codigo', 'director_adp');
+        $this->assertSame('Asumido provisionalmente', $necesidad['estado']['label']);
+        $this->assertSame(0.0, $necesidad['horas_contrato_pendientes']);
+        $this->assertSame($horas, $necesidad['horas_contrato_asignadas_calculo']);
+        $this->assertSame(74.0 + $horas, $data['resumen']['horas_contrato_docentes']);
+        $this->assertSame(54.0 + $horas, $data['resumen']['horas_contrato_docentes_aula_general']);
+        $this->assertSame($horas, $data['resumen']['horas_contrato_docentes_por_asumir']);
+        $this->assertSame(30.0, $data['resumen']['horas_contrato_docentes_por_contratar']);
+        $this->assertSame($horas, $data['resumen']['horas_contrato_calculado']);
+        $this->assertCount(1, $data['docentes']);
+        $this->assertCount(4, $data['asignacion']['docentes']); // No ofrece la plaza automática como persona.
+        $this->assertCount(1, $data['asignacion']['plazas_por_asumir']);
+        $this->assertSame($data['resumen'], DotacionEstablecimientoCalculator::build($this->ee, $anio, false)['resumen']);
+        $this->assertSame(74.0 + $horas, DotacionEstablecimientoCalculator::resumenListado($this->ee, $anio)['resumen']['horas_contrato_docentes']);
+        $referencia = (new DotacionContratoVigentePorBloque)->paraEstablecimiento($this->ee, $anio);
+        $this->assertSame(($anio === 2026 ? 44.0 : 0.0) + 30.0 + $horas, array_sum(array_filter($referencia, 'is_float')));
+        $this->assertSame(44.0, DotacionEstablecimientoCalculator::build($this->ee, $anio === 2026 ? 2027 : 2026)['resumen']['horas_contrato_docentes']);
+        $otra = Establecimiento::create(['rbd' => 99998, 'cod_estab' => 'OTHER', 'nombre_establecimiento' => 'Otra escuela sintética']);
+        $this->assertEmpty(DotacionAsignacionCalculator::plazasPorAsumir($otra, $anio));
+
+        $proceso = DotacionProceso2027Calculator::resumen($this->ee, 2027, $data);
+        $this->assertSame($horas, $proceso['bloques']['bloque_1']['asignadas']);
+        $this->assertSame($horas, $proceso['bloques']['bloque_1']['asignadas_obligatorias']);
+        $this->assertSame(0.0, $proceso['bloques']['bloque_1']['pendientes']);
+        $this->assertSame(0.0, $proceso['bloques']['bloque_1']['sin_padron_asignadas']);
+        $sobredotacion = DotacionSobredotacionCalculator::build($data['docentes'], $data['resumen']);
+        $this->assertFalse($sobredotacion['aula']['resumen']['tiene_ajuste_no_asociado']);
+        $conciliacion = DotacionConciliacionGeneral::build(
+            $data['asignacion']['docentes']->concat($data['asignacion']['plazas_por_asumir']),
+            $data['resumen'], $proceso, $sobredotacion
+        );
+        $this->assertSame($horas, $conciliacion['asignadas']);
+        $this->assertSame(54.0, $conciliacion['saldo_neto']);
+        $html = view('admin.dotacion-establecimiento.partials._asignacion', [
+            ...$data, 'establecimiento' => $this->ee, 'anio' => $anio,
+            'errors' => new \Illuminate\Support\ViewErrorBag,
+        ])->render();
+        $this->assertStringContainsString('Asumido provisionalmente', $html);
+        $this->assertStringContainsString('cuentan como asignadas y contratadas', $html);
+        $this->assertStringContainsString('Asignar docente directivo', $html);
+
+        $asignacion = DotacionDocenteAsignacion::create([
+            'establecimiento_id' => $this->ee->id, 'anio' => $anio, 'docente_rut' => '99000001-K',
+            'docente_rut_normalizado' => '99000001K', 'docente_nombre' => 'Docente sintético',
+            'tipo_asignacion' => 'funcion_directiva', 'subtipo_asignacion' => 'directiva',
+            'dotacion_funcion_regla_id' => $regla, 'horas_contrato' => $horas, 'estado' => 'activa',
+        ]);
+        $real = DotacionEstablecimientoCalculator::build($this->ee, $anio);
+        $this->assertEmpty($real['asignacion']['plazas_por_asumir']);
+        $this->assertSame(74.0, $real['resumen']['horas_contrato_docentes']);
+        $this->assertSame(30.0, $real['resumen']['horas_contrato_docentes_por_contratar']);
+        $this->assertSame($horas, $real['resumen']['horas_contrato_calculado']);
+        $this->assertSame(74.0, DotacionEstablecimientoCalculator::resumenListado($this->ee, $anio)['resumen']['horas_contrato_docentes']);
+        $this->assertFalse($real['asignacion']['necesidades']['funciones']->firstWhere('codigo', 'director_adp')['asignacion_automatica']);
+        $asignacion->update(['estado' => 'inactiva']);
+        $this->assertSame(74.0 + $horas, DotacionEstablecimientoCalculator::build($this->ee, $anio)['resumen']['horas_contrato_docentes']);
+    }
+
+    public static function jornadasAdp(): array
+    {
+        return [[44.0], [22.0]];
+    }
+
+    #[DataProvider('jornadasAdp')]
+    public function test_sustituye_adp_por_http_con_tope_justo_sin_exigir_un_segundo_cupo(float $horas): void
+    {
+        $this->withoutExceptionHandling([ValidationException::class]);
+        Schema::table('dotacion_docente_asignaciones', function (Blueprint $table): void {
+            $table->string('estamento_cobertura')->default('docente');
+            $table->integer('dotacion_curso_combinado_id')->nullable();
+            $table->integer('dotacion_curso_combinado_asignatura_id')->nullable();
+            $table->text('excepcion_prelacion')->nullable();
+        });
+        Schema::create('dotacion_proceso_2027_configuraciones', function (Blueprint $table): void {
+            $table->id();
+            $table->integer('establecimiento_id');
+            $table->integer('anio');
+            $table->string('decision_combinacion');
+            foreach ([1, 2, 3] as $bloque) {
+                $table->decimal('max_horas_bloque_'.$bloque, 8, 2)->nullable();
+            }
+            $table->json('funciones_normativas')->nullable();
+        });
+        DB::table('dotacion_funciones_reglas')->update(['vigente' => false]);
+        $regla = DB::table('dotacion_funciones_reglas')->insertGetId([
+            'codigo' => 'director_adp', 'categoria' => 'directiva', 'nombre' => 'Director(a) ADP',
+            'tipo_regla' => 'director_adp', 'horas_fijas' => 44, 'vigente' => true,
+        ]);
+        DB::table('dotacion_establecimiento_configuraciones')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'director_adp' => true,
+        ]);
+        $curso = DB::table('cursos')->where('codigo', '1B')->value('id');
+        $plan = DB::table('planes_estudio')->insertGetId([
+            'curso_id' => $curso, 'anio' => 2027, 'nombre_plan' => 'Plan sintético mínimo',
+            'regimen_jec' => 'sin_jec', 'horas_semanales_total' => 1,
+        ]);
+        DB::table('establecimiento_cursos')->insert([
+            'establecimiento_id' => $this->ee->id, 'curso_id' => $curso, 'plan_estudio_id' => $plan,
+            'anio' => 2027, 'nombre_seccion' => '1° Básico A', 'matricula' => 1, 'regimen_jec' => 'sin_jec',
+        ]);
+        DB::table('dotacion_proceso_2027_configuraciones')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'decision_combinacion' => 'sin_combinacion',
+            'funciones_normativas' => json_encode(['_horas' => ['director_adp' => $horas]]),
+        ]);
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $proceso = DotacionProceso2027Calculator::resumen($this->ee, 2027, $data);
+        (require database_path('migrations/2026_09_29_130000_create_dotacion_docente_subsectores_table.php'))->up();
+        foreach ($proceso['docentes_subsector']['asignaturas'] as $asignatura) {
+            DB::table('dotacion_docente_subsectores')->insert([
+                'establecimiento_id' => $this->ee->id, 'anio' => 2027,
+                'asignatura_key' => $asignatura['key'], 'asignatura_nombre' => $asignatura['nombre'],
+                'nivel' => $asignatura['nivel'], 'docente_rut_normalizado' => '99000001K',
+            ]);
+        }
+        DB::table('dotacion_proceso_2027_configuraciones')->update([
+            'max_horas_bloque_1' => $proceso['bloques']['bloque_1']['requeridas'],
+            'max_horas_bloque_2' => 0, 'max_horas_bloque_3' => 0,
+        ]);
+        $preparado = DotacionProceso2027Calculator::resumen($this->ee, 2027);
+        $this->assertTrue($preparado['asignacion_habilitada'], json_encode($preparado['pasos']));
+        $htmlProceso = view('admin.dotacion-establecimiento.partials._proceso_2027', [
+            ...$data, 'establecimiento' => $this->ee, 'anio' => 2027, 'proceso2027' => $preparado,
+        ])->render();
+        $this->assertStringContainsString('Incluye '.(int) $horas.' h de plaza por asumir, cubierta provisionalmente', $htmlProceso);
+        $user = $this->testUser(1, 3);
+        $this->actingAs($user)->withSession(['active_role' => 'admin']);
+        $url = route('admin.dotacion-establecimiento.asignaciones.store', $this->ee);
+        $payload = [
+            'anio' => 2027, 'docente_rut' => '99000001-K', 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => 'funcion_directiva', 'subtipo_asignacion' => 'directiva',
+            'dotacion_funcion_regla_id' => $regla, 'horas_contrato' => $horas,
+            'necesidad_key' => $data['asignacion']['necesidades']['funciones']->firstWhere('codigo', 'director_adp')['key'],
+        ];
+        $this->post($url, $payload)->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertSame(1, DB::table('dotacion_docente_asignaciones')->count());
+        $final = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $this->assertSame(44.0, $final['resumen']['horas_contrato_docentes']);
+        $this->assertSame($horas, $final['resumen']['horas_contrato_calculado']);
+        $this->assertEmpty($final['asignacion']['plazas_por_asumir']);
+        $this->post($url, $payload)->assertRedirect()->assertSessionHasErrors('horas_contrato');
+        $this->assertSame(1, DB::table('dotacion_docente_asignaciones')->count());
     }
 
     public static function roles(): array

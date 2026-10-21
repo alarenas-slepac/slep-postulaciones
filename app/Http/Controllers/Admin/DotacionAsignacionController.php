@@ -1216,6 +1216,16 @@ class DotacionAsignacionController extends Controller
         $asignadas = (float) ($bloqueProceso['asignadas'] ?? 0);
         $asignadasMaximo = max(0.0, (float) ($bloqueProceso['asignadas_para_maximo']
             ?? ($asignadas - (float) ($bloqueProceso['asignadas_acompanamiento'] ?? 0))));
+        // Sustituir la plaza automática no agrega una segunda cobertura al
+        // bloque. Se libera únicamente la plaza de la misma regla normativa.
+        if (($payload['tipo_asignacion'] ?? '') === 'funcion_directiva'
+            && (int) ($payload['dotacion_funcion_regla_id'] ?? 0) > 0) {
+            $horasPorAsumir = (float) collect($proceso['plazas_por_asumir'] ?? [])
+                ->filter(fn ($plaza) => (int) data_get($plaza, 'dotacion_funcion_regla_id') === (int) $payload['dotacion_funcion_regla_id']
+                    && DotacionProceso2027Calculator::bloqueParaAsignacion($plaza) === $bloque)
+                ->sum('horas_contrato');
+            $asignadasMaximo = max(0.0, $asignadasMaximo - $horasPorAsumir);
+        }
         $noNormativas = (float) ($bloqueProceso['asignadas_no_normativas'] ?? 0);
         $esNoNormativa = (int) ($payload['dotacion_funcion_id'] ?? 0) > 0
             || (string) ($payload['tipo_asignacion'] ?? '') === 'otra_funcion';

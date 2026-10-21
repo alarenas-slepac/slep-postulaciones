@@ -689,10 +689,10 @@
                                 <td role="cell" data-label="Estado"><span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Pendiente' }}</span></td>
                                 <td role="cell" data-label="Acción">
                                     @if ($asignacionAutomatica)
-                                        <div class="alert alert-primary small mb-0">
-                                            <div class="fw-semibold">Asignación automática</div>
+                                        <div class="alert alert-info rounded-4 small mb-0" role="note">
+                                            <div class="fw-semibold">Plaza cubierta provisionalmente</div>
                                             <div>Docente Directivo por asumir · {{ $fmt($item['horas_contrato_asignadas'] ?? 0) }} hrs contrato.</div>
-                                            <div class="mt-1">La plaza activa {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas definidas como necesidad hasta asignar al docente directivo.</div>
+                                            <div class="mt-1">Estas {{ $fmt($item['horas_contrato_requeridas'] ?? 44) }} horas cuentan como asignadas y contratadas por el establecimiento. Al asignar a una persona se retira automáticamente la plaza provisional, sin duplicar horas.</div>
                                         </div>
                                         @component('admin.dotacion-establecimiento.partials._asignacion_editor', ['soloConsulta' => $asignacionesSoloConsulta, 'editorId' => 'dotacion-editor-'.sha1($item['key'].'funcion_directiva'), 'abierto' => $esFormularioFallido($item, 'funcion_directiva'), 'accion' => 'Asignar docente directivo', 'contexto' => ($item['titulo'] ?? 'Necesidad').' · '.($item['curso_label'] ?? 'Establecimiento')])
                                         @unless ($asignacionesSoloConsulta)

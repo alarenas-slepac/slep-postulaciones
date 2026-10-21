@@ -192,9 +192,13 @@ class DotacionFuncionesAnualesTest extends TestCase
         $asignacion = $necesidad['asignaciones']->sole();
 
         $this->assertTrue($necesidad['asignacion_automatica']);
-        $this->assertSame('pendiente', $necesidad['estado']['key']);
+        $this->assertSame('cubierta', $necesidad['estado']['key']);
+        $this->assertSame('Asumido provisionalmente', $necesidad['estado']['label']);
         $this->assertSame(44.0, $necesidad['horas_contrato_asignadas']);
-        $this->assertSame(0.0, $necesidad['horas_contrato_asignadas_calculo']);
+        $this->assertSame(44.0, $necesidad['horas_contrato_asignadas_calculo']);
+        $this->assertSame(0.0, $necesidad['horas_contrato_pendientes']);
+        $this->assertSame(44.0, $resultado['resumen']['horas_asignadas']);
+        $this->assertSame(44.0, $resultado['subvenciones']->sole()['horas']);
         $this->assertTrue($asignacion->asignacion_automatica);
         $this->assertSame('Docente Directivo por asumir', $asignacion->docente_nombre);
         $this->assertSame(44.0, $asignacion->horas_contrato);

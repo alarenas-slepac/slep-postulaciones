@@ -30,10 +30,9 @@ class DotacionConciliacionGeneralTest extends TestCase
         $this->assertSame($antes, serialize($datos));
     }
 
-    public function test_separa_parvularia_pie_virtuales_inactivos_y_cobertura_asistente(): void
+    public function test_separa_parvularia_pie_inactivos_y_cobertura_asistente(): void
     {
         $datos = $this->datos();
-        $datos[0][] = ['cupo_contrata_id' => 1, 'asignaciones' => [$this->fila('otra_funcion', 44)]];
         $datos[0][] = ['estamento_cobertura' => 'asistente', 'asignaciones' => [$this->fila('otra_funcion', 6)]];
         $datos[0][] = [
             'titulo' => 'Pedagogía en Educación de Párvulos',
@@ -57,6 +56,32 @@ class DotacionConciliacionGeneralTest extends TestCase
         $this->assertSame(597.0, $resultado['asignadas']);
         $this->assertSame(10.0, $resultado['reservadas']);
         $this->assertSame(36.0, $resultado['saldo_neto']);
+    }
+
+    public function test_incluye_asignaciones_de_cupos_y_plaza_adp_una_sola_vez_en_conciliacion_y_vista(): void
+    {
+        $datos = $this->datos();
+        $cupos = [
+            ['cupo_contrata_id' => 1, 'asignaciones' => [
+                $this->fila('otra_funcion', 10), $this->fila('reserva_no_normativa', 2),
+            ]],
+            ['es_plaza_por_asumir' => true, 'asignaciones' => [
+                $this->fila('funcion_directiva', 44, ['asignacion_automatica' => true]),
+            ]],
+        ];
+        $datos[1]['horas_contrato_docentes_aula_general'] += 56;
+        $html = view('admin.dotacion-establecimiento.partials._conciliacion_general', [
+            'docentes' => $datos[0], 'resumen' => $datos[1], 'proceso2027' => $datos[2],
+            'sobredotacion' => $datos[3],
+            'asignacion' => ['docentes' => [...$datos[0], $cupos[0]], 'plazas_por_asumir' => [$cupos[1]]],
+        ])->render();
+        $datos[0] = [...$datos[0], ...$cupos];
+        $resultado = DotacionConciliacionGeneral::build(...$datos);
+        $this->assertSame(699.0, $resultado['contrato']);
+        $this->assertSame(651.0, $resultado['asignadas']);
+        $this->assertSame(12.0, $resultado['reservadas']);
+        $this->assertSame(36.0, $resultado['saldo_neto']);
+        $this->assertStringContainsString('699 = 651 asignadas + 12 reservadas + 36 de saldo', $html);
     }
 
     public function test_reasignar_aaee_a_docentes_cambia_saldo_y_no_el_contrato_o_maximo(): void
