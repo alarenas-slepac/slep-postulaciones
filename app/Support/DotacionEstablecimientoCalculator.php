@@ -68,6 +68,7 @@ class DotacionEstablecimientoCalculator
         $cursos = self::cursosPorNivel($establecimiento, $anio);
         $bloques = self::bloquesDotacion($establecimiento, $anio);
         $docentes = self::docentes($establecimiento, $anio, false);
+        $cupos = app(ContratacionHabilitacionService::class)->docentesVirtuales($establecimiento, $anio, false);
 
         return [
             'resumen' => [
@@ -75,7 +76,7 @@ class DotacionEstablecimientoCalculator
                 'cursos_total' => (int) ($cursos['totales']['cursos'] ?? 0),
                 'docentes_total' => $docentes->count(),
                 'horas_plan_total' => (float) ($cursos['totales']['horas'] ?? 0),
-                'horas_contrato_docentes' => $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0)),
+                'horas_contrato_docentes' => round((float) $docentes->concat($cupos)->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0)), 2),
             ],
             'bloques' => $bloques,
         ];
@@ -94,10 +95,11 @@ class DotacionEstablecimientoCalculator
             ? self::asistentes($establecimiento, $anio)
             : collect();
         $asignacion = DotacionAsignacionCalculator::build($establecimiento, $anio, $docentes, $cursos, $bloques, $asistentes);
-        $docentesVirtuales = $incluirResumenAsignaturas
-            ? app(ContratacionHabilitacionService::class)->docentesVirtuales($establecimiento, $anio)
-            : collect();
-        $asignacion['docentes'] = $docentes->concat($docentesVirtuales)->values();
+        // Los cupos aportan contrato al año y bloque de creación también en
+        // lecturas sin consolidado. La nómina del padrón se conserva separada.
+        $docentesVirtuales = app(ContratacionHabilitacionService::class)->docentesVirtuales($establecimiento, $anio);
+        $docentesContrato = $docentes->concat($docentesVirtuales)->values();
+        $asignacion['docentes'] = $docentesContrato;
         $planNeeds = collect(data_get($asignacion, 'necesidades.plan_estudio', []));
         $cursosCombinados = DotacionCursoCombinadoCalculator::summary(
             $establecimiento,
@@ -208,18 +210,29 @@ class DotacionEstablecimientoCalculator
         );
         $horasDotacionFuncionesNormativasDisponibles = (float) ($desgloseHorasDotacion['total_normativas_disponibles'] ?? 0);
         $contratoPlanMasTrabajoColaborativoPie = (float) ($horasContratoPlanAjustadas + ($cursos['totales']['trabajo_colaborativo_pie'] ?? 0));
-        $horasContratoDocentesBase = $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0));
+        $horasCuposPorBloque = collect(ContratacionHabilitacionService::BLOQUES)->mapWithKeys(fn ($bloque) => [
+            $bloque => round((float) $docentesVirtuales->where('cupo_bloque', $bloque)->sum('horas_contrato'), 2),
+        ])->all();
+        $horasContratoDocentesBase = round((float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0)), 2);
         $horasContratoDocentesExcluidas = $docentes->sum(fn ($docente) => (float) ($docente['horas_excluidas'] ?? 0));
-        $horasContratoDocentes = $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0));
+        $horasContratoDocentes = round((float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0)), 2);
         $horasContratoDocentePieCoordinacion = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie_coordinacion', 0);
-        $horasContratoDocentePieEducadoras = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie_educadoras_diferenciales', 0);
-        $horasContratoDocentePie = (float) data_get($asignacion, 'resumen.horas_contrato_docente_pie', 0);
-        $horasContratoDocentesAula = max(0.0, round($horasContratoDocentes - $horasContratoDocentePie, 2));
-        $contratoParvularia = self::contratoParvularia(
-            $docentes,
-            $horasContratoDocentesAula,
-            (float) $contratoPlanPorEnsenanza['contrato_parvularia_mas_pie']
+        $horasContratoDocentePieEducadoras = round((float) data_get($asignacion, 'resumen.horas_contrato_docente_pie_educadoras_diferenciales', 0) + $horasCuposPorBloque['pie'], 2);
+        $contratosPorBloque = (new DotacionContratoVigentePorBloque)->desdeDocentes(
+            $docentesContrato, collect($asignacion['asignaciones']), (bool) $establecimiento->especial
         );
+        $horasContratoDocentePie = $contratosPorBloque['contrato_vigente_bloque_3'];
+        $asignacion['resumen']['horas_contrato_docente_pie'] = $horasContratoDocentePie;
+        $asignacion['resumen']['horas_contrato_docente_pie_educadoras_diferenciales'] = $horasContratoDocentePieEducadoras;
+        $asignacion['resumen']['docentes_disponibles'] = $docentesContrato
+            ->filter(fn ($docente) => (float) ($docente['diferencia'] ?? 0) > 0.01)->count();
+        $horasContratoDocentesAula = max(0.0, round($horasContratoDocentes - $horasContratoDocentePie, 2));
+        $contratoParvularia = [
+            'horas_contrato_docentes_parvularia' => $contratosPorBloque['contrato_vigente_bloque_2'],
+            'horas_contrato_docentes_aula_general' => $contratosPorBloque['contrato_vigente_bloque_1'],
+            'brecha_dotacion_parvularia' => round((float) $contratoPlanPorEnsenanza['contrato_parvularia_mas_pie']
+                - $contratosPorBloque['contrato_vigente_bloque_2'], 2),
+        ];
         $horasContratoDocentePieExceso = max(0.0, round($horasContratoDocentePie - $horasContratoDocentes, 2));
         $brechasDotacion = self::brechasDotacionSeparadas(
             (float) $contratoPlanPorEnsenanza['contrato_general_mas_pie'],
@@ -230,12 +243,12 @@ class DotacionEstablecimientoCalculator
         );
         $horasContratoRequeridas = $contratoPlanMasTrabajoColaborativoPie + $horasDotacionFunciones + $horasContratoPieNecesarias;
         $brechaContrato = round($horasContratoRequeridas - $horasContratoDocentes, 2);
-        $horasAulaAsignadas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_aula'] ?? 0));
-        $horasContrato6535 = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_65_35'] ?? 0));
-        $horasContrato6040 = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_60_40'] ?? 0));
-        $horasContratoEspecial = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_especial'] ?? 0));
-        $horasFuncionesAsignadas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_funciones_total'] ?? 0));
-        $horasContratoCalculado = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_asignadas_total'] ?? 0));
+        $horasAulaAsignadas = (float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_aula'] ?? 0));
+        $horasContrato6535 = (float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_contrato_65_35'] ?? 0));
+        $horasContrato6040 = (float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_contrato_60_40'] ?? 0));
+        $horasContratoEspecial = (float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_contrato_especial'] ?? 0));
+        $horasFuncionesAsignadas = (float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_funciones_total'] ?? 0));
+        $horasContratoCalculado = (float) $docentesContrato->sum(fn ($docente) => (float) ($docente['horas_asignadas_total'] ?? 0));
         $diferenciaContratoCalculado = round($horasContratoDocentes - $horasContratoCalculado, 2);
         $horasAulaAsistentes = (float) data_get($asignacion, 'resumen.horas_aula_asistentes', 0);
         $horasContratoAsistentes = (float) data_get($asignacion, 'resumen.horas_contrato_asistentes', 0);
@@ -275,6 +288,9 @@ class DotacionEstablecimientoCalculator
             'horas_contrato_docentes_base' => $horasContratoDocentesBase,
             'horas_contrato_docentes_excluidas' => $horasContratoDocentesExcluidas,
             'horas_contrato_docentes' => $horasContratoDocentes,
+            'horas_contrato_docentes_padron' => round((float) $docentes->sum('horas_contrato'), 2),
+            'horas_contrato_docentes_por_contratar' => round((float) $docentesVirtuales->sum('horas_contrato'), 2),
+            'horas_contrato_por_contratar_por_bloque' => $horasCuposPorBloque,
             'horas_contrato_docentes_aula' => $horasContratoDocentesAula,
             ...$contratoParvularia,
             'horas_contrato_docente_pie_coordinacion' => $horasContratoDocentePieCoordinacion,

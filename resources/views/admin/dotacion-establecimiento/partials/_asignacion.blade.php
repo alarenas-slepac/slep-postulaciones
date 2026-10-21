@@ -160,7 +160,7 @@
             <div>
                 <div class="dotacion-eyebrow">Asignación de carga horaria</div>
                 <h2 class="h5 fw-bold mb-1">Asignar horas a docentes, cupos por contratar o asistentes</h2>
-                <div class="text-muted small">Asocia docentes vigentes o cupos provisionales a las horas de cada bloque. Los cupos por contratar muestran su saldo asignable sin incorporarse a la base contractual vigente.</div>
+                <div class="text-muted small">Asocia docentes vigentes o cupos por contratar a las horas de cada bloque. Las horas de los cupos se incluyen en el contrato del bloque y en el total del establecimiento para {{ $anio }}, aunque aún no tengan asignaciones.</div>
             </div>
         </div>
     </div>

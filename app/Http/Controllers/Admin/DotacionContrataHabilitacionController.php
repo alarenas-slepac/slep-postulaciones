@@ -40,7 +40,7 @@ class DotacionContrataHabilitacionController extends Controller
         ]);
 
         $service->habilitar($establecimiento, (int) $data['anio'], $data['bloque'], (int) $data['cantidad'], (float) $data['horas'], $request->user()?->id);
-        $mensaje = 'Docentes provisionales creados para el bloque seleccionado. Ya puede asignarles horas.';
+        $mensaje = 'Docentes por contratar creados para '.$data['anio'].'. Sus horas ya se suman al contrato del bloque seleccionado y al total del establecimiento. Ya puede asignarles horas.';
 
         return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
             ->withFragment('habilitaciones-contrata')

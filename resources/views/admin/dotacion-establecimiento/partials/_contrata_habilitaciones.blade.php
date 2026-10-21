@@ -5,6 +5,11 @@
         'pie' => (float) ($resumen['brecha_dotacion_pie'] ?? 0),
     ];
     $bloquesContrata = \App\Services\Dotacion\NoRenovacionService::BLOQUES;
+    $contratosContrata = [
+        'plan_estudio' => (float) ($resumen['horas_contrato_docentes_aula_general'] ?? 0),
+        'parvularia' => (float) ($resumen['horas_contrato_docentes_parvularia'] ?? 0),
+        'pie' => (float) ($resumen['horas_contrato_docente_pie'] ?? 0),
+    ];
     $mostrarContrata = true;
 @endphp
 @include('admin.dotacion-establecimiento.partials._personal_select_assets')
@@ -21,7 +26,7 @@
             <div class="dotacion-section-header">
                 <div class="dotacion-eyebrow mb-1">Planificación de contratación</div>
                 <h2 class="h5 fw-bold mb-1" id="habilitaciones-contrata-titulo">Docentes por contratar</h2>
-                <p class="text-muted small mb-0">Cree cupos para cubrir una brecha o reemplazar un contrato a contrata en cualquiera de los tres bloques. Cada cupo permite asignar hasta 44 horas y conserva el título del docente reemplazado. Los cupos no se suman a los contratos vigentes del padrón.</p>
+                <p class="text-muted small mb-0">Cree docentes por contratar en cualquiera de los tres bloques, con o sin sobredotación. Sus horas se suman al contrato del bloque y al total del establecimiento para {{ $anio }}, desde su creación. Cada cupo admite hasta 44 horas. También puede reemplazar un contrato a contrata, conservando su título y horas.</p>
             </div>
             <div class="card-body">
                 @if (session('contrata_success'))
@@ -40,22 +45,20 @@
                         @foreach ($bloquesContrata as $bloque => $titulo)
                             @php
                                 $habilitaciones = ($contrataHabilitaciones ?? collect())->get($bloque, collect());
-                                $brecha = max(0, $brechasContrata[$bloque]);
+                                $brecha = $brechasContrata[$bloque];
                                 $habilitadas = round((float) $habilitaciones->sum('horas'), 2);
-                                $disponibles = max(0, round($brecha - $habilitadas, 2));
+                                $formularioCreacionFallido = $errors->any() && old('accion') !== 'reemplazar' && old('bloque') === $bloque;
                             @endphp
                             <div class="col-xl-4 col-md-6">
                                 <div class="dotacion-breakdown-item p-3 h-100">
                                     <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
                                         <div>
                                             <h3 class="h6 fw-bold mb-1">{{ $titulo }}</h3>
-                                            <div class="small text-muted">{{ $fmt($brecha) }} h por contratar · {{ $fmt($habilitadas) }} h habilitadas · {{ $fmt($disponibles) }} h disponibles</div>
+                                            <div class="small text-muted">Contrato {{ $anio }}: <strong>{{ $fmt($contratosContrata[$bloque]) }} h</strong>, incluye {{ $fmt($habilitadas) }} h de cupos por contratar.</div>
+                                            <div class="small text-muted mt-1">{{ $brecha < 0 ? 'Sobredotación del bloque:' : 'Brecha de contratación:' }} {{ $fmt(abs($brecha)) }} h. Puede crear nuevos cupos.</div>
                                         </div>
-                                        <span class="badge rounded-pill {{ $disponibles > 0 ? 'text-bg-success' : 'dotacion-badge-soft' }}">{{ $habilitaciones->count() }} cupo(s)</span>
+                                        <span class="badge rounded-pill dotacion-badge-soft">{{ $habilitaciones->count() }} cupo(s)</span>
                                     </div>
-                                    @if ((float) $habilitaciones->filter(fn ($cupo) => empty($cupo->no_renovacion_id))->sum('horas') > $brecha)
-                                        <div class="alert alert-warning small py-2">Las horas habilitadas exceden la brecha actual. Revise los cupos tras el cambio de contratos.</div>
-                                    @endif
                                     @if ($habilitaciones->isNotEmpty())
                                         <ul class="list-unstyled mb-3">
                                             @foreach ($habilitaciones as $habilitacion)
@@ -118,39 +121,41 @@
                                                     @if (old('accion') === 'reemplazar' && old('bloque') === $bloque && $errors->any())
                                                         <div class="alert alert-danger small mt-2" role="alert"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
                                                     @endif
-                                                    <button type="submit" class="btn btn-primary rounded-pill w-100 mt-3"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Reemplazar por Docente por contratar</button>
+                                                    <button type="submit" class="btn btn-outline-primary rounded-pill w-100 mt-3"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Reemplazar por Docente por contratar</button>
                                                 </form>
                                             @endif
                                         </div>
                                     @endif
-                                    @if (($canManageContrataHabilitaciones ?? false) && $disponibles >= 0.01)
+                                    @if ($canManageContrataHabilitaciones ?? false)
                                         <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $establecimiento) }}" class="border-top pt-3">
                                             @csrf
+                                            <h4 class="h6 fw-bold">Crear nuevos cupos</h4>
+                                            <input type="hidden" name="accion" value="crear">
                                             <input type="hidden" name="anio" value="{{ $anio }}">
                                             <input type="hidden" name="bloque" value="{{ $bloque }}">
-                                            @if ($errors->any() && old('bloque') === $bloque)
-                                                <div class="alert alert-danger small py-2" role="alert">Revise la cantidad y las horas indicadas para {{ $titulo }}.</div>
+                                            @if ($formularioCreacionFallido)
+                                                <div class="alert alert-danger small py-2" role="alert"><strong>Revise los datos de {{ $titulo }}.</strong><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
                                             @endif
                                             <div class="row g-2 align-items-end">
                                                 <div class="col-sm-4">
-                                                    <label for="contrata-cantidad-{{ $bloque }}" class="form-label small fw-semibold">Docentes</label>
-                                                    <input id="contrata-cantidad-{{ $bloque }}" name="cantidad" type="number" class="form-control {{ old('bloque') === $bloque && $errors->has('cantidad') ? 'is-invalid' : '' }}" min="1" max="100" value="{{ old('bloque') === $bloque ? old('cantidad', 1) : 1 }}" required>
-                                                    @if (old('bloque') === $bloque)
+                                                    <label for="contrata-cantidad-{{ $bloque }}" class="form-label small fw-semibold">Docentes <span class="text-danger">*</span></label>
+                                                    <input id="contrata-cantidad-{{ $bloque }}" name="cantidad" type="number" class="form-control {{ $formularioCreacionFallido && $errors->has('cantidad') ? 'is-invalid' : '' }}" min="1" max="100" value="{{ $formularioCreacionFallido ? old('cantidad', 1) : 1 }}" aria-describedby="contrata-ayuda-{{ $bloque }}" required>
+                                                    @if ($formularioCreacionFallido)
                                                         @error('cantidad') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                                     @endif
                                                 </div>
                                                 <div class="col-sm-4">
-                                                    <label for="contrata-horas-{{ $bloque }}" class="form-label small fw-semibold">Horas por funcionario</label>
-                                                    <input id="contrata-horas-{{ $bloque }}" name="horas" type="number" class="form-control {{ old('bloque') === $bloque && $errors->has('horas') ? 'is-invalid' : '' }}" min="0.01" max="{{ min(44, $disponibles) }}" step="0.01" value="{{ old('bloque') === $bloque ? old('horas', min(44, $disponibles)) : min(44, $disponibles) }}" required>
-                                                    @if (old('bloque') === $bloque)
+                                                    <label for="contrata-horas-{{ $bloque }}" class="form-label small fw-semibold">Horas por docente <span class="text-danger">*</span></label>
+                                                    <input id="contrata-horas-{{ $bloque }}" name="horas" type="number" class="form-control {{ $formularioCreacionFallido && $errors->has('horas') ? 'is-invalid' : '' }}" min="0.01" max="44" step="0.01" value="{{ $formularioCreacionFallido ? old('horas', 44) : 44 }}" aria-describedby="contrata-ayuda-{{ $bloque }}" required>
+                                                    @if ($formularioCreacionFallido)
                                                         @error('horas') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                                     @endif
                                                 </div>
                                                 <div class="col-sm-4">
-                                                    <button type="submit" class="btn btn-primary rounded-pill w-100"><i class="bi bi-person-plus" aria-hidden="true"></i> Habilitar</button>
+                                                    <button type="submit" class="btn btn-primary rounded-pill w-100"><i class="bi bi-person-plus" aria-hidden="true"></i> Crear cupos</button>
                                                 </div>
                                             </div>
-                                            <div class="form-text">Para cubrir todo el saldo se requieren al menos {{ (int) ceil($disponibles / 44) }} docente(s). La cantidad multiplicada por las horas no puede superar las {{ $fmt($disponibles) }} h disponibles.</div>
+                                            <div id="contrata-ayuda-{{ $bloque }}" class="form-text">Entre 1 y 100 docentes, de 0,01 a 44 h cada uno. La cantidad multiplicada por las horas se suma al contrato de {{ $titulo }} para {{ $anio }}. Las asignaciones conservan sus reglas y máximos autorizados.</div>
                                         </form>
                                     @endif
                                 </div>

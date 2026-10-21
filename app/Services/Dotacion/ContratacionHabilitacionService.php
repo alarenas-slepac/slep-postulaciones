@@ -33,51 +33,59 @@ class ContratacionHabilitacionService
     }
 
     /** @return Collection<int, array<string, mixed>> */
-    public function docentesVirtuales(Establecimiento $establecimiento, int $anio): Collection
+    public function docentesVirtuales(Establecimiento $establecimiento, int $anio, bool $incluirAsignaciones = true): Collection
     {
         if (! Schema::hasTable('dotacion_contrata_habilitaciones')) {
             return collect();
         }
 
-        $asignaciones = DotacionAsignacionCalculator::assignmentsByRut($establecimiento, $anio);
-
-        return DB::table('dotacion_contrata_habilitaciones')
+        $cupos = DB::table('dotacion_contrata_habilitaciones')
             ->where('establecimiento_id', $establecimiento->getKey())
             ->where('anio', $anio)
             ->orderBy('id')
-            ->get()
-            ->map(function ($cupo) use ($asignaciones): array {
-                $rut = self::rutVirtual((int) $cupo->id);
-                $rutNormalizado = DotacionEstablecimientoCalculator::normalizeRut($rut);
-                $detalle = $asignaciones[$rutNormalizado] ?? [];
-                $horas = (float) $cupo->horas;
-                $asignadas = round((float) collect($detalle['items'] ?? [])->sum('horas_contrato'), 2);
-                $parvularia = $cupo->bloque === 'parvularia';
+            ->get();
+        $asignaciones = $incluirAsignaciones && $cupos->isNotEmpty()
+            ? DotacionAsignacionCalculator::assignmentsByRut($establecimiento, $anio) : [];
 
-                return [
-                    'rut' => $rut,
-                    'rut_normalizado' => $rutNormalizado,
-                    'nombre' => 'Docente por contratar #'.$cupo->id.' · '.(NoRenovacionService::BLOQUES[$cupo->bloque] ?? $cupo->bloque),
-                    'titulo' => $cupo->titulo ?? ($parvularia ? 'Pedagogía en Educación de Párvulos' : ($cupo->bloque === 'pie' ? 'Pedagogía en Educación Diferencial' : 'Sin título declarado')),
-                    'funcion' => $cupo->funcion ?? ($parvularia ? 'Educadora de Párvulos por contratar' : ($cupo->bloque === 'pie' ? 'Educadora Diferencial por contratar' : 'Docente por contratar')),
-                    'estamento' => 'Docente',
-                    'estamento_cobertura' => 'docente',
-                    'horas_contrato' => $horas,
-                    'horas_contrato_base' => $horas,
-                    'horas_planta' => 0.0,
-                    'horas_contrata' => $horas,
-                    'horas_asignadas_total' => $asignadas,
-                    'diferencia' => round($horas - $asignadas, 2),
-                    'asignaciones' => $detalle['items'] ?? collect(),
-                    'tipo_contrato' => 'Por contratar',
-                    'fecha_antiguedad' => null,
-                    'tramo' => null,
-                    'declaracion' => null,
-                    'fuente_contrato' => 'dotacion_contrata_habilitaciones',
-                    'cupo_contrata_id' => (int) $cupo->id,
-                    'cupo_bloque' => (string) $cupo->bloque,
-                ];
-            });
+        return $cupos->map(function ($cupo) use ($asignaciones): array {
+            $rut = self::rutVirtual((int) $cupo->id);
+            $rutNormalizado = DotacionEstablecimientoCalculator::normalizeRut($rut);
+            $detalle = $asignaciones[$rutNormalizado] ?? [];
+            $horas = (float) $cupo->horas;
+            $asignadas = round((float) collect($detalle['items'] ?? [])->sum('horas_contrato'), 2);
+            $parvularia = $cupo->bloque === 'parvularia';
+
+            return [
+                'rut' => $rut,
+                'rut_normalizado' => $rutNormalizado,
+                'nombre' => 'Docente por contratar #'.$cupo->id.' · '.(NoRenovacionService::BLOQUES[$cupo->bloque] ?? $cupo->bloque),
+                'titulo' => $cupo->titulo ?? ($parvularia ? 'Pedagogía en Educación de Párvulos' : ($cupo->bloque === 'pie' ? 'Pedagogía en Educación Diferencial' : 'Sin título declarado')),
+                'funcion' => $cupo->funcion ?? ($parvularia ? 'Educadora de Párvulos por contratar' : ($cupo->bloque === 'pie' ? 'Educadora Diferencial por contratar' : 'Docente por contratar')),
+                'estamento' => 'Docente',
+                'estamento_cobertura' => 'docente',
+                'horas_contrato' => $horas,
+                'horas_contrato_base' => $horas,
+                'horas_planta' => 0.0,
+                'horas_contrata' => $horas,
+                'horas_asignadas_total' => $asignadas,
+                'horas_aula' => (float) ($detalle['aula'] ?? 0),
+                'horas_contrato_65_35' => (float) ($detalle['contrato_65_35'] ?? 0),
+                'horas_contrato_60_40' => (float) ($detalle['contrato_60_40'] ?? 0),
+                'horas_contrato_especial' => (float) ($detalle['contrato_especial'] ?? 0),
+                'horas_funciones_total' => (float) ($detalle['funciones_total'] ?? 0),
+                'horas_reservadas_no_normativas' => (float) ($detalle['reservadas_no_normativas'] ?? 0),
+                'diferencia' => round($horas - $asignadas, 2),
+                'asignaciones' => $detalle['items'] ?? collect(),
+                'tipo_contrato' => 'Por contratar',
+                'fecha_antiguedad' => null,
+                'tramo' => null,
+                'declaracion' => null,
+                'fuente_contrato' => 'dotacion_contrata_habilitaciones',
+                'cupo_contrata_id' => (int) $cupo->id,
+                'cupo_bloque' => (string) $cupo->bloque,
+                'anio' => (int) $cupo->anio,
+            ];
+        });
     }
 
     public function docenteVirtual(Establecimiento $establecimiento, int $anio, string $rut): ?array
@@ -105,6 +113,9 @@ class ContratacionHabilitacionService
 
     public function habilitar(Establecimiento $establecimiento, int $anio, string $bloque, int $cantidad, float $horas, ?int $userId): void
     {
+        if ($anio < 2020 || $anio > 2100) {
+            throw ValidationException::withMessages(['anio' => 'Seleccione un año entre 2020 y 2100.']);
+        }
         if (! in_array($bloque, self::BLOQUES, true)) {
             throw ValidationException::withMessages(['bloque' => 'Bloque de dotación no válido.']);
         }
@@ -115,21 +126,8 @@ class ContratacionHabilitacionService
         }
 
         DB::transaction(function () use ($establecimiento, $anio, $bloque, $cantidad, $horasCent, $userId): void {
-            // Serializa las habilitaciones de ambos bloques del establecimiento.
+            // Serializa la creación y el retiro de cupos del establecimiento.
             Establecimiento::query()->whereKey($establecimiento->getKey())->lockForUpdate()->firstOrFail();
-            $resumen = $this->resumen($establecimiento, $anio);
-            $brechaCent = (int) round(max(0, self::brecha($resumen, $bloque)) * 100);
-            $habilitadasCent = (int) round((float) DB::table('dotacion_contrata_habilitaciones')
-                ->where('establecimiento_id', $establecimiento->getKey())
-                ->where('anio', $anio)
-                ->where('bloque', $bloque)
-                ->sum('horas') * 100);
-
-            if ($brechaCent <= 0 || $cantidad * $horasCent > $brechaCent - $habilitadasCent) {
-                throw ValidationException::withMessages([
-                    'horas' => 'La habilitación supera las horas por contratar disponibles en este bloque.',
-                ]);
-            }
 
             $now = now();
             $rows = [];
