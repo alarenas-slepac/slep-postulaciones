@@ -17,6 +17,19 @@ class DotacionContrataHabilitacionController extends Controller
     {
         $this->authorizeRequest($request, $establecimiento);
         abort_unless(Schema::hasTable('dotacion_contrata_habilitaciones'), 503, 'Debe ejecutar las migraciones para habilitar contrataciones.');
+        if ($request->input('accion') === 'anular_retiro') {
+            $data = $request->validate([
+                'anio' => ['required', 'integer', 'between:2020,2100'],
+                'no_renovacion_id' => ['required', 'integer', 'min:1'],
+            ]);
+            abort_unless(app(NoRenovacionService::class)->anular($establecimiento, (int) $data['anio'],
+                (int) $data['no_renovacion_id'], $request->user()?->id), 404);
+            $mensaje = 'Retiro anulado. El docente vuelve a la dotación de '.$data['anio'].'. Se retiraron sus cupos de reemplazo sin reactivar las asignaciones anteriores.';
+
+            return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
+                ->withFragment('no-renovaciones-historial')
+                ->with('success', $mensaje)->with('contrata_success', $mensaje);
+        }
         if ($request->input('accion') === 'reemplazar') {
             $data = $request->validate([
                 'anio' => ['required', 'integer', 'between:2027,2100'],

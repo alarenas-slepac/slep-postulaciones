@@ -2,7 +2,6 @@
 
 namespace App\Services\Dotacion;
 
-use App\Models\DotacionNoRenovacion;
 use App\Models\Establecimiento;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
@@ -161,25 +160,7 @@ class ContratacionHabilitacionService
             }
 
             if (! empty($cupo->no_renovacion_id)) {
-                $registro = DotacionNoRenovacion::query()->whereKey($cupo->no_renovacion_id)
-                    ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
-                    ->whereNull('anulada_at')->lockForUpdate()->firstOrFail();
-                $cupos = DB::table('dotacion_contrata_habilitaciones')->where('no_renovacion_id', $registro->id)
-                    ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)->lockForUpdate()->get();
-                $ruts = $cupos->map(fn ($row) => DotacionEstablecimientoCalculator::normalizeRut(self::rutVirtual($row->id)));
-                if (Schema::hasTable('dotacion_docente_asignaciones') && DB::table('dotacion_docente_asignaciones')
-                    ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
-                    ->whereIn('docente_rut_normalizado', $ruts)->where('estado', 'activa')->exists()) {
-                    throw ValidationException::withMessages(['habilitacion' => 'Retire las asignaciones de todos los cupos de este reemplazo antes de anular la no renovación.']);
-                }
-                if (Schema::hasTable('dotacion_docente_subsectores')) {
-                    DB::table('dotacion_docente_subsectores')->where('establecimiento_id', $establecimiento->id)
-                        ->where('anio', $anio)->whereIn('docente_rut_normalizado', $ruts)->delete();
-                }
-                DB::table('dotacion_contrata_habilitaciones')->whereIn('id', $cupos->pluck('id'))->delete();
-                $registro->forceFill(['anulada_at' => now(), 'anulada_by' => auth()->id(), 'clave_activa' => null])->save();
-
-                return true;
+                return app(NoRenovacionService::class)->anular($establecimiento, $anio, (int) $cupo->no_renovacion_id, auth()->id());
             }
 
             $asignado = Schema::hasTable('dotacion_docente_asignaciones') && DB::table('dotacion_docente_asignaciones')

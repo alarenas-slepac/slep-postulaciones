@@ -70,6 +70,7 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
     {
         $this->resetCalculators();
         DotacionDocenteAsignacion::flushEventListeners();
+        DotacionNoRenovacion::flushEventListeners();
         parent::tearDown();
     }
 
@@ -334,6 +335,167 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
         $this->assertSame('Pedagogía en Educación Básica', DB::table('dotacion_contrata_habilitaciones')->sole()->titulo);
         $this->assertEquals(44, DB::table('dotacion_contrata_habilitaciones')->sole()->horas);
         $this->actingAs($this->testUser(2, 1))->withSession(['active_role' => 'postulante'])->post($url, $params)->assertForbidden();
+    }
+
+    #[DataProvider('bloques')]
+    public function test_eliminar_retiro_por_http_reincorpora_sin_duplicar_contrato_y_conserva_historial(string $bloque, string $titulo): void
+    {
+        $this->personal($titulo);
+        $anterior = $this->asignacion();
+        $historica = $this->asignacion(['anio' => 2026]);
+        $padron = DB::table('reemplazos_personal')->get()->toJson();
+        $registro = $this->reemplazar($bloque);
+        $cupo = DB::table('dotacion_contrata_habilitaciones')->sole();
+        DB::table('dotacion_docente_subsectores')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'asignatura_key' => str_repeat('a', 40),
+            'nivel' => 'basica', 'asignatura_nombre' => 'Asignatura sintética', 'docente_rut_normalizado' => 'VACANTE_'.$cupo->id,
+        ]);
+        app(ContratacionHabilitacionService::class)->habilitar($this->ee, 2027, 'plan_estudio', 1, 6, auth()->id());
+        $this->post(route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $this->ee), [
+            'accion' => 'anular_retiro', 'anio' => 2027, 'no_renovacion_id' => $registro->id,
+        ])->assertRedirect(route('admin.dotacion-establecimiento.show', [$this->ee, 'anio' => 2027]).'#no-renovaciones-historial')
+            ->assertSessionHasNoErrors()->assertSessionHas('contrata_success');
+
+        $this->assertNotNull($registro->fresh()->anulada_at);
+        $this->assertSame(auth()->id(), $registro->fresh()->anulada_by);
+        $this->assertNull($registro->fresh()->clave_activa);
+        $this->assertSame('No renovación sintética debidamente fundada.', $registro->fresh()->justificacion);
+        $this->assertCount(1, $registro->fresh()->asignaciones_anteriores);
+        $this->assertSame('no_renovada', $anterior->fresh()->estado);
+        $this->assertSame('activa', $historica->fresh()->estado);
+        $docentes = DotacionEstablecimientoCalculator::docentes($this->ee, 2027);
+        $virtuales = app(ContratacionHabilitacionService::class)->docentesVirtuales($this->ee, 2027, false);
+        $this->assertCount(1, $docentes);
+        $this->assertCount(1, $virtuales);
+        $this->assertSame(50.0, (float) $docentes->concat($virtuales)->sum('horas_contrato'));
+        $this->assertSame(0, DB::table('dotacion_docente_subsectores')->count());
+        $this->assertSame(0, DB::table('dotacion_contrata_habilitaciones')->where('no_renovacion_id', $registro->id)->count());
+        $this->assertSame($padron, DB::table('reemplazos_personal')->get()->toJson());
+    }
+
+    public static function rolesAnularRetiro(): array
+    {
+        return [['admin'], ['coordinador_uatp'], ['coordinador_gdp'], ['supervisor_plani']];
+    }
+
+    #[DataProvider('rolesAnularRetiro')]
+    public function test_roles_de_gestion_pueden_eliminar_retiro(string $rol): void
+    {
+        $this->personal();
+        $registro = $this->reemplazar();
+        $roleId = DB::table('roles')->where('name', $rol)->value('id')
+            ?? DB::table('roles')->insertGetId(['name' => $rol, 'guard_name' => 'web']);
+        $user = $this->testUser(2, $roleId);
+        $this->actingAs($user)->withSession(['active_role' => $rol])->post(
+            route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $this->ee),
+            ['accion' => 'anular_retiro', 'anio' => 2027, 'no_renovacion_id' => $registro->id]
+        )->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame($user->id, $registro->fresh()->anulada_by);
+        $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+    }
+
+    public function test_eliminar_retiro_valida_rol_ano_establecimiento_y_reenvio_sin_alterar_otros_registros(): void
+    {
+        $this->personal();
+        $registro = $this->reemplazar();
+        $otra = Establecimiento::create(['rbd' => 99998, 'cod_estab' => 'OTHER', 'nombre_establecimiento' => 'Otra escuela sintética']);
+        $url = route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $this->ee);
+        $datos = ['accion' => 'anular_retiro', 'anio' => 2027, 'no_renovacion_id' => $registro->id];
+        $this->post($url, [...$datos, 'anio' => 2026])->assertNotFound();
+        $this->post(route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $otra), $datos)->assertNotFound();
+        $this->post($url, [...$datos, 'no_renovacion_id' => 999999])->assertNotFound();
+        $this->post($url, [...$datos, 'no_renovacion_id' => 'incorrecto'])->assertRedirect()->assertSessionHasErrors('no_renovacion_id');
+        foreach (['postulante', 'funcionario_directivo_estab'] as $index => $rol) {
+            $roleId = DB::table('roles')->where('name', $rol)->value('id')
+                ?? DB::table('roles')->insertGetId(['name' => $rol, 'guard_name' => 'web']);
+            $this->actingAs($this->testUser($index + 2, $roleId))->withSession(['active_role' => $rol])
+                ->post($url, $datos)->assertForbidden();
+        }
+        $this->assertNull($registro->fresh()->anulada_at);
+        $this->assertSame(1, DB::table('dotacion_contrata_habilitaciones')->count());
+        $this->actingAs(\App\Models\User::findOrFail(1))->withSession(['active_role' => 'admin']);
+        $this->post($url, $datos)->assertRedirect();
+        $anulado = $registro->fresh()->getAttributes();
+        $this->post($url, $datos)->assertNotFound();
+        $this->assertSame($anulado, $registro->fresh()->getAttributes());
+    }
+
+    public function test_eliminar_retiro_rechaza_cualquier_cupo_ocupado_sin_retirar_los_demas(): void
+    {
+        $this->personal('Pedagogía en Educación Diferencial');
+        $this->asignacion(['tipo_asignacion' => 'funcion_tecnico_pedagogica', 'subtipo_asignacion' => 'tecnico_pedagogica', 'horas_contrato' => 6]);
+        $registro = $this->reemplazar('pie');
+        $cupos = DB::table('dotacion_contrata_habilitaciones')->get()->keyBy('bloque');
+        $ocupada = $this->asignacion(['docente_rut' => 'VACANTE-'.$cupos['pie']->id, 'docente_rut_normalizado' => 'VACANTE_'.$cupos['pie']->id]);
+        $this->post(route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $this->ee), [
+            'accion' => 'anular_retiro', 'anio' => 2027, 'no_renovacion_id' => $registro->id,
+        ])->assertRedirect()->assertSessionHasErrors('habilitacion');
+        $this->assertNull($registro->fresh()->anulada_at);
+        $this->assertSame(2, DB::table('dotacion_contrata_habilitaciones')->count());
+        $this->assertSame('activa', $ocupada->fresh()->estado);
+        $this->assertCount(0, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+        $ocupada->update(['estado' => 'inactiva']);
+        $this->post(route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $this->ee), [
+            'accion' => 'anular_retiro', 'anio' => 2027, 'no_renovacion_id' => $registro->id,
+        ])->assertRedirect();
+        $this->assertNotNull($registro->fresh()->anulada_at);
+        $this->assertSame(0, DB::table('dotacion_contrata_habilitaciones')->count());
+        $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+    }
+
+    public function test_permite_anular_retiro_historico_sin_cupos_y_revierte_todo_si_falla_la_anulacion(): void
+    {
+        $this->personal();
+        $registro = $this->reemplazar();
+        $cupo = DB::table('dotacion_contrata_habilitaciones')->sole();
+        DotacionNoRenovacion::updating(fn () => throw new \RuntimeException('Fallo sintético de anulación'));
+        try {
+            app(NoRenovacionService::class)->anular($this->ee, 2027, $registro->id, auth()->id());
+            $this->fail('Debe revertirse la eliminación del cupo.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Fallo sintético de anulación', $error->getMessage());
+        }
+        $this->assertNull($registro->fresh()->anulada_at);
+        $this->assertTrue(DB::table('dotacion_contrata_habilitaciones')->where('id', $cupo->id)->exists());
+        $this->assertCount(0, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+        DotacionNoRenovacion::flushEventListeners();
+        DB::table('dotacion_contrata_habilitaciones')->where('id', $cupo->id)->delete();
+        $this->assertTrue(app(NoRenovacionService::class)->anular($this->ee, 2027, $registro->id, auth()->id()));
+        $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+    }
+
+    public function test_historial_muestra_confirmacion_boton_bloqueo_y_solo_consulta(): void
+    {
+        $this->personal();
+        $registro = $this->reemplazar();
+        $cupo = DB::table('dotacion_contrata_habilitaciones')->sole();
+        $vars = [
+            'establecimiento' => $this->ee, 'anio' => 2027, 'resumen' => [],
+            'contrataHabilitacionesTableReady' => true,
+            'contrataHabilitaciones' => collect([$cupo])->groupBy('bloque'),
+            'noRenovaciones' => collect([$registro]), 'canManageContrataHabilitaciones' => true,
+            'fmt' => fn ($value) => (string) $value, 'errors' => new ViewErrorBag,
+        ];
+        $render = fn (array $datos) => view('admin.dotacion-establecimiento.partials._contrata_habilitaciones', $datos)->render();
+        $html = $render($vars);
+        $this->assertStringContainsString('Eliminar retiro', $html);
+        $this->assertStringContainsString('name="accion" value="anular_retiro"', $html);
+        $this->assertStringContainsString('name="no_renovacion_id" value="'.$registro->id.'"', $html);
+        $this->assertStringContainsString('¿Anular este retiro?', $html);
+        $soloConsulta = $render([...$vars, 'canManageContrataHabilitaciones' => false]);
+        $this->assertStringNotContainsString('anular_retiro', $soloConsulta);
+        $ocupado = $render([...$vars, 'docentesVirtualesPorCupo' => collect([
+            $cupo->id => ['horas_asignadas_total' => 4],
+        ])]);
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="UTF-8">'.$ocupado);
+        $xpath = new \DOMXPath($dom);
+        $this->assertSame(1, $xpath->query('//form[input[@name="accion" and @value="anular_retiro"]]//button[@disabled]')->length);
+        $this->assertStringContainsString('Retire primero las asignaciones de todos los cupos', $ocupado);
+        app(NoRenovacionService::class)->anular($this->ee, 2027, $registro->id, auth()->id());
+        $final = $render([...$vars, 'noRenovaciones' => collect([$registro->fresh()]), 'contrataHabilitaciones' => collect()]);
+        $this->assertStringContainsString('Anulado', $final);
+        $this->assertStringNotContainsString('name="accion" value="anular_retiro"', $final);
     }
 
     public function test_migracion_es_aditiva_repetible_y_conserva_cupos_historicos(): void
