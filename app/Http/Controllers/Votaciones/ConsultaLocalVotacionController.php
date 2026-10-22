@@ -36,7 +36,9 @@ class ConsultaLocalVotacionController extends Controller
             }
             $resultados = $jornada->padronConsulta()->where('rut', $rut)->with([
                 'local.establecimientoDestino:id,rbd,comuna,latitud,longitud',
-                'local.establecimientoDestino.admisionPerfil:id,establecimiento_id,direccion_publica',
+                'local.establecimientoDestino.admisionPerfil:id,establecimiento_id,direccion_publica,logo_path',
+                'establecimientoOrigen:id,rbd',
+                'establecimientoOrigen.admisionPerfil:id,establecimiento_id,logo_path',
             ])->orderBy('rbd')->get();
 
             return $this->pantalla($request, resultados: $resultados, consultada: $jornada);

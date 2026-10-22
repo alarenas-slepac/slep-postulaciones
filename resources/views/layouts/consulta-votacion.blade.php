@@ -6,10 +6,11 @@
     <meta name="robots" content="noindex, nofollow, noarchive">
     <meta name="referrer" content="no-referrer">
     <meta name="theme-color" content="#0b3d91">
-    <title>Consulta tu local de votación · {{ config('brand.org_name', 'SLEP Andalién Costa') }}</title>
+    <title>@yield('title', 'Consulta tu local de votación') · {{ config('brand.org_name', 'SLEP Andalién Costa') }}</title>
     <link rel="icon" href="{{ asset('branding/favicon.ico') }}">
     @vite(['resources/scss/app.scss', 'resources/css/consulta-votacion.css'])
     @stack('map-assets')
+    @stack('styles')
 </head>
 <body class="cv-public">
 <a class="cv-skip" href="#contenido">Saltar al contenido</a>
@@ -24,6 +25,7 @@
 <main id="contenido" class="container cv-shell py-4 py-md-5">@yield('content')</main>
 <footer class="container cv-footer py-4">
     <span>© {{ now()->year }} {{ config('brand.org_name', 'SLEP Andalién Costa') }}</span>
+    <a href="{{ route('public.resultados-votacion.index', request()->filled('jornada') ? ['jornada' => request()->query('jornada')] : []) }}">Resultados de votación</a>
     <span>Elección de caja de compensación y consulta de mutualidad</span>
 </footer>
 </body>
