@@ -2,6 +2,9 @@
 <nav class="va-nav" aria-label="Navegación del módulo de votaciones">
     <a href="{{ route('votaciones.admin.dashboard') }}" @class(['active' => request()->routeIs('votaciones.admin.dashboard')])><i class="bi bi-speedometer2"></i> Dashboard</a>
     <a href="{{ route('votaciones.admin.jornadas.index') }}" @class(['active' => request()->routeIs('votaciones.admin.jornadas.*')])><i class="bi bi-calendar-event"></i> Jornadas</a>
+    @role('admin')
+        <a href="{{ route('votaciones.admin.padrones.index', $jornadaContextual ? ['jornada' => $jornada->slug] : []) }}" @class(['active' => request()->routeIs('votaciones.admin.padrones.*')])><i class="bi bi-person-vcard"></i> Padrón y locales</a>
+    @endrole
     @if($jornadaContextual)
         <a href="{{ route('votaciones.admin.jornadas.show', $jornada) }}#grupos"><i class="bi bi-people"></i> Grupos</a>
         <a href="{{ route('votaciones.admin.jornadas.show', $jornada) }}#rutas"><i class="bi bi-signpost-split"></i> Rutas</a>

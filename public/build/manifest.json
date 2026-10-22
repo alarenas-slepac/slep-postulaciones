@@ -15,6 +15,14 @@
     "file": "assets/leaflet-CLLlcC51.css",
     "src": "_leaflet-CLLlcC51.css"
   },
+  "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff": {
+    "file": "assets/bootstrap-icons-BeopsB42.woff",
+    "src": "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff"
+  },
+  "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2": {
+    "file": "assets/bootstrap-icons-mSm7cUeB.woff2",
+    "src": "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2"
+  },
   "node_modules/flag-icons/flags/1x1/ad.svg": {
     "file": "assets/ad-Blhdm5jl.svg",
     "src": "node_modules/flag-icons/flags/1x1/ad.svg"
@@ -2202,6 +2210,15 @@
     "name": "centro-operaciones",
     "names": [
       "centro-operaciones.css"
+    ]
+  },
+  "resources/css/consulta-votacion.css": {
+    "file": "assets/consulta-votacion-2U3XB7wY.css",
+    "src": "resources/css/consulta-votacion.css",
+    "isEntry": true,
+    "name": "consulta-votacion",
+    "names": [
+      "consulta-votacion.css"
     ]
   },
   "resources/css/dotacion-establecimiento.css": {
