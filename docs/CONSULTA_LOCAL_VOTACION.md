@@ -55,6 +55,18 @@ Las fechas de texto `MM/DD/AAAA` se detectan si al menos una de ellas tiene un d
 
 ## Acceso y protección
 
+### Dirección y mapa del destino
+
+El resultado busca el **RBD_LUGAR_DE_VOTACION** en `establecimientos.rbd`. La relación utiliza el RBD del destino, no el RBD de origen ni `establecimientos.id`. Obtiene `latitud`, `longitud` y `comuna` desde ese catálogo. En la estructura actual, la dirección está en `admision_establecimientos.direccion_publica`, relacionada mediante `establecimiento_id` y `Establecimiento.admisionPerfil`; es la misma dirección pública utilizada por los avisos al reemplazante. No se crea otra copia de esos datos en el padrón de votación.
+
+El mapa usa Leaflet y OpenStreetMap, como Centro de Operaciones. Muestra únicamente el punto del local y ofrece **Cómo llegar** para abrir las coordenadas en Google Maps. No solicita la geolocalización del funcionario. Los datos del mapa no incluyen RUT, nombre de la persona, contrato ni información de otros votantes. Las teselas usan `referrerPolicy: origin`, por lo que sólo envían el origen del sitio, conservando el `no-referrer` del resto de la consulta. Se mantiene visible la atribución de OpenStreetMap.
+
+Si no hay coincidencia de RBD, la consulta conserva el local y horario del padrón e indica **Ubicación en mapa por confirmar**. Si falta la dirección, muestra **Dirección por confirmar**. Las coordenadas fuera de rango, incompletas y el par `0,0` no generan un marcador. Ante errores del proveedor del mapa, sigue disponible la dirección y el enlace externo cuando hay coordenadas válidas.
+
+Para corregir coordenadas o comuna, actualiza el establecimiento en el catálogo existente. Para completar la dirección, usa su perfil de Admisión Escolar. Los cambios se reflejan en la siguiente consulta sin volver a importar el Excel. Esta ampliación no requiere migraciones, paquetes ni variables `.env` adicionales; desplegar también el nuevo JavaScript y los recursos compilados de `public/build`.
+
+### Consulta y administración
+
 Las rutas administrativas exigen autenticación, correo verificado, rol `admin` y el control de módulo existente. La consulta pública acepta solamente búsquedas exactas por RUT válido y jornada publicada para consulta. No hay listado público, búsqueda parcial, exportación ni API que entregue el padrón completo.
 
 La búsqueda usa POST con protección CSRF, hasta 15 intentos por minuto e IP y un límite general de 60 peticiones por minuto. No incorpora RUT en enlaces ni resultados en la sesión. Las respuestas usan `no-store`, `noindex`, `nofollow`, `noarchive` y `no-referrer`. La consulta por RUT solamente es una decisión de acceso del módulo: no autentica la identidad de quien consulta. El proveedor debe excluir esta ruta de cualquier caché de HTML del proxy/CDN y evitar registrar cuerpos POST en herramientas de depuración.
@@ -86,3 +98,5 @@ Después de instalar, probar con datos ficticios: carga inválida sin cambios, c
 ## Referencias técnicas
 
 La lectura utiliza las opciones documentadas de [PhpSpreadsheet](https://phpspreadsheet.readthedocs.io/en/latest/topics/reading-files/), con lectura de valores sin evaluar fórmulas y límites de archivo, hojas, filas, columnas y tamaño descomprimido. Los controles de carga y límites HTTP usan los componentes existentes de Laravel 12.
+
+El mapa sigue la [referencia de Leaflet 1.9.4](https://leafletjs.com/reference.html) y la [política de teselas de OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/), con URL HTTPS, atribución visible y referer de origen sin información del votante.

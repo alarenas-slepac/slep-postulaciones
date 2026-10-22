@@ -2213,7 +2213,7 @@
     ]
   },
   "resources/css/consulta-votacion.css": {
-    "file": "assets/consulta-votacion-2U3XB7wY.css",
+    "file": "assets/consulta-votacion-C7E1UMVX.css",
     "src": "resources/css/consulta-votacion.css",
     "isEntry": true,
     "name": "consulta-votacion",
@@ -2307,6 +2307,15 @@
     ],
     "css": [
       "assets/centro-operaciones-BKK0pH8C.css"
+    ]
+  },
+  "resources/js/consulta-votacion-mapa.js": {
+    "file": "assets/consulta-votacion-mapa-Aq-M-BoV.js",
+    "name": "consulta-votacion-mapa",
+    "src": "resources/js/consulta-votacion-mapa.js",
+    "isEntry": true,
+    "imports": [
+      "_leaflet-Bu0uVQ8k.js"
     ]
   },
   "resources/js/dotacion-asignacion.js": {

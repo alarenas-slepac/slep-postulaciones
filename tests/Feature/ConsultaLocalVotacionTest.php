@@ -28,7 +28,14 @@ class ConsultaLocalVotacionTest extends IsolatedSecurityTestCase
         parent::setUp();
         $this->withoutVite();
         app()->setLocale('es');
-        Schema::create('establecimientos', fn (Blueprint $t) => $t->id());
+        Schema::create('establecimientos', function (Blueprint $t): void {
+            $t->id(); $t->unsignedInteger('rbd')->unique(); $t->string('nombre_establecimiento');
+            $t->string('comuna')->nullable(); $t->decimal('latitud', 10, 7)->nullable();
+            $t->decimal('longitud', 10, 7)->nullable(); $t->string('director_contacto')->nullable();
+        });
+        Schema::create('admision_establecimientos', function (Blueprint $t): void {
+            $t->id(); $t->unsignedBigInteger('establecimiento_id')->unique(); $t->string('direccion_publica', 500)->nullable();
+        });
         Schema::create('modules', function (Blueprint $t): void { $t->id(); $t->string('key'); });
         DB::table('modules')->insert(['key' => 'votaciones']);
         foreach (['model_has_permissions', 'role_has_permissions'] as $table) {
@@ -287,6 +294,77 @@ class ConsultaLocalVotacionTest extends IsolatedSecurityTestCase
         $this->assertSame($body.'K', RutConsulta::normalizar($body.'-k'));
         $this->assertNull(RutConsulta::normalizar('abc'.$this->rut()));
         $this->assertNull(RutConsulta::normalizar('99000001-0'));
+    }
+
+    public function test_mapa_y_direccion_se_obtienen_del_rbd_de_destino_y_no_del_origen_o_id(): void
+    {
+        DB::table('establecimientos')->insert([
+            ['id' => 9501, 'rbd' => 9001, 'nombre_establecimiento' => 'Origen', 'comuna' => 'Comuna origen', 'latitud' => -36.1, 'longitud' => -72.1, 'director_contacto' => null],
+            ['id' => 42, 'rbd' => 9501, 'nombre_establecimiento' => 'Destino', 'comuna' => 'Comuna destino', 'latitud' => -37.1, 'longitud' => -73.1, 'director_contacto' => 'CONTACTO_INTERNO_NO_PUBLICAR'],
+        ]);
+        DB::table('admision_establecimientos')->insert([
+            ['establecimiento_id' => 9501, 'direccion_publica' => 'Direccion del origen que no debe usarse'],
+            ['establecimiento_id' => 42, 'direccion_publica' => 'Calle de prueba 123'],
+        ]);
+        $this->cargar(); $this->publicar();
+        $this->get(route('public.consulta-votacion.index'))->assertDontSee('Calle de prueba 123')->assertDontSee('data-cv-map', false);
+        $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])
+            ->assertOk()->assertSee('Calle de prueba 123')->assertSee('Comuna destino')
+            ->assertSee('data-latitude="-37.1"', false)->assertSee('data-longitude="-73.1"', false)
+            ->assertSee('Cómo llegar')->assertSee('destination=-37.1%2C-73.1', false)
+            ->assertDontSee('Direccion del origen que no debe usarse')->assertDontSee('CONTACTO_INTERNO_NO_PUBLICAR');
+    }
+
+    public function test_local_sin_establecimiento_relacionado_conserva_resultado_y_explica_ubicacion_pendiente(): void
+    {
+        $this->cargar(); $this->publicar();
+        $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])
+            ->assertOk()->assertSee('Local de prueba')->assertSee('Dirección por confirmar')->assertSee('Ubicación en mapa por confirmar')
+            ->assertDontSee('data-cv-map', false)->assertDontSee('Cómo llegar');
+    }
+
+    public function test_coordenadas_ausentes_fuera_de_rango_o_cero_no_generan_un_mapa_ficticio(): void
+    {
+        DB::table('establecimientos')->insert(['id' => 42, 'rbd' => 9501, 'nombre_establecimiento' => 'Destino']);
+        DB::table('admision_establecimientos')->insert(['establecimiento_id' => 42, 'direccion_publica' => 'Calle de prueba 123']);
+        $this->cargar(); $this->publicar();
+        foreach ([[null, -73.1], [-37.1, null], [0, 0], [91, -73.1], [-37.1, 181]] as [$lat, $lng]) {
+            DB::table('establecimientos')->where('id', 42)->update(['latitud' => $lat, 'longitud' => $lng]);
+            $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])
+                ->assertOk()->assertSee('Calle de prueba 123')->assertSee('Ubicación en mapa por confirmar')
+                ->assertDontSee('data-cv-map', false)->assertDontSee('Cómo llegar');
+        }
+    }
+
+    public function test_coordenadas_validas_sin_direccion_muestran_mapa_y_estado_de_direccion(): void
+    {
+        DB::table('establecimientos')->insert(['id' => 42, 'rbd' => 9501, 'nombre_establecimiento' => 'Destino', 'latitud' => -37.1, 'longitud' => -73.1]);
+        $this->cargar(); $this->publicar();
+        $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])
+            ->assertOk()->assertSee('Dirección por confirmar')->assertSee('data-cv-map', false)->assertSee('Cómo llegar');
+    }
+
+    public function test_actualizar_la_ubicacion_del_catalogo_se_refleja_sin_reimportar_el_padron(): void
+    {
+        DB::table('establecimientos')->insert(['id' => 42, 'rbd' => 9501, 'nombre_establecimiento' => 'Destino', 'latitud' => -37.1, 'longitud' => -73.1]);
+        DB::table('admision_establecimientos')->insert(['establecimiento_id' => 42, 'direccion_publica' => 'Direccion inicial']);
+        $this->cargar(); $this->publicar();
+        DB::table('establecimientos')->where('id', 42)->update(['latitud' => -37.2]);
+        DB::table('admision_establecimientos')->where('establecimiento_id', 42)->update(['direccion_publica' => 'Direccion actualizada']);
+        $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])
+            ->assertOk()->assertSee('Direccion actualizada')->assertSee('data-latitude="-37.2"', false)->assertDontSee('Direccion inicial');
+        $this->assertSame(1, $this->jornada->padronConsulta()->count());
+    }
+
+    public function test_textos_del_catalogo_y_nombre_del_local_se_escapan_en_la_tarjeta_del_mapa(): void
+    {
+        DB::table('establecimientos')->insert(['id' => 42, 'rbd' => 9501, 'nombre_establecimiento' => 'Destino', 'latitud' => -37.1, 'longitud' => -73.1]);
+        DB::table('admision_establecimientos')->insert(['establecimiento_id' => 42, 'direccion_publica' => '<script>direccion()</script>']);
+        $analysis = $this->analizar(locals: [$this->local(['LUGAR_DE_VOTACION' => '<img src=x onerror=local()>'])]);
+        $this->cargar($analysis); $this->publicar();
+        $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])
+            ->assertOk()->assertDontSee('<script>direccion()</script>', false)->assertDontSee('<img src=x onerror=local()>', false)
+            ->assertSee('&lt;script&gt;direccion()&lt;/script&gt;', false)->assertSee('&lt;img src=x onerror=local()&gt;', false);
     }
 
     private function cargar(?array $analysis = null, bool $confirmar = false): void
