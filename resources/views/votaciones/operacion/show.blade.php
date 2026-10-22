@@ -14,12 +14,17 @@
 <div class="va-shell va-operation" data-votaciones-admin>
     <header class="va-operation-hero"><div class="va-operation-hero__top"><div><a class="text-white-50 text-decoration-none small" href="{{ route('votaciones.operacion.index') }}"><i class="bi bi-arrow-left"></i> Mis grupos</a><p class="va-topbar__eyebrow mt-2 mb-0">Grupo {{ $grupo->numero }}</p><h1>{{ $grupo->nombre }}</h1><p>{{ $grupo->jornada->nombre }} · {{ $grupo->jornada->procesos->pluck('codigo')->join(' + ') }}</p></div><span class="va-status va-status--{{ $grupo->estado }}">{{ str($grupo->estado)->replace('_', ' ') }}</span></div><div class="va-progress mt-3"><div class="va-progress__bar"><span style="width:{{ $porcentaje }}%"></span></div><div class="d-flex justify-content-between small mt-2 text-white-50"><span>{{ $finalizadas }} de {{ $total }} establecimientos atendidos</span><strong class="text-white">{{ $porcentaje }}%</strong></div></div></header>
     @include('votaciones.partials.alertas')
+    <section class="alert {{ $grupo->dentroDelPeriodo() ? 'alert-info' : 'alert-warning' }} mt-3" role="status">
+        <i class="bi bi-calendar-range me-1" aria-hidden="true"></i> Período del grupo: <strong>{{ $grupo->periodo_funcionamiento }}</strong> · Jornada: {{ $grupo->jornada->periodo_funcionamiento }} · Hora de Chile.
+        @if(! $grupo->dentroDelPeriodo())<span class="d-block mt-1">Fuera del período de funcionamiento. Puede consultar el recorrido; el inicio de grupos y el registro de visitas están bloqueados.</span>@endif
+    </section>
 
     @if($actual)
         <section class="va-current">
             <span class="va-field-label">{{ $grupo->estado === 'pendiente' ? 'Primera parada' : 'Establecimiento actual' }}</span>
             <div class="va-current__school"><span class="va-school-logo"><img src="{{ $logoActual }}" alt=""></span><div><h2>{{ $actual->establecimiento->nombre_establecimiento }}</h2><p>RBD {{ $actual->establecimiento->rbd }} · {{ $actual->establecimiento->comuna }}</p><span class="va-status va-status--{{ $actual->visita?->estado ?? 'pendiente' }} mt-2">{{ str($actual->visita?->estado ?? 'pendiente')->replace('_', ' ') }}</span></div></div>
 
+            @if($grupo->dentroDelPeriodo())
             @if($grupo->estado === 'pendiente')
                 <form method="POST" action="{{ route('votaciones.operacion.grupos.iniciar', $grupo) }}" data-disable-on-submit>@csrf<button class="btn btn-success va-primary-action" onclick="return confirm('¿Iniciar el recorrido del grupo?')"><i class="bi bi-play-circle me-1"></i> INICIAR JORNADA</button></form>
             @elseif($actual->visita?->estado === 'en_traslado')
@@ -27,6 +32,7 @@
             @elseif($actual->visita?->estado === 'en_votacion')
                 <div class="mt-3 small text-success fw-bold"><i class="bi bi-clock"></i> Inicio: {{ $actual->visita->inicio_votacion_at?->timezone(config('votaciones.timezone'))->format('H:i') }}</div>
                 <form method="POST" action="{{ route('votaciones.operacion.rutas.finalizar', $actual) }}" data-disable-on-submit>@csrf<label class="form-label mt-3" for="fin-votacion">Hora efectiva de término</label><input class="form-control" id="fin-votacion" type="datetime-local" name="fecha_hora" value="{{ now(config('votaciones.timezone'))->format('Y-m-d\TH:i') }}"><button class="btn btn-danger va-primary-action" onclick="return confirm('¿Finalizar la votación en este establecimiento?')"><i class="bi bi-stop-circle me-1"></i> FINALIZAR VOTACIÓN</button></form>
+            @endif
             @endif
         </section>
     @elseif($grupo->estado === 'finalizado')

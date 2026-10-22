@@ -13,7 +13,11 @@
             <section class="va-form-section">
                 <h2><i class="bi bi-card-text me-1"></i> Información general</h2><p>Datos que identifican esta jornada dentro de la gestión.</p>
                 <div class="mb-3"><label class="form-label" for="nombre">Nombre</label><input class="form-control" id="nombre" name="nombre" required maxlength="255" value="{{ old('nombre', $jornada->nombre) }}"></div>
-                <div class="mb-3"><label class="form-label" for="fecha">Fecha</label><input class="form-control" id="fecha" type="date" name="fecha" required value="{{ old('fecha', $jornada->fecha?->format('Y-m-d')) }}"></div>
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6"><label class="form-label" for="fecha">Fecha de inicio *</label><input class="form-control @error('fecha') is-invalid @enderror" id="fecha" type="date" name="fecha" required value="{{ old('fecha', $jornada->fecha?->format('Y-m-d')) }}">@error('fecha')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                    <div class="col-sm-6"><label class="form-label" for="fecha-fin">Fecha de término *</label><input class="form-control @error('fecha_fin') is-invalid @enderror" id="fecha-fin" type="date" name="fecha_fin" required value="{{ old('fecha_fin', $jornada->exists ? $jornada->finFuncionamiento()->format('Y-m-d') : null) }}">@error('fecha_fin')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                    <div class="col-12"><p class="form-text mb-0">Ambos días están incluidos. Cada grupo debe funcionar dentro de este período. Fuera de sus fechas no podrá iniciar recorridos ni registrar visitas (hora de Chile).</p></div>
+                </div>
                 <div><label class="form-label" for="descripcion">Descripción</label><textarea class="form-control" id="descripcion" name="descripcion" rows="5" maxlength="3000">{{ old('descripcion', $jornada->descripcion) }}</textarea></div>
             </section>
             <section class="va-form-section">

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 
 class GrupoVotacion extends Model
 {
@@ -23,11 +25,39 @@ class GrupoVotacion extends Model
 
     protected $table = 'grupos_votacion';
 
-    protected $fillable = ['jornada_votacion_id', 'numero', 'nombre', 'encargado_id', 'estado', 'observacion', 'iniciado_at', 'finalizado_at'];
+    protected $fillable = ['jornada_votacion_id', 'grupo_origen_id', 'fecha_inicio', 'fecha_fin', 'numero', 'nombre', 'encargado_id', 'estado', 'observacion', 'iniciado_at', 'finalizado_at'];
 
     protected function casts(): array
     {
-        return ['iniciado_at' => 'datetime', 'finalizado_at' => 'datetime'];
+        return ['fecha_inicio' => 'date', 'fecha_fin' => 'date', 'iniciado_at' => 'datetime', 'finalizado_at' => 'datetime'];
+    }
+
+    public function inicioFuncionamiento(): CarbonInterface
+    {
+        return $this->fecha_inicio ?? $this->jornada->fecha;
+    }
+
+    public function finFuncionamiento(): CarbonInterface
+    {
+        return $this->fecha_fin ?? $this->jornada->finFuncionamiento();
+    }
+
+    public function getPeriodoFuncionamientoAttribute(): string
+    {
+        $inicio = $this->inicioFuncionamiento()->format('d-m-Y');
+
+        return $this->inicioFuncionamiento()->isSameDay($this->finFuncionamiento()) ? $inicio : $inicio.' al '.$this->finFuncionamiento()->format('d-m-Y');
+    }
+
+    public function dentroDelPeriodo(?CarbonInterface $momento = null): bool
+    {
+        $dia = CarbonImmutable::instance($momento ?? CarbonImmutable::now(config('votaciones.timezone')))
+            ->timezone(config('votaciones.timezone'))->toDateString();
+
+        return $dia >= $this->inicioFuncionamiento()->toDateString()
+            && $dia <= $this->finFuncionamiento()->toDateString()
+            && $dia >= $this->jornada->fecha->toDateString()
+            && $dia <= $this->jornada->finFuncionamiento()->toDateString();
     }
 
     public function jornada(): BelongsTo

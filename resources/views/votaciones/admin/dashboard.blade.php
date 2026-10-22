@@ -13,7 +13,7 @@
         <section class="va-card va-empty"><div><i class="bi bi-calendar2-plus"></i><h2>Aún no existen jornadas</h2><p>Crea la primera jornada para configurar procesos, grupos y recorridos.</p><a class="btn btn-primary" href="{{ route('votaciones.admin.jornadas.create') }}">Crear jornada</a></div></section>
     @else
         <form method="GET" class="va-filterbar" aria-label="Seleccionar jornada del dashboard">
-            <label><span>Jornada visualizada</span><select class="form-select" name="jornada" data-auto-submit>@foreach($jornadas as $opcion)<option value="{{ $opcion->slug }}" @selected($opcion->is($jornada))>{{ $opcion->nombre }} · {{ $opcion->fecha->format('d-m-Y') }}</option>@endforeach</select></label>
+            <label><span>Jornada visualizada</span><select class="form-select" name="jornada" data-auto-submit>@foreach($jornadas as $opcion)<option value="{{ $opcion->slug }}" @selected($opcion->is($jornada))>{{ $opcion->nombre }} · {{ $opcion->periodo_funcionamiento }}</option>@endforeach</select></label>
             <div><span class="va-field-label">Estado</span><span class="va-status va-status--{{ $jornada->estado }}">{{ str($jornada->estado)->replace('_', ' ') }}</span></div>
             <div><span class="va-field-label">Última actualización</span><strong>{{ $jornada->updated_at->timezone(config('votaciones.timezone'))->format('d-m-Y H:i') }}</strong></div>
         </form>
@@ -39,7 +39,7 @@
                     @foreach($grupos as $fila)
                         @php($grupo = $fila['modelo'])
                         <tr>
-                            <td><span class="va-table__title">{{ $grupo->numero }}. {{ $grupo->nombre }}</span><span class="va-table__meta">{{ $grupo->encargado?->display_name ?? 'Sin responsable' }}</span></td>
+                            <td><span class="va-table__title">{{ $grupo->numero }}. {{ $grupo->nombre }}</span><span class="va-table__meta">{{ $grupo->encargado?->display_name ?? 'Sin responsable' }}</span><span class="va-table__meta">{{ $grupo->periodo_funcionamiento }}</span></td>
                             <td data-label="Estado"><span class="va-status va-status--{{ $grupo->estado }}">{{ str($grupo->estado)->replace('_', ' ') }}</span></td>
                             <td data-label="Actual">{{ $fila['actual']?->establecimiento?->nombre_establecimiento ?? '—' }}</td>
                             <td data-label="Próximo">{{ $fila['proxima']?->establecimiento?->nombre_establecimiento ?? '—' }}</td>
@@ -50,7 +50,7 @@
                     </tbody></table></div>
                 @endif
             </section>
-            <aside class="va-card"><div class="va-card__header"><div><h2>{{ $jornada->nombre }}</h2><p>{{ $jornada->fecha->format('d-m-Y') }} · {{ $jornada->procesos->pluck('codigo')->join(' + ') }}</p></div></div><div class="va-card__body"><div class="va-quick-actions">
+            <aside class="va-card"><div class="va-card__header"><div><h2>{{ $jornada->nombre }}</h2><p>{{ $jornada->periodo_funcionamiento }} · {{ $jornada->procesos->pluck('codigo')->join(' + ') }}</p></div></div><div class="va-card__body"><div class="va-quick-actions">
                 <a href="{{ route('votaciones.admin.jornadas.show', $jornada) }}"><i class="bi bi-sliders"></i> Gestionar jornada</a>
                 <a href="{{ route('votaciones.admin.jornadas.show', $jornada) }}#grupos"><i class="bi bi-people"></i> Gestionar grupos</a>
                 <a href="{{ route('votaciones.admin.jornadas.show', $jornada) }}#rutas"><i class="bi bi-signpost-split"></i> Gestionar rutas</a>

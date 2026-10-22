@@ -25,6 +25,7 @@ class OperacionVotacionService
             if ($grupo->estado !== GrupoVotacion::PENDIENTE) {
                 throw ValidationException::withMessages(['grupo' => 'El grupo ya fue iniciado.']);
             }
+            $this->validarPeriodo($grupo);
             $primera = $grupo->rutas()->where('activa', true)->orderBy('orden')->lockForUpdate()->first();
             if (! $primera) {
                 throw ValidationException::withMessages(['grupo' => 'El grupo no tiene una ruta activa.']);
@@ -68,6 +69,7 @@ class OperacionVotacionService
                 throw ValidationException::withMessages(['estado' => 'Esta visita ya fue iniciada o finalizada.']);
             }
             $momento = $this->momentoValido($fechaHora);
+            $this->validarPeriodo($grupo, $momento);
             if ($visita->inicio_traslado_at && $momento->lt($visita->inicio_traslado_at)) {
                 throw ValidationException::withMessages(['fecha_hora' => 'El inicio no puede ser anterior al traslado.']);
             }
@@ -95,6 +97,7 @@ class OperacionVotacionService
                 throw ValidationException::withMessages(['estado' => 'La visita no está en votación.']);
             }
             $momento = $this->momentoValido($fechaHora);
+            $this->validarPeriodo($grupo, $momento);
             if (! $visita->inicio_votacion_at || $momento->lt($visita->inicio_votacion_at)) {
                 throw ValidationException::withMessages(['fecha_hora' => 'El término no puede ser anterior al inicio.']);
             }
@@ -117,6 +120,13 @@ class OperacionVotacionService
 
             return $visita->refresh();
         }, 3);
+    }
+
+    private function validarPeriodo(GrupoVotacion $grupo, ?CarbonImmutable $momento = null): void
+    {
+        if (! $grupo->dentroDelPeriodo() || ($momento && ! $grupo->dentroDelPeriodo($momento))) {
+            throw ValidationException::withMessages(['fecha_hora' => 'La operación solo está permitida dentro del período del grupo ('.$grupo->periodo_funcionamiento.') y de su jornada, según la hora de Chile.']);
+        }
     }
 
     private function momentoValido(?string $value): CarbonImmutable
