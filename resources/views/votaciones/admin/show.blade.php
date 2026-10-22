@@ -3,7 +3,7 @@
 @section('content')
 <div class="va-shell" data-votaciones-admin data-votaciones-admin-jornada data-routing-url="{{ route('votaciones.admin.jornadas.ruta-vial', $jornada) }}">
     <header class="va-topbar">
-        <div><p class="va-topbar__eyebrow">Administración de jornada</p><h1>{{ $jornada->nombre }}</h1><p>{{ $jornada->fecha->format('d-m-Y') }} · {{ $jornada->procesos->pluck('codigo')->join(' + ') }}</p></div>
+        <div><p class="va-topbar__eyebrow">Administración de jornada</p><h1>{{ $jornada->nombre }}</h1><p>{{ $jornada->periodo_funcionamiento }} · {{ $jornada->procesos->pluck('codigo')->join(' + ') }} · Hora de Chile</p></div>
         <div class="va-topbar__actions">
             @if($jornada->publica)<a class="btn btn-outline-light" target="_blank" rel="noopener" href="{{ route('public.votaciones.show', $jornada) }}"><i class="bi bi-box-arrow-up-right"></i> Vista pública</a>@endif
             @if($jornada->estado === 'borrador')
@@ -40,8 +40,12 @@
 
     <div id="grupos" class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
         <div><p class="va-eyebrow text-primary">Equipos y recorridos</p><h2 class="h4 mb-1">Gestión de grupos</h2><p class="text-muted mb-0">Responsables, integrantes y constructor de rutas.</p></div>
-        @if($jornada->estado === 'borrador')<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-crear-grupo"><i class="bi bi-plus-circle me-1"></i> Crear grupo</button>@endif
+        @if($jornada->estado === 'borrador')@can('votaciones.manage-grupos')<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-crear-grupo"><i class="bi bi-plus-circle me-1"></i> Crear grupo</button>@endcan @endif
     </div>
+
+    @if($jornada->estado === 'borrador')
+        @include('votaciones.partials.asociar-grupo')
+    @endif
 
     <div class="va-group-list">
         @forelse($jornada->grupos as $grupo)
@@ -54,7 +58,7 @@
             @endphp
             <article class="va-group" id="grupo-{{ $grupo->id }}">
                 <header class="va-group__head">
-                    <div class="va-group__identity"><span class="va-group__number">{{ $grupo->numero }}</span><div><h2>{{ $grupo->nombre }}</h2><p>Responsable: {{ $grupo->encargado?->display_name ?? 'Sin asignar' }} · {{ $grupo->miembros->count() }} integrante(s)</p></div></div>
+                    <div class="va-group__identity"><span class="va-group__number">{{ $grupo->numero }}</span><div><h2>{{ $grupo->nombre }}</h2><p>Responsable: {{ $grupo->encargado?->display_name ?? 'Sin asignar' }} · {{ $grupo->miembros->count() }} integrante(s)</p><p><i class="bi bi-calendar-range me-1" aria-hidden="true"></i>{{ $grupo->periodo_funcionamiento }}</p>@if($grupo->grupo_origen_id)<p>Equipo y ruta incorporados desde otra jornada.</p>@endif</div></div>
                     <div class="d-flex flex-wrap align-items-center gap-2"><span class="va-status va-status--{{ $grupo->estado }}">{{ str($grupo->estado)->replace('_', ' ') }}</span><a class="btn btn-sm btn-outline-primary" href="{{ route('votaciones.operacion.show', $grupo) }}"><i class="bi bi-phone"></i> Abrir operación</a></div>
                 </header>
                 <div class="va-group__body">
@@ -65,18 +69,19 @@
                         <div class="va-mini-stat"><span>Incidencias abiertas</span><strong>{{ $incidenciasGrupo }}</strong></div>
                     </div>
 
-                    @if($jornada->estado === 'borrador')
+                    @if($jornada->estado === 'borrador')@can('votaciones.manage-grupos')
                         <details class="mb-3"><summary class="btn btn-sm btn-outline-secondary"><i class="bi bi-person-gear me-1"></i> Editar equipo</summary><div class="va-route-panel mt-2">
                             <form method="POST" action="{{ route('votaciones.admin.grupos.update', $grupo) }}" class="row g-3" data-disable-on-submit>@csrf @method('PUT')
-                                <div class="col-sm-2"><label class="form-label">Número</label><input class="form-control" type="number" min="1" name="numero" value="{{ $grupo->numero }}" required></div>
-                                <div class="col-sm-4"><label class="form-label">Nombre</label><input class="form-control" name="nombre" value="{{ $grupo->nombre }}" required maxlength="255"></div>
-                                <div class="col-sm-6"><label class="form-label">Encargado</label><select class="form-select" name="encargado_id" required>@foreach($usuarios as $usuario)<option value="{{ $usuario->id }}" @selected($grupo->encargado_id === $usuario->id)>{{ $usuario->display_name }} · {{ $usuario->email }}</option>@endforeach</select></div>
-                                <div class="col-12"><label class="form-label">Integrantes / Ministros de Fe</label><select class="form-select" name="miembros[]" multiple size="4">@foreach($usuarios as $usuario)<option value="{{ $usuario->id }}" @selected($grupo->miembros->contains($usuario))>{{ $usuario->display_name }} · {{ $usuario->email }}</option>@endforeach</select></div>
+                                <div class="col-sm-2"><label class="form-label" for="numero-{{ $grupo->id }}">Número *</label><input class="form-control" id="numero-{{ $grupo->id }}" type="number" min="1" max="999" name="numero" value="{{ $grupo->numero }}" required></div>
+                                <div class="col-sm-4"><label class="form-label" for="nombre-{{ $grupo->id }}">Nombre *</label><input class="form-control" id="nombre-{{ $grupo->id }}" name="nombre" value="{{ $grupo->nombre }}" required maxlength="255"></div>
+                                <div class="col-sm-6"><label class="form-label" for="encargado-{{ $grupo->id }}">Encargado *</label><select class="form-select" id="encargado-{{ $grupo->id }}" name="encargado_id" required>@foreach($usuarios as $usuario)<option value="{{ $usuario->id }}" @selected($grupo->encargado_id === $usuario->id)>{{ $usuario->display_name }} · {{ $usuario->email }}</option>@endforeach</select></div>
+                                <div class="col-12"><label class="form-label" for="miembros-{{ $grupo->id }}">Integrantes / Ministros de Fe</label><select class="form-select" id="miembros-{{ $grupo->id }}" name="miembros[]" multiple size="4">@foreach($usuarios as $usuario)<option value="{{ $usuario->id }}" @selected($grupo->miembros->contains($usuario))>{{ $usuario->display_name }} · {{ $usuario->email }}</option>@endforeach</select></div>
+                                @include('votaciones.partials.periodo-grupo', ['prefijo' => 'editar-'.$grupo->id, 'grupoPeriodo' => $grupo])
                                 <div class="col-12 text-end"><button class="btn btn-primary">Guardar equipo</button></div>
                             </form>
                             <form method="POST" action="{{ route('votaciones.admin.grupos.destroy', $grupo) }}" class="mt-2 text-end" onsubmit="return confirm('¿Eliminar el grupo y su ruta?')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Eliminar grupo</button></form>
                         </div></details>
-                    @endif
+                    @endcan @endif
 
                     <div class="va-route-builder">
                         <section class="va-route-panel">
@@ -139,7 +144,7 @@
     @endcan
 
     @if($jornada->estado === 'borrador')
-        <div class="modal fade va-modal" id="modal-crear-grupo" tabindex="-1" aria-labelledby="titulo-crear-grupo" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><div><h2 class="modal-title h5" id="titulo-crear-grupo">Crear grupo operativo</h2><p class="text-muted small mb-0">Asigna responsable e integrantes antes de construir la ruta.</p></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div><form method="POST" action="{{ route('votaciones.admin.grupos.store', $jornada) }}" data-disable-on-submit>@csrf<div class="modal-body"><div class="row g-3"><div class="col-sm-3"><label class="form-label">Número</label><input class="form-control" type="number" min="1" name="numero" value="{{ old('numero', $jornada->grupos->max('numero') + 1) }}" required></div><div class="col-sm-9"><label class="form-label">Nombre</label><input class="form-control" name="nombre" value="{{ old('nombre') }}" placeholder="Grupo 1" required maxlength="255"></div><div class="col-12"><label class="form-label">Encargado</label><select class="form-select" name="encargado_id" required><option value="">Seleccione una persona</option>@foreach($usuarios as $usuario)<option value="{{ $usuario->id }}">{{ $usuario->display_name }} · {{ $usuario->email }}</option>@endforeach</select></div><div class="col-12"><label class="form-label">Integrantes / Ministros de Fe</label><select class="form-select" name="miembros[]" multiple size="5">@foreach($usuarios as $usuario)<option value="{{ $usuario->id }}">{{ $usuario->display_name }} · {{ $usuario->email }}</option>@endforeach</select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary">Crear grupo</button></div></form></div></div></div>
+        @can('votaciones.manage-grupos')@include('votaciones.partials.crear-grupo')@endcan
     @endif
 </div>
 @endsection

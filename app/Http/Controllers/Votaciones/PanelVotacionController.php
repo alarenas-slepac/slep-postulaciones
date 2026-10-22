@@ -16,7 +16,7 @@ class PanelVotacionController extends Controller
 {
     public function index(Request $request): View
     {
-        $jornadas = JornadaVotacion::query()->latest('fecha')->get(['id', 'nombre', 'slug', 'fecha', 'estado']);
+        $jornadas = JornadaVotacion::query()->latest('fecha')->get(['id', 'nombre', 'slug', 'fecha', 'fecha_fin', 'estado']);
         $jornada = $this->jornadaSeleccionada($request);
 
         if (! $jornada) {

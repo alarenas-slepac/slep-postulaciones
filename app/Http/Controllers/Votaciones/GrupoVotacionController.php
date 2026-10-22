@@ -7,6 +7,7 @@ use App\Http\Requests\Votaciones\GuardarGrupoRequest;
 use App\Models\GrupoVotacion;
 use App\Models\JornadaVotacion;
 use App\Services\Votaciones\BitacoraVotacionService;
+use App\Services\Votaciones\ConfiguracionGrupoVotacionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,30 +15,17 @@ use Illuminate\Validation\ValidationException;
 
 class GrupoVotacionController extends Controller
 {
-    public function store(GuardarGrupoRequest $request, JornadaVotacion $jornada, BitacoraVotacionService $bitacora): RedirectResponse
+    public function store(GuardarGrupoRequest $request, JornadaVotacion $jornada, ConfiguracionGrupoVotacionService $service): RedirectResponse
     {
-        if ($jornada->estado !== 'borrador') {
-            throw ValidationException::withMessages(['grupo' => 'Los grupos solo se configuran en borrador.']);
-        }
-        DB::transaction(function () use ($request, $jornada, $bitacora) {
-            $data = $request->safe()->except('miembros');
-            $g = $jornada->grupos()->create($data + ['estado' => 'pendiente']);
-            $g->miembros()->sync($request->validated('miembros', []));
-            $bitacora->registrar($jornada, 'grupo_creado', "Se creó {$g->nombre}.", $request->user(), $g);
-        });
+        $grupo = $service->crear($jornada, $request->validated(), $request->user());
 
-        return back()->with('success', 'Grupo creado.');
+        return redirect()->route('votaciones.admin.jornadas.show', $jornada)->withFragment('grupo-'.$grupo->id)
+            ->with('success', $grupo->grupo_origen_id ? 'Grupo asociado a la jornada. Su equipo y ruta se pueden configurar de forma independiente.' : 'Grupo creado y asociado a la jornada.');
     }
 
-    public function update(GuardarGrupoRequest $request, GrupoVotacion $grupo, BitacoraVotacionService $bitacora): RedirectResponse
+    public function update(GuardarGrupoRequest $request, GrupoVotacion $grupo, ConfiguracionGrupoVotacionService $service): RedirectResponse
     {
-        if ($grupo->jornada->estado !== 'borrador') {
-            throw ValidationException::withMessages(['grupo' => 'Los grupos solo se configuran en borrador.']);
-        } DB::transaction(function () use ($request, $grupo, $bitacora) {
-            $grupo->update($request->safe()->except('miembros'));
-            $grupo->miembros()->sync($request->validated('miembros', []));
-            $bitacora->registrar($grupo->jornada, 'grupo_actualizado', "Se actualizó {$grupo->nombre}.", $request->user(), $grupo);
-        });
+        $service->actualizar($grupo, $request->validated(), $request->user());
 
         return back()->with('success', 'Grupo actualizado.');
     }

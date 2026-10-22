@@ -27,7 +27,7 @@
                 @endphp
                 <tr>
                     <td><span class="va-table__title">{{ $jornada->nombre }}</span><span class="va-table__meta">{{ $jornada->slug }}</span></td>
-                    <td data-label="Fecha / procesos"><strong>{{ $jornada->fecha->format('d-m-Y') }}</strong><span class="va-table__meta">{{ $jornada->procesos->pluck('codigo')->join(' + ') }}</span></td>
+                    <td data-label="Fecha / procesos"><strong>{{ $jornada->periodo_funcionamiento }}</strong><span class="va-table__meta">{{ $jornada->procesos->pluck('codigo')->join(' + ') }}</span></td>
                     <td data-label="Estado"><span class="va-status va-status--{{ $jornada->estado }}">{{ str($jornada->estado)->replace('_', ' ') }}</span></td>
                     <td data-label="Grupos">{{ $jornada->grupos_count }}</td><td data-label="Establecimientos">{{ $total }}</td>
                     <td data-label="Avance"><div class="va-progress"><div class="va-progress__bar"><span style="width: {{ $porcentaje }}%"></span></div><div class="va-progress__meta"><span>{{ $atendidas }} / {{ $total }}</span><strong>{{ $porcentaje }}%</strong></div></div></td>

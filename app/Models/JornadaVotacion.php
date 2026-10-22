@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Carbon\CarbonInterface;
 
 class JornadaVotacion extends Model
 {
@@ -22,11 +23,23 @@ class JornadaVotacion extends Model
 
     protected $table = 'jornadas_votacion';
 
-    protected $fillable = ['nombre', 'slug', 'fecha', 'estado', 'publica', 'descripcion', 'publicada_at', 'iniciada_at', 'finalizada_at', 'creada_por', 'actualizada_por'];
+    protected $fillable = ['nombre', 'slug', 'fecha', 'fecha_fin', 'estado', 'publica', 'descripcion', 'publicada_at', 'iniciada_at', 'finalizada_at', 'creada_por', 'actualizada_por'];
 
     protected function casts(): array
     {
-        return ['fecha' => 'date', 'publica' => 'boolean', 'consulta_publica' => 'boolean', 'publicada_at' => 'datetime', 'iniciada_at' => 'datetime', 'finalizada_at' => 'datetime'];
+        return ['fecha' => 'date', 'fecha_fin' => 'date', 'publica' => 'boolean', 'consulta_publica' => 'boolean', 'publicada_at' => 'datetime', 'iniciada_at' => 'datetime', 'finalizada_at' => 'datetime'];
+    }
+
+    public function finFuncionamiento(): CarbonInterface
+    {
+        return $this->fecha_fin ?? $this->fecha;
+    }
+
+    public function getPeriodoFuncionamientoAttribute(): string
+    {
+        $inicio = $this->fecha->format('d-m-Y');
+
+        return $this->fecha->isSameDay($this->finFuncionamiento()) ? $inicio : $inicio.' al '.$this->finFuncionamiento()->format('d-m-Y');
     }
 
     public function getRouteKeyName(): string

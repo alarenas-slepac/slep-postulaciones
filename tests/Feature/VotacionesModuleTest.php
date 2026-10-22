@@ -70,6 +70,8 @@ class VotacionesModuleTest extends TestCase
         $this->permissionMigration->up();
         $this->migration = require database_path('migrations/2026_08_27_210000_create_votaciones_module_tables.php');
         $this->migration->up();
+        (require database_path('migrations/2026_10_22_200000_add_periodos_to_votaciones.php'))->up();
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-08-27 12:00:00', config('votaciones.timezone')));
         $this->operator = $this->crearUsuario('111111111', 'Operador', 'de', 'Prueba', 'operador@example.test');
         $permissions = collect([
             'votaciones.manage-jornadas',

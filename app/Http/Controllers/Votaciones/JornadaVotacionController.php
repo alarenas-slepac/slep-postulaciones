@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Votaciones;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Votaciones\GuardarJornadaRequest;
 use App\Models\Establecimiento;
+use App\Models\GrupoVotacion;
 use App\Models\JornadaVotacion;
 use App\Models\ProcesoVotacion;
 use App\Models\User;
@@ -49,6 +50,7 @@ class JornadaVotacionController extends Controller
     {
         $jornada = DB::transaction(function () use ($request, $bitacora) {
             $data = $request->safe()->except('procesos');
+            $data['fecha_fin'] = $data['fecha_fin'] ?? $data['fecha'];
             $data += ['estado' => 'borrador', 'creada_por' => $request->user()->id, 'actualizada_por' => $request->user()->id];
             $j = JornadaVotacion::create($data);
             $j->procesos()->sync($request->validated('procesos'));
@@ -73,10 +75,25 @@ class JornadaVotacionController extends Controller
         if ($jornada->estado !== 'borrador') {
             throw ValidationException::withMessages(['jornada' => 'Solo se editan jornadas en borrador.']);
         }
-        DB::transaction(function () use ($request, $jornada, $bitacora) {
-            $jornada->update($request->safe()->except('procesos') + ['actualizada_por' => $request->user()->id]);
+        $jornada = DB::transaction(function () use ($request, $jornada, $bitacora) {
+            $jornada = JornadaVotacion::query()->lockForUpdate()->findOrFail($jornada->id);
+            if ($jornada->estado !== JornadaVotacion::BORRADOR) {
+                throw ValidationException::withMessages(['jornada' => 'Solo se editan jornadas en borrador.']);
+            }
+            $data = $request->safe()->except('procesos');
+            $data['fecha_fin'] = $data['fecha_fin'] ?? $jornada->fecha_fin?->toDateString() ?? $data['fecha'];
+            if ($data['fecha_fin'] < $data['fecha']) {
+                throw ValidationException::withMessages(['fecha_fin' => 'El término debe ser igual o posterior al inicio.']);
+            }
+            if ($jornada->grupos()->where(fn ($q) => $q->whereDate('fecha_inicio', '<', $data['fecha'])
+                ->orWhereDate('fecha_fin', '>', $data['fecha_fin']))->exists()) {
+                throw ValidationException::withMessages(['fecha_fin' => 'Hay grupos fuera del nuevo período. Ajusta sus fechas antes de reducir el período de la jornada.']);
+            }
+            $jornada->update($data + ['actualizada_por' => $request->user()->id]);
             $jornada->procesos()->sync($request->validated('procesos'));
             $bitacora->registrar($jornada, 'jornada_actualizada', 'Se actualizó la configuración.', $request->user());
+
+            return $jornada;
         });
 
         return redirect()->route('votaciones.admin.jornadas.show', $jornada)->with('success', 'Jornada actualizada.');
@@ -98,6 +115,12 @@ class JornadaVotacionController extends Controller
             'bitacora.ruta.establecimiento',
         ]);
         $usuarios = User::permission('votaciones.operate-group')->orderBy('nombres')->orderBy('apellido_paterno')->get(['id', 'nombres', 'apellido_paterno', 'apellido_materno', 'email']);
+        $gruposDisponibles = $jornada->estado === JornadaVotacion::BORRADOR
+            ? GrupoVotacion::query()->with('jornada:id,nombre,fecha,fecha_fin')
+                ->where('jornada_votacion_id', '!=', $jornada->id)
+                ->whereNotIn('id', $jornada->grupos()->whereNotNull('grupo_origen_id')->select('grupo_origen_id'))
+                ->orderByDesc('jornada_votacion_id')->orderBy('numero')->get()
+            : collect();
         $establecimientos = Establecimiento::with('admisionPerfil')->orderBy('comuna')->orderBy('nombre_establecimiento')->get(['id', 'rbd', 'nombre_establecimiento', 'comuna', 'latitud', 'longitud']);
         $coordenadasValidas = $establecimientos->mapWithKeys(fn ($establecimiento) => [
             $establecimiento->id => CoordenadasEstablecimiento::sonValidas($establecimiento->latitud, $establecimiento->longitud),
@@ -121,7 +144,7 @@ class JornadaVotacionController extends Controller
             })->values(),
         ])->values();
 
-        return view('votaciones.admin.show', compact('jornada', 'usuarios', 'establecimientos', 'coordenadasValidas', 'mapaRutas'));
+        return view('votaciones.admin.show', compact('jornada', 'usuarios', 'establecimientos', 'coordenadasValidas', 'mapaRutas', 'gruposDisponibles'));
     }
 
     public function publicar(Request $request, JornadaVotacion $jornada, BitacoraVotacionService $bitacora): RedirectResponse

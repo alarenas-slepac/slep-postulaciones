@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.22.625',
+    'current_version' => '2026.10.22.626',
     'entries' => [
+        [
+            'version' => '2026.10.22.626',
+            'title' => 'Grupos reutilizables y períodos de funcionamiento en Votaciones',
+            'summary' => 'Permite incorporar grupos de otras jornadas y definir las fechas inclusivas de funcionamiento de cada jornada y equipo, con control de operación en el servidor.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac'],
+            'items' => [
+                'Agrega Asociar grupo existente en Gestión de grupos: copia responsable, integrantes y ruta hacia una jornada en borrador, conserva el grupo original y mantiene independientes estados, visitas e historial. Evita repetir la misma asociación y registra el origen en bitácora.',
+                'Permite definir inicio y término de las jornadas y de sus grupos. Los períodos de los grupos deben estar contenidos en el de su jornada; impide reducir la jornada dejando grupos fuera. Los registros históricos sin fechas nuevas mantienen su fecha original como período de un día.',
+                'Bloquea el inicio de grupos y el inicio o término de visitas fuera de las fechas autorizadas, incluyendo peticiones directas y horarios manipulados, con días inclusivos y zona horaria de Chile. Conserva la consulta del recorrido fuera del período.',
+                'Mantiene los permisos existentes de configuración y operación, usa transacciones y restricciones únicas, e incluye pruebas aisladas. Requiere la migración aditiva 2026_10_22_200000_add_periodos_to_votaciones; no requiere nuevas variables de entorno.',
+            ],
+            'published_at' => '2026-10-22',
+        ],
         [
             'version' => '2026.10.22.625',
             'title' => 'Estudiantes PIE por curso en solo consulta para directivos de establecimiento',

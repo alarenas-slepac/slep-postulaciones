@@ -16,6 +16,6 @@ class GuardarJornadaRequest extends FormRequest
     {
         $id = $this->route('jornada')?->id;
 
-        return ['nombre' => ['required', 'string', 'max:255'], 'slug' => ['required', 'alpha_dash', 'max:255', Rule::unique('jornadas_votacion', 'slug')->ignore($id)], 'fecha' => ['required', 'date'], 'descripcion' => ['nullable', 'string', 'max:3000'], 'procesos' => ['required', 'array', 'min:1'], 'procesos.*' => ['integer', 'exists:procesos_votacion,id']];
+        return ['nombre' => ['required', 'string', 'max:255'], 'slug' => ['required', 'alpha_dash', 'max:255', Rule::unique('jornadas_votacion', 'slug')->ignore($id)], 'fecha' => ['required', 'date'], 'fecha_fin' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:fecha'], 'descripcion' => ['nullable', 'string', 'max:3000'], 'procesos' => ['required', 'array', 'min:1'], 'procesos.*' => ['integer', 'exists:procesos_votacion,id']];
     }
 }
