@@ -35,8 +35,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css">
     <style>
-        #grupo-origen + .select2-container .select2-selection { min-height: 2.75rem; border-color: var(--slep-border, #dbe4f0); border-radius: .75rem; }
-        #grupo-origen + .select2-container--focus .select2-selection { border-color: #0d6efd; box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .15); }
+        #grupo-origen + .select2-container .select2-selection, .js-votacion-convocados + .select2-container .select2-selection { min-height: 2.75rem; border-color: var(--slep-border, #dbe4f0); border-radius: .75rem; }
+        #grupo-origen + .select2-container--focus .select2-selection, .js-votacion-convocados + .select2-container--focus .select2-selection { border-color: #0d6efd; box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .15); }
     </style>
 @endpush
 @push('scripts')
@@ -48,6 +48,10 @@
                 window.jQuery('#grupo-origen').select2({
                     theme: 'bootstrap-5', width: '100%', placeholder: 'Buscar grupo o jornada…',
                     language: { noResults: () => 'No se encontraron grupos.' }
+                });
+                window.jQuery('.js-votacion-convocados').select2({
+                    theme: 'bootstrap-5', width: '100%', placeholder: 'Buscar establecimientos por RBD o nombre…',
+                    language: { noResults: () => 'No se encontraron establecimientos.' }
                 });
             }
         });

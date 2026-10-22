@@ -11,6 +11,7 @@ use App\Models\ProcesoVotacion;
 use App\Models\User;
 use App\Models\VisitaVotacion;
 use App\Services\Votaciones\BitacoraVotacionService;
+use App\Services\Votaciones\ConvocadosLocalVotacionService;
 use App\Support\Votaciones\CoordenadasEstablecimiento;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
@@ -99,7 +100,7 @@ class JornadaVotacionController extends Controller
         return redirect()->route('votaciones.admin.jornadas.show', $jornada)->with('success', 'Jornada actualizada.');
     }
 
-    public function show(JornadaVotacion $jornada): View
+    public function show(JornadaVotacion $jornada, ConvocadosLocalVotacionService $convocados): View
     {
         $jornada->load([
             'procesos',
@@ -144,7 +145,12 @@ class JornadaVotacionController extends Controller
             })->values(),
         ])->values();
 
-        return view('votaciones.admin.show', compact('jornada', 'usuarios', 'establecimientos', 'coordenadasValidas', 'mapaRutas', 'gruposDisponibles'));
+        return view('votaciones.admin.show', [
+            ...compact('jornada', 'usuarios', 'establecimientos', 'coordenadasValidas', 'mapaRutas', 'gruposDisponibles'),
+            'convocatorias' => $convocados->paraJornada($jornada),
+            'opcionesConvocados' => $jornada->estado === JornadaVotacion::BORRADOR ? $convocados->opciones($jornada) : collect(),
+            'edicionConvocadosDisponible' => $convocados->edicionDisponible(),
+        ]);
     }
 
     public function publicar(Request $request, JornadaVotacion $jornada, BitacoraVotacionService $bitacora): RedirectResponse

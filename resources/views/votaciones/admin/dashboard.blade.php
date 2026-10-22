@@ -22,7 +22,7 @@
             @foreach([
                 ['total_grupos', 'bi-people', 'Total de grupos', ''], ['grupos_votando', 'bi-check2-circle', 'Grupos en votación', 'green'],
                 ['grupos_traslado', 'bi-bus-front', 'Grupos en traslado', 'cyan'], ['grupos_finalizados', 'bi-flag', 'Grupos finalizados', 'green'],
-                ['establecimientos_atendidos', 'bi-building-check', 'Establecimientos atendidos', 'green'], ['establecimientos_pendientes', 'bi-hourglass-split', 'Establecimientos pendientes', ''],
+                ['establecimientos_atendidos', 'bi-building-check', 'Locales de votación atendidos', 'green'], ['establecimientos_pendientes', 'bi-hourglass-split', 'Locales de votación pendientes', ''],
                 ['incidencias_abiertas', 'bi-exclamation-triangle', 'Incidencias abiertas', 'orange'], ['rutas_con_problemas', 'bi-signpost-2', 'Rutas con problemas', 'red'],
             ] as [$key, $icon, $label, $tone])
                 <article class="va-kpi {{ $tone ? 'va-kpi--'.$tone : '' }}"><div class="va-kpi__icon"><i class="bi {{ $icon }}"></i></div><div><strong>{{ $resumen[$key] }}</strong><span>{{ $label }}</span></div></article>
