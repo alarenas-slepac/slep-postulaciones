@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.22.626',
+    'current_version' => '2026.10.22.627',
     'entries' => [
+        [
+            'version' => '2026.10.22.627',
+            'title' => 'Locales de votación y establecimientos convocados por grupo',
+            'summary' => 'Distingue las paradas de la ruta de los establecimientos que acudirán a votar a cada local, con precarga desde el padrón y ajustes manuales por jornada.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac'],
+            'items' => [
+                'Presenta la estructura Grupo, ruta de locales de votación y establecimientos convocados bajo cada local en Administración y Operación. Precarga por RBD del destino, jornada y período del grupo desde Padrón y locales, sin consultar datos personales.',
+                'Permite agregar o quitar establecimientos en jornadas en borrador con los permisos existentes de configuración de rutas, y restablecer la nómina del padrón. Conserva ajustes manuales ante nuevas cargas y admite RBD históricos sin correspondencia en el catálogo.',
+                'Mantiene la planificación del grupo separada de las asignaciones individuales publicadas por RUT, e informa cómo actualizar estas últimas. Al reutilizar grupos en otra jornada, toma los convocados del padrón de destino.',
+                'Agrega almacenamiento por local con restricción única, transacción y bitácora para los ajustes; protege autenticación, permisos, CSRF y conservación de datos ante fallos. Incluye pruebas aisladas y migración aditiva 2026_10_22_210000_create_ruta_votacion_convocados.',
+            ],
+            'published_at' => '2026-10-22',
+        ],
         [
             'version' => '2026.10.22.626',
             'title' => 'Grupos reutilizables y períodos de funcionamiento en Votaciones',

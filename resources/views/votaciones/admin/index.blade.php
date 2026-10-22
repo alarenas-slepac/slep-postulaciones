@@ -17,7 +17,7 @@
         @if($jornadas->isEmpty())
             <div class="va-empty"><div><i class="bi bi-calendar-x"></i><h2>No se encontraron jornadas</h2><p>Ajusta los filtros o crea una nueva jornada de votación.</p><a class="btn btn-primary" href="{{ route('votaciones.admin.jornadas.create') }}">Crear jornada</a></div></div>
         @else
-            <div class="table-responsive"><table class="table va-table va-table-responsive-cards"><thead><tr><th>Jornada</th><th>Fecha / procesos</th><th>Estado</th><th>Grupos</th><th>Establecimientos</th><th>Avance</th><th>Publicación</th><th></th></tr></thead><tbody>
+            <div class="table-responsive"><table class="table va-table va-table-responsive-cards"><thead><tr><th>Jornada</th><th>Fecha / procesos</th><th>Estado</th><th>Grupos</th><th>Locales de votación</th><th>Avance</th><th>Publicación</th><th></th></tr></thead><tbody>
             @foreach($jornadas as $jornada)
                 @php
                     $rutas = $jornada->grupos->flatMap->rutas;
@@ -29,7 +29,7 @@
                     <td><span class="va-table__title">{{ $jornada->nombre }}</span><span class="va-table__meta">{{ $jornada->slug }}</span></td>
                     <td data-label="Fecha / procesos"><strong>{{ $jornada->periodo_funcionamiento }}</strong><span class="va-table__meta">{{ $jornada->procesos->pluck('codigo')->join(' + ') }}</span></td>
                     <td data-label="Estado"><span class="va-status va-status--{{ $jornada->estado }}">{{ str($jornada->estado)->replace('_', ' ') }}</span></td>
-                    <td data-label="Grupos">{{ $jornada->grupos_count }}</td><td data-label="Establecimientos">{{ $total }}</td>
+                    <td data-label="Grupos">{{ $jornada->grupos_count }}</td><td data-label="Locales de votación">{{ $total }}</td>
                     <td data-label="Avance"><div class="va-progress"><div class="va-progress__bar"><span style="width: {{ $porcentaje }}%"></span></div><div class="va-progress__meta"><span>{{ $atendidas }} / {{ $total }}</span><strong>{{ $porcentaje }}%</strong></div></div></td>
                     <td data-label="Publicación"><i class="bi {{ $jornada->publica ? 'bi-eye text-success' : 'bi-eye-slash text-muted' }}"></i> {{ $jornada->publica ? 'Pública' : 'Privada' }}</td>
                     <td data-label="Acciones"><div class="va-table__actions"><a class="btn btn-sm btn-outline-primary" href="{{ route('votaciones.admin.jornadas.show', $jornada) }}">Administrar</a></div></td>

@@ -24,7 +24,7 @@
     <section class="va-kpis">
         <article class="va-kpi"><div class="va-kpi__icon"><i class="bi bi-activity"></i></div><div><strong class="fs-5"><span class="va-status va-status--{{ $jornada->estado }}">{{ str($jornada->estado)->replace('_', ' ') }}</span></strong><span>Estado de jornada</span></div></article>
         <article class="va-kpi"><div class="va-kpi__icon"><i class="bi bi-people"></i></div><div><strong>{{ $jornada->grupos->count() }}</strong><span>Grupos configurados</span></div></article>
-        <article class="va-kpi va-kpi--green"><div class="va-kpi__icon"><i class="bi bi-building-check"></i></div><div><strong>{{ $rutasFinalizadas }} / {{ $totalRutas }}</strong><span>Establecimientos atendidos</span></div></article>
+        <article class="va-kpi va-kpi--green"><div class="va-kpi__icon"><i class="bi bi-building-check"></i></div><div><strong>{{ $rutasFinalizadas }} / {{ $totalRutas }}</strong><span>Locales de votación atendidos</span></div></article>
         <article class="va-kpi va-kpi--orange"><div class="va-kpi__icon"><i class="bi bi-exclamation-triangle"></i></div><div><strong>{{ $jornada->incidencias->where('estado', 'abierta')->count() }}</strong><span>Incidencias abiertas</span></div></article>
     </section>
 
@@ -33,13 +33,13 @@
     @endif
 
     <section class="va-card mb-4" id="rutas">
-        <div class="va-card__header"><div><h2>Mapa operacional de rutas</h2><p>Recorridos por carretera, orden de paradas y estado de coordenadas.</p></div><span class="votaciones-admin-map-status" data-votaciones-admin-map-status></span></div>
+        <div class="va-card__header"><div><h2>Mapa operacional de rutas</h2><p>Recorridos por carretera entre locales de votación, orden de paradas y coordenadas.</p></div><span class="votaciones-admin-map-status" data-votaciones-admin-map-status></span></div>
         <div class="va-card__body"><div class="votaciones-admin-map" data-votaciones-admin-map aria-label="Mapa de las rutas configuradas"></div><div class="votaciones-admin-routing-status mt-3" data-votaciones-admin-routing-status aria-live="polite">Calculando recorridos por carretera…</div><div class="votaciones-admin-distance-summary" data-votaciones-admin-distance-summary></div></div>
     </section>
     <script type="application/json" id="votaciones-admin-rutas-data">{!! json_encode($mapaRutas, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT) !!}</script>
 
     <div id="grupos" class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
-        <div><p class="va-eyebrow text-primary">Equipos y recorridos</p><h2 class="h4 mb-1">Gestión de grupos</h2><p class="text-muted mb-0">Responsables, integrantes y constructor de rutas.</p></div>
+        <div><p class="va-eyebrow text-primary">Equipos y recorridos</p><h2 class="h4 mb-1">Gestión de grupos</h2><p class="text-muted mb-0">Grupo → ruta de locales de votación → establecimientos convocados en cada local.</p></div>
         @if($jornada->estado === 'borrador')@can('votaciones.manage-grupos')<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-crear-grupo"><i class="bi bi-plus-circle me-1"></i> Crear grupo</button>@endcan @endif
     </div>
 
@@ -64,7 +64,7 @@
                 <div class="va-group__body">
                     <div class="va-group__stats">
                         <div class="va-mini-stat"><span>Ubicación actual</span><strong>{{ $actual?->establecimiento?->nombre_establecimiento ?? 'Sin actividad' }}</strong></div>
-                        <div class="va-mini-stat"><span>Ruta</span><strong>{{ $totalGrupo }} establecimiento(s)</strong></div>
+                        <div class="va-mini-stat"><span>Ruta</span><strong>{{ $totalGrupo }} local(es) de votación</strong></div>
                         <div class="va-mini-stat"><span>Avance</span><strong>{{ $finalizadas }} / {{ $totalGrupo }} · {{ $avance }}%</strong></div>
                         <div class="va-mini-stat"><span>Incidencias abiertas</span><strong>{{ $incidenciasGrupo }}</strong></div>
                     </div>
@@ -85,12 +85,12 @@
 
                     <div class="va-route-builder">
                         <section class="va-route-panel">
-                            <h3><i class="bi bi-building-add me-1"></i> Establecimientos disponibles</h3>
+                            <h3><i class="bi bi-building-add me-1"></i> Locales de votación disponibles</h3>
                             @if($jornada->estado === 'borrador')
                                 <form method="POST" action="{{ route('votaciones.admin.rutas.store', $grupo) }}" data-disable-on-submit>@csrf
                                     <label class="form-label" for="buscar-establecimiento-{{ $grupo->id }}">Buscar por nombre, RBD o comuna</label><input class="form-control mb-2" id="buscar-establecimiento-{{ $grupo->id }}" type="search" data-votacion-establecimiento-search placeholder="Ej.: 5001 o Coronel" autocomplete="off">
                                     <select class="form-select mb-2" name="establecimiento_id" data-votacion-establecimiento-select required><option value="">Seleccione un establecimiento</option>@foreach($establecimientos as $establecimiento)<option value="{{ $establecimiento->id }}" data-search="{{ $establecimiento->rbd }} {{ $establecimiento->nombre_establecimiento }} {{ $establecimiento->comuna }}" @disabled($grupo->rutas->contains('establecimiento_id', $establecimiento->id))>RBD {{ $establecimiento->rbd }} · {{ $establecimiento->nombre_establecimiento }} · {{ $establecimiento->comuna }}{{ $coordenadasValidas->get($establecimiento->id, false) ? '' : ' · SIN COORDENADAS' }}</option>@endforeach</select>
-                                    <button class="btn btn-outline-primary w-100"><i class="bi bi-plus-circle"></i> Agregar a la ruta</button>
+                                    <button class="btn btn-outline-primary w-100"><i class="bi bi-plus-circle"></i> Agregar local a la ruta</button>
                                 </form>
                             @else
                                 <p class="text-muted small mb-0"><i class="bi bi-lock me-1"></i> La ruta queda bloqueada una vez publicada la jornada.</p>
@@ -101,7 +101,7 @@
                             <div class="va-route-list">
                                 @forelse($grupo->rutas as $ruta)
                                     @php($logo = $ruta->establecimiento->admisionPerfil?->logoUrl() ?? asset(config('brand.logo_principal', 'branding/01_logo_principal.png')))
-                                    <div class="va-route-stop">
+                                    <section class="border rounded-3 bg-white" id="local-{{ $ruta->id }}"><div class="va-route-stop border-0">
                                         <span class="va-route-stop__order">{{ $ruta->orden }}</span><span class="va-school-logo"><img src="{{ $logo }}" alt=""></span>
                                         <div><strong>{{ $ruta->establecimiento->nombre_establecimiento }}</strong><small>RBD {{ $ruta->establecimiento->rbd }} · {{ $ruta->establecimiento->comuna }} · @if($coordenadasValidas->get($ruta->establecimiento_id, false))<span class="text-success">Coordenadas válidas</span>@else<span class="text-danger">Sin coordenadas</span>@endif</small></div>
                                         <div class="va-route-stop__actions">
@@ -114,8 +114,11 @@
                                             @endif
                                         </div>
                                     </div>
+                                    <div class="px-3 pb-3">
+                                        @include('votaciones.partials.convocados-local', ['convocatoria' => $convocatorias[$ruta->id], 'editableConvocados' => $jornada->estado === 'borrador' && auth()->user()->can('votaciones.manage-rutas')])
+                                    </div></section>
                                 @empty
-                                    <div class="va-empty py-3" style="min-height:130px"><div><i class="bi bi-signpost"></i><h3>Ruta vacía</h3><p>Agrega establecimientos para construir el recorrido.</p></div></div>
+                                    <div class="va-empty py-3" style="min-height:130px"><div><i class="bi bi-signpost"></i><h3>Ruta vacía</h3><p>Agrega locales de votación para construir el recorrido.</p></div></div>
                                 @endforelse
                             </div>
                         </section>

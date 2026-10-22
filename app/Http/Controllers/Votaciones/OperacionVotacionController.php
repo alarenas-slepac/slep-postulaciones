@@ -7,6 +7,7 @@ use App\Http\Requests\Votaciones\RegistrarHorarioRequest;
 use App\Models\GrupoVotacion;
 use App\Models\RutaVotacion;
 use App\Services\Votaciones\OperacionVotacionService;
+use App\Services\Votaciones\ConvocadosLocalVotacionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,12 +26,12 @@ class OperacionVotacionController extends Controller
         return view('votaciones.operacion.index', ['grupos' => $query->orderBy('jornada_votacion_id')->orderBy('numero')->get()]);
     }
 
-    public function show(Request $request, GrupoVotacion $grupo): View
+    public function show(Request $request, GrupoVotacion $grupo, ConvocadosLocalVotacionService $convocados): View
     {
         $this->authorize('operate', $grupo);
         $grupo->load(['jornada.procesos', 'rutas.establecimiento.admisionPerfil', 'rutas.visita']);
 
-        return view('votaciones.operacion.show', compact('grupo'));
+        return view('votaciones.operacion.show', ['grupo' => $grupo, 'convocatorias' => $convocados->paraGrupo($grupo)]);
     }
 
     public function iniciarGrupo(Request $request, GrupoVotacion $grupo, OperacionVotacionService $service): RedirectResponse
