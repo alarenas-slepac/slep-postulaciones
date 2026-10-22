@@ -67,7 +67,7 @@ Para corregir coordenadas o comuna, actualiza el establecimiento en el catálogo
 
 La tarjeta muestra también los logos del local de votación y del establecimiento donde trabaja la persona. Reutiliza `admision_establecimientos.logo_path` y `logoUrl()` del perfil asociado al catálogo. Cada imagen se busca por su RBD respectivo; cuando falta el establecimiento o su logo, se muestra un icono institucional de edificio. No se copian imágenes al padrón.
 
-El pie de página enlaza a **Resultados de votación**, que muestra sólo escrutinios diarios publicados por administración. Su operación y migración se detallan en `docs/RESULTADOS_VOTACIONES.md`.
+El pie de página enlaza a **Resultados de votación**, que muestra el consolidado publicado por administración y conserva las publicaciones históricas. Permite registrar varios días y luego consolidarlos y publicarlos en una sola acción. Su operación y migraciones se detallan en `docs/RESULTADOS_VOTACIONES.md`.
 
 ### Consulta y administración
 

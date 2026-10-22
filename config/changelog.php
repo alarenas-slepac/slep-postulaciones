@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.21.623',
+    'current_version' => '2026.10.22.624',
     'entries' => [
+        [
+            'version' => '2026.10.22.624',
+            'title' => 'Consolidación y publicación conjunta de varios días de votación',
+            'summary' => 'Separa el registro de cada fecha, la revisión de todos los días y la publicación de un único consolidado de la jornada.',
+            'roles' => ['admin'],
+            'items' => [
+                'Permite guardar varias fechas como borradores y muestra una tabla con los totales diarios y la suma general. Consolidar todos los días prepara una versión con cada opción, votos válidos, nulos y blancos de las tres papeletas.',
+                'Publicar consolidado hace visibles todos los días incluidos con una sola acción. Las publicaciones son copias inmutables: añadir o corregir días conserva la última versión pública hasta revisar y publicar una nueva.',
+                'Rechaza consolidaciones o publicaciones desactualizadas cuando cambian las fechas, cantidades o revisiones. Evita duplicados, conserva las versiones previas y registra consolidaciones, publicaciones y retiros en la bitácora.',
+                'Conserva los registros y publicaciones diarias históricos y sus rutas, sin exigir republicarlos. Incorpora una tabla aditiva para consolidados y pruebas de permisos, aislamiento, concurrencia y sumas entre varios días. No requiere variables de entorno adicionales.',
+            ],
+            'published_at' => '2026-10-22',
+        ],
         [
             'version' => '2026.10.21.623',
             'title' => 'Escrutinios diarios y resultados públicos de votaciones',

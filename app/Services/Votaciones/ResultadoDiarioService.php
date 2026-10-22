@@ -31,7 +31,7 @@ class ResultadoDiarioService
                 }
             }
             $observacion = trim((string) ($data['observacion_interna'] ?? '')) ?: null;
-            if ($resultado && $resultado->conteos === $conteos && $resultado->observacion_interna === $observacion) {
+            if ($resultado && $resultado->conteos == $conteos && $resultado->observacion_interna === $observacion) {
                 return $resultado;
             }
             $anterior = $resultado?->conteos;
@@ -56,6 +56,9 @@ class ResultadoDiarioService
         DB::transaction(function () use ($jornada, $dia, $publicar, $version, $usuario): void {
             $jornada = JornadaVotacion::query()->lockForUpdate()->findOrFail($jornada->id);
             $dia = $jornada->resultadosDiarios()->lockForUpdate()->findOrFail($dia->id);
+            if ($publicar && $jornada->resultadosConsolidados()->exists()) {
+                throw ValidationException::withMessages(['publicacion' => 'Esta jornada utiliza consolidación. Publica el consolidado de todos los días.']);
+            }
             $this->comprobarVersion($dia, $version);
             if ($publicar && ($jornada->estado === JornadaVotacion::SUSPENDIDA || $dia->fecha->toDateString() > now(config('votaciones.timezone'))->toDateString())) {
                 throw ValidationException::withMessages(['publicacion' => 'No se publican resultados futuros ni de una jornada suspendida.']);
