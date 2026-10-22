@@ -1,6 +1,6 @@
 # Escrutinios diarios de CCAF y Consulta Mutual
 
-En **Votaciones → Resultados diarios**, el administrador registra **un total general de todos los locales por jornada y fecha**. No se registra un voto individual, no se pregunta qué eligió una persona y no se modifica el padrón de consulta ni el seguimiento territorial.
+En **Votaciones → Resultados diarios**, la pantalla **Resultados y consolidación** permite al administrador registrar **un total general de todos los locales por jornada y fecha**, guardar varios días, consolidarlos y publicar un único resultado general. No se registra un voto individual, no se pregunta qué eligió una persona y no se modifica el padrón de consulta ni el seguimiento territorial.
 
 ## Papeletas
 
@@ -18,19 +18,24 @@ Los días ya guardados conservan sus papeletas aunque posteriormente se cambien 
 
 ## Ingreso y correcciones
 
-1. Seleccionar jornada y día; se admite una fecha real hasta el día actual de `America/Santiago`, sin fechas futuras. La fecha de referencia de la jornada no limita las múltiples fechas de votación.
-2. Completar **todas** las cantidades como enteros de 0 a 1.000.000, incluyendo ceros expresos. El navegador calcula los totales al instante; el servidor valida los valores y los vuelve a calcular para las consultas.
-3. Guardar el escrutinio. Queda en borrador, disponible sólo en administración.
-4. Revisar las cifras guardadas y pulsar **Publicar día**. La observación interna no se publica.
-5. Para corregir, abrir el día, modificar y guardar. Si cambian las cifras o la observación, se retira la publicación de ese día y exige nueva revisión/publicación. Guardar exactamente lo mismo conserva el estado.
+1. En **Registrar días**, seleccionar la jornada y la fecha y pulsar **Abrir día**. Se admite una fecha real hasta el día actual de `America/Santiago`, sin fechas futuras. La fecha de referencia de la jornada no limita las múltiples fechas de votación.
+2. Completar **todas** las cantidades como enteros de 0 a 1.000.000, incluyendo ceros expresos. El navegador calcula los totales al instante; el servidor valida los valores.
+3. Pulsar **Guardar escrutinio del día**. Seleccionar otra fecha arriba y repetir. Por ejemplo, guardar el 23, 26, 27, 28 y 29 de octubre después del cierre de cada fecha. Los días anteriores se conservan; guardarlos no publica resultados.
+4. Revisar **Días registrados que se van a consolidar**. La tabla presenta cada fecha, los totales de cada papeleta y la suma general. Se incluyen **todos los días guardados de esa jornada**, aunque sigan en borrador. La aplicación no supone que ya se hayan ingresado todas las fechas previstas: el administrador debe comprobar la lista.
+5. Pulsar **Consolidar todos los días**. Se prepara una versión que conserva fechas, opciones y sumas. Revisar las tres papeletas consolidadas y pulsar **Publicar consolidado**. No hay que publicar cada día por separado.
+6. Para corregir, pulsar **Editar día**, modificar y guardar. **El público conserva la última versión publicada**, sin incluir las correcciones ni nuevas fechas pendientes. Volver a consolidar y publicar para actualizar los resultados. Si alguien modifica los días entre la revisión y la publicación, se rechaza la versión desactualizada y se pide reconsolidar.
 
-La combinación jornada/fecha es única. Las operaciones bloquean la jornada en una transacción y usan una versión del registro. Si otro administrador cambió el día, el formulario anterior se rechaza con un aviso de recarga; nunca se acumula el mismo envío ni se sobrescribe silenciosamente. No hay acción de eliminación. Guardados, correcciones, publicaciones y retiros quedan en la bitácora existente, con cantidades anteriores/nuevas cuando se corrigen votos. Un fallo de bitácora revierte la operación.
+La combinación jornada/fecha es única. Las operaciones bloquean la jornada en una transacción y usan una versión del registro diario y una huella de los datos consolidados. Si otro administrador cambió el día, el formulario anterior se rechaza con un aviso de recarga; nunca se acumula el mismo envío ni se sobrescribe silenciosamente. Repetir la consolidación de los mismos datos reutiliza la versión ya preparada; repetir una publicación activa no duplica la bitácora. No hay acción de eliminación. Guardados, correcciones, consolidaciones, publicaciones y retiros quedan en la bitácora existente. Un fallo de bitácora revierte la operación completa.
 
 ## Publicación
 
-La vista **`/resultados-votacion?jornada=<slug>`** no requiere login. Permite alternar entre acumulado y día publicado; también admite `&fecha=AAAA-MM-DD`. El acumulado público incluye sólo días publicados. El acumulado interno incluye borradores y publicados, expresamente identificado.
+La vista **`/resultados-votacion?jornada=<slug>`** no requiere login. Presenta la última versión del **consolidado publicado**, con todas las fechas que incluía al prepararlo. Permite consultar el total general o el detalle de una fecha incluida, mediante los botones o `&fecha=AAAA-MM-DD`. El detalle diario se calcula sobre la misma copia publicada; no mezcla borradores posteriores.
 
-Guardar no publica. La publicación de resultados es independiente de la publicación de la consulta por RUT y del seguimiento territorial. Una jornada suspendida no muestra resultados públicos. El enlace de una jornada sin ningún día publicado devuelve 404; la portada sin parámetros informa que aún no hay resultados. No se exponen observaciones, usuarios, datos del padrón ni días en borrador, y las respuestas no se almacenan en caché HTTP. La consulta del local incluye un enlace a los resultados en el pie de página.
+Guardar días y preparar un consolidado no publica. **Publicar consolidado** sustituye la versión pública anterior de forma atómica y conserva su copia para historial. **Retirar consolidado publicado** oculta los resultados hasta una nueva publicación; no hace reaparecer las publicaciones diarias antiguas. La publicación de resultados es independiente de la consulta por RUT y del seguimiento territorial. Una jornada suspendida no muestra resultados públicos. El enlace de una jornada sin publicación devuelve 404; la portada sin parámetros informa que aún no hay resultados. No se exponen observaciones, usuarios, datos del padrón ni revisiones pendientes, y las respuestas no se almacenan en caché HTTP. La consulta del local incluye un enlace a los resultados en el pie de página.
+
+Las publicaciones diarias realizadas con el parche anterior se conservan y se siguen mostrando hasta publicar el primer consolidado. Las rutas diarias antiguas permanecen por compatibilidad, pero una jornada que ya preparó una consolidación no admite nuevas publicaciones diarias por esa vía. Al publicar el primer consolidado se usan todos los días registrados, independientemente de sus marcas diarias históricas.
+
+Las copias y sus versiones se guardan en `votacion_resultados_consolidados`. Las fechas y el resumen se serializan como JSON en columnas TEXT para conservar el orden de las papeletas y opciones en MySQL. El modelo impide modificar el contenido de una versión o eliminarla; los cambios de votos requieren una versión nueva. Las etiquetas del consolidado publicado no cambian si después se modifica el catálogo de papeletas.
 
 Las rutas de ingreso y publicación exigen autenticación, correo verificado, rol **admin**, acceso al módulo y CSRF. Tener permisos operativos de votaciones con otro rol no habilita estas acciones. Se reutilizan roles existentes sin añadir permisos ni eventos de notificación.
 
@@ -40,17 +45,19 @@ Se muestra el logo del local de votación y del lugar de trabajo. Ambos se obtie
 
 ## Despliegue en cPanel
 
-Requiere las tablas existentes del módulo de Votaciones. El parche añade exclusivamente `votacion_resultados_diarios`; no altera tablas históricas ni necesita variables `.env` nuevas. Desplegar código y `public/build`, respaldar la base de datos y revisar primero las pendientes:
+Requiere las tablas existentes del módulo de Votaciones y `votacion_resultados_diarios` del parche anterior. Esta ampliación agrega `votacion_resultados_consolidados`, sin modificar ni borrar los resultados diarios existentes y sin variables `.env` nuevas. Desplegar código, respaldar la base de datos y revisar primero las pendientes:
 
 ```bash
 cd /home/slepac/apps/slep_postulaciones
 /opt/cpanel/ea-php83/root/usr/bin/php artisan migrate:status
 # Si las migraciones anteriores de Votaciones ya están aplicadas:
+# Sólo si la tabla diaria aún no está instalada:
 /opt/cpanel/ea-php83/root/usr/bin/php artisan migrate --path=database/migrations/2026_10_22_010000_create_votacion_resultados_diarios.php --force
+/opt/cpanel/ea-php83/root/usr/bin/php artisan migrate --path=database/migrations/2026_10_22_020000_create_votacion_resultados_consolidados.php --force
 /opt/cpanel/ea-php83/root/usr/bin/php artisan optimize:clear
 /opt/cpanel/ea-php83/root/usr/bin/php artisan route:list --path=resultados
 ```
 
-Los recursos se generan localmente con `npm run build`; no se requieren dependencias nuevas ni colas. Para logos, mantener el disco de medios de Admisión y su acceso público ya utilizados por el sistema. Un rollback eliminaría los escrutinios: no forma parte de la actualización habitual.
+Se reutilizan los recursos CSS y JavaScript ya compilados del parche anterior; esta ampliación cambia vistas y código PHP. No se requieren dependencias nuevas ni colas. Para logos, mantener el disco de medios de Admisión y su acceso público ya utilizados por el sistema. Un rollback eliminaría los escrutinios: no forma parte de la actualización habitual.
 
-Antes de cargar datos reales, comprobar con un registro ficticio en un entorno de pruebas: guardar sin publicación pública, revisar sumas, publicar, consultar por día y acumulado, corregir (debe ocultarse), republicar y retirar. Las pruebas automatizadas usan exclusivamente SQLite en memoria, datos ficticios y almacenamiento temporal; no envían mensajes.
+Antes de cargar datos reales, comprobar en un entorno de pruebas: guardar al menos tres fechas sin publicación pública, consolidar las tres, revisar sumas y publicar en una acción; añadir/corregir un día y comprobar que la versión pública permanece igual; volver a consolidar y publicar; consultar una fecha y retirar el consolidado. Las pruebas automatizadas usan exclusivamente SQLite en memoria, datos ficticios y almacenamiento temporal; no envían mensajes.

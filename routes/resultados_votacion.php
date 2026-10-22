@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Votaciones\ResultadoDiarioVotacionController;
+use App\Http\Controllers\Votaciones\ResultadoConsolidadoVotacionController;
 use App\Http\Middleware\ConsultaVotacionPrivada;
 use Illuminate\Support\Facades\Route;
 
@@ -11,6 +12,8 @@ Route::prefix('gestion/votaciones/admin/resultados')->name('votaciones.admin.res
     ->middleware(['auth', 'verified', 'ensure.role:admin', 'ensure.module', ConsultaVotacionPrivada::class])
     ->group(function (): void {
         Route::get('/', [ResultadoDiarioVotacionController::class, 'index'])->name('index');
+        Route::post('/{jornada:slug}/consolidar', [ResultadoConsolidadoVotacionController::class, 'consolidar'])->name('consolidar');
+        Route::patch('/{jornada:slug}/consolidados/{consolidado}/publicacion', [ResultadoConsolidadoVotacionController::class, 'publicacion'])->name('consolidados.publicacion');
         Route::post('/{jornada:slug}', [ResultadoDiarioVotacionController::class, 'guardar'])->name('guardar');
         Route::patch('/{jornada:slug}/{resultado}/publicacion', [ResultadoDiarioVotacionController::class, 'publicacion'])->name('publicacion');
     });

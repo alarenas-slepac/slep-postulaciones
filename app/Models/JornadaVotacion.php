@@ -68,4 +68,9 @@ class JornadaVotacion extends Model
     {
         return $this->hasMany(ResultadoDiarioVotacion::class, 'jornada_votacion_id');
     }
+
+    public function resultadosConsolidados(): HasMany
+    {
+        return $this->hasMany(ResultadoConsolidadoVotacion::class, 'jornada_votacion_id');
+    }
 }

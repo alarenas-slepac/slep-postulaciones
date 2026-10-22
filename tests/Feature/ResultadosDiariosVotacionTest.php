@@ -36,6 +36,7 @@ class ResultadosDiariosVotacionTest extends IsolatedSecurityTestCase
         }
         (require database_path('migrations/2026_08_27_210000_create_votaciones_module_tables.php'))->up();
         (require database_path('migrations/2026_10_22_010000_create_votacion_resultados_diarios.php'))->up();
+        (require database_path('migrations/2026_10_22_020000_create_votacion_resultados_consolidados.php'))->up();
         $this->jornada = $this->crearJornada('jornada-prueba');
         $this->admin = $this->testUser(1, 3);
         Storage::disk('local')->put('test-views/layouts/app.blade.php', '<!doctype html><html lang="es"><head>@stack(\'styles\')</head><body>@yield(\'content\')@stack(\'scripts\')</body></html>');
@@ -81,7 +82,7 @@ class ResultadosDiariosVotacionTest extends IsolatedSecurityTestCase
         $this->assertFalse($this->jornada->publica);
         $this->get(route('votaciones.admin.resultados.index', ['jornada' => $this->jornada->slug, 'fecha' => '2026-10-23']))
             ->assertOk()->assertSee('Desafiliación CCAF')->assertSee('Afiliación CCAF')->assertSee('Consulta Mutual')
-            ->assertSee('Los Héroes')->assertSee('18 de Septiembre')->assertSee('La Araucana')->assertSee('Mutual')->assertSee('Publicar día');
+            ->assertSee('Los Héroes')->assertSee('18 de Septiembre')->assertSee('La Araucana')->assertSee('Mutual')->assertSee('Consolidar todos los días')->assertDontSee('Publicar día');
         $this->assertSame('resultado_diario_creado', DB::table('bitacora_votacion')->value('evento'));
     }
 

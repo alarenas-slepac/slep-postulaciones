@@ -48,7 +48,7 @@ final class PapeletasVotacion
                 unset($cantidad);
             }
             $validos = array_sum(array_intersect_key($conteos, $papeleta['opciones']));
-            $resumen[$clave] = $papeleta + ['conteos' => $conteos, 'validos' => $validos, 'emitidos' => array_sum($conteos)];
+            $resumen[$clave] = array_replace($papeleta, ['conteos' => $conteos, 'validos' => $validos, 'emitidos' => array_sum($conteos)]);
         }
 
         return $resumen;
