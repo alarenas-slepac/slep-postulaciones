@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.21.621',
+    'current_version' => '2026.10.21.622',
     'entries' => [
+        [
+            'version' => '2026.10.21.622',
+            'title' => 'Dirección y mapa del local de votación',
+            'summary' => 'Asocia el RBD del local de votación al catálogo de establecimientos y muestra su dirección, comuna, mapa y enlace Cómo llegar en el resultado de la consulta.',
+            'roles' => ['admin'],
+            'items' => [
+                'Obtiene la ubicación por RBD_LUGAR_DE_VOTACION, sin confundirla con el RBD del establecimiento donde trabaja la persona ni con el identificador interno del catálogo. Carga los destinos en conjunto y consulta la información vigente sin reimportar el padrón.',
+                'Reutiliza las coordenadas de establecimientos y la dirección pública del perfil asociado de Admisión Escolar. Si falta la dirección, el establecimiento o una coordenada válida, informa el dato pendiente sin inventar un punto en el mapa.',
+                'Incorpora Leaflet y OpenStreetMap, ya usados en Centro de Operaciones, con marcador del destino, carga al acercarse al área visible y enlace externo Cómo llegar. Conserva la consulta por POST y limita los datos del mapa a la ubicación del local.',
+                'Mantiene el sistema de diseño institucional, la adaptación móvil y alternativas ante errores de carga. Incluye pruebas de asociación por RBD, datos faltantes, coordenadas inválidas, textos seguros y comportamiento del mapa. No requiere migraciones ni nuevas variables de entorno.',
+            ],
+            'published_at' => '2026-10-21',
+        ],
         [
             'version' => '2026.10.21.621',
             'title' => 'Consulta pública del local de votación por RUT',

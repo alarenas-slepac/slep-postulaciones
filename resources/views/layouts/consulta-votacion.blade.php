@@ -9,6 +9,7 @@
     <title>Consulta tu local de votación · {{ config('brand.org_name', 'SLEP Andalién Costa') }}</title>
     <link rel="icon" href="{{ asset('branding/favicon.ico') }}">
     @vite(['resources/scss/app.scss', 'resources/css/consulta-votacion.css'])
+    @stack('map-assets')
 </head>
 <body class="cv-public">
 <a class="cv-skip" href="#contenido">Saltar al contenido</a>

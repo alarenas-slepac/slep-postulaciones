@@ -34,7 +34,10 @@ class ConsultaLocalVotacionController extends Controller
             if (! $jornada) {
                 return $this->pantalla($request, error: 'La consulta de esta jornada no está disponible.', status: 404);
             }
-            $resultados = $jornada->padronConsulta()->where('rut', $rut)->with('local')->orderBy('rbd')->get();
+            $resultados = $jornada->padronConsulta()->where('rut', $rut)->with([
+                'local.establecimientoDestino:id,rbd,comuna,latitud,longitud',
+                'local.establecimientoDestino.admisionPerfil:id,establecimiento_id,direccion_publica',
+            ])->orderBy('rbd')->get();
 
             return $this->pantalla($request, resultados: $resultados, consultada: $jornada);
         });
