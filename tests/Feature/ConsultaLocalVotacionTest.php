@@ -34,7 +34,7 @@ class ConsultaLocalVotacionTest extends IsolatedSecurityTestCase
             $t->decimal('longitud', 10, 7)->nullable(); $t->string('director_contacto')->nullable();
         });
         Schema::create('admision_establecimientos', function (Blueprint $t): void {
-            $t->id(); $t->unsignedBigInteger('establecimiento_id')->unique(); $t->string('direccion_publica', 500)->nullable();
+            $t->id(); $t->unsignedBigInteger('establecimiento_id')->unique(); $t->string('direccion_publica', 500)->nullable(); $t->string('logo_path')->nullable();
         });
         Schema::create('modules', function (Blueprint $t): void { $t->id(); $t->string('key'); });
         DB::table('modules')->insert(['key' => 'votaciones']);
@@ -365,6 +365,33 @@ class ConsultaLocalVotacionTest extends IsolatedSecurityTestCase
         $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])
             ->assertOk()->assertDontSee('<script>direccion()</script>', false)->assertDontSee('<img src=x onerror=local()>', false)
             ->assertSee('&lt;script&gt;direccion()&lt;/script&gt;', false)->assertSee('&lt;img src=x onerror=local()&gt;', false);
+    }
+
+    public function test_logos_del_destino_y_del_origen_corresponden_a_sus_rbd_y_no_a_sus_id(): void
+    {
+        config(['admision.media_disk' => 'public']);
+        DB::table('establecimientos')->insert([
+            ['id' => 9501, 'rbd' => 9001, 'nombre_establecimiento' => 'Origen'],
+            ['id' => 42, 'rbd' => 9501, 'nombre_establecimiento' => 'Destino'],
+        ]);
+        DB::table('admision_establecimientos')->insert([
+            ['establecimiento_id' => 9501, 'logo_path' => 'admision/logos/origen-prueba.png'],
+            ['establecimiento_id' => 42, 'logo_path' => 'admision/logos/destino-prueba.png'],
+        ]);
+        $this->cargar(); $this->publicar();
+        $this->get(route('public.consulta-votacion.index'))->assertDontSee('destino-prueba.png')->assertDontSee('origen-prueba.png');
+        $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])
+            ->assertOk()->assertSeeInOrder(['destino-prueba.png', 'Logo de Local de prueba', 'origen-prueba.png', 'Logo de Origen de prueba'])
+            ->assertSee('referrerpolicy="no-referrer"', false);
+    }
+
+    public function test_logo_ausente_no_impide_consulta_y_no_inventa_un_archivo_de_imagen(): void
+    {
+        DB::table('establecimientos')->insert(['id' => 42, 'rbd' => 9501, 'nombre_establecimiento' => 'Destino']);
+        $this->cargar(); $this->publicar();
+        $response = $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug]);
+        $response->assertOk()->assertSee('Local de prueba')->assertSee('Origen de prueba')->assertDontSee('alt="Logo de', false);
+        $this->assertSame(2, substr_count($response->getContent(), 'class="cv-establishment-logo"'));
     }
 
     private function cargar(?array $analysis = null, bool $confirmar = false): void

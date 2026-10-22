@@ -2213,7 +2213,7 @@
     ]
   },
   "resources/css/consulta-votacion.css": {
-    "file": "assets/consulta-votacion-C7E1UMVX.css",
+    "file": "assets/consulta-votacion-CU3Tme0n.css",
     "src": "resources/css/consulta-votacion.css",
     "isEntry": true,
     "name": "consulta-votacion",
@@ -2264,6 +2264,15 @@
     "name": "votaciones-publicas",
     "names": [
       "votaciones-publicas.css"
+    ]
+  },
+  "resources/css/votaciones-resultados.css": {
+    "file": "assets/votaciones-resultados-DnssLD68.css",
+    "src": "resources/css/votaciones-resultados.css",
+    "isEntry": true,
+    "name": "votaciones-resultados",
+    "names": [
+      "votaciones-resultados.css"
     ]
   },
   "resources/css/whatsapp-admin.css": {
@@ -2356,6 +2365,12 @@
     "imports": [
       "_leaflet-Bu0uVQ8k.js"
     ]
+  },
+  "resources/js/votaciones-resultados.js": {
+    "file": "assets/votaciones-resultados-BwUU4jcP.js",
+    "name": "votaciones-resultados",
+    "src": "resources/js/votaciones-resultados.js",
+    "isEntry": true
   },
   "resources/js/whatsapp-admin.js": {
     "file": "assets/whatsapp-admin-CirOB12h.js",

@@ -63,4 +63,9 @@ class JornadaVotacion extends Model
     {
         return $this->hasMany(LocalConsultaVotacion::class, 'jornada_votacion_id');
     }
+
+    public function resultadosDiarios(): HasMany
+    {
+        return $this->hasMany(ResultadoDiarioVotacion::class, 'jornada_votacion_id');
+    }
 }

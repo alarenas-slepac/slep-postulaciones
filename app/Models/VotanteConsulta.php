@@ -18,4 +18,9 @@ class VotanteConsulta extends Model
     {
         return $this->belongsTo(LocalConsultaVotacion::class, 'local_consulta_id');
     }
+
+    public function establecimientoOrigen(): BelongsTo
+    {
+        return $this->belongsTo(Establecimiento::class, 'rbd', 'rbd');
+    }
 }

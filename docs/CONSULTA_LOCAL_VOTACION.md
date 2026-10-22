@@ -65,6 +65,10 @@ Si no hay coincidencia de RBD, la consulta conserva el local y horario del padr�
 
 Para corregir coordenadas o comuna, actualiza el establecimiento en el catálogo existente. Para completar la dirección, usa su perfil de Admisión Escolar. Los cambios se reflejan en la siguiente consulta sin volver a importar el Excel. Esta ampliación no requiere migraciones, paquetes ni variables `.env` adicionales; desplegar también el nuevo JavaScript y los recursos compilados de `public/build`.
 
+La tarjeta muestra también los logos del local de votación y del establecimiento donde trabaja la persona. Reutiliza `admision_establecimientos.logo_path` y `logoUrl()` del perfil asociado al catálogo. Cada imagen se busca por su RBD respectivo; cuando falta el establecimiento o su logo, se muestra un icono institucional de edificio. No se copian imágenes al padrón.
+
+El pie de página enlaza a **Resultados de votación**, que muestra sólo escrutinios diarios publicados por administración. Su operación y migración se detallan en `docs/RESULTADOS_VOTACIONES.md`.
+
 ### Consulta y administración
 
 Las rutas administrativas exigen autenticación, correo verificado, rol `admin` y el control de módulo existente. La consulta pública acepta solamente búsquedas exactas por RUT válido y jornada publicada para consulta. No hay listado público, búsqueda parcial, exportación ni API que entregue el padrón completo.

@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.21.622',
+    'current_version' => '2026.10.21.623',
     'entries' => [
+        [
+            'version' => '2026.10.21.623',
+            'title' => 'Escrutinios diarios y resultados públicos de votaciones',
+            'summary' => 'Permite al administrador guardar el total general de cada día para Desafiliación CCAF, Afiliación CCAF y Consulta Mutual, con publicación explícita y acumulado público.',
+            'roles' => ['admin'],
+            'items' => [
+                'Agrega Resultados diarios a Votaciones. Separa las opciones de cada papeleta, nulos y blancos; calcula votos válidos y total de papeletas al instante. Utiliza los procesos de la jornada y no vincula votos a personas del padrón.',
+                'Conserva un registro por jornada y fecha, impide fechas futuras y cantidades negativas o decimales, y registra cambios en la bitácora. Usa transacciones, restricción única y revisión de versión para evitar duplicados y sobrescrituras concurrentes.',
+                'Los borradores sólo son visibles para administradores. Publicar día habilita resultados por fecha y acumulado de días publicados sin login. Corregir cifras retira el día hasta una nueva publicación; las observaciones internas nunca aparecen públicamente.',
+                'Mantiene la publicación de resultados independiente de la consulta por RUT y del seguimiento territorial. Incluye diseño institucional adaptable, pruebas y documentación. Requiere una migración aditiva para los escrutinios diarios; no requiere nuevas variables de entorno.',
+                'La consulta de local muestra los logos del destino de votación y del establecimiento de trabajo desde sus perfiles de Admisión, vinculados por sus RBD respectivos, con icono alternativo cuando no hay logo.',
+            ],
+            'published_at' => '2026-10-21',
+        ],
         [
             'version' => '2026.10.21.622',
             'title' => 'Dirección y mapa del local de votación',

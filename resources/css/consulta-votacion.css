@@ -54,6 +54,9 @@
 .cv-badge-muted { background: #f8fafc; border-color: #dbe4f0; color: #64748b; }
 .cv-result-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.5rem; }
 .cv-destination h4 { line-height: 1.5; }.cv-destination h4 i { color: #0d6efd; }
+.cv-establishment-heading { display: flex; align-items: center; gap: 1rem; }.cv-establishment-heading > div { min-width: 0; }
+.cv-shell .cv-establishment-logo { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 4rem; width: 4rem; height: 4rem; padding: .35rem; border: 1px solid #dbe4f0; border-radius: 1rem; color: #0d47a1; background: #fff; }
+.cv-establishment-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }.cv-establishment-logo i { font-size: 1.5rem; }
 .cv-group { display: inline-block; color: #0d47a1; background: #eef6ff; border-radius: .75rem; padding: .5rem .75rem; font-weight: 700; }
 .cv-schedule { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }.cv-schedule > div { padding: 1rem; background: #f8fbff; border: 1px solid #dbe4f0; border-radius: 1rem; }.cv-schedule dt { color: #64748b; font-size: .78rem; font-weight: 400; }.cv-schedule dd { color: #0b3d91; font-weight: 700; font-size: 1.15rem; margin: .75rem 0 0; }.cv-schedule dd small { font-size: .8rem; }
 .cv-work { display: flex; align-items: center; gap: 1rem; padding: 1rem; margin-top: 1.5rem; background: #f8fafc; border-radius: 1rem; }.cv-work > i { color: #64748b; font-size: 1.3rem; }.cv-work span, .cv-work strong, .cv-work small { display: block; }.cv-work span, .cv-work small { color: #64748b; font-size: .8rem; }.cv-work strong { margin: .3rem 0; }

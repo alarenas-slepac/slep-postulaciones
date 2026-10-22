@@ -53,7 +53,7 @@
             <article class="cv-panel cv-result-card mb-3">
                 <div class="cv-result-top"><div><span class="cv-eyebrow">Funcionario/a</span><h3>{{ $votante->nombre }}</h3></div><span class="cv-badge"><i class="bi bi-check-circle" aria-hidden="true"></i> Registro en el padrón</span></div>
                 <div class="cv-result-grid">
-                    <div class="cv-destination"><span class="cv-eyebrow">Debes dirigirte a</span><h4><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ $votante->local->lugar_votacion }}</h4><p class="mb-2">RBD del local: <strong>{{ $votante->local->rbd_local }}</strong></p><span class="cv-group">Grupo: {{ $votante->grupo ?? 'Por confirmar' }}</span></div>
+                    <div class="cv-destination"><span class="cv-eyebrow">Debes dirigirte a</span><div class="cv-establishment-heading">@include('public.votaciones.partials.establecimiento-logo', ['logo' => $votante->local->establecimientoDestino?->admisionPerfil?->logoUrl(), 'nombre' => $votante->local->lugar_votacion])<div><h4>{{ $votante->local->lugar_votacion }}</h4><p class="mb-0">RBD del local: <strong>{{ $votante->local->rbd_local }}</strong></p></div></div><span class="cv-group mt-2">Grupo: {{ $votante->grupo ?? 'Por confirmar' }}</span></div>
                     <dl class="cv-schedule mb-0"><div><dt><i class="bi bi-calendar3" aria-hidden="true"></i> Día de votación</dt><dd>{{ $votante->local->dia->translatedFormat('l d') }} de {{ $votante->local->dia->translatedFormat('F Y') }}</dd></div><div><dt><i class="bi bi-clock" aria-hidden="true"></i> Hora de inicio</dt><dd>{{ substr($votante->local->hora_inicio, 0, 5) }} <small>hrs.</small></dd></div></dl>
                 </div>
                 <section class="cv-location" aria-labelledby="ubicacion-titulo-{{ $loop->index }}">
@@ -70,7 +70,7 @@
                         <p class="cv-location-pending mb-0"><i class="bi bi-info-circle" aria-hidden="true"></i> Ubicación en mapa por confirmar. Consulta con la organización antes de dirigirte al local.</p>
                     @endif
                 </section>
-                <div class="cv-work"><i class="bi bi-building" aria-hidden="true"></i><div><span>Establecimiento donde trabajas</span><strong>{{ $votante->establecimiento }}</strong><small>RBD {{ $votante->rbd }} · {{ $votante->tipo_contrato }}</small></div></div>
+                <div class="cv-work">@include('public.votaciones.partials.establecimiento-logo', ['logo' => $votante->establecimientoOrigen?->admisionPerfil?->logoUrl(), 'nombre' => $votante->establecimiento])<div><span>Establecimiento donde trabajas</span><strong>{{ $votante->establecimiento }}</strong><small>RBD {{ $votante->rbd }} · {{ $votante->tipo_contrato }}</small></div></div>
                 @if(!$votante->grupo)<p class="cv-inline-note mb-0"><i class="bi bi-info-circle" aria-hidden="true"></i> El padrón aún no indica tu grupo. Confírmalo con la organización de la jornada.</p>@endif
             </article>
         @empty

@@ -11,6 +11,8 @@ Route::prefix('consulta-local-votacion')->name('public.consulta-votacion.')
         Route::post('/', [ConsultaLocalVotacionController::class, 'consultar'])->middleware('throttle:15,1,consulta-rut')->name('consultar');
     });
 
+require __DIR__.'/resultados_votacion.php';
+
 Route::prefix('gestion/votaciones/admin/padrones')->name('votaciones.admin.padrones.')
     ->middleware(['auth', 'verified', 'ensure.role:admin', 'ensure.module', ConsultaVotacionPrivada::class])
     ->group(function (): void {

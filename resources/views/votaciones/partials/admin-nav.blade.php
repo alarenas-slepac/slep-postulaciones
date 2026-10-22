@@ -4,6 +4,7 @@
     <a href="{{ route('votaciones.admin.jornadas.index') }}" @class(['active' => request()->routeIs('votaciones.admin.jornadas.*')])><i class="bi bi-calendar-event"></i> Jornadas</a>
     @role('admin')
         <a href="{{ route('votaciones.admin.padrones.index', $jornadaContextual ? ['jornada' => $jornada->slug] : []) }}" @class(['active' => request()->routeIs('votaciones.admin.padrones.*')])><i class="bi bi-person-vcard"></i> Padrón y locales</a>
+        <a href="{{ route('votaciones.admin.resultados.index', $jornadaContextual ? ['jornada' => $jornada->slug] : []) }}" @class(['active' => request()->routeIs('votaciones.admin.resultados.*')])><i class="bi bi-bar-chart" aria-hidden="true"></i> Resultados diarios</a>
     @endrole
     @if($jornadaContextual)
         <a href="{{ route('votaciones.admin.jornadas.show', $jornada) }}#grupos"><i class="bi bi-people"></i> Grupos</a>
