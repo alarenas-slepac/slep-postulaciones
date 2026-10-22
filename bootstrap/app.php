@@ -7,7 +7,7 @@ use App\Http\Middleware\TouchLastSeen;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: [__DIR__ . '/../routes/web.php', __DIR__ . '/../routes/padron_individual.php', __DIR__ . '/../routes/reemplazo_documentos.php', __DIR__ . '/../routes/padron_datos.php', __DIR__ . '/../routes/whatsapp.php'],
+        web: [__DIR__ . '/../routes/web.php', __DIR__ . '/../routes/padron_individual.php', __DIR__ . '/../routes/reemplazo_documentos.php', __DIR__ . '/../routes/padron_datos.php', __DIR__ . '/../routes/whatsapp.php', __DIR__ . '/../routes/consulta_votacion.php'],
         api: __DIR__ . '/../routes/api.php',
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',

@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.21.620',
+    'current_version' => '2026.10.21.621',
     'entries' => [
+        [
+            'version' => '2026.10.21.621',
+            'title' => 'Consulta pública del local de votación por RUT',
+            'summary' => 'Incorpora consulta sin inicio de sesión para caja de compensación y mutualidad, con carga validada de padrón, locales, días y horarios por jornada.',
+            'roles' => ['admin'],
+            'items' => [
+                'Añade Padrón y locales en Votaciones para el administrador. Importa un Excel con las hojas PADRON VOTACIÓN y LOCALES VOTACION, valida RUT con dígito verificador y relaciona cada asignación por RBD de origen y RBD del local.',
+                'Informa hoja y fila de los errores sin incluir datos personales. Rechaza horarios contradictorios, destinos sin correspondencia, fórmulas y archivos fuera de los límites. Conserva registros de múltiples establecimientos y muestra Por confirmar cuando el grupo está vacío.',
+                'Reemplaza únicamente el padrón de consulta de la jornada seleccionada dentro de una transacción, exige confirmación para sustituir datos existentes y retira su publicación hasta la revisión. Registra conteos en la bitácora existente y conserva los demás padrones del SGA.',
+                'Publica y retira la consulta de manera independiente del seguimiento de recorridos. La consulta pública por POST muestra local, RBD, grupo, día y hora; limita intentos por IP, no coloca el RUT en la URL ni lo guarda en sesión y envía cabeceras contra caché e indexación.',
+                'Aplica el sistema de diseño institucional en administración, consulta y resultados, con formularios accesibles y adaptación a móviles. Incluye documentación de carga y despliegue, migración aditiva y pruebas aisladas de validación, permisos, consulta y reversión.',
+            ],
+            'published_at' => '2026-10-21',
+        ],
         [
             'version' => '2026.10.21.620',
             'title' => 'Eliminar retiro desde el historial de no renovaciones',

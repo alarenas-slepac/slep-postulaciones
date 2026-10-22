@@ -19,6 +19,7 @@ export default defineConfig({
                 'resources/css/votaciones-publicas.css',
                 'resources/js/votaciones-publicas.js',
                 'resources/css/votaciones-admin.css',
+                'resources/css/consulta-votacion.css',
                 'resources/js/votaciones-admin.js',
                 'resources/js/votaciones-admin-rutas.js',
                 'resources/css/dotacion-establecimiento.css',

@@ -26,7 +26,7 @@ class JornadaVotacion extends Model
 
     protected function casts(): array
     {
-        return ['fecha' => 'date', 'publica' => 'boolean', 'publicada_at' => 'datetime', 'iniciada_at' => 'datetime', 'finalizada_at' => 'datetime'];
+        return ['fecha' => 'date', 'publica' => 'boolean', 'consulta_publica' => 'boolean', 'publicada_at' => 'datetime', 'iniciada_at' => 'datetime', 'finalizada_at' => 'datetime'];
     }
 
     public function getRouteKeyName(): string
@@ -52,5 +52,15 @@ class JornadaVotacion extends Model
     public function bitacora(): HasMany
     {
         return $this->hasMany(BitacoraVotacion::class)->latest('created_at');
+    }
+
+    public function padronConsulta(): HasMany
+    {
+        return $this->hasMany(VotanteConsulta::class, 'jornada_votacion_id');
+    }
+
+    public function localesConsulta(): HasMany
+    {
+        return $this->hasMany(LocalConsultaVotacion::class, 'jornada_votacion_id');
     }
 }
