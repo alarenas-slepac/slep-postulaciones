@@ -20,7 +20,7 @@ use ZipArchive;
 class EstablecimientoCursoPieController extends Controller
 {
     private array $allowedRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
-    private array $editableRoles = ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'supervisor_plani'];
+    private array $editableRoles = ['admin', 'coordinador_uatp', 'supervisor_plani'];
 
     public function index(Request $request)
     {

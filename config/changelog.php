@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.22.624',
+    'current_version' => '2026.10.22.625',
     'entries' => [
+        [
+            'version' => '2026.10.22.625',
+            'title' => 'Estudiantes PIE por curso en solo consulta para directivos de establecimiento',
+            'summary' => 'El rol funcionario_directivo_estab conserva el listado y detalle de su establecimiento, con todas las operaciones de edición bloqueadas en el servidor.',
+            'roles' => ['funcionario_directivo_estab', 'admin', 'coordinador_uatp', 'supervisor_plani'],
+            'items' => [
+                'Retira al funcionario directivo de los roles de edición de Estudiantes PIE por curso. Oculta las acciones de registro, edición, carga masiva, plantilla de carga y traspaso entre años mediante los permisos existentes de la vista.',
+                'Rechaza las solicitudes directas de creación, modificación, eliminación, importación y traspaso, incluidas las páginas de creación y edición. Mantiene el acceso de consulta limitado al establecimiento asociado al usuario.',
+                'Conserva la edición para Administración, Coordinación UATP y Supervisión de Planificación, y la consulta para Coordinación GDP. Añade pruebas HTTP de permisos, rol activo, alcance, presentación y conservación de datos. No requiere migraciones ni cambios de recursos compilados.',
+            ],
+            'published_at' => '2026-10-22',
+        ],
         [
             'version' => '2026.10.22.624',
             'title' => 'Consolidación y publicación conjunta de varios días de votación',
