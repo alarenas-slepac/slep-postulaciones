@@ -2230,6 +2230,15 @@
       "dotacion-establecimiento.css"
     ]
   },
+  "resources/css/funcionario-consulta.css": {
+    "file": "assets/funcionario-consulta-BCXhVRDY.css",
+    "src": "resources/css/funcionario-consulta.css",
+    "isEntry": true,
+    "name": "funcionario-consulta",
+    "names": [
+      "funcionario-consulta.css"
+    ]
+  },
   "resources/css/notification-events.css": {
     "file": "assets/notification-events-9hnmAjNk.css",
     "src": "resources/css/notification-events.css",
@@ -2331,6 +2340,12 @@
     "file": "assets/dotacion-asignacion-DjyiSzqh.js",
     "name": "dotacion-asignacion",
     "src": "resources/js/dotacion-asignacion.js",
+    "isEntry": true
+  },
+  "resources/js/funcionario-consulta.js": {
+    "file": "assets/funcionario-consulta-DXrrOlQA.js",
+    "name": "funcionario-consulta",
+    "src": "resources/js/funcionario-consulta.js",
     "isEntry": true
   },
   "resources/js/pie-comparison.js": {

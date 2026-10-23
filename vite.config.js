@@ -32,6 +32,8 @@ export default defineConfig({
                 'resources/css/pie-comparison.css',
                 'resources/js/pie-comparison.js',
                 'resources/js/whatsapp-admin.js',
+                'resources/css/funcionario-consulta.css',
+                'resources/js/funcionario-consulta.js',
             ],
             refresh: true,
         }),

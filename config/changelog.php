@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.22.627',
+    'current_version' => '2026.10.22.628',
     'entries' => [
+        [
+            'version' => '2026.10.22.628',
+            'title' => 'Consulta institucional de funcionarios y acceso API por integración',
+            'summary' => 'Permite consultar por RUT la dependencia registrada en establecimientos o Administración Central, desde una pantalla autorizada del SGA y una API privada para otros sistemas.',
+            'roles' => ['admin', 'funcionario_estab', 'funcionario_establecimiento'],
+            'items' => [
+                'Agrega Consulta de funcionarios con validación del DV y respuesta de vínculos por establecimiento, RBD, estatuto, escalafón y período. Administración Central entrega RUT normalizado, apellidos, nombres, unidad, subdirección y jefatura como 1/0.',
+                'Distingue padrón actual, autorización AC activa, antecedentes sin dependencia actual y coincidencias que requieren revisión. No clasifica por roles de usuario ni confunde errores de fuentes con personas no encontradas.',
+                'Incorpora integraciones administradas exclusivamente por administrador con tokens Sanctum independientes, entrega única, vencimiento, renovación, revocación, suspensión y límites configurables. Protege la consulta web con rol activo, permiso y CSRF.',
+                'Registra auditoría sin RUT ni contenido consultado en claro, evita caché y errores sensibles, y añade índices virtuales normalizados sin alterar los RUT históricos. Incluye migraciones aditivas, pruebas aisladas y documentación de contrato OpenAPI e instalación en cPanel.',
+            ],
+            'published_at' => '2026-10-22',
+        ],
         [
             'version' => '2026.10.22.627',
             'title' => 'Locales de votación y establecimientos convocados por grupo',
