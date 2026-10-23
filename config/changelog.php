@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.22.628',
+    'current_version' => '2026.10.22.629',
     'entries' => [
+        [
+            'version' => '2026.10.22.629',
+            'title' => 'Cabecera Authorization y diagnóstico privado de la API de funcionarios',
+            'summary' => 'Corrige el reenvío de Authorization hacia PHP CGI/FPM en Apache y permite comprobar una integración y su token desde Terminal sin revelar secretos.',
+            'roles' => ['admin'],
+            'items' => [
+                'Añade a public/.htaccess la regla de Authorization usada por Laravel, antes del front controller, conservando el handler PHP 8.3 y las rutas existentes. Evita que la pérdida de la cabecera en Apache origine un 401 con tokens válidos.',
+                'Incorpora funcionarios-api:diagnosticar con ID de integración y archivo privado opcional para verificar hash, propietario, vigencia, habilidad y configuración del guard. No crea ni renueva tokens, no consulta personas y no realiza peticiones HTTP.',
+                'Documenta la distinción entre 401, 403 y 422, el alcance del checksum, la revisión del DocumentRoot real y el diagnóstico por parte del proveedor. Incluye pruebas aisladas de privacidad, tokens y ausencia de escrituras; la corrección debe verificarse en el hosting.',
+            ],
+            'published_at' => '2026-10-22',
+        ],
         [
             'version' => '2026.10.22.628',
             'title' => 'Consulta institucional de funcionarios y acceso API por integración',

@@ -10,12 +10,14 @@ use App\Support\RutChile;
 use App\Support\SlepUiRegistry;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\PersonalAccessToken;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
@@ -358,5 +360,129 @@ class FuncionarioConsultaApiTest extends IsolatedSecurityTestCase
         FuncionarioAcAutorizado::query()->update(['estado_autorizacion' => 'inactivo']);
         $this->employee();
         $this->callApi($token)->assertJsonPath('estado', 'padron_actual')->assertJsonPath('clasificacion', 'establecimiento');
+    }
+
+    private function diagnose(FuncionarioApiIntegration $client, ?string $token = null): array
+    {
+        $options = ['integration' => (string) $client->id];
+        if ($token !== null) {
+            Storage::disk('local')->put('api-diagnostico.txt', $token);
+            $path = Storage::disk('local')->path('api-diagnostico.txt');
+            chmod($path, 0600);
+            $options['--token-file'] = $path;
+        }
+        $exit = Artisan::call('funcionarios-api:diagnosticar', $options);
+        $output = Artisan::output();
+        if ($token !== null) $this->assertStringNotContainsString($token, $output);
+        return [$exit, json_decode($output, true, flags: JSON_THROW_ON_ERROR)];
+    }
+
+    public function test_cli_diagnosis_reports_metadata_without_disclosing_or_touching_tokens(): void
+    {
+        $client = $this->integration(); $plain = $this->token($client);
+        $this->token($client, days: -1);
+        $before = $client->tokens()->get()->toArray();
+        [$exit, $report] = $this->diagnose($client);
+        $this->assertSame(0, $exit);
+        $this->assertTrue($report['integration_enabled']);
+        $this->assertSame(2, $report['tokens_registered']);
+        $this->assertSame(1, $report['tokens_current_with_ability']);
+        $this->assertTrue($report['guard_accepts_integration']);
+        $this->assertSame('not_verified_from_cli', $report['http_header_forwarding']);
+        $this->assertStringNotContainsString($plain, json_encode($report));
+        $this->assertStringNotContainsString($client->name, json_encode($report));
+        $this->assertSame($before, $client->tokens()->get()->toArray());
+        $this->assertSame(0, DB::table('funcionario_consulta_audits')->count());
+    }
+
+    public function test_cli_diagnosis_matches_a_private_token_against_its_hash_without_http_or_writes(): void
+    {
+        $client = $this->integration(); $plain = $this->token($client);
+        [$exit, $report] = $this->diagnose($client, $plain);
+        $this->assertSame(0, $exit);
+        foreach (['token_matches_database', 'token_belongs_to_integration', 'token_within_expiration', 'token_has_ability', 'credentials_ready'] as $field) {
+            $this->assertTrue($report[$field]);
+        }
+        $stored = $client->tokens()->sole();
+        $this->assertStringNotContainsString($stored->token, json_encode($report));
+        $this->assertNull($stored->last_used_at);
+        $this->assertSame(0, DB::table('funcionario_consulta_audits')->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_cli_diagnosis_distinguishes_wrong_owner_revoked_expired_and_scope(): void
+    {
+        $client = $this->integration();
+        $other = $this->integration(['name' => 'Otra integración sintética']);
+        $foreign = $this->token($other);
+        [$exit, $report] = $this->diagnose($client, $foreign);
+        $this->assertSame(1, $exit);
+        $this->assertTrue($report['token_matches_database']);
+        $this->assertFalse($report['token_belongs_to_integration']);
+        $other->tokens()->delete();
+        [, $report] = $this->diagnose($client, $foreign);
+        $this->assertFalse($report['token_matches_database']);
+        $expired = $this->token($client, days: -1);
+        [$exit, $report] = $this->diagnose($client, $expired);
+        $this->assertSame(1, $exit);
+        $this->assertTrue($report['token_matches_database']);
+        $this->assertFalse($report['token_within_expiration']);
+        $wrongScope = $this->token($client, ['otra-habilidad']);
+        [$exit, $report] = $this->diagnose($client, $wrongScope);
+        $this->assertSame(1, $exit);
+        $this->assertFalse($report['token_has_ability']);
+    }
+
+    public function test_cli_diagnosis_detects_suspension_global_expiration_and_guard_provider(): void
+    {
+        $client = $this->integration(['enabled' => false]); $plain = $this->token($client);
+        [$exit, $report] = $this->diagnose($client, $plain);
+        $this->assertSame(1, $exit);
+        $this->assertFalse($report['integration_enabled']);
+        $this->assertTrue($report['token_matches_database']);
+        $client->update(['enabled' => true]);
+        config(['auth.guards.sanctum.provider' => 'users']);
+        [$exit, $report] = $this->diagnose($client, $plain);
+        $this->assertSame(1, $exit);
+        $this->assertFalse($report['guard_accepts_integration']);
+        config(['auth.guards.sanctum.provider' => null, 'sanctum.expiration' => 60]);
+        $client->tokens()->update(['created_at' => now()->subHours(2)]);
+        [$exit, $report] = $this->diagnose($client, $plain);
+        $this->assertSame(1, $exit);
+        $this->assertFalse($report['token_within_expiration']);
+        $this->assertSame(60, $report['global_expiration_minutes']);
+    }
+
+    public function test_cli_diagnosis_rejects_public_invalid_and_oversized_secret_files(): void
+    {
+        $client = $this->integration(); $plain = $this->token($client);
+        $originalPublic = public_path();
+        $this->app->usePublicPath(Storage::disk('public')->path(''));
+        Storage::disk('public')->put('no-usar.txt', $plain);
+        $exit = Artisan::call('funcionarios-api:diagnosticar', ['integration' => (string) $client->id,
+            '--token-file' => Storage::disk('public')->path('no-usar.txt')]);
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('token_file_invalid_or_not_private', Artisan::output());
+        $this->assertStringNotContainsString($plain, Artisan::output());
+        $this->app->usePublicPath($originalPublic);
+        config(['filesystems.disks.public.root' => Storage::disk('public')->path('')]);
+        $exit = Artisan::call('funcionarios-api:diagnosticar', ['integration' => (string) $client->id,
+            '--token-file' => Storage::disk('public')->path('no-usar.txt')]);
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('token_file_invalid_or_not_private', Artisan::output());
+        $this->assertStringNotContainsString($plain, Artisan::output());
+        foreach (['texto-que-no-es-token', str_repeat('x', 4097)] as $bad) {
+            [$exit, $report] = $this->diagnose($client, $bad);
+            $this->assertSame(1, $exit);
+            $this->assertSame('token_file_invalid_or_not_private', $report['error']);
+        }
+    }
+
+    public function test_cli_diagnosis_reports_unavailable_tables_without_dumping_exception_details(): void
+    {
+        $client = $this->integration(); Schema::drop('personal_access_tokens');
+        [$exit, $report] = $this->diagnose($client);
+        $this->assertSame(1, $exit);
+        $this->assertSame(['error' => 'database_or_configuration_unavailable'], $report);
     }
 }
