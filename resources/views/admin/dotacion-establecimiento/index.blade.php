@@ -36,6 +36,11 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
+                @if (\App\Support\DotacionInformeFunciones::puedeVer($activeRole))
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_cursos' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}">
+                        <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Informe de cursos por nivel
+                    </a>
+                @endif
                 @if (\App\Support\DotacionInformeFunciones::puedeVer($activeRole) && in_array((int) $anio, [2026, 2027], true))
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}">
                         <i class="bi bi-table" aria-hidden="true"></i> Informe de dotación por funciones
@@ -87,6 +92,9 @@
         <div class="alert alert-danger" role="alert">{{ $message }}</div>
     @enderror
     @error('export_planes_niveles')
+        <div class="alert alert-danger" role="alert">{{ $message }}</div>
+    @enderror
+    @error('informe_cursos')
         <div class="alert alert-danger" role="alert">{{ $message }}</div>
     @enderror
 

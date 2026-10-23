@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.22.629',
+    'current_version' => '2026.10.23.630',
     'entries' => [
+        [
+            'version' => '2026.10.23.630',
+            'title' => 'Informe de cursos por nivel con selección y grupos combinados',
+            'summary' => 'Agrega un consolidado territorial con una fila por establecimiento, niveles seleccionables y descarga Excel, contando cada grupo combinado activo como un solo curso.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Incorpora Informe de cursos por nivel en el listado de Dotación Establecimiento, conservando año, búsqueda y comuna. Permite seleccionar cursos del catálogo agrupados por enseñanza y muestra todos los establecimientos filtrados, incluidos los que tienen cero cursos en los niveles elegidos.',
+                'Cuenta cursos activos con matrícula del año consultado. Cada grupo combinado activo suma una unidad en una columna identificada por sus niveles; dos grupos suman dos cursos, sin volver a sumar sus integrantes. Al seleccionar parte de un grupo se incluye completo una sola vez.',
+                'Genera un Excel con los mismos datos, totales y detalle de grupos, conserva textos como texto y procesa únicamente cursos y establecimientos sin calcular nóminas ni asignaciones docentes. Incluye catálogos históricos y rechaza configuraciones que duplican un curso entre grupos activos.',
+                'Protege la consulta y descarga por rol activo, mantiene las rutas existentes y añade pruebas aisladas de filtros, permisos, conteos, históricos y Excel. No requiere migraciones ni nuevas variables de entorno.',
+            ],
+            'published_at' => '2026-10-23',
+        ],
         [
             'version' => '2026.10.22.629',
             'title' => 'Cabecera Authorization y diagnóstico privado de la API de funcionarios',
