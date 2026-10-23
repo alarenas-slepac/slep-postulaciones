@@ -32,6 +32,12 @@ class DotacionEstablecimientoController extends Controller
 
     public function index(Request $request)
     {
+        if ($request->boolean('informe_cursos')) {
+            $this->authorizeDotacionAccess($request);
+
+            return app(DotacionInformeCursosController::class)->index($request);
+        }
+
         if ($request->boolean('informe_funciones')) {
             $this->authorizeDotacionAccess($request);
             // El informe mantiene sus referencias de lectura por establecimiento,
