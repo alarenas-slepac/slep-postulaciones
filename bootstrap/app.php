@@ -13,6 +13,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->prependToPriorityList(
+            \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            \App\Http\Middleware\FuncionarioConsultaPrivacy::class,
+        );
+        $middleware->prependToPriorityList(
+            \Illuminate\Routing\Middleware\ThrottleRequests::class,
+            \App\Http\Middleware\AuthorizeFuncionarioIntegration::class,
+        );
         // Alias de middleware (colócalos aquí, SOLO alias – nada que resuelva URL/Route)
         $middleware->alias([
             'verified'    => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,

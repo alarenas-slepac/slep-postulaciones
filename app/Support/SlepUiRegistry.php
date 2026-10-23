@@ -83,6 +83,7 @@ class SlepUiRegistry
                 self::entry('Mantenedor de riesgo IRTE', 'centro-operaciones.riesgos.configuracion', 'bi-ui-checks-grid', ['admin', 'comunicaciones', 'gabinete_slep']),
             ],
             'Trámites y operación' => [
+                self::entry('Consulta de funcionarios', 'funcionarios.consulta.index', 'bi-person-vcard', ['admin', 'funcionario_estab', 'funcionario_establecimiento']),
                 self::entry('Votaciones CCAF y Mutualidades', 'votaciones.admin.dashboard', 'bi-geo-alt-fill', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'votaciones'),
                 self::entry('Operación de votaciones', 'votaciones.operacion.index', 'bi-sign-turn-right-fill', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac'], 'votaciones'),
                 self::entry('Certificados laborales', 'certificados.index', 'bi-file-earmark-check', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario', 'funcionario_ac'], 'certificados'),
@@ -113,6 +114,7 @@ class SlepUiRegistry
                 self::entry('Mis liquidaciones', 'liquidaciones.mis.index', 'bi-receipt', ['postulante', 'funcionario']),
             ],
             'Administración' => [
+                self::entry('Integraciones API de funcionarios', 'admin.funcionarios-api.index', 'bi-plug', ['admin']),
                 self::entry('Usuarios y roles', 'admin.users.index', 'bi-people-fill', ['admin'], 'admin.users'),
                 self::entry('Correos masivos por rol', 'admin.bulk-role-mail.index', 'bi-envelope-at', ['admin', 'coordinador_gdp']),
                 self::entry('Historial de notificaciones', 'admin.notification-logs.index', 'bi-envelope-check', ['admin'], 'admin.notification-logs'),
@@ -287,6 +289,14 @@ class SlepUiRegistry
 
     private static function entryVisible(array $item, $user, ?string $activeRole): bool
     {
+        $consultationPermission = match ($item['route']) {
+            'funcionarios.consulta.index' => 'consultar_funcionarios',
+            'admin.funcionarios-api.index' => 'funcionarios_api.manage',
+            default => null,
+        };
+        if ($consultationPermission && (!$user || !$user->can($consultationPermission))) {
+            return false;
+        }
         if ($item['route'] === 'admin.notification-events.index' && (!$user || !$user->can('notifications.manage'))) {
             return false;
         }

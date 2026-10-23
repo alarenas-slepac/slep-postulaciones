@@ -1,0 +1,152 @@
+openapi: 3.0.3
+info:
+  title: SGA - Consulta de funcionarios
+  version: 1.0.0
+  description: Consulta individual autenticada de padrones del SLEP. No certifica vigencia laboral.
+paths:
+  /api/v1/funcionarios/consultar:
+    post:
+      operationId: consultarFuncionario
+      summary: Consultar dependencia por RUT con DV
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rut]
+              properties:
+                rut:
+                  type: string
+                  pattern: '^[0-9]{1,8}[0-9Kk]$'
+                  example: '990000018'
+                  description: RUT sintético de ejemplo. Sin puntos ni guion; DV validado por módulo 11.
+      responses:
+        '200':
+          description: Consulta completa, con o sin coincidencias. Revisar estado y advertencias.
+          headers:
+            X-Request-ID:
+              schema: {type: string, format: uuid}
+            Cache-Control:
+              schema: {type: string, example: 'no-store, private'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Resultado'}
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '429':
+          description: Límite de entrada por IP o por actor alcanzado.
+          headers:
+            Retry-After:
+              schema: {type: integer, minimum: 0}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Token Sanctum de integración habilitada, no vencido, con habilidad funcionarios:consultar.
+  responses:
+    Error:
+      description: '401 autenticación; 403 acceso/transporte; 422 RUT inválido; 503 fuente o auditoría no disponible.'
+      headers:
+        Cache-Control:
+          schema: {type: string, example: 'no-store, private'}
+        X-Request-ID:
+          schema: {type: string, format: uuid}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum: [no_autenticado, sin_permiso, rut_invalido, limite_excedido, servicio_no_disponible]
+        message: {type: string}
+        errors:
+          type: object
+          properties:
+            rut:
+              type: array
+              items: {type: string}
+    Resultado:
+      type: object
+      required: [encontrado, clasificacion, estado, fuente, funcionario, advertencias]
+      properties:
+        encontrado: {type: boolean}
+        clasificacion:
+          type: string
+          nullable: true
+          enum: [establecimiento, administracion_central, revision_requerida, null]
+        estado:
+          type: string
+          enum: [padron_actual, autorizacion_activa, sin_antecedentes, sin_vinculo_actual_confirmado, revision_requerida]
+        fuente:
+          type: string
+          nullable: true
+          enum: [reemplazos_personal, funcionarios_ac_autorizados, null]
+        funcionario:
+          nullable: true
+          oneOf:
+            - {$ref: '#/components/schemas/FuncionarioEscuela'}
+            - {$ref: '#/components/schemas/FuncionarioAC'}
+            - {type: object, nullable: true, enum: [null]}
+        advertencias:
+          type: array
+          items: {type: string}
+        coincidencias:
+          type: object
+          required: [establecimiento, administracion_central]
+          properties:
+            establecimiento:
+              oneOf:
+                - {$ref: '#/components/schemas/FuncionarioEscuela'}
+                - {type: object, nullable: true, enum: [null]}
+            administracion_central:
+              type: array
+              items: {$ref: '#/components/schemas/FuncionarioAC'}
+    FuncionarioEscuela:
+      type: object
+      additionalProperties: false
+      required: [rut_normalizado, nombre, vinculos]
+      properties:
+        rut_normalizado: {type: string, example: '990000018'}
+        nombre: {type: string, nullable: true}
+        vinculos:
+          type: array
+          items: {$ref: '#/components/schemas/Vinculo'}
+    Vinculo:
+      type: object
+      additionalProperties: false
+      required: [rbd, establecimiento, estatuto, escalafon, periodo]
+      properties:
+        rbd: {type: integer, nullable: true}
+        establecimiento: {type: string, nullable: true}
+        estatuto: {type: string, nullable: true}
+        escalafon: {type: string, nullable: true}
+        periodo: {type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'}
+    FuncionarioAC:
+      type: object
+      additionalProperties: false
+      required: [rut_normalizado, apellido_paterno, apellido_materno, nombres, unidad_departamento, subdireccion_dependencia, jefatura]
+      properties:
+        rut_normalizado: {type: string, example: '990000018'}
+        apellido_paterno: {type: string, nullable: true}
+        apellido_materno: {type: string, nullable: true}
+        nombres: {type: string, nullable: true}
+        unidad_departamento: {type: string, nullable: true}
+        subdireccion_dependencia: {type: string, nullable: true}
+        jefatura: {type: integer, enum: [0, 1]}
