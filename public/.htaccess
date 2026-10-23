@@ -4,6 +4,10 @@ AddHandler application/x-httpd-ea-php83 .php .php8 .phtml
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Conservar Authorization para Laravel/Sanctum al pasar a PHP CGI/FPM.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
     # Si existe el archivo o carpeta, NO pasar por Laravel
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d

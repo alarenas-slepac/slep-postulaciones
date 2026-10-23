@@ -122,11 +122,72 @@ Este cambio se despliega junto con Laravel. Requiere PHP 8.3 y MySQL con columna
    /opt/cpanel/ea-php83/root/usr/bin/php artisan route:list --path=funcionarios
    ```
 
-4. Verificar que HTTPS llega correctamente a Laravel y que Apache/cPanel entrega la cabecera `Authorization` al PHP. No desactivar la autenticación para resolver un `401`. Esta API no requiere un token global ni variables nuevas en `.env`.
+4. Verificar que HTTPS llega correctamente a Laravel y que Apache/cPanel entrega la cabecera `Authorization` al PHP. El `.htaccess` del DocumentRoot efectivo debe conservar la regla incluida en `public/.htaccess`, explicada abajo. No desactivar la autenticación para resolver un `401`. Esta API no requiere un token global ni variables nuevas en `.env`.
 5. Ingresar como administrador, verificar ambas vistas y crear expresamente cada integración. Para comprobar desde otro sistema, usar su backend y leer el token desde su configuración privada; consultar sólo un RUT autorizado para la prueba. No registrar la respuesta en logs.
 6. Verificar `401` sin token, `422` con un RUT sintético inválido y la revocación/suspensión con una integración de prueba. La consulta externa real y el comportamiento de proxy/WAF deben comprobarse en ese hosting; las pruebas locales no acreditan funcionamiento productivo.
 
 Los `down()` son conservadores: preservan historial, permisos, tokens y columnas derivadas. Para detener el acceso, suspender integraciones/revocar tokens y retirar permisos. No ejecutar rollback como sustituto de la revocación. Cualquier eliminación de datos o tablas requiere revisión independiente.
+
+## Diagnóstico de un `401 no_autenticado`
+
+El checksum del token de Sanctum sólo ayuda a detectar errores de copia. No demuestra que su hash siga registrado, que corresponda a este servidor/integración ni que esté vigente. El número anterior a `|` identifica el registro del **token**, no el ID de la integración.
+
+En esta implementación, un token ausente, desconocido, revocado o vencido produce `401`. Una integración suspendida con un token reconocido y vigente produce `403`, al igual que una capacidad insuficiente. Un RUT inválido produce `422` sólo después de superar la autenticación y autorización. Recibir `401` con distintos RUT no permite distinguir entre un token rechazado y una cabecera perdida.
+
+### 1. Conservar Authorization en Apache
+
+El archivo `public/.htaccess` incluye esta regla inmediatamente después de `RewriteEngine On`, antes de las excepciones de archivos/directorios y de enviar la petición a `index.php`:
+
+```apache
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+```
+
+Es la regla del [proyecto oficial Laravel 12](https://raw.githubusercontent.com/laravel/laravel/12.x/public/.htaccess). Versiones anteriores de este proyecto no la incluían. Desplegar el archivo corregido conservando el handler PHP 8.3 y las demás reglas del sitio. Si el dominio usa otro DocumentRoot, como `public_html`, comprobar cuál `.htaccess` procesa realmente las peticiones: actualizar únicamente una copia sin uso no corrige el servidor. La existencia de la regla en el repositorio no acredita su aplicación en cPanel.
+
+### 2. Revisar la integración sin credenciales en la salida
+
+Después de desplegar también el comando de diagnóstico:
+
+```bash
+cd /home/slepac/apps/slep_postulaciones
+/opt/cpanel/ea-php83/root/usr/bin/php artisan optimize:clear
+/opt/cpanel/ea-php83/root/usr/bin/php artisan funcionarios-api:diagnosticar 1
+```
+
+Es de sólo lectura: no consulta personas, no crea/renueva tokens, no llama a la API y no actualiza su último uso. Devuelve JSON con el estado de la integración, cantidad de tokens vigentes con capacidad y compatibilidad del guard. No devuelve nombre, token ni hash. `authorization_rule_in_project` sólo comprueba el archivo local; `http_header_forwarding=not_verified_from_cli` recuerda que Artisan no puede observar la cabecera de una petición web.
+
+Para comprobar además el token exacto del consumidor, crear mediante un editor privado un archivo fuera de cualquier directorio público, por ejemplo `/home/slepac/.config/sga-api-token-diagnostico.txt`, y pegar allí **únicamente el token completo**. No sobrescribir otros archivos de secretos. No poner su contenido en comandos, historial, Git, tickets ni logs.
+
+```bash
+chmod 600 /home/slepac/.config/sga-api-token-diagnostico.txt
+/opt/cpanel/ea-php83/root/usr/bin/php artisan funcionarios-api:diagnosticar 1 --token-file=/home/slepac/.config/sga-api-token-diagnostico.txt
+```
+
+El argumento contiene sólo la ruta privada. Se rechazan archivos dentro de `public`, el disco público o los destinos de enlaces públicos configurados por Laravel, ilegibles, con formato inválido o mayores de 4 KiB; en Linux también se exigen permisos exclusivos del propietario. Es necesario comprobar además que el hosting no publique esa carpeta mediante otro alias/DocumentRoot. El diagnóstico no imprime la ruta ni la credencial. Eliminar después exclusivamente ese archivo temporal, si ya no es necesario.
+
+| Resultado | Interpretación / siguiente comprobación |
+| --- | --- |
+| `integration_exists=false` | No existe ese ID en la base que utiliza Artisan; revisar despliegue/base e integración elegida. |
+| `integration_enabled=false` | Integración suspendida. Con token válido, la API devuelve `403`. Reactivar sólo si corresponde. |
+| `token_matches_database=false` | El token exacto no coincide con ningún hash actual en esta base: revisar copia, renovación, revocación o entorno. |
+| `token_belongs_to_integration=false` | El token no corresponde a la integración solicitada, o no coincide con ningún registro. |
+| `token_within_expiration=false` | No hay coincidencia o ha vencido su plazo propio/global. |
+| `token_has_ability=false` | No hay coincidencia o falta `funcionarios:consultar`. |
+| `guard_accepts_integration=false` | El provider configurado del guard Sanctum no admite la identidad técnica. Revisar configuración desplegada y su caché. |
+| `credentials_ready=true` | Las comprobaciones locales de estado/guard/vigencia/capacidad pasan. Sin `--token-file` sólo acredita que existe al menos un token apto; no verifica el token del consumidor. No acredita transporte HTTP ni callbacks personalizados. |
+
+El comando devuelve código de salida `0` si pasan estas comprobaciones; de lo contrario, `1` (`2` para ID inválido). `custom_auth_callback_configured=true` requiere revisar ese código adicional: el diagnóstico no lo ejecuta. `database_or_configuration_unavailable` requiere revisar conexión/esquema/configuración, sin compartir excepciones que puedan contener credenciales.
+
+### 3. Comprobar por HTTP y escalar sólo lo pendiente
+
+Si el token exacto pasa las comprobaciones pero HTTP sigue respondiendo `401`, revisar el DocumentRoot efectivo, reglas Apache, redirecciones/cambios de dominio, proxy/WAF y que PHP web y Artisan utilicen la misma aplicación/base/configuración. Tras corregirlo, probar desde el backend consumidor con el token en su configuración privada y un **RUT sintético con DV inválido**: recibir `422` demuestra que esa petición pasó autenticación/autorización, sin consultar personas. No registrar `Authorization` ni el cuerpo/respuesta de una consulta real.
+
+La cuenta cPanel puede actualizar el `.htaccess` permitido y ejecutar Artisan con PHP 8.3. Si no basta, pedir al proveedor que verifique el paso de `Authorization` a CGI/FPM y los permisos de configuración; [Apache documenta `CGIPassAuth`](https://httpd.apache.org/docs/2.4/mod/core.html#cgipassauth), pero no añadirlo a ciegas a `.htaccess`: depende del handler y de `AllowOverride`, y una directiva no permitida puede producir `500`. No crear `phpinfo()` ni un endpoint público que vuelque cabeceras.
+
+Los `401` anónimos reciben `X-Request-ID`, pero no generan fila en la auditoría de actores identificados. Su referencia sólo podrá correlacionarse con registros del servidor/proxy si éstos la conservan de forma segura; su ausencia en la auditoría no demuestra que la petición no haya llegado.
+
+Esta corrección no añade dependencias, migraciones ni variables `.env`. La comprobación local no verifica la configuración del hosting ni el token real del consumidor.
 
 ## Validación local
 
@@ -136,6 +197,8 @@ Interfaz: `node --test tests/js/funcionario-consulta.test.mjs`; compilación: `n
 
 ### Comprobaciones realizadas el 22-10-2026
 
+- Corrección de Authorization (parche 629): prueba aislada con Apache **2.4.66**, PHP CGI **8.3.30**, `CGIPassAuth Off` y una cabecera sintética. La petición POST al front controller no recibía el Bearer con el `.htaccess` anterior y sí lo recibe con la regla nueva; sin cabecera continúa ausente. No se inició el SGA en ese servidor de prueba ni se consultó su base. El proceso de prueba quedó detenido. Falta verificar el handler/configuración reales de cPanel.
+- Para el mismo parche se ejecutó nuevamente `FuncionarioConsultaApiTest`: **39 pruebas y 311 aserciones**, aprobadas. Incluyen diagnóstico sin escrituras, comparación con hash, integración ajena, revocación, vencimiento, capacidad, suspensión, provider incompatible y rechazo de archivos públicos/inválidos. Pasaron también la sintaxis de los tres PHP modificados/nuevos, descubrimiento del comando, `optimize:clear` y `git diff --check`. No cambian rutas ni recursos CSS/JavaScript compilados.
 - Suite relacionada: **127 pruebas PHP, 898 aserciones**, incluyendo API, permisos, tokens, CSRF, errores, límites, migraciones reanudables y regresiones de padrón, licencias y directorio AC. Todas aprobadas, con SQLite en memoria y datos sintéticos.
 - **2 pruebas JavaScript** aprobadas. `npm run build`, sintaxis de los **21 PHP nuevos/modificados**, `composer validate`, `route:list`, `optimize:clear` y revisión de diferencias completados.
 - Contrato OpenAPI validado. Revisión de navegador con datos sintéticos a **1440 × 1080** y **390 × 844**: consulta, vínculos, errores de DV y administración, sin errores JavaScript ni desborde horizontal de página. Se comprobó también la vista de entrega única de token.
