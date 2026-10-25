@@ -147,6 +147,119 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $this->assertNull($row['R']);
     }
 
+    public static function nivelesPal(): array
+    {
+        return [
+            'EPJA básico 1' => [['codigo' => 'EPJA_BASICA_N1', 'nivel_educativo' => 'EPJA Básica'], 'Educación Básica'],
+            'EPJA básico 2' => [['codigo' => 'EPJA_BASICA_N2', 'nivel_educativo' => 'EPJA Básica'], 'Educación Básica'],
+            'EPJA básico 3' => [['codigo' => 'EPJA_BASICA_N3', 'nivel_educativo' => 'EPJA Básica'], 'Educación Básica'],
+            'EPJA medio 1' => [['codigo' => 'EPJA_MEDIA_N1', 'nivel_educativo' => 'EPJA Media'], 'Educación Media'],
+            'EPJA medio 2' => [['codigo' => 'EPJA_MEDIA_N2', 'nivel_educativo' => 'EPJA Media'], 'Educación Media'],
+            'EPJA nombre básico histórico' => [['nombre' => '1er Nivel Básico', 'modalidad' => 'EPJA'], 'Educación Básica'],
+            'EPJA nombre medio histórico' => [['nombre' => '2° Nivel Medio', 'modalidad' => 'Adultos'], 'Educación Media'],
+            'básica regular' => [['codigo' => '8B'], 'Educación Básica'],
+            'media HC regular' => [['codigo' => '3M-HC'], 'Educación Media'],
+            'media TP regular' => [['codigo' => '4M-TP'], 'Educación Media'],
+            'curso laboral' => [['codigo' => 'ESPECIAL_LABORAL_1', 'nivel_educativo' => 'Educación Especial'], 'Educación Básica'],
+            'EPJA sin nivel' => [['codigo' => 'EPJA_SIN_DETALLE', 'modalidad' => 'EPJA'], ''],
+        ];
+    }
+
+    #[DataProvider('nivelesPal')]
+    public function test_nivel_pal_segun_curso_asignado_epja_y_ensenanza_regular(array $curso, string $esperado): void
+    {
+        $asignacion = $this->asignacionCurso($curso);
+        $doc = $this->docente(['niveles_declarados' => ['Parvularia'], 'asignaciones' => [$asignacion]]);
+        $antes = json_encode($doc);
+        $row = $this->reporte(['docentes' => [$doc]])['docentes'][0];
+        $this->assertSame($esperado, $row['D']);
+        if ($esperado === '') {
+            $this->assertNull($row['K']); $this->assertNull($row['L']);
+            $this->assertStringContainsString('falta desglose del nivel', $row['S']);
+        } else {
+            $this->assertSame(38.0, $row[$esperado === 'Educación Media' ? 'L' : 'K']);
+            $this->assertNull($row[$esperado === 'Educación Media' ? 'K' : 'L']);
+            $this->assertStringNotContainsString('INCOMPATIBLE:', $row['S']);
+        }
+        $this->assertSame($antes, json_encode($doc));
+    }
+
+    public function test_escuela_especial_informa_basica_para_todos_sin_alterar_horas_ni_conversion_parvularia(): void
+    {
+        $this->ee->especial = true;
+        $docs = [
+            $this->docente(['asignaciones' => [$this->asignacionCurso(['codigo' => 'ESPECIAL_LABORAL_2'])]]),
+            $this->docente(['asignaciones' => [$this->asignacion(['tipo_asignacion' => 'funcion_directiva'])]]),
+            $this->docente(['niveles_declarados' => ['Media'], 'asignaciones' => []]),
+            $this->docente(['titulo' => 'Pedagogía en Educación de Párvulos',
+                'asignaciones' => [$this->asignacionNt(['horas_contrato' => 37, 'horas_plan_pedagogicas' => 25])]]),
+        ];
+        $rows = $this->reporte(['docentes' => $docs])['docentes'];
+        $this->assertCount(4, $rows);
+        $this->assertSame(array_fill(0, 4, 'Educación Básica'), array_column($rows, 'D'));
+        $this->assertSame(38.0, $rows[0]['K']);
+        $this->assertSame(44.0, $rows[1]['R']); $this->assertNull($rows[2]['R']);
+        $this->assertSame(32.0, $rows[3]['K']); $this->assertSame('65/35', $rows[3]['M']);
+    }
+
+    public function test_docente_basica_y_media_usa_opcion_mixta_y_conserva_horas_por_nivel_en_ambos_excel(): void
+    {
+        $docs = [];
+        foreach ([['1B', '4M-TP'], ['EPJA_BASICA_N3', 'EPJA_MEDIA_N2']] as [$basica, $media]) {
+            $docs[] = $this->docente(['horas_contrato' => 88, 'horas_planta' => 88, 'niveles_declarados' => ['Parvularia'], 'asignaciones' => [
+                $this->asignacionCurso(['codigo' => $basica], ['id' => 1]),
+                $this->asignacionCurso(['codigo' => $media], ['id' => 2]),
+                $this->asignacionNt(['id' => 3, 'estado' => 'anulada']),
+                $this->asignacionNt(['id' => 4, 'horas_contrato' => 0, 'horas_plan_pedagogicas' => 0]),
+                $this->asignacionNt(['id' => 5, 'estamento_cobertura' => 'asistente']),
+            ]]);
+        }
+        $report = $this->reporte(['docentes' => $docs]);
+        $this->assertCount(4, $report['docentes']);
+        $this->assertSame(array_fill(0, 4, 'Ed. Básica/Media'), array_column($report['docentes'], 'D'));
+        $this->assertSame([38.0, null, 38.0, null], array_column($report['docentes'], 'K'));
+        $this->assertSame([null, 38.0, null, 38.0], array_column($report['docentes'], 'L'));
+        $this->assertSame(0, $report['incompatibles']);
+        foreach ([false, true] as $global) {
+            $path = Storage::disk('local')->path($global ? 'niveles-todos.xlsx' : 'niveles.xlsx');
+            if ($global) { app(DotacionPal2027ConsolidadoExport::class)->guardarTodos([$report], $path); }
+            else { app(DotacionPal2027Export::class)->guardar($report, $path); }
+            $book = IOFactory::createReader('Xlsx')->setLoadSheetsOnly(['Info Funcionario (DOCENTE)', 'Tabla 65-35'])->load($path);
+            try {
+                $sheet = $book->getSheetByName('Info Funcionario (DOCENTE)');
+                foreach ([3, 4, 5, 6] as $r) {
+                    $this->assertSame('Ed. Básica/Media', (string) $sheet->getCell('D'.$r)->getValue());
+                    $this->assertEquals(44, $sheet->getCell('J'.$r)->getCalculatedValue());
+                }
+                $this->assertEquals(38, $sheet->getCell('K3')->getValue());
+                $this->assertEquals(38, $sheet->getCell('L4')->getValue());
+            } finally { $book->disconnectWorksheets(); }
+        }
+    }
+
+    public function test_funciones_y_pie_sin_curso_no_cambian_el_nivel_de_las_clases(): void
+    {
+        $pie = $this->asignacion(['id' => 2, 'tipo_asignacion' => 'pie_educadora_diferencial', 'subvencion' => 'PIE',
+            'horas_contrato' => 3, 'horas_plan_pedagogicas' => 0])->setRelation('establecimientoCurso', null);
+        $funcion = $this->asignacionCurso(['codigo' => '4M-TP'], ['id' => 3, 'tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 2]);
+        $doc = $this->docente(['horas_contrato' => 49, 'horas_planta' => 49, 'niveles_declarados' => ['Media'],
+            'asignaciones' => [$this->asignacion(), $pie, $funcion]]);
+        $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
+        $this->assertSame(array_fill(0, 3, 'Educación Básica'), array_column($rows, 'D'));
+        $this->assertSame(38.0, $rows[0]['K']);
+        $this->assertSame(3.0, $rows[1]['P']); $this->assertSame(2.0, $rows[2]['R']);
+    }
+
+    public function test_parvularia_y_basica_conservan_sus_opciones_y_la_conversion_sin_categoria_inventada(): void
+    {
+        $doc = $this->docente(['titulo' => 'Pedagogía en Educación de Párvulos', 'horas_contrato' => 81, 'horas_planta' => 81,
+            'asignaciones' => [$this->asignacionNt(['id' => 1, 'horas_contrato' => 37, 'horas_plan_pedagogicas' => 25]), $this->asignacion(['id' => 2])]]);
+        $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
+        $this->assertSame(['Educación Parvularia', 'Educación Básica'], array_column($rows, 'D'));
+        $this->assertSame([32.0, 38.0], array_column($rows, 'K'));
+        $this->assertEquals(81, $this->contratoRepresentado($rows));
+    }
+
     public function test_situaciones_2027_informan_contrato_completo_sin_completar_horas_distribuidas(): void
     {
         foreach (\App\Models\DotacionDocenteExclusion::MOTIVOS as $motivo => $label) {
@@ -481,6 +594,11 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         return (new DotacionDocenteAsignacion)->forceFill(array_replace(['id' => 1, 'docente_rut' => '99000001-K',
             'tipo_asignacion' => 'plan_estudio', 'subvencion' => 'General', 'horas_contrato' => 44,
             'horas_plan_pedagogicas' => 38, 'proporcion_aplicada' => '65/35', 'estado' => 'activa'], $changes))->setRelation('establecimientoCurso', $curso);
+    }
+    private function asignacionCurso(array $catalogo, array $changes = []): DotacionDocenteAsignacion
+    {
+        return $this->asignacion($changes)->setRelation('establecimientoCurso', (new EstablecimientoCurso)
+            ->setRelation('curso', (new Curso)->forceFill($catalogo)));
     }
     private function asignacionNt(array $changes = []): DotacionDocenteAsignacion
     {

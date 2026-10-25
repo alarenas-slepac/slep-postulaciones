@@ -49,6 +49,7 @@ class DotacionPal2027
 
     private function docente(Establecimiento $ee, array $docente, array $tablas): array
     {
+        $docente['pal_nivel'] = $this->nivelDocente($ee, $docente);
         $base = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
         $titular = min($base, max(0.0, (float) ($docente['horas_planta'] ?? 0)));
         $contrata = min(max(0, $base - $titular), max(0.0, (float) ($docente['horas_contrata'] ?? 0)));
@@ -138,11 +139,40 @@ class DotacionPal2027
         return $filas;
     }
 
+    /** Una opción de la plantilla por docente, conservando el nivel de cálculo de cada grupo. */
+    private function nivelDocente(Establecimiento $ee, array $docente): ?string
+    {
+        if ($ee->especial) { return 'Educación Básica'; }
+        $clases = collect($docente['asignaciones'] ?? [])->filter(fn ($a) =>
+            (data_get($a, 'estado') ?? 'activa') === 'activa'
+            && DotacionAsignacionCalculator::esAsignacionDocenteReal($a)
+            && in_array(data_get($a, 'tipo_asignacion'), ['plan_estudio', 'acompanamiento_parvularia', 'pie_colaborativo', 'pie_educadora_diferencial'], true)
+            && (in_array(data_get($a, 'tipo_asignacion'), ['plan_estudio', 'acompanamiento_parvularia'], true)
+                || data_get($a, 'establecimientoCurso.curso') !== null)
+            && ((float) data_get($a, 'horas_contrato', 0) > 0 || (float) data_get($a, 'horas_plan_pedagogicas', 0) > 0));
+        if ($clases->isEmpty()) { return $this->nivel([], $docente); }
+        $niveles = $clases->map(fn ($a) => $this->nivel($a, []))->unique()->values();
+        if ($niveles->contains('')) { return null; }
+        if ($niveles->count() === 1) { return $niveles->first(); }
+        if ($niveles->count() === 2 && $niveles->contains('Educación Básica') && $niveles->contains('Educación Media')) {
+            return 'Ed. Básica/Media';
+        }
+        // La plantilla no ofrece una opción mixta que incluya Parvularia.
+        // Se conserva entonces el nivel de cada fila, sin inventar categorías.
+        return null;
+    }
+
     private function nivel(object|array $a, array $docente): string
     {
         $curso = data_get($a, 'establecimientoCurso.curso');
-        $texto = mb_strtoupper(\Illuminate\Support\Str::ascii(implode(' ', [(string) data_get($curso, 'codigo'), (string) data_get($curso, 'nivel_educativo')])));
-        if (str_contains($texto, 'EPJA') || str_contains($texto, 'ADULTO') || str_contains($texto, 'ESPECIAL') || str_contains($texto, 'LABORAL')) { return ''; }
+        $texto = mb_strtoupper(\Illuminate\Support\Str::ascii(implode(' ', [(string) data_get($curso, 'codigo'),
+            (string) data_get($curso, 'nivel_educativo'), (string) data_get($curso, 'nombre'), (string) data_get($curso, 'modalidad')])));
+        if (str_contains($texto, 'EPJA') || str_contains($texto, 'ADULTO')) {
+            if (str_contains($texto, 'BASIC')) { return 'Educación Básica'; }
+            if (str_contains($texto, 'MEDIA') || str_contains($texto, 'MEDIO')) { return 'Educación Media'; }
+            return '';
+        }
+        if (str_contains($texto, 'ESPECIAL') || str_contains($texto, 'LABORAL') || str_contains($texto, 'DIFERENCIAL')) { return 'Educación Básica'; }
         if (str_contains($texto, 'NT1') || str_contains($texto, 'NT2') || str_contains($texto, 'PARVUL')) { return 'Educación Parvularia'; }
         if (preg_match('/^[1-8]B\b/', $texto) || str_contains($texto, 'BASIC')) { return 'Educación Básica'; }
         if (preg_match('/^[1-4]M\b/', $texto) || str_contains($texto, 'MEDIA')) { return 'Educación Media'; }
@@ -160,7 +190,7 @@ class DotacionPal2027
         $fila = array_fill_keys(['A','B','C','D','E','F','G','H','I','K','L','M','P','Q','R','S'], null);
         $perfil = DotacionProfesionDocenteResolver::perfilTitulo($docente);
         $fila = array_replace($fila, ['A' => (string) ($docente['rut'] ?? ''), 'B' => (string) $ee->nombre_establecimiento,
-            'C' => (string) $ee->rbd, 'D' => $grupo['nivel'] ?? $this->nivel([], $docente),
+            'C' => (string) $ee->rbd, 'D' => $docente['pal_nivel'] ?? ($grupo['nivel'] ?? $this->nivel([], $docente)),
             'E' => $perfil['es_educacion_parvulos'] ? 'Educadora de Parvulos' : 'Docente',
             'F' => (string) ($docente['funcion'] ?? ''), 'G' => $grupo['funcion'] ?? '', 'H' => $capacidad['calidad'],
             'I' => data_get($docente, 'exclusion_docente.motivo') === 'horas_catedra_art_69' ? 'si' : null]);
@@ -186,9 +216,9 @@ class DotacionPal2027
                 $proporcion = in_array($grupo['proporcion'], ['65/35','60/40'], true) ? $grupo['proporcion'] : null;
                 $regla = $proporcion ? ($tablas[$proporcion][number_format($pedagogicas, 4, '.', '')] ?? null) : null;
                 if ($regla === null || abs($regla['contrato'] - $parte) > 0.01) { $problemas[] = 'la fórmula original no representa '.$pedagogicas.' h pedagógicas / '.$parte.' h de contrato SGA ('.$grupo['proporcion'].')'; }
-                if ($fila['D'] === '' || $fila['D'] === 'Ed. Básica/Media') { $problemas[] = 'falta desglose del nivel de las horas lectivas'; }
+                if ($grupo['nivel'] === '' || $grupo['nivel'] === 'Ed. Básica/Media') { $problemas[] = 'falta desglose del nivel de las horas lectivas'; }
                 if ($problemas === []) {
-                    $fila[$fila['D'] === 'Educación Media' ? 'L' : 'K'] = $pedagogicas;
+                    $fila[$grupo['nivel'] === 'Educación Media' ? 'L' : 'K'] = $pedagogicas;
                     $fila['M'] = $proporcion;
                 }
             } elseif ($grupo['columna'] === 'incompatible') {

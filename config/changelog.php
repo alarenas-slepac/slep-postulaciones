@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.637',
+    'current_version' => '2026.10.25.638',
     'entries' => [
+        [
+            'version' => '2026.10.25.638',
+            'title' => 'Nivel docente del PAL según clases, Especial y EPJA',
+            'summary' => 'Completa NIVEL con las opciones del formato y las asignaciones del docente: Básica para escuelas especiales y clasificación básica/media para EPJA.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Informa Educación Básica para todos los docentes de establecimientos marcados como Educación Especial. Clasifica los niveles básicos 1, 2 y 3 de EPJA como Básica y sus niveles medios 1 y 2 como Media, usando el catálogo de cursos y sus antecedentes históricos.',
+                'Selecciona Ed. Básica/Media cuando el docente tiene clases activas con horas en ambos niveles. Conserva el desglose lectivo en K y L y las fórmulas originales; las asignaciones anuladas, sin horas y de asistentes no añaden niveles.',
+                'Prioriza las clases sobre los niveles declarados, conserva la referencia declarada cuando no hay clases y mantiene identificados los casos sin detalle. La presentación de Especial no altera la conversión contractual de Parvularia. Incluye pruebas del Excel individual y consolidado y no requiere migraciones ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.637',
             'title' => 'PAL 2027: planes, cursos combinados y situaciones docentes',
