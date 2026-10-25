@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.23.630',
+    'current_version' => '2026.10.25.631',
     'entries' => [
+        [
+            'version' => '2026.10.25.631',
+            'title' => 'Filtro por comuna en el padrón mensual de reemplazos',
+            'summary' => 'Permite consultar el personal de todos los establecimientos de una comuna, combinando período, establecimiento y búsqueda.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_estab', 'supervisor_plani', 'coordinador_plani'],
+            'items' => [
+                'Agrega un selector de comunas desde el catálogo de establecimientos disponible para el período y el usuario. Aplica el mismo filtro al detalle, resumen, totales, archivo de origen y exportación CSV, incluyendo padrones históricos.',
+                'Conserva la comuna al paginar, editar, bloquear o desbloquear registros, y la elimina al limpiar los filtros adicionales. Mantiene la restricción al establecimiento asignado y evita ofrecer comunas ajenas a usuarios sin establecimiento.',
+                'Adapta el panel de filtros al Design System con controles etiquetados y distribución responsive. No requiere migraciones ni variables de entorno nuevas.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.23.630',
             'title' => 'Informe de cursos por nivel con selección y grupos combinados',

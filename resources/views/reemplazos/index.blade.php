@@ -1,5 +1,34 @@
 @extends('layouts.app')
 
+@push('styles')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css">
+    <style>
+        #padron-filtros .form-control, #padron-filtros .form-select,
+        #padron-filtros .select2-container--bootstrap-5 .select2-selection--single {
+            min-height: 2.65rem;
+            border-color: var(--slep-border, #dbe4f0);
+            border-radius: .75rem;
+            color: var(--slep-text, #0f172a);
+        }
+        #padron-filtros .form-control:focus, #padron-filtros .form-select:focus,
+        #padron-filtros .select2-container--bootstrap-5.select2-container--focus .select2-selection {
+            border-color: var(--slep-blue, #0d6efd);
+            box-shadow: 0 0 0 .18rem rgba(13, 110, 253, .12);
+        }
+        .padron-select-dropdown.select2-dropdown { border-color: #dbe4f0; border-radius: .75rem; overflow: hidden; }
+        .padron-select-dropdown .select2-search__field { min-height: 2.65rem; border-radius: .75rem; }
+        #padron-filtros .btn-primary {
+            --bs-btn-bg: var(--slep-blue, #0d6efd);
+            --bs-btn-border-color: var(--slep-blue, #0d6efd);
+            --bs-btn-hover-bg: #0b5ed7;
+            --bs-btn-hover-border-color: #0b5ed7;
+        }
+        #padron-filtros .btn-outline-secondary { color: #334155; border-color: #dbe4f0; }
+        #padron-filtros .btn-outline-secondary:hover { color: #0f172a; background: #f8fbff; }
+    </style>
+@endpush
+
 @section('content')
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
@@ -143,11 +172,11 @@
             $userCanManageBloqueos = empty($filters['historico']) && auth()->check() && method_exists(auth()->user(), 'hasAnyRole') && auth()->user()->hasAnyRole(['admin', 'funcionario_slep', 'coordinador_uatp', 'supervisor_plani', 'coordinador_plani']);
         @endphp
 
-        <div class="card mb-3">
-            <div class="card-body">
+        <div class="slep-card mb-3" id="padron-filtros">
+            <div class="p-3 p-lg-4">
                 <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
                     <div>
-                        <h5 class="card-title mb-1"><i class="bi bi-people"></i> Padrón mensual de personal</h5>
+                        <h2 class="h5 mb-1"><i class="bi bi-people" aria-hidden="true"></i> Padrón mensual de personal</h2>
                         <div class="text-muted small">
                             Vista operativa del padrón por establecimiento para el período seleccionado.
                             El bloqueo sigue al funcionario por RUT en todos sus contratos, aunque cambie de establecimiento; no requiere traspaso manual.
@@ -168,10 +197,10 @@
                     </div>
                 </div>
 
-                <form method="GET" action="{{ route('reemplazos.index') }}" class="row g-3 align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label">Período</label>
-                        <select name="periodo" class="form-select">
+                <form method="GET" action="{{ route('reemplazos.index') }}" class="row g-3 align-items-start">
+                    <div class="col-md-6 col-xl-2">
+                        <label for="padron-periodo" class="form-label">Período</label>
+                        <select name="periodo" id="padron-periodo" class="form-select py-2">
                             @foreach ($periodOptions as $period)
                                 <option value="{{ $period->key }}" @selected($filters['period_key'] === $period->key)>
                                     {{ $period->label }}
@@ -180,16 +209,30 @@
                         </select>
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">Establecimiento</label>
+                    <div class="col-md-6 col-xl-3">
+                        <label for="padron-comuna" class="form-label">Comuna</label>
+                        <select name="comuna" id="padron-comuna" class="form-select py-2 @error('comuna') is-invalid @enderror">
+                            <option value="">Todas las comunas</option>
+                            @if ($filters['comuna'] !== '' && !$comunas->contains($filters['comuna']))
+                                <option value="{{ $filters['comuna'] }}" selected>{{ $filters['comuna'] }}</option>
+                            @endif
+                            @foreach ($comunas as $comuna)
+                                <option value="{{ $comuna }}" @selected($filters['comuna'] === $comuna)>{{ $comuna }}</option>
+                            @endforeach
+                        </select>
+                        @error('comuna')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-md-12 col-xl-7">
+                        <label for="padron-establecimiento" class="form-label">Establecimiento</label>
                         @if ($isFuncionarioEstab)
-                            <input type="text" class="form-control" value="{{ $forcedEstablecimiento?->nombre_establecimiento ?? 'Sin establecimiento asignado' }}" disabled>
+                            <input type="text" id="padron-establecimiento" class="form-control py-2" value="{{ $forcedEstablecimiento?->nombre_establecimiento ?? 'Sin establecimiento asignado' }}" disabled>
                             @if ($forcedEstablecimiento)
                                 <input type="hidden" name="establecimiento_id" value="{{ $forcedEstablecimiento->id }}">
                             @endif
                             <div class="form-text">Tu rol solo puede consultar el padrón de tu establecimiento.</div>
                         @else
-                            <select name="establecimiento_id" class="form-select">
+                            <select name="establecimiento_id" id="padron-establecimiento" class="form-select py-2">
                                 <option value="">Todos los establecimientos</option>
                                 @foreach ($establecimientos as $establecimiento)
                                     <option value="{{ $establecimiento->id }}" @selected((int) $filters['establecimiento_id'] === (int) $establecimiento->id)>
@@ -200,15 +243,15 @@
                         @endif
                     </div>
 
-                    <div class="col-md-3">
-                        <label class="form-label">Búsqueda</label>
-                        <input type="text" name="q" class="form-control" value="{{ $filters['q'] }}"
+                    <div class="col-md-8 col-xl-9">
+                        <label for="padron-busqueda" class="form-label">Búsqueda</label>
+                        <input type="text" name="q" id="padron-busqueda" class="form-control py-2" value="{{ $filters['q'] }}"
                             placeholder="RUT, nombre, RBD o establecimiento">
                     </div>
 
-                    <div class="col-md-2">
-                        <label class="form-label">Registros por página</label>
-                        <select name="per_page" class="form-select">
+                    <div class="col-md-4 col-xl-3">
+                        <label for="padron-por-pagina" class="form-label">Registros por página</label>
+                        <select name="per_page" id="padron-por-pagina" class="form-select py-2">
                             @foreach ([15, 25, 50, 100] as $perPage)
                                 <option value="{{ $perPage }}" @selected((int) $filters['per_page'] === $perPage)>{{ $perPage }}</option>
                             @endforeach
@@ -519,3 +562,19 @@
         </div>
     @endif
 @endsection
+
+@push('scripts')
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const establecimiento = document.querySelector('select#padron-establecimiento');
+            if (!establecimiento || !window.jQuery?.fn?.select2) return;
+            window.jQuery(establecimiento).select2({
+                theme: 'bootstrap-5', width: '100%', allowClear: true,
+                placeholder: 'Todos los establecimientos', dropdownCssClass: 'padron-select-dropdown',
+                language: { noResults: () => 'No se encontraron establecimientos' },
+            });
+        });
+    </script>
+@endpush
