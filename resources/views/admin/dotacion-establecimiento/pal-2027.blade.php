@@ -49,8 +49,8 @@
                 <li>Columna H de establecimientos: contrato necesario para el plan de estudios, sin agregar PIE ni funciones.</li>
                 <li>Separa titular y plazo fijo. La distribución cubre primero titular y luego contrata; se identifica cada función y proporción.</li>
                 <li>Para educadoras con título de Párvulos y aula asignada en Parvularia, convierte el contrato especial a horas aula equivalentes 65/35. Conserva el contrato y deja las horas aula reales en Observaciones.</li>
-                <li>Las horas pendientes se informan en Observaciones. No se convierten en otras funciones.</li>
-                <li>Las situaciones 2027 informan en Observaciones el contrato completo, las horas consideradas y las no necesarias. J conserva las horas distribuidas. Los docentes con situación BIR 2027 se excluyen del PAL.</li>
+                <li>Los saldos titulares sin asignar se clasifican en FUNCIÓN «Otros (Talleristas / Apoyo / etc.)», descontando las horas justificadas en Sobredotación 2027. Los saldos a contrata no se incorporan por esta regla.</li>
+                <li>Las horas excluidas por situaciones 2027 se incorporan en FUNCIÓN «Otros», respetando titular y contrata. Observaciones detalla el motivo, el contrato y las horas incorporadas o excluidas. Los docentes con situación BIR 2027 se excluyen del PAL.</li>
                 <li>Asistentes y VTF quedan vacías. Las plazas sin persona identificada no se presentan como funcionarios.</li>
                 <li>La hoja «Resumen» conserva sus fórmulas y necesita Excel compatible con FILTER, UNIQUE, VSTACK y LET. Revise el recálculo al abrir.</li>
             </ul>

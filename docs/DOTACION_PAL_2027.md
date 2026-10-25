@@ -54,7 +54,7 @@ dotación. No habilita datos de matrícula para el rol directivo.
 | Docentes K–L | Horas pedagógicas de aula financiadas por General, separadas por nivel, cuando la regla es representable |
 | Docentes M | 65/35 o 60/40 de la asignación; las educadoras elegibles de Parvularia representan el contrato especial como 65/35 según la excepción siguiente |
 | Docentes P–Q | Horas cronológicas asignadas y financiadas por PIE o SEP |
-| Docentes R | Funciones efectivamente asignadas financiadas por General; nunca el saldo sin asignar |
+| Docentes R | Funciones asignadas de General, horas excluidas por situaciones 2027 y saldos titulares sin asignar que no estén justificados en Sobredotación, clasificados como Otros |
 | Docentes S | Contrato de referencia, tramo distribuido, situación 2027 con contrato completo y horas consideradas/no necesarias, pendientes, detalle e incompatibilidades |
 
 Se consumen primero las horas titulares del docente y después las de plazo fijo.
@@ -84,8 +84,16 @@ Ejemplo: dos filas de Docente aula/Titular con 19 h pedagógicas en Básica y
 19 h en Media, 22 h contractuales cada una, y otra fila de 3 h PIE quedan en una
 fila con K=19, L=19, P=3, M=65/35 y J=47. Se conserva **Ed. Básica/Media**.
 
+La unión de filas de **Educación Básica y Educación Media** requiere **65/35
+en ambas**, además del mismo docente, establecimiento, función y calidad
+contractual. Las filas generadas con **60/40 se excluyen de esta consolidación**,
+incluso si ambas son 60/40 y su suma tendría equivalencia en la tabla. Tampoco se
+les agrega una fila PIE u otra sin proporción. Se conservan su cálculo original
+y una explicación en Observaciones; no se convierten a 65/35. Las filas sin
+horas lectivas continúan consolidándose entre sí cuando son compatibles.
+
 Por decisión del usuario, las excepciones permanecen separadas y se explican en
-Observaciones: proporciones 65/35 y 60/40 distintas, niveles sin opción común,
+Observaciones: filas 60/40, proporciones distintas, niveles sin opción común,
 horas fuera del rango de la tabla, diferencias en lectivas/no lectivas,
 incompatibilidades previas o datos de estamento, cargo y art. 69 que no coincidan.
 Si no cabe todo el grupo, se intentan subconjuntos compatibles. No se fuerzan
@@ -93,7 +101,7 @@ redondeos ni nuevas fórmulas; una jornada de Parvularia que necesita varias fil
 para representar su contrato conserva las que sean necesarias.
 
 La consolidación se aplica al informe individual y al de todos los establecimientos.
-No altera asignaciones, contratos, pendientes, situaciones 2027 ni la exclusión
+No altera asignaciones, contratos, saldos del SGA, situaciones 2027 ni la exclusión
 de BIR. Los recuentos de personas siguen siendo independientes de las filas.
 
 ### Nivel del docente en Info Funcionario (DOCENTE)
@@ -141,21 +149,52 @@ situación contractual (`horas_contrato`) y las **horas no necesarias** por la
 situación (`horas_excluidas`). Por compatibilidad, si un DTO antiguo no trae la
 base se obtiene sumando las horas consideradas y excluidas.
 
-Por decisión del usuario, el contrato completo es una **referencia en S**: no
-se carga la diferencia automáticamente en aula, PIE, SEP ni otras funciones.
-J conserva su fórmula y las horas efectivamente distribuidas que el formato
-puede representar. Ejemplo: contrato completo 44 h, consideradas 20 h y situación
-24 h; con 20 h de funciones distribuidas, S informa los tres valores y J suma
-20 h. También se mantiene el detalle de situaciones que dejan cero horas
-consideradas, sin inventar asignaciones.
+Las horas excluidas por situaciones 2027 se incorporan al informe con **FUNCIÓN
+(G) = Otros (Talleristas / Apoyo / etc.)** y como horas cronológicas no lectivas
+en **R**. Se respeta su calidad contractual: las horas titulares y las de plazo
+fijo se presentan separadas. Observaciones identifica el motivo, las horas por
+situación, el contrato completo y la calidad correspondiente. También se cubren
+las situaciones que excluyen todo el contrato; no se crea una asignación en el SGA.
+
+Ejemplo: contrato completo 44 h, consideradas 20 h y situación 24 h; con 20 h
+asignadas a función directiva, el PAL informa esa fila y las 24 h en función Otros.
+La suma de J por docente es 44. Si el contrato es 32 h titular y 12 h a contrata,
+las 20 h consideradas consumen primero titular y las 24 h de situación se
+representan como 12 h Otros/Titular y 12 h Otros/Plazo Fijo.
+
+### Horas titulares sin asignar y Sobredotación
+
+Además de las situaciones, se incorpora en **FUNCIÓN Otros / R** únicamente
+el saldo **titular sin asignar**. Los saldos sin asignar de **contrata u otras
+calidades quedan fuera de esta incorporación**. Esta restricción no afecta las
+horas de situaciones docentes: éstas conservan su tratamiento en ambas calidades,
+según la aclaración del usuario.
+
+Del saldo titular se descuentan las horas con justificación registrada en
+**Sobredotación**, para el mismo establecimiento, RUT normalizado y año **2027**,
+en los bloques plan de estudio, Parvularia y PIE, de tipo `titular`, con cantidad
+positiva y justificación no vacía. Se suman los importes registrados por bloque
+y se limita el descuento al saldo titular actual: una justificación anterior
+superior al saldo no resta horas ya asignadas ni vuelve negativos los totales.
+No se usan justificaciones de otros años, establecimientos ni tipo contrata.
+La lectura es una consulta por establecimiento, sin modificar las justificaciones.
+
+Observaciones distingue las horas por situación, las titulares sin asignación
+incorporadas y las titulares justificadas que se excluyen del informe. Si ya
+existe una fila Otros de igual función y calidad, se consolida con las nuevas
+horas cuando es compatible, sin duplicar los valores. El personal BIR continúa
+excluido. Si las horas consideradas y excluidas no coinciden con el contrato
+completo, se cancela el informe para revisar los datos antes de informar cifras.
 
 ## Fórmulas originales y borradores
 
 El usuario solicitó conservar estrictamente los criterios de cálculo originales.
 Las instrucciones de la plantilla dicen informar el contrato completo en J, pero
-J en realidad suma N+O+P+Q+R. Se conserva esta fórmula: un docente de 44 horas con
-30 distribuidas muestra el total representado y **14 horas pendientes** en S.
-No se inventa una función para completar la diferencia.
+J en realidad suma N+O+P+Q+R. Se conserva esta fórmula y se completa R con las
+horas de situaciones y los saldos titulares elegibles descritos antes. Un docente
+con contrato titular de 44 h, 30 distribuidas y sin justificación de Sobredotación
+incluye las otras 14 h en FUNCIÓN Otros y suma 44 h en el PAL. Los saldos a
+contrata y las horas titulares justificadas no se añaden para completar el total.
 
 Cada entrada lectiva se contrasta con el mismo rango exacto de BUSCARV que usa el
 Excel (`A4:D47` en cada tabla). Si no existe una equivalencia, o no coincide con el
@@ -194,7 +233,8 @@ Ejemplo de comprobación con datos sintéticos: **25 h aula reales → 37 h cont
 especial → 32 h aula equivalentes 65/35 → 37 h contrato PAL**. La plantilla relaciona
 34 h aula con 39 h contrato, por lo que no se usan 34 para representar 37. Si hay
 además 3 h PIE y un contrato base de 44, PIE queda aparte, el total representado
-es 40 h y se siguen informando 4 h pendientes.
+es 40 h antes del saldo. Si las 4 h pendientes son titulares y no están justificadas
+en Sobredotación, se incorporan en otra fila con FUNCIÓN Otros, sumando 44 h.
 
 Cuando el contrato supera la fila máxima de la tabla o no tiene una equivalencia
 directa por aulas repetidas, se usan las mínimas filas necesarias cuya suma

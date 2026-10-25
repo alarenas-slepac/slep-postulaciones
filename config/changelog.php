@@ -6457,8 +6457,33 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.639',
+    'current_version' => '2026.10.25.641',
     'entries' => [
+        [
+            'version' => '2026.10.25.641',
+            'title' => 'Situaciones y saldos titulares elegibles en función Otros del PAL',
+            'summary' => 'Incorpora horas de situaciones docentes y saldos titulares sin asignar, descontando los justificados en Sobredotación 2027 y explicando el detalle en Observaciones.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Clasifica las horas excluidas por situaciones 2027 en FUNCIÓN Otros (Talleristas / Apoyo / etc.) y en las horas no lectivas de R. Conserva titular y plazo fijo separados, el motivo y el contrato de referencia, manteniendo a BIR fuera del PAL.',
+                'Incorpora únicamente saldos titulares sin asignar que no estén justificados en Sobredotación del mismo establecimiento, RUT y 2027. Descuenta los importes titulares justificados por bloque, acotados al saldo actual, sin retirar horas ya asignadas ni sumar saldos pendientes a contrata.',
+                'Completa las fórmulas del Excel individual y consolidado sin crear asignaciones en el SGA. Observaciones distingue situaciones, saldos incorporados y horas justificadas excluidas; valida la consistencia contractual y conserva las excepciones de proporción e incompatibilidades.',
+                'Incluye pruebas de calidades, justificaciones de otros años y establecimientos, saldos a contrata, doble conteo, BIR, contratos completos y recálculo de ambos Excel. No requiere migraciones ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
+        [
+            'version' => '2026.10.25.640',
+            'title' => 'Consolidación Básica/Media 65/35 con excepción 60/40',
+            'summary' => 'Conserva la unión compatible de Básica y Media cuando ambas son 65/35 y excluye expresamente las filas 60/40.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Mantiene el criterio de mismo docente, establecimiento, función y calidad contractual para consolidar Básica y Media 65/35, conservando el desglose K/L y los resultados de las fórmulas originales.',
+                'Las filas generadas con 60/40 permanecen separadas incluso entre sí o frente a una fila PIE sin proporción, con explicación en Observaciones y sin convertir sus horas a 65/35. Las filas sin docencia lectiva conservan su consolidación compatible.',
+                'Incluye pruebas de la excepción aunque la tabla admita la suma y recálculo del contrato, lectivas y no lectivas en ambos Excel. No requiere migraciones ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.639',
             'title' => 'Filas docentes del PAL consolidadas por función y contrato',

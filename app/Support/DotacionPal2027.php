@@ -8,6 +8,7 @@ use App\Models\Establecimiento;
 class DotacionPal2027
 {
     public const ROLES = ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'];
+    private const FUNCION_OTROS = 'Otros (Talleristas / Apoyo / etc.)';
 
     public static function canView(?string $role): bool
     {
@@ -29,8 +30,10 @@ class DotacionPal2027
         $docentes = collect($data['docentes'] ?? []);
         $cantidadBir = $docentes->where('exclusion_docente.motivo', 'proceso_bir')->count();
         $docentes = $docentes->reject(fn ($d) => data_get($d, 'exclusion_docente.motivo') === 'proceso_bir')->values();
+        $justificadas = $this->titularesJustificados($ee);
         if ($cantidadBir > 0) { $advertencias[] = 'Se excluyen del PAL '.$cantidadBir.' docente(s) con situación Proceso BIR 2027.'; }
         foreach ($docentes as $docente) {
+            $docente['pal_titulares_justificadas'] = $justificadas[DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? null)] ?? 0.0;
             array_push($filasDocentes, ...$this->docente($ee, $docente, $tablas));
         }
         $filasDocentes = (new DotacionPalFilas2027)->consolidar($filasDocentes, $tablas);
@@ -52,13 +55,7 @@ class DotacionPal2027
     {
         $docente['pal_nivel'] = $this->nivelDocente($ee, $docente);
         $base = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
-        $titular = min($base, max(0.0, (float) ($docente['horas_planta'] ?? 0)));
-        $contrata = min(max(0, $base - $titular), max(0.0, (float) ($docente['horas_contrata'] ?? 0)));
-        $capacidades = [];
-        foreach (['Titular' => $titular, 'Plazo Fijo' => $contrata, 'Otros' => max(0, $base - $titular - $contrata)] as $calidad => $horas) {
-            if ($horas > 0) { $capacidades[] = ['calidad' => $calidad, 'horas' => round($horas, 2), 'usadas' => 0.0]; }
-        }
-        if ($capacidades === []) { $capacidades[] = ['calidad' => 'Otros', 'horas' => 0.0, 'usadas' => 0.0]; }
+        $capacidades = $this->capacidadesContrato($base, $docente);
         $grupos = $this->grupos($docente);
         $asignadas = round((float) collect($grupos)->sum('contrato'), 2);
         $pendientes = max(0, round($base - $asignadas, 2));
@@ -80,9 +77,78 @@ class DotacionPal2027
                 $restante = round($restante - $parte, 4);
             }
         }
-        foreach ($capacidades as $capacidad) {
-            if ($capacidad['usadas'] > 0) { continue; }
-            $filas[] = $this->fila($ee, $docente, null, 0, $capacidad, $pendientes, $tablas);
+        $titular = collect($capacidades)->firstWhere('calidad', 'Titular');
+        $docente['pal_sobredotacion_excluida'] = min((float) $docente['pal_titulares_justificadas'],
+            max(0.0, round(($titular['horas'] ?? 0) - ($titular['usadas'] ?? 0), 2)));
+        array_push($filas, ...$this->filasOtrasHoras($ee, $docente, $capacidades, $pendientes, $tablas));
+        if ($filas === []) { $filas[] = $this->fila($ee, $docente, null, 0, $capacidades[0], $pendientes, $tablas); }
+        if ($docente['pal_sobredotacion_excluida'] > 0) {
+            foreach ($filas as &$fila) {
+                $fila['S'] .= ' Sobredotación 2027: '.$docente['pal_sobredotacion_excluida'].' h titulares justificadas excluidas de la incorporación del saldo en FUNCIÓN '.self::FUNCION_OTROS.'.';
+            }
+            unset($fila);
+        }
+        return $filas;
+    }
+
+    /** Una lectura acotada al establecimiento/año, nunca una consulta por docente. */
+    private function titularesJustificados(Establecimiento $ee): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('dotacion_sobredotacion_justificaciones')) { return []; }
+        $horas = [];
+        $registros = \App\Models\DotacionSobredotacionJustificacion::query()
+            ->where('establecimiento_id', $ee->id)->where('anio', 2027)->where('tipo_horas', 'titular')
+            ->whereIn('bloque', ['plan_estudio', 'parvularia', 'pie'])->where('horas_detectadas', '>', 0)
+            ->get(['docente_rut_normalizado', 'horas_detectadas', 'justificacion']);
+        foreach ($registros as $registro) {
+            if (trim((string) $registro->justificacion) === '') { continue; }
+            $rut = DotacionEstablecimientoCalculator::normalizeRut($registro->docente_rut_normalizado);
+            if ($rut !== '') { $horas[$rut] = round(($horas[$rut] ?? 0) + (float) $registro->horas_detectadas, 2); }
+        }
+        return $horas;
+    }
+
+    private function capacidadesContrato(float $base, array $docente): array
+    {
+        $titular = min($base, max(0.0, (float) ($docente['horas_planta'] ?? 0)));
+        $contrata = min(max(0, $base - $titular), max(0.0, (float) ($docente['horas_contrata'] ?? 0)));
+        $capacidades = [];
+        foreach (['Titular' => $titular, 'Plazo Fijo' => $contrata, 'Otros' => max(0, $base - $titular - $contrata)] as $calidad => $horas) {
+            if ($horas > 0) { $capacidades[] = ['calidad' => $calidad, 'horas' => round($horas, 2), 'usadas' => 0.0]; }
+        }
+        return $capacidades ?: [['calidad' => 'Otros', 'horas' => 0.0, 'usadas' => 0.0]];
+    }
+
+    /** Completa sólo el informe: conserva por separado situación y saldo sin asignar. */
+    private function filasOtrasHoras(Establecimiento $ee, array $docente, array $capacidades, float $pendientes, array $tablas): array
+    {
+        $base = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
+        $situacion = $docente['exclusion_docente'] ?? null;
+        $excluidas = ! empty($situacion['motivo'])
+            ? max(0.0, (float) ($docente['horas_excluidas'] ?? $situacion['horas'] ?? 0)) : 0.0;
+        $completo = max(0.0, (float) ($docente['horas_contrato_base'] ?? ($base + $excluidas)));
+        if (abs(round($completo - $base - $excluidas, 2)) > 0.0001) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['pal' => 'Las horas consideradas y excluidas de un docente no coinciden con su contrato completo. Revise la situación 2027 antes de descargar el PAL.']);
+        }
+        $motivo = $situacion['motivo_label'] ?? (\App\Models\DotacionDocenteExclusion::MOTIVOS[$situacion['motivo'] ?? ''] ?? 'Situación 2027');
+        $consideradas = array_column($capacidades, null, 'calidad');
+        $filas = [];
+        foreach ($this->capacidadesContrato($completo, $docente) as $capacidad) {
+            $actual = $consideradas[$capacidad['calidad']] ?? ['horas' => 0.0, 'usadas' => 0.0];
+            $porSituacion = max(0.0, round($capacidad['horas'] - $actual['horas'], 2));
+            $sinAsignar = $capacidad['calidad'] === 'Titular'
+                ? max(0.0, round($actual['horas'] - $actual['usadas'] - $docente['pal_sobredotacion_excluida'], 2)) : 0.0;
+            $total = round($porSituacion + $sinAsignar, 2);
+            if ($total <= 0) { continue; }
+            $fila = $this->fila($ee, $docente, null, 0, $capacidad, $pendientes, $tablas);
+            $fila['G'] = self::FUNCION_OTROS;
+            $fila['R'] = $total;
+            $detalle = [];
+            if ($porSituacion > 0) { $detalle[] = $porSituacion.' h por situación 2027: '.$motivo; }
+            if ($sinAsignar > 0) { $detalle[] = $sinAsignar.' h titulares sin asignación, sin justificación en Sobredotación'; }
+            $fila['S'] .= ' Clasificación para el informe PAL: '.$total.' h cronológicas no lectivas en FUNCIÓN '.self::FUNCION_OTROS
+                .' ('.implode('; ', $detalle).'). Calidad contractual: '.$capacidad['calidad'].'.';
+            $filas[] = $fila;
         }
         return $filas;
     }
@@ -106,7 +172,7 @@ class DotacionPal2027
             $funcion = match ($tipo) {
                 'funcion_directiva' => 'Función Directiva', 'funcion_tecnico_pedagogica' => 'Función Técnico Pedagógica',
                 'plan_estudio', 'acompanamiento_parvularia', 'pie_colaborativo', 'pie_educadora_diferencial' => 'Docente aula',
-                default => 'Otros (Talleristas / Apoyo / etc.)',
+                default => self::FUNCION_OTROS,
             };
             $convertir = $esParvulos && $columna === 'aula' && $nivel === 'Educación Parvularia'
                 && DotacionProfesionDocenteResolver::esAsignacionParvularia(['proporcion_aplicada' => $proporcion]);
@@ -205,9 +271,9 @@ class DotacionPal2027
             $notas[] = 'Situación 2027: '.$motivo.'. Contrato completo del docente: '.$completo.' h.'
                 .' Horas consideradas para la situación contractual: '.$consideradas.' h.'
                 .' Horas no necesarias por la situación: '.$noNecesarias.' h.'
-                .' El contrato completo es una referencia; J conserva las horas distribuidas.';
+                .' Las horas excluidas se incorporan en el PAL con FUNCIÓN '.self::FUNCION_OTROS.'.';
         }
-        if ($pendientes > 0) { $notas[] = 'Pendientes de distribución del docente: '.$pendientes.' h; no se asignan automáticamente a otras funciones.'; }
+        if ($pendientes > 0) { $notas[] = 'Pendientes de distribución del docente: '.$pendientes.' h. Sólo el saldo titular sin justificación en Sobredotación se incorpora en el PAL con FUNCIÓN '.self::FUNCION_OTROS.'.'; }
         $problemas = [];
         if ($grupo) {
             $factor = $grupo['contrato'] > 0 ? $parte / $grupo['contrato'] : 0;
