@@ -125,6 +125,8 @@ class ReemplazosController extends Controller
                 'Jornada basica',
                 'Jornada media',
                 'Ultima actualizacion',
+                'Fecha de antigüedad',
+                'Tramo',
             ], ';');
 
             foreach ($rows as $row) {
@@ -145,6 +147,8 @@ class ReemplazosController extends Controller
                     $this->formatHours($row->jornada_basica),
                     $this->formatHours($row->jornada_media),
                     cl_datetime($row->updated_at, 'd/m/Y H:i', ''),
+                    $this->formatDateOnly($row->fecha_antiguedad),
+                    $row->tramo ?? '',
                 ], ';');
             }
 

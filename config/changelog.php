@@ -6457,8 +6457,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.631',
+    'current_version' => '2026.10.25.632',
     'entries' => [
+        [
+            'version' => '2026.10.25.632',
+            'title' => 'Fecha de antigüedad y tramo en la exportación del padrón',
+            'summary' => 'Añade fecha de antigüedad y tramo al CSV del padrón mensual que se abre en Excel.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_estab', 'supervisor_plani', 'coordinador_plani'],
+            'items' => [
+                'Incorpora las dos columnas al final del archivo, con fecha dd/mm/aaaa y celdas vacías cuando no hay información. Conserva filtros, permisos, columnas anteriores y valores del período archivado al exportar históricos.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.631',
             'title' => 'Filtro por comuna en el padrón mensual de reemplazos',
