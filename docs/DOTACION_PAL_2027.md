@@ -57,13 +57,44 @@ dotación. No habilita datos de matrícula para el rol directivo.
 | Docentes R | Funciones efectivamente asignadas financiadas por General; nunca el saldo sin asignar |
 | Docentes S | Contrato de referencia, tramo distribuido, situación 2027 con contrato completo y horas consideradas/no necesarias, pendientes, detalle e incompatibilidades |
 
-Un docente puede tener varias filas por calidad contractual, función, nivel y
-proporción. Se consumen primero sus horas titulares y después las de plazo fijo.
+Se consumen primero las horas titulares del docente y después las de plazo fijo.
 Los grupos se recorren en orden estable de sus primeras asignaciones por ID. El
 reparto es sólo una representación para el informe y no actualiza asignaciones ni
 la calidad jurídica del padrón. El conteo de personas se obtiene de la nómina, no
 de la cantidad de filas. Las personas que trabajan en dos establecimientos se
 mantienen en cada RBD, conforme al formato original.
+
+### Consolidación de filas docentes
+
+Después de distribuir titular y contrata, se consolidan las filas con el mismo
+**RUT normalizado, RBD, función del PAL (G) y calidad contractual (H)**. No se
+mezclan funciones distintas ni contratos titulares con plazo fijo. La primera
+aparición de cada fila determina el orden del resultado; se conservan las notas
+de los registros de origen y se indica cuántas filas se unieron.
+
+Se suman K, L, P, Q y R, manteniendo el desglose por nivel y financiamiento. La
+columna M debe admitir una sola proporción. Antes de unir, se contrastan tanto
+las **horas lectivas (N)** como las **no lectivas (O)** calculadas con la tabla
+original; deben coincidir con las sumas de las filas originales. Es relevante
+porque N y O hacen **una búsqueda de K+L**, no una búsqueda independiente por
+cada nivel. Conservar sólo la suma del contrato no basta si cambia ese desglose.
+J conserva su fórmula y su total, incluyendo PIE, SEP y otras funciones.
+
+Ejemplo: dos filas de Docente aula/Titular con 19 h pedagógicas en Básica y
+19 h en Media, 22 h contractuales cada una, y otra fila de 3 h PIE quedan en una
+fila con K=19, L=19, P=3, M=65/35 y J=47. Se conserva **Ed. Básica/Media**.
+
+Por decisión del usuario, las excepciones permanecen separadas y se explican en
+Observaciones: proporciones 65/35 y 60/40 distintas, niveles sin opción común,
+horas fuera del rango de la tabla, diferencias en lectivas/no lectivas,
+incompatibilidades previas o datos de estamento, cargo y art. 69 que no coincidan.
+Si no cabe todo el grupo, se intentan subconjuntos compatibles. No se fuerzan
+redondeos ni nuevas fórmulas; una jornada de Parvularia que necesita varias filas
+para representar su contrato conserva las que sean necesarias.
+
+La consolidación se aplica al informe individual y al de todos los establecimientos.
+No altera asignaciones, contratos, pendientes, situaciones 2027 ni la exclusión
+de BIR. Los recuentos de personas siguen siendo independientes de las filas.
 
 ### Nivel del docente en Info Funcionario (DOCENTE)
 
