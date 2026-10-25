@@ -195,7 +195,8 @@ class DotacionPal2027ConsolidadoTest extends IsolatedSecurityTestCase
     private function data(): array
     {
         return ['resumen' => ['anio_padron' => 2026], 'cursos' => ['rows' => ['1B' => ['label' => '1° Básico', 'matricula' => 25,
-            'cursos' => 1, 'horas_por_nivel' => 38, 'total_horas_contrato_equivalente' => 44, 'detalles' => [['establecimiento_curso_id' => 1]]]]],
+            'cursos' => 1, 'horas_por_nivel' => 38, 'total_horas_contrato_equivalente' => 44, 'detalles' => [['establecimiento_curso_id' => 1,
+                'nombre_seccion' => '1° Básico A', 'matricula' => 25, 'horas_plan_base' => 38, 'horas_contrato_base' => 44]]]]],
             'docentes' => [['rut' => '99000001-K', 'titulo' => 'Sin título declarado', 'funcion' => 'Docente', 'horas_contrato' => 44, 'horas_planta' => 44,
                 'asignaciones' => [['id' => 1, 'docente_rut' => '99000001-K', 'estado' => 'activa', 'tipo_asignacion' => 'plan_estudio', 'subvencion' => 'General',
                     'horas_contrato' => 44, 'horas_plan_pedagogicas' => 38, 'proporcion_aplicada' => '65/35',

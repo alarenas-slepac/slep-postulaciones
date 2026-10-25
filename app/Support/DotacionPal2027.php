@@ -21,41 +21,21 @@ class DotacionPal2027
 
     public function construir(Establecimiento $ee, array $data, array $tablas): array
     {
-        $advertencias = [];
-        $filasCursos = [];
-        $combinados = collect(data_get($data, 'cursos_combinados.grupos', []))->where('activo', true);
-        $idsCombinados = $combinados->flatMap(fn ($g) => collect(data_get($g, 'miembros', []))->pluck('id'))->map(fn ($id) => (int) $id);
-        foreach (data_get($data, 'cursos.rows', []) as $nivel) {
-            if ((int) ($nivel['cursos'] ?? 0) === 0) { continue; }
-            $problemas = [];
-            $detalles = collect($nivel['detalles'] ?? []);
-            $combinado = $detalles->contains(fn ($d) => $idsCombinados->contains((int) $d['establecimiento_curso_id']));
-            $variable = (bool) ($nivel['horas_variable'] ?? false);
-            if ($combinado) { $problemas[] = 'curso combinado: horas compartidas sin reparto por nivel'; }
-            if ($variable) { $problemas[] = 'planes distintos: no existe una única carga semanal'; }
-            if ((int) ($nivel['sin_horas_plan'] ?? 0) > 0) { $problemas[] = 'falta configurar el plan'; }
-            $label = (string) ($nivel['label'] ?? 'Nivel sin identificar');
-            if ($problemas !== []) {
-                $advertencias[] = $label.': '.implode('; ', $problemas).'.';
-                $label .= ' [INCOMPATIBLE: '.implode('; ', $problemas).'; revisar SGA]';
-            }
-            $filasCursos[] = [
-                'A' => (string) $ee->nombre_establecimiento, 'B' => (string) $ee->rbd,
-                'C' => $label, 'D' => (int) ($nivel['matricula'] ?? 0), 'E' => (int) $nivel['cursos'],
-                'F' => $problemas === [] ? ($nivel['horas_por_nivel'] ?? null) : null,
-                // Sólo necesidad del plan, sin agregar PIE ni funciones.
-                'H' => $combinado ? null : (float) ($nivel['total_horas_contrato_equivalente'] ?? 0),
-            ];
-        }
-        if ($filasCursos === []) { $advertencias[] = 'No hay cursos activos con matrícula registrados para 2027.'; }
+        $cursosPal = (new DotacionPalCursos2027)->construir($ee, $data);
+        $advertencias = $cursosPal['advertencias'];
+        $filasCursos = $cursosPal['filas'];
         $filasDocentes = [];
+        // La fuente ya consulta las situaciones exclusivamente del año 2027.
         $docentes = collect($data['docentes'] ?? []);
+        $cantidadBir = $docentes->where('exclusion_docente.motivo', 'proceso_bir')->count();
+        $docentes = $docentes->reject(fn ($d) => data_get($d, 'exclusion_docente.motivo') === 'proceso_bir')->values();
+        if ($cantidadBir > 0) { $advertencias[] = 'Se excluyen del PAL '.$cantidadBir.' docente(s) con situación Proceso BIR 2027.'; }
         foreach ($docentes as $docente) {
             array_push($filasDocentes, ...$this->docente($ee, $docente, $tablas));
         }
         $incompatibles = count(array_filter($filasDocentes, fn ($row) => str_contains($row['S'], 'INCOMPATIBLE:')));
         if ($incompatibles) { $advertencias[] = $incompatibles.' fila(s) docentes incompatibles: sus horas se describen en Observaciones y no se fuerzan a otra regla.'; }
-        if ($docentes->isEmpty()) { $advertencias[] = 'No hay docentes del padrón disponibles para el proceso.'; }
+        if ($docentes->isEmpty()) { $advertencias[] = 'No hay docentes del padrón incluidos en el PAL 2027.'; }
         $virtuales = collect(data_get($data, 'asignacion.docentes', []))->filter(fn ($d) => isset($d['cupo_contrata_id']))->count();
         if ($virtuales || count(data_get($data, 'asignacion.plazas_por_asumir', []))) {
             $advertencias[] = 'Las plazas por asumir y cupos sin persona identificada no se exportan como funcionarios.';
@@ -185,6 +165,17 @@ class DotacionPal2027
             'F' => (string) ($docente['funcion'] ?? ''), 'G' => $grupo['funcion'] ?? '', 'H' => $capacidad['calidad'],
             'I' => data_get($docente, 'exclusion_docente.motivo') === 'horas_catedra_art_69' ? 'si' : null]);
         $notas = ['Borrador PAL 2027. Contrato '.$capacidad['calidad'].': '.$capacidad['horas'].' h.'];
+        $situacion = $docente['exclusion_docente'] ?? null;
+        if (! empty($situacion['motivo'])) {
+            $consideradas = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
+            $noNecesarias = max(0.0, (float) ($docente['horas_excluidas'] ?? $situacion['horas'] ?? 0));
+            $completo = max(0.0, (float) ($docente['horas_contrato_base'] ?? ($consideradas + $noNecesarias)));
+            $motivo = $situacion['motivo_label'] ?? (\App\Models\DotacionDocenteExclusion::MOTIVOS[$situacion['motivo']] ?? $situacion['motivo']);
+            $notas[] = 'Situación 2027: '.$motivo.'. Contrato completo del docente: '.$completo.' h.'
+                .' Horas consideradas para la situación contractual: '.$consideradas.' h.'
+                .' Horas no necesarias por la situación: '.$noNecesarias.' h.'
+                .' El contrato completo es una referencia; J conserva las horas distribuidas.';
+        }
         if ($pendientes > 0) { $notas[] = 'Pendientes de distribución del docente: '.$pendientes.' h; no se asignan automáticamente a otras funciones.'; }
         $problemas = [];
         if ($grupo) {
