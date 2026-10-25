@@ -1,0 +1,111 @@
+# Exportación del borrador PAL 2027
+
+En Dotación Establecimiento, seleccionar **2027 → establecimiento → Excel PAL 2027**.
+La pantalla permite revisar los totales del SGA y descargar un borrador del formato
+«Resumen Dotación PAL 2027». Acceso por rol activo: administrador, coordinador UATP,
+coordinador GDP y supervisor de Planificación, como los informes consolidados de
+dotación. No habilita datos de matrícula para el rol directivo.
+
+## Fuente y alcance
+
+- Plantilla privada versionada: `resources/templates/dotacion/resumen_dotacion_pal_2027.xlsx`.
+  Procede del archivo proporcionado por el usuario. Conserva sus nueve hojas y
+  fórmulas, estilos, validaciones, objetos y tablas auxiliares. Se limpiaron los
+  datos de ejemplo, las cachés calculadas y los nombres personales de las propiedades.
+- `DotacionEstablecimientoCalculator::build($ee, 2027, false, false)` proporciona
+  los mismos datos del proceso, sin calcular los consolidados por asignatura.
+  La lectura se encapsula en `DotacionLecturaCache` y no modifica registros.
+- Cursos y asignaciones: sólo 2027. El padrón puede corresponder al año previo,
+  conforme al servicio de períodos y a las reglas de continuidad vigentes del SGA.
+  El año de padrón se indica en la revisión previa. No se supone que Git sincronice
+  bases de datos ni que el ambiente local tenga lo ingresado en producción.
+- Se completan **Info Establecimiento** e **Info Funcionario (DOCENTE)**.
+  Asistentes y VTF conservan encabezados, pero quedan sin registros. No se presentan
+  vacantes, plazas por asumir o cupos sin RUT real como funcionarios.
+
+## Mapeo
+
+| Hoja / columnas | Fuente y criterio |
+| --- | --- |
+| Establecimiento A–C | Nombre y RBD de establecimientos; nivel del curso |
+| Establecimiento D–E | Matrícula y cantidad de cursos activos con matrícula 2027 |
+| Establecimiento F | Horas semanales del plan vigente del nivel, si es uniforme y representable |
+| Establecimiento G | Fórmula original `E × F`, sin reemplazar su cálculo |
+| Establecimiento H | Horas de contrato necesarias para cubrir el plan del nivel; excluye PIE y funciones |
+| Docentes A–C | RUT de la nómina del proceso, establecimiento y RBD |
+| Docentes D–G | Nivel identificado en curso o declaración, estamento/título, cargo declarado y función asignada |
+| Docentes H | Titular, Plazo Fijo u Otros, según las capacidades contractuales del proceso |
+| Docentes I | «si» sólo si existe la situación anual explícita `horas_catedra_art_69` |
+| Docentes J, N, O | Fórmulas originales de suma y búsqueda en las tablas auxiliares |
+| Docentes K–L | Horas pedagógicas de aula financiadas por General, separadas por nivel, cuando la regla es representable |
+| Docentes M | 65/35 o 60/40 registrados en la asignación; no se convierten reglas especiales a una proporción genérica |
+| Docentes P–Q | Horas cronológicas asignadas y financiadas por PIE o SEP |
+| Docentes R | Funciones efectivamente asignadas financiadas por General; nunca el saldo sin asignar |
+| Docentes S | Contrato de referencia, tramo distribuido, pendientes, detalle e incompatibilidades |
+
+Un docente puede tener varias filas por calidad contractual, función, nivel y
+proporción. Se consumen primero sus horas titulares y después las de plazo fijo.
+Los grupos se recorren en orden estable de sus primeras asignaciones por ID. El
+reparto es sólo una representación para el informe y no actualiza asignaciones ni
+la calidad jurídica del padrón. El conteo de personas se obtiene de la nómina, no
+de la cantidad de filas.
+
+## Fórmulas originales y borradores
+
+El usuario solicitó conservar estrictamente los criterios de cálculo originales.
+Las instrucciones de la plantilla dicen informar el contrato completo en J, pero
+J en realidad suma N+O+P+Q+R. Se conserva esta fórmula: un docente de 44 horas con
+30 distribuidas muestra el total representado y **14 horas pendientes** en S.
+No se inventa una función para completar la diferencia.
+
+Cada entrada lectiva se contrasta con el mismo rango exacto de BUSCARV que usa el
+Excel (`A4:D47` en cada tabla). Si no existe una equivalencia, o no coincide con el
+contrato consolidado del SGA, la fila queda marcada **INCOMPATIBLE** en S y sus
+entradas numéricas incompatibles quedan vacías. S conserva las horas pedagógicas
+y cronológicas que motivan el problema. J/N/O pueden calcular cero: ese cero **no
+representa ausencia de horas**. No usar esas filas como dotación definitiva.
+
+Esto puede ocurrir con Parvularia, reglas especiales, fracciones producidas al
+separar contratos, niveles sin desglose, reservas sin función y financiamientos
+sin equivalencia. Los excesos de asignación se marcan y no se transforman en otro
+contrato real.
+
+En establecimientos, un nivel con planes diferentes no se sustituye por un
+promedio. Los cursos combinados conservan sus alumnos y cursos, pero no se inventa
+un reparto del contrato compartido por nivel. F o H se dejan sin completar según
+corresponda y C señala la incompatibilidad. La revisión previa muestra además el
+total contractual de plan del SGA, calculado sin duplicar grupos combinados. La
+fórmula G permanece intacta aunque una entrada no esté disponible.
+
+Las filas se amplían copiando las fórmulas y estilos originales. Se extienden la
+tabla docente, las validaciones y los rangos finitos de Resumen cuando corresponde,
+sin cambiar sus funciones ni criterios. Sólo se ajustan el alto de las filas
+completadas y el ajuste de texto de nombre/nivel para que sean legibles, manteniendo
+los estilos originales y el orden de columnas. Límite defensivo por descarga: 10.000 filas
+docentes y 1.000 niveles. Los textos se escriben como texto, incluso si comienzan
+con `=`. No se conserva un Excel con datos de usuarios en el repositorio.
+
+## Instalación y verificación
+
+Desplegar los archivos de este cambio incluyendo la plantilla privada y ejecutar,
+con PHP 8.3, `php artisan optimize:clear` y las regeneraciones de caché utilizadas
+por el despliegue existente. No requiere migraciones ni nuevas variables `.env`.
+Usa PhpSpreadsheet ya instalado y las extensiones ZIP/DOM de PHP. El directorio
+temporal de PHP debe permitir archivos privados y escritura. La descarga se
+prepara completamente antes de enviarse y elimina su temporal al terminar o al
+cerrarse la petición.
+
+La conservación de fórmulas y objetos se realiza editando sólo las partes XML
+necesarias del XLSX, para evitar que un motor de cálculo diferente cambie las
+fórmulas matriciales de Excel. `Resumen` requiere una versión de Excel compatible
+con `FILTER`, `UNIQUE`, `VSTACK` y `LET`. El archivo solicita recálculo automático
+completo al abrir. Las cachés de los ejemplos se eliminaron para no mostrar totales
+anteriores. Un visor sin recálculo puede mostrar celdas vacías o no representar
+estas fórmulas; abrir en Excel compatible y revisar antes de presentar el PAL.
+
+Pruebas: `php vendor/phpunit/phpunit/phpunit tests/Feature/DotacionPal2027Test.php`.
+Usan SQLite en memoria y datos sintéticos: permisos por rol activo, validación del
+año, privacidad, contratos, pendientes, incompatibilidades, conservación de
+fórmulas/hojas/estilos y expansión a 220 filas. El recálculo nativo de Excel y un
+archivo con datos reales de 2027 requieren validación adicional; no se da por
+comprobado el resultado en producción.
