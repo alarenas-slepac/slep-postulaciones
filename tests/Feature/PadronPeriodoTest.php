@@ -32,7 +32,7 @@ class PadronPeriodoTest extends TestCase
         });
         Schema::create('reemplazos_personal', function (Blueprint $t) {
             $t->id(); $t->integer('establecimiento_id');
-            foreach (['rut', 'nombre', 'tipocontrato', 'estatuto', 'escalafon', 'financiamiento', 'row_hash', 'source_filename'] as $campo) {
+            foreach (['rut', 'nombre', 'tipocontrato', 'estatuto', 'escalafon', 'financiamiento', 'row_hash', 'source_filename', 'tramo'] as $campo) {
                 $t->string($campo)->nullable();
             }
             foreach (['anio', 'mes', 'rbd', 'jornada', 'jornada_basica', 'jornada_media'] as $campo) {
@@ -286,8 +286,10 @@ class PadronPeriodoTest extends TestCase
 
     public function test_monthly_controller_search_pagination_and_export_use_old_contract(): void
     {
+        DB::table('reemplazos_personal')->where('id', 101)->update(['tramo' => 'Experto 1']);
         $this->capturarCambio(fn () => DB::table('reemplazos_personal')->update([
             'establecimiento_id' => 2, 'rbd' => 99998, 'mes' => 9, 'nombre' => 'Nombre actual', 'jornada' => 20,
+            'fecha_antiguedad' => '2025-01-01', 'tramo' => 'Experto 2',
         ]));
         $controller = app(ReemplazosController::class);
         $request = Request::create('/padron', 'GET', ['periodo' => '2026-08', 'establecimiento_id' => 1, 'q' => 'sintética 101']);
@@ -305,6 +307,14 @@ class PadronPeriodoTest extends TestCase
         $this->assertStringContainsString('Escuela sintética A', $csv);
         $this->assertStringNotContainsString('Nombre actual', $csv);
         $this->assertStringNotContainsString('Persona sintética 102', $csv);
+        $lines = preg_split('/\r?\n/', trim(substr($csv, 3))); // Omite el BOM UTF-8.
+        $headers = str_getcsv($lines[0], ';');
+        $record = array_combine($headers, str_getcsv($lines[1], ';'));
+        $this->assertCount(18, $headers);
+        $this->assertSame('Ultima actualizacion', $headers[15]);
+        $this->assertSame(['Fecha de antigüedad', 'Tramo'], array_slice($headers, -2));
+        $this->assertSame('01/03/2010', $record['Fecha de antigüedad']);
+        $this->assertSame('Experto 1', $record['Tramo']);
     }
 
     public function test_forced_establishment_still_limits_historical_results(): void
@@ -425,6 +435,7 @@ class PadronPeriodoTest extends TestCase
     public function test_paginacion_conserva_comuna_y_csv_exporta_todos_los_registros_filtrados(): void
     {
         $this->prepararComunas();
+        DB::table('reemplazos_personal')->where('id', 106)->update(['fecha_antiguedad' => null]);
         for ($id = 120; $id < 140; $id++) { $this->personal($id, ['establecimiento_id' => 3, 'rbd' => 99997]); }
         $request = Request::create('/reemplazos', 'GET', ['periodo' => '2026-08', 'comuna' => 'Comuna A', 'per_page' => 15]);
         $this->app->instance('request', $request);
@@ -445,6 +456,11 @@ class PadronPeriodoTest extends TestCase
         $this->assertStringNotContainsString('Persona comuna B', $csv);
         $this->assertStringNotContainsString('Persona sin comuna', $csv);
         $this->assertStringNotContainsString('Persona comuna vacía', $csv);
+        $records = array_map(fn ($line) => str_getcsv($line, ';'), preg_split('/\r?\n/', trim(substr($csv, 3))));
+        $headers = array_shift($records);
+        $empty = collect($records)->map(fn ($row) => array_combine($headers, $row))->firstWhere('Nombre', 'Persona sintética 106');
+        $this->assertSame('', $empty['Fecha de antigüedad']);
+        $this->assertSame('', $empty['Tramo']);
     }
 
     public function test_comuna_filtra_el_establecimiento_del_contrato_archivado_y_no_el_actual(): void
