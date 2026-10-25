@@ -67,6 +67,7 @@ class ReemplazosController extends Controller
             'filters' => $filters,
             'periodOptions' => $context['periodOptions'],
             'establecimientos' => $context['establecimientos'],
+            'comunas' => $context['comunas'],
             'resumenEstablecimientos' => $resumenEstablecimientos,
             'summary' => $summary,
             'personal' => $personal,
@@ -177,6 +178,7 @@ class ReemplazosController extends Controller
             'establecimiento_id' => ['required', 'integer', 'exists:establecimientos,id'],
             'return.periodo' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'return.establecimiento_id' => ['nullable', 'integer', 'exists:establecimientos,id'],
+            'return.comuna' => ['nullable', 'string', 'max:120'],
             'return.q' => ['nullable', 'string', 'max:120'],
             'return.per_page' => ['nullable', 'integer', 'in:15,25,50,100'],
             'return.page' => ['nullable', 'integer', 'min:1'],
@@ -228,6 +230,7 @@ class ReemplazosController extends Controller
             ->route('reemplazos.index', array_filter([
                 'periodo' => $returnFilters['periodo'] ?? null,
                 'establecimiento_id' => $returnFilters['establecimiento_id'] ?? null,
+                'comuna' => $returnFilters['comuna'] ?? null,
                 'q' => $returnFilters['q'] ?? null,
                 'per_page' => $returnFilters['per_page'] ?? null,
                 'page' => $returnFilters['page'] ?? null,
@@ -243,6 +246,7 @@ class ReemplazosController extends Controller
             'observacion' => ['nullable', 'string', 'max:2000'],
             'return.periodo' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'return.establecimiento_id' => ['nullable', 'integer', 'exists:establecimientos,id'],
+            'return.comuna' => ['nullable', 'string', 'max:120'],
             'return.q' => ['nullable', 'string', 'max:120'],
             'return.per_page' => ['nullable', 'integer', 'in:15,25,50,100'],
             'return.page' => ['nullable', 'integer', 'min:1'],
@@ -287,6 +291,7 @@ class ReemplazosController extends Controller
         $validated = $request->validate([
             'return.periodo' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'return.establecimiento_id' => ['nullable', 'integer', 'exists:establecimientos,id'],
+            'return.comuna' => ['nullable', 'string', 'max:120'],
             'return.q' => ['nullable', 'string', 'max:120'],
             'return.per_page' => ['nullable', 'integer', 'in:15,25,50,100'],
             'return.page' => ['nullable', 'integer', 'min:1'],
@@ -405,6 +410,7 @@ class ReemplazosController extends Controller
         return redirect()->route('reemplazos.index', array_filter([
             'periodo' => $returnFilters['periodo'] ?? null,
             'establecimiento_id' => $returnFilters['establecimiento_id'] ?? null,
+            'comuna' => $returnFilters['comuna'] ?? null,
             'q' => $returnFilters['q'] ?? null,
             'per_page' => $returnFilters['per_page'] ?? null,
             'page' => $returnFilters['page'] ?? null,
@@ -467,6 +473,7 @@ class ReemplazosController extends Controller
         $validated = $request->validate([
             'periodo' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'establecimiento_id' => ['nullable', 'integer', 'exists:establecimientos,id'],
+            'comuna' => ['nullable', 'string', 'max:120'],
             'q' => ['nullable', 'string', 'max:120'],
             'per_page' => ['nullable', 'integer', 'in:15,25,50,100'],
         ]);
@@ -479,30 +486,26 @@ class ReemplazosController extends Controller
         [$selectedYear, $selectedMonth] = $this->parsePeriodKey($selectedPeriodKey);
 
         $establecimientosQuery = Establecimiento::query()
-            ->select('establecimientos.id', 'establecimientos.rbd', 'establecimientos.nombre_establecimiento')
+            ->select('establecimientos.id', 'establecimientos.rbd', 'establecimientos.nombre_establecimiento', 'establecimientos.comuna')
             ->whereIn('establecimientos.id', $periodos->consultaMensual($selectedYear, $selectedMonth)
                 ->select('reemplazos_personal.establecimiento_id')->distinct())
             ->orderBy('establecimientos.nombre_establecimiento');
 
-        if ($forcedEstablecimiento) {
-            $establecimientosQuery->where('establecimientos.id', $forcedEstablecimiento->id);
+        if ($isFuncionarioEstab) {
+            $establecimientosQuery->where('establecimientos.id', $forcedEstablecimiento?->id ?? 0);
         }
 
         $establecimientos = $establecimientosQuery->get();
+        $comunas = $establecimientos->pluck('comuna')
+            ->filter(fn ($comuna) => is_string($comuna) && trim($comuna) !== '')
+            ->map(fn ($comuna) => trim($comuna))
+            ->unique()->sort()->values();
 
         $lockedWithoutEstablecimiento = $isFuncionarioEstab && !$forcedEstablecimiento;
 
         $selectedEstablecimientoId = $forcedEstablecimiento?->id ?: ($validated['establecimiento_id'] ?? null);
         if ($selectedEstablecimientoId && !$establecimientos->contains('id', (int) $selectedEstablecimientoId)) {
             $selectedEstablecimientoId = $forcedEstablecimiento?->id;
-        }
-
-        $latestFile = null;
-        if ($selectedYear && $selectedMonth) {
-            $latestFile = $periodos->consultaMensual($selectedYear, $selectedMonth)
-                ->whereNotNull('source_filename')
-                ->orderByDesc('updated_at')
-                ->value('source_filename');
         }
 
         $selectedPeriodLabel = $selectedPeriodKey !== ''
@@ -514,15 +517,22 @@ class ReemplazosController extends Controller
             'anio' => $selectedYear,
             'mes' => $selectedMonth,
             'establecimiento_id' => $selectedEstablecimientoId ? (int) $selectedEstablecimientoId : null,
+            'comuna' => trim((string) ($validated['comuna'] ?? '')),
             'q' => trim((string) ($validated['q'] ?? '')),
             'per_page' => (int) ($validated['per_page'] ?? 25),
             'locked_without_establecimiento' => $lockedWithoutEstablecimiento,
             'historico' => $periodos->esHistorico($selectedYear, $selectedMonth),
         ];
 
+        $latestFile = $this->buildPadronQuery($filters)
+            ->whereNotNull('reemplazos_personal.source_filename')
+            ->orderByDesc('reemplazos_personal.updated_at')
+            ->value('reemplazos_personal.source_filename');
+
         return [$filters, [
             'periodOptions' => $periodOptions,
             'establecimientos' => $establecimientos,
+            'comunas' => $comunas,
             'selectedPeriodLabel' => $selectedPeriodLabel,
             'latestFile' => $latestFile,
             'isFuncionarioEstab' => $isFuncionarioEstab,
@@ -552,6 +562,10 @@ class ReemplazosController extends Controller
 
         if (!empty($filters['establecimiento_id'])) {
             $query->where('reemplazos_personal.establecimiento_id', (int) $filters['establecimiento_id']);
+        }
+
+        if ($filters['comuna'] !== '') {
+            $query->whereRaw('TRIM(establecimientos.comuna) = ?', [$filters['comuna']]);
         }
 
         if ($filters['q'] !== '') {
@@ -586,9 +600,12 @@ class ReemplazosController extends Controller
 
     private function extractReturnFilters(Request $request): array
     {
+        $validated = $request->validate(['comuna' => ['nullable', 'string', 'max:120']]);
+
         return [
             'periodo' => $request->query('periodo'),
             'establecimiento_id' => $request->query('establecimiento_id'),
+            'comuna' => $validated['comuna'] ?? null,
             'q' => $request->query('q'),
             'per_page' => $request->query('per_page'),
             'page' => $request->query('page'),

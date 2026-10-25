@@ -28,6 +28,7 @@ class PadronPeriodoTest extends TestCase
         $this->resetCaches();
         Schema::create('establecimientos', function (Blueprint $t) {
             $t->id(); $t->integer('rbd'); $t->string('nombre_establecimiento');
+            $t->string('comuna')->nullable();
         });
         Schema::create('reemplazos_personal', function (Blueprint $t) {
             $t->id(); $t->integer('establecimiento_id');
@@ -41,6 +42,10 @@ class PadronPeriodoTest extends TestCase
         });
         Schema::create('reemplazos_personal_bloqueos', function (Blueprint $t) {
             $t->id(); $t->integer('reemplazo_personal_id'); $t->boolean('activo'); $t->string('motivo');
+            $t->integer('establecimiento_id')->nullable(); $t->integer('rbd')->nullable();
+            foreach (['rut', 'nombre', 'observacion'] as $campo) { $t->string($campo)->nullable(); }
+            $t->integer('bloqueado_por')->nullable(); $t->integer('desbloqueado_por')->nullable();
+            $t->timestamp('desbloqueado_at')->nullable(); $t->timestamps();
         });
         (require base_path('database/migrations/2026_09_08_120000_create_padron_revisiones.php'))->up();
         (require base_path('database/migrations/2026_09_08_130000_add_padron_aplicacion_segura.php'))->up();
@@ -363,5 +368,175 @@ class PadronPeriodoTest extends TestCase
         $view = app(ReemplazosController::class)->index(Request::create('/padron', 'GET', ['periodo' => '2026-08']))->getData();
         $this->assertSame(1, $view['summary']['bloqueados']);
         $this->assertSame('Bloqueo sintético', $view['personal']->firstWhere('id', 101)->bloqueoActivo->motivo);
+    }
+
+    private function prepararComunas(): void
+    {
+        DB::table('establecimientos')->where('id', 1)->update(['comuna' => 'Comuna A']);
+        DB::table('establecimientos')->where('id', 2)->update(['comuna' => 'Comuna B']);
+        DB::table('establecimientos')->insert([
+            ['id' => 3, 'rbd' => 99997, 'nombre_establecimiento' => 'Escuela sintética C', 'comuna' => ' Comuna A '],
+            ['id' => 4, 'rbd' => 99996, 'nombre_establecimiento' => 'Escuela sin comuna', 'comuna' => null],
+            ['id' => 5, 'rbd' => 99995, 'nombre_establecimiento' => 'Escuela comuna vacía', 'comuna' => ''],
+        ]);
+        $this->personal(105, ['establecimiento_id' => 2, 'rbd' => 99998, 'nombre' => 'Persona comuna B',
+            'source_filename' => 'comuna-b.xlsx', 'updated_at' => '2026-08-30 00:00:00']);
+        $this->personal(106, ['establecimiento_id' => 3, 'rbd' => 99997,
+            'source_filename' => 'comuna-a.xlsx', 'updated_at' => '2026-08-20 00:00:00']);
+        $this->personal(107, ['establecimiento_id' => 4, 'rbd' => 99996, 'nombre' => 'Persona sin comuna']);
+        $this->personal(108, ['establecimiento_id' => 5, 'rbd' => 99995, 'nombre' => 'Persona comuna vacía']);
+    }
+
+    public function test_comuna_incluye_todos_los_contratos_y_establecimientos_con_resumen_coherente(): void
+    {
+        $this->prepararComunas();
+        DB::table('reemplazos_personal_bloqueos')->insert(['reemplazo_personal_id' => 101, 'activo' => true, 'motivo' => 'Bloqueo sintético']);
+        $view = app(ReemplazosController::class)->index(Request::create('/reemplazos', 'GET', ['comuna' => 'Comuna A']))->getData();
+        $this->assertSame(['Comuna A', 'Comuna B'], $view['comunas']->all());
+        $this->assertSame('Comuna A', $view['filters']['comuna']);
+        $this->assertSame(5, $view['personal']->total());
+        $this->assertEqualsCanonicalizing([101, 102, 103, 104, 106], $view['personal']->pluck('id')->all());
+        $this->assertSame(5, $view['summary']['total']);
+        $this->assertSame(2, $view['summary']['establecimientos']);
+        $this->assertSame(2, $view['summary']['bloqueados']);
+        $this->assertEqualsCanonicalizing([1, 3], $view['resumenEstablecimientos']->pluck('establecimiento_id')->all());
+        $this->assertEquals(5, $view['resumenEstablecimientos']->sum('total_registros'));
+        $this->assertSame('comuna-a.xlsx', $view['latestFile']);
+    }
+
+    public function test_comuna_se_combina_con_busqueda_y_establecimiento_y_no_amplia_filtros_sin_resultados(): void
+    {
+        $this->prepararComunas();
+        $controller = app(ReemplazosController::class);
+        $view = $controller->index(Request::create('/reemplazos', 'GET', [
+            'comuna' => 'Comuna A', 'establecimiento_id' => 3, 'q' => 'sintética 106',
+        ]))->getData();
+        $this->assertSame([106], $view['personal']->pluck('id')->all());
+        foreach ([['comuna' => 'Comuna A', 'establecimiento_id' => 2], ['comuna' => 'Comuna inexistente']] as $filtros) {
+            $empty = $controller->index(Request::create('/reemplazos', 'GET', $filtros))->getData();
+            $this->assertSame(0, $empty['personal']->total());
+            $this->assertSame(0, $empty['summary']['total']);
+            $this->assertNull($empty['latestFile']);
+        }
+        $all = $controller->index(Request::create('/reemplazos', 'GET'))->getData();
+        $this->assertSame(8, $all['personal']->total()); // Incluye comunas nulas/vacías al limpiar el filtro.
+    }
+
+    public function test_paginacion_conserva_comuna_y_csv_exporta_todos_los_registros_filtrados(): void
+    {
+        $this->prepararComunas();
+        for ($id = 120; $id < 140; $id++) { $this->personal($id, ['establecimiento_id' => 3, 'rbd' => 99997]); }
+        $request = Request::create('/reemplazos', 'GET', ['periodo' => '2026-08', 'comuna' => 'Comuna A', 'per_page' => 15]);
+        $this->app->instance('request', $request);
+        $controller = app(ReemplazosController::class);
+        $view = $controller->index($request)->getData();
+        $this->assertCount(15, $view['personal']);
+        $this->assertSame(25, $view['personal']->total());
+        parse_str(parse_url($view['personal']->nextPageUrl(), PHP_URL_QUERY), $query);
+        $this->assertSame('Comuna A', $query['comuna']);
+        $this->assertSame('2026-08', $query['periodo']);
+        ob_start();
+        $controller->export($request)->sendContent();
+        $csv = ob_get_clean();
+        $this->assertCount(26, preg_split('/\r?\n/', trim($csv)));
+        $this->assertStringContainsString('Persona sintética 139', $csv);
+        $this->assertStringContainsString('Escuela sintética A', $csv);
+        $this->assertStringContainsString('Escuela sintética C', $csv);
+        $this->assertStringNotContainsString('Persona comuna B', $csv);
+        $this->assertStringNotContainsString('Persona sin comuna', $csv);
+        $this->assertStringNotContainsString('Persona comuna vacía', $csv);
+    }
+
+    public function test_comuna_filtra_el_establecimiento_del_contrato_archivado_y_no_el_actual(): void
+    {
+        $this->prepararComunas();
+        $this->capturarCambio(fn () => DB::table('reemplazos_personal')->update([
+            'mes' => 9, 'establecimiento_id' => 2, 'rbd' => 99998, 'nombre' => 'Nombre actual en otra comuna',
+        ]));
+        $request = Request::create('/reemplazos', 'GET', ['periodo' => '2026-08', 'comuna' => 'Comuna A']);
+        $controller = app(ReemplazosController::class);
+        $view = $controller->index($request)->getData();
+        $this->assertTrue($view['filters']['historico']);
+        $this->assertSame(5, $view['personal']->total());
+        $this->assertEqualsCanonicalizing([1, 3], $view['personal']->pluck('establecimiento_id')->unique()->all());
+        ob_start(); $controller->export($request)->sendContent(); $csv = ob_get_clean();
+        $this->assertStringContainsString('Persona sintética 106', $csv);
+        $this->assertStringNotContainsString('Nombre actual en otra comuna', $csv);
+    }
+
+    public function test_comuna_no_permite_consultar_otros_establecimientos_ni_ofrece_catalogo_sin_asignacion(): void
+    {
+        $this->prepararComunas();
+        $user = new class extends User {
+            public function hasRole($roles, ?string $guard = null): bool { return $roles === 'funcionario_estab'; }
+        };
+        $user->establecimiento_id = 2;
+        foreach (['Comuna A' => 0, 'Comuna B' => 1] as $comuna => $count) {
+            $request = Request::create('/reemplazos', 'GET', ['comuna' => $comuna, 'establecimiento_id' => 1]);
+            $request->setUserResolver(fn () => $user);
+            $view = app(ReemplazosController::class)->index($request)->getData();
+            $this->assertSame($count, $view['personal']->total());
+            $this->assertSame(2, $view['filters']['establecimiento_id']);
+            $this->assertSame(['Comuna B'], $view['comunas']->all());
+            ob_start(); app(ReemplazosController::class)->export($request)->sendContent(); $csv = ob_get_clean();
+            $this->assertStringNotContainsString('Persona sintética 101', $csv);
+        }
+        $user->establecimiento_id = null;
+        $view = app(ReemplazosController::class)->index($request)->getData();
+        $this->assertSame(0, $view['personal']->total());
+        $this->assertTrue($view['establecimientos']->isEmpty());
+        $this->assertTrue($view['comunas']->isEmpty());
+    }
+
+    public function test_comuna_rechaza_valores_no_escalares_y_demasiado_largos(): void
+    {
+        foreach ([['Comuna A'], str_repeat('a', 121)] as $invalid) {
+            try {
+                app(ReemplazosController::class)->index(Request::create('/reemplazos', 'GET', ['comuna' => $invalid]));
+                $this->fail('Debe validar comuna antes de consultar el padrón.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('comuna', $exception->errors());
+            }
+            try {
+                app(ReemplazosController::class)->editPersonal(Request::create('/reemplazos/101/edit', 'GET', ['comuna' => $invalid]), ReemplazoPersonal::findOrFail(101));
+                $this->fail('Debe validar la comuna al preparar el retorno de edición.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('comuna', $exception->errors());
+            }
+        }
+    }
+
+    public function test_edicion_y_retorno_al_padron_conservan_la_comuna(): void
+    {
+        $this->prepararComunas();
+        $personal = ReemplazoPersonal::findOrFail(101);
+        $controller = app(ReemplazosController::class);
+        $edit = $controller->editPersonal(Request::create('/reemplazos/101/edit', 'GET', ['comuna' => 'Comuna A']), $personal)->getData();
+        $this->assertSame('Comuna A', $edit['returnFilters']['comuna']);
+        $response = $controller->updatePersonal(Request::create('/reemplazos/101', 'PUT', [
+            'establecimiento_id' => 3, 'return' => ['periodo' => '2026-08', 'comuna' => 'Comuna A'],
+        ]), $personal);
+        parse_str(parse_url($response->getTargetUrl(), PHP_URL_QUERY), $query);
+        $this->assertSame('Comuna A', $query['comuna']);
+        $this->assertSame(3, $personal->fresh()->establecimiento_id);
+    }
+
+    public function test_bloquear_y_desbloquear_conservan_comuna_y_paginacion(): void
+    {
+        $this->prepararComunas();
+        $controller = app(ReemplazosController::class);
+        $personal = ReemplazoPersonal::findOrFail(101);
+        $return = ['periodo' => '2026-08', 'comuna' => 'Comuna A', 'per_page' => 15, 'page' => 2];
+        $block = Request::create('/reemplazos/101/bloquear', 'POST', ['motivo' => 'Bloqueo sintético', 'return' => $return]);
+        $block->setUserResolver(fn () => (new User)->forceFill(['id' => 1]));
+        $unblock = Request::create('/reemplazos/101/desbloquear', 'DELETE', ['return' => $return]);
+        $unblock->setUserResolver($block->getUserResolver());
+        foreach ([$controller->bloquearPersonal($block, $personal), $controller->desbloquearPersonal($unblock, $personal)] as $response) {
+            parse_str(parse_url($response->getTargetUrl(), PHP_URL_QUERY), $query);
+            $this->assertSame('Comuna A', $query['comuna']);
+            $this->assertSame('2', $query['page']);
+            $this->assertSame('15', $query['per_page']);
+        }
+        $this->assertDatabaseHas('reemplazos_personal_bloqueos', ['reemplazo_personal_id' => 101, 'activo' => false]);
     }
 }
