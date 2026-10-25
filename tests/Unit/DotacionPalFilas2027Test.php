@@ -52,6 +52,23 @@ class DotacionPalFilas2027Test extends TestCase
         $this->assertSame([5, 5], array_column($out, 'K'));
     }
 
+    public function test_no_consolida_dos_filas_6040_ni_les_agrega_pie_aunque_la_tabla_lo_admita(): void
+    {
+        $out = (new DotacionPalFilas2027)->consolidar([
+            $this->fila(['M' => '60/40', 'K' => 5]),
+            $this->fila(['M' => '60/40', 'D' => 'Educación Media', 'L' => 5]),
+            $this->fila(['M' => null, 'P' => 3]),
+        ], $this->tablas());
+        $this->assertCount(3, $out);
+        $this->assertSame(['60/40', '60/40', null], array_column($out, 'M'));
+        $this->assertSame([5, null, null], array_column($out, 'K'));
+        $this->assertSame([null, 5, null], array_column($out, 'L'));
+        $this->assertSame([null, null, 3], array_column($out, 'P'));
+        foreach (array_slice($out, 0, 2) as $row) {
+            $this->assertStringContainsString('60/40 queda excluida', $row['S']);
+        }
+    }
+
     public function test_busca_k_mas_l_y_no_consolida_si_el_total_no_existe_en_la_tabla(): void
     {
         $out = (new DotacionPalFilas2027)->consolidar([$this->fila(['K' => 10]),

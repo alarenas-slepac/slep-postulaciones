@@ -33,7 +33,9 @@ class DotacionPalFilas2027
             }
             foreach ($lotes as $lote) {
                 $fila = count($lote) === 1 ? $lote[0] : $this->combinar($lote, $tablas);
-                $fila['S'] = ($fila['S'] ?? '').' Consolidación PAL: se conservan filas separadas por proporción, nivel, incompatibilidad o límites de la tabla original.';
+                $fila['S'] = ($fila['S'] ?? '').(($fila['M'] ?? null) === '60/40'
+                    ? ' Consolidación PAL: se conservan filas separadas; la proporción 60/40 queda excluida de la consolidación.'
+                    : ' Consolidación PAL: se conservan filas separadas por proporción, nivel, incompatibilidad o límites de la tabla original.');
                 $resultado[] = $fila;
             }
         }
@@ -47,6 +49,7 @@ class DotacionPalFilas2027
     {
         $fila = $filas[0]; $niveles = []; $proporciones = []; $lectivas = 0.0; $noLectivas = 0.0;
         foreach ($filas as $origen) {
+            if (($origen['M'] ?? null) === '60/40') { return null; }
             if (str_contains($origen['S'] ?? '', 'INCOMPATIBLE:')) { return null; }
             foreach (['B', 'E', 'F', 'I'] as $campo) {
                 if (($origen[$campo] ?? null) !== ($fila[$campo] ?? null)) { return null; }

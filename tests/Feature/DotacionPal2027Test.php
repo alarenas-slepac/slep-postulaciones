@@ -137,14 +137,15 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         foreach ($split as $r) { $this->assertStringContainsString('INCOMPATIBLE:', $r['S']); }
     }
 
-    public function test_funciones_sin_nivel_no_inventan_datos_y_art69_es_expreso(): void
+    public function test_saldo_titular_en_otros_conserva_nivel_pendiente_y_art69_expreso(): void
     {
         $doc = $this->docente(['niveles_declarados' => 'Sin declaración', 'asignaciones' => [],
             'exclusion_docente' => ['motivo' => 'horas_catedra_art_69']]);
         $row = $this->reporte(['docentes' => [$doc]])['docentes'][0];
         $this->assertSame('', $row['D']); $this->assertSame('si', $row['I']);
         $this->assertStringContainsString('44 h', $row['S']);
-        $this->assertNull($row['R']);
+        $this->assertSame(44.0, $row['R']);
+        $this->assertSame('Otros (Talleristas / Apoyo / etc.)', $row['G']);
     }
 
     public static function nivelesPal(): array
@@ -195,11 +196,12 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
                 'asignaciones' => [$this->asignacionNt(['horas_contrato' => 37, 'horas_plan_pedagogicas' => 25])]]),
         ];
         $rows = $this->reporte(['docentes' => $docs])['docentes'];
-        $this->assertCount(4, $rows);
-        $this->assertSame(array_fill(0, 4, 'Educación Básica'), array_column($rows, 'D'));
+        $this->assertCount(5, $rows);
+        $this->assertSame(array_fill(0, 5, 'Educación Básica'), array_column($rows, 'D'));
         $this->assertSame(38.0, $rows[0]['K']);
-        $this->assertSame(44.0, $rows[1]['R']); $this->assertNull($rows[2]['R']);
+        $this->assertSame(44.0, $rows[1]['R']); $this->assertSame(44.0, $rows[2]['R']);
         $this->assertSame(32.0, $rows[3]['K']); $this->assertSame('65/35', $rows[3]['M']);
+        $this->assertSame(7.0, $rows[4]['R']);
     }
 
     public function test_docente_basica_y_media_usa_opcion_mixta_y_conserva_horas_por_nivel_en_ambos_excel(): void
@@ -307,7 +309,40 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         }
     }
 
-    public function test_situaciones_2027_informan_contrato_completo_sin_completar_horas_distribuidas(): void
+    public function test_basica_y_media_6040_separadas_conservan_formula_y_contrato_en_ambos_excel(): void
+    {
+        $doc = $this->docente(['horas_contrato' => 23, 'horas_planta' => 23, 'asignaciones' => [
+            $this->asignacionCurso(['codigo' => '1B'], ['id' => 1, 'proporcion_aplicada' => '60/40', 'horas_plan_pedagogicas' => 8, 'horas_contrato' => 10]),
+            $this->asignacionCurso(['codigo' => '1M'], ['id' => 2, 'proporcion_aplicada' => '60/40', 'horas_plan_pedagogicas' => 8, 'horas_contrato' => 10]),
+            $this->asignacion(['id' => 3, 'tipo_asignacion' => 'pie_colaborativo', 'subvencion' => 'PIE', 'horas_contrato' => 3, 'horas_plan_pedagogicas' => 0]),
+        ]]);
+        $report = $this->reporte(['docentes' => [$doc]]);
+        $this->assertCount(3, $report['docentes']);
+        $this->assertSame(['60/40', '60/40', null], array_column($report['docentes'], 'M'));
+        $this->assertSame(0, $report['incompatibles']); $this->assertSame(1, $report['personas']);
+        foreach ([false, true] as $global) {
+            $path = Storage::disk('local')->path($global ? 'excepcion-6040-todos.xlsx' : 'excepcion-6040.xlsx');
+            if ($global) { app(DotacionPal2027ConsolidadoExport::class)->guardarTodos([$report], $path); }
+            else { app(DotacionPal2027Export::class)->guardar($report, $path); }
+            $book = IOFactory::createReader('Xlsx')->setLoadSheetsOnly(['Info Funcionario (DOCENTE)', 'Tabla 65-35', 'Tabla 60-40'])->load($path);
+            try {
+                $sheet = $book->getSheetByName('Info Funcionario (DOCENTE)');
+                $this->assertEquals(8, $sheet->getCell('K3')->getValue()); $this->assertEquals(8, $sheet->getCell('L4')->getValue());
+                foreach ([3, 4] as $r) {
+                    $this->assertSame('60/40', (string) $sheet->getCell('M'.$r)->getValue());
+                    $this->assertEquals(10, $sheet->getCell('J'.$r)->getCalculatedValue());
+                    $this->assertEquals(6, $sheet->getCell('N'.$r)->getCalculatedValue());
+                    $this->assertEquals(4, $sheet->getCell('O'.$r)->getCalculatedValue());
+                    $this->assertStringContainsString('60/40 queda excluida', (string) $sheet->getCell('S'.$r)->getValue());
+                    $this->assertStringStartsWith('=', $sheet->getCell('J'.$r)->getValue());
+                }
+                $this->assertEquals(3, $sheet->getCell('J5')->getCalculatedValue());
+                $this->assertNull($sheet->getCell('A6')->getValue());
+            } finally { $book->disconnectWorksheets(); }
+        }
+    }
+
+    public function test_situaciones_2027_incorporan_excluidas_en_funcion_otros_con_observaciones(): void
     {
         foreach (\App\Models\DotacionDocenteExclusion::MOTIVOS as $motivo => $label) {
             if ($motivo === 'proceso_bir') { continue; }
@@ -316,8 +351,11 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
                 'asignaciones' => [$this->asignacion(['tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 20])]]);
             $antes = json_encode($doc);
             $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
-            $this->assertCount(1, $rows);
+            $this->assertCount(2, $rows);
             $this->assertSame(20.0, $rows[0]['R']);
+            $this->assertSame(24.0, $rows[1]['R']);
+            $this->assertSame('Otros (Talleristas / Apoyo / etc.)', $rows[1]['G']);
+            $this->assertStringContainsString('24 h por situación 2027: '.$label, $rows[1]['S']);
             $this->assertNull($rows[0]['K']); $this->assertNull($rows[0]['P']);
             $this->assertStringContainsString('Situación 2027: '.$label, $rows[0]['S']);
             $this->assertStringContainsString('Contrato completo del docente: 44 h', $rows[0]['S']);
@@ -332,7 +370,7 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $row = $this->reporte(['docentes' => [$doc]])['docentes'][0];
         $this->assertStringContainsString('Contrato completo del docente: 44 h', $row['S']);
         $this->assertStringContainsString('situación contractual: 0 h', $row['S']);
-        $this->assertNull($row['R']);
+        $this->assertSame(44.0, $row['R']);
     }
 
     public function test_bir_2027_se_excluye_de_personas_y_excel_individual_y_consolidado(): void
@@ -343,7 +381,7 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $bir = $this->docente(['exclusion_docente' => ['motivo' => 'proceso_bir', 'horas_traspaso_bir' => 12]]);
         $report = $this->reporte(['docentes' => [$bir, $normal]]);
         $this->assertSame(1, $report['personas']);
-        $this->assertSame(['99000002-8'], array_column($report['docentes'], 'A'));
+        $this->assertSame(['99000002-8', '99000002-8'], array_column($report['docentes'], 'A'));
         $this->assertStringContainsString('1 docente(s) con situación Proceso BIR 2027', implode(' ', $report['advertencias']));
         foreach ([false, true] as $global) {
             $path = Storage::disk('local')->path($global ? 'situaciones-todos.xlsx' : 'situaciones.xlsx');
@@ -353,7 +391,9 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
             try {
                 $sheet = $book->getSheetByName('Info Funcionario (DOCENTE)');
                 $this->assertSame('99000002-8', (string) $sheet->getCell('A3')->getValue());
-                $this->assertNull($sheet->getCell('A4')->getValue());
+                $this->assertSame('Otros (Talleristas / Apoyo / etc.)', (string) $sheet->getCell('G4')->getValue());
+                $this->assertEquals(24, $sheet->getCell('J4')->getCalculatedValue());
+                $this->assertNull($sheet->getCell('A5')->getValue());
                 $this->assertStringContainsString('Contrato completo del docente: 44 h', (string) $sheet->getCell('S3')->getValue());
                 $this->assertEquals(20, $sheet->getCell('J3')->getCalculatedValue());
             } finally { $book->disconnectWorksheets(); }
@@ -362,13 +402,13 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $this->assertSame(0, $soloBir['personas']); $this->assertSame([], $soloBir['docentes']);
     }
 
-    public function test_parvularia_conserva_37_contrato_convierte_a_32_aula_y_mantiene_3_pie_y_4_pendientes(): void
+    public function test_parvularia_conserva_37_contrato_3_pie_e_incorpora_4_titulares_sin_asignar_en_otros(): void
     {
         $aula = $this->asignacionNt(['horas_contrato' => 37, 'horas_plan_pedagogicas' => 25]);
         $pie = $this->asignacionNt(['id' => 2, 'tipo_asignacion' => 'pie_colaborativo', 'subvencion' => 'PIE', 'horas_contrato' => 3, 'horas_plan_pedagogicas' => 0]);
         $antes = $aula->getAttributes();
         $report = $this->reporte(['docentes' => [$this->docente(['titulo' => 'Pedagogía en Educación de Párvulos', 'asignaciones' => [$aula, $pie]])]]);
-        $this->assertCount(1, $report['docentes']);
+        $this->assertCount(2, $report['docentes']);
         $row = $report['docentes'][0];
         $this->assertSame(32.0, $row['K']); $this->assertSame('65/35', $row['M']);
         $this->assertSame('Educación Parvularia', $row['D']); $this->assertSame('Educadora de Parvulos', $row['E']);
@@ -376,6 +416,8 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $this->assertStringContainsString('4 h', $row['S']);
         $this->assertStringNotContainsString('INCOMPATIBLE:', $row['S']);
         $this->assertEquals(3, $row['P']);
+        $this->assertSame(4.0, $report['docentes'][1]['R']);
+        $this->assertSame('Otros (Talleristas / Apoyo / etc.)', $report['docentes'][1]['G']);
         $this->assertSame(0, $report['incompatibles']); $this->assertSame($antes, $aula->getAttributes());
         foreach ([false, true] as $consolidado) {
             $path = Storage::disk('local')->path($consolidado ? 'parv-global.xlsx' : 'parv.xlsx');
@@ -392,7 +434,8 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
                 $this->assertEquals(40, $sheet->getCell('J3')->getCalculatedValue());
                 $this->assertEquals(24, $sheet->getCell('N3')->getCalculatedValue());
                 $this->assertEquals(13, $sheet->getCell('O3')->getCalculatedValue());
-                $this->assertNull($sheet->getCell('A4')->getValue());
+                $this->assertEquals(4, $sheet->getCell('J4')->getCalculatedValue());
+                $this->assertEquals(44, $sheet->getCell('J3')->getCalculatedValue() + $sheet->getCell('J4')->getCalculatedValue());
                 $this->assertStringStartsWith('=', $sheet->getCell('J3')->getValue());
             } finally { $book->disconnectWorksheets(); }
         }
@@ -435,7 +478,7 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
             $this->asignacionNt(['id' => 1, 'horas_contrato' => 12.5, 'horas_plan_pedagogicas' => 8, 'proporcion_aplicada' => 'NT Sin JEC · base contractual 31 h']),
             $this->asignacionNt(['id' => 2, 'horas_contrato' => 24.5, 'horas_plan_pedagogicas' => 17, 'proporcion_aplicada' => 'NT Sin JEC · base contractual 35 h'])]]);
         $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
-        $this->assertCount(1, $rows); $this->assertSame(32.0, $rows[0]['K']);
+        $this->assertCount(2, $rows); $this->assertSame(32.0, $rows[0]['K']);
         $this->assertStringContainsString('25 h aula real y 37 h contrato', $rows[0]['S']);
         $this->assertStringContainsString('contractual 31 h / NT Sin JEC', $rows[0]['S']);
     }
@@ -655,7 +698,7 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
     private function contratoRepresentado(array $rows): float
     {
         $tabla = app(DotacionPal2027Export::class)->tablas()['65/35'];
-        return (float) array_sum(array_map(fn ($r) => $tabla[number_format($r['K'], 4, '.', '')]['contrato'], $rows));
+        return (float) array_sum(array_map(fn ($r) => $r['K'] === null ? 0 : $tabla[number_format($r['K'], 4, '.', '')]['contrato'], $rows));
     }
     private function zip(string $path): ZipArchive { $zip = new ZipArchive; $this->assertTrue($zip->open($path)); return $zip; }
     private function xml(string $xml): \SimpleXMLElement { $d = simplexml_load_string($xml); $d->registerXPathNamespace('m', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'); return $d; }
