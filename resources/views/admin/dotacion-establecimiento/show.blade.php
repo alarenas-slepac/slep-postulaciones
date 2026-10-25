@@ -146,6 +146,11 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
+                @if ((int) $anio === 2027 && \App\Support\DotacionPal2027::canView($activeRole))
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.pal-2027', $establecimiento) }}">
+                        <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Excel PAL 2027
+                    </a>
+                @endif
                 @if (\App\Support\DotacionProyeccionCalculator::canView($activeRole))
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'proyeccion' => 1]) }}">
                         <i class="bi bi-calendar2-range" aria-hidden="true"></i> Proyección {{ $anio + 1 }}

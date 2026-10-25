@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.633',
+    'current_version' => '2026.10.25.634',
     'entries' => [
+        [
+            'version' => '2026.10.25.634',
+            'title' => 'Borrador PAL 2027 por establecimiento',
+            'summary' => 'Completa establecimiento y docentes en el formato PAL, conserva sus fórmulas y permite revisar incompatibilidades y horas pendientes antes de descargar.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade Excel PAL 2027 al detalle de dotación y una revisión previa con totales del SGA. La descarga utiliza el padrón elegido por el proceso y exclusivamente los cursos y asignaciones del año 2027.',
+                'Informa contrato necesario para el plan por nivel, separa titular y plazo fijo y distribuye primero las horas titulares. Mantiene como pendientes las horas sin asignación y marca reglas especiales o repartos incompatibles sin forzar otras funciones ni proporciones.',
+                'Conserva las nueve hojas, columnas, tablas auxiliares y fórmulas originales del formato recibido. Amplía las filas, validaciones y referencias para nóminas grandes; elimina los ejemplos de asistentes y VTF.',
+                'Protege consulta y descarga por rol activo, mantiene los archivos temporales fuera del directorio público y conserva los textos como texto. Incluye pruebas aisladas y documentación; no requiere migraciones, dependencias nuevas ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.633',
             'title' => 'Nuevo grupo de prelación No Regido Ley 20903',
