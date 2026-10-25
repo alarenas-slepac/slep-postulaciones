@@ -47,7 +47,7 @@ dotación. No habilita datos de matrícula para el rol directivo.
 | Establecimiento G | Fórmula original `E × F`, sin reemplazar su cálculo |
 | Establecimiento H | Horas de contrato necesarias para cubrir el plan del nivel; excluye PIE y funciones |
 | Docentes A–C | RUT de la nómina del proceso, establecimiento y RBD |
-| Docentes D–G | Nivel identificado en curso o declaración, estamento/título, cargo declarado y función asignada |
+| Docentes D–G | Nivel según clases asignadas y reglas de Especial/EPJA, estamento/título, cargo declarado y función asignada |
 | Docentes H | Titular, Plazo Fijo u Otros, según las capacidades contractuales del proceso |
 | Docentes I | «si» sólo si existe la situación anual explícita `horas_catedra_art_69` |
 | Docentes J, N, O | Fórmulas originales de suma y búsqueda en las tablas auxiliares |
@@ -64,6 +64,37 @@ reparto es sólo una representación para el informe y no actualiza asignaciones
 la calidad jurídica del padrón. El conteo de personas se obtiene de la nómina, no
 de la cantidad de filas. Las personas que trabajan en dos establecimientos se
 mantienen en cada RBD, conforme al formato original.
+
+### Nivel del docente en Info Funcionario (DOCENTE)
+
+La columna **D, NIVEL**, usa las opciones originales de la plantilla. Se obtiene
+de los cursos de las asignaciones activas con horas positivas de aula,
+acompañamiento de Parvularia o docencia PIE. Las asignaciones anuladas, sin horas,
+de asistentes, plazas por asumir y funciones administrativas no añaden niveles
+de clases. Los cursos asignados tienen prioridad sobre los niveles declarados;
+una bolsa PIE sin curso identificado tampoco añade por sí sola un nivel.
+Si no hay clases asignadas se conserva la declaración como referencia y se
+mantiene pendiente cuando no permite identificar una categoría.
+
+- En establecimientos marcados como **Educación Especial** (`especial`), todos
+  los docentes se informan como **Educación Básica**, incluso quienes sólo tienen
+  funciones o todavía no tienen clases asignadas. Los cursos del catálogo
+  Especial/Laboral también se representan como Básica.
+- En **EPJA**, los niveles básicos **1, 2 y 3** se informan como **Educación
+  Básica**. Los niveles medios **1 y 2** se informan como **Educación Media**.
+  Se reconoce el código del catálogo y los nombres históricos con su modalidad;
+  una asignación EPJA sin detalle del nivel permanece pendiente.
+- Si el docente hace clases en Básica y Media, se selecciona **Ed. Básica/Media**
+  en sus filas, tanto en enseñanza regular como en EPJA. Las horas siguen
+  desglosadas por el nivel de cada asignación: K para Básica y L para Media,
+  conservando las fórmulas y el total contractual, sin duplicar horas.
+- Parvularia conserva su opción. Si se combina con otro nivel, el formato no
+  ofrece una categoría mixta que la incluya: cada fila conserva entonces su
+  nivel correspondiente. La excepción de presentación de escuelas especiales
+  no cambia la regla contractual ni la conversión de Parvularia a 65/35.
+
+Estas reglas sólo adaptan la representación del PAL, en la descarga individual
+y en el consolidado. No cambian cursos, asignaciones, declaraciones ni matrícula.
 
 ### Situaciones docentes 2027
 
