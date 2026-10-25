@@ -33,6 +33,7 @@ class DotacionPal2027
         foreach ($docentes as $docente) {
             array_push($filasDocentes, ...$this->docente($ee, $docente, $tablas));
         }
+        $filasDocentes = (new DotacionPalFilas2027)->consolidar($filasDocentes, $tablas);
         $incompatibles = count(array_filter($filasDocentes, fn ($row) => str_contains($row['S'], 'INCOMPATIBLE:')));
         if ($incompatibles) { $advertencias[] = $incompatibles.' fila(s) docentes incompatibles: sus horas se describen en Observaciones y no se fuerzan a otra regla.'; }
         if ($docentes->isEmpty()) { $advertencias[] = 'No hay docentes del padrón incluidos en el PAL 2027.'; }

@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.638',
+    'current_version' => '2026.10.25.639',
     'entries' => [
+        [
+            'version' => '2026.10.25.639',
+            'title' => 'Filas docentes del PAL consolidadas por función y contrato',
+            'summary' => 'Une filas del mismo docente, establecimiento, función y calidad contractual cuando conserva exactamente los cálculos originales.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Consolida por RUT normalizado, RBD, función del PAL y calidad contractual después del reparto titular/contrata. Suma las columnas de aula, PIE, SEP y otras funciones sin mezclar funciones o contratos distintos, manteniendo el orden y las notas de origen.',
+                'Comprueba las horas lectivas y no lectivas con la búsqueda original de K+L antes de unir. Mantiene separadas y explicadas las proporciones distintas, las incompatibilidades y las sumas que no admite la tabla, conservando las fórmulas del formato.',
+                'Aplica al Excel individual y al consolidado, conserva las situaciones 2027, la exclusión BIR y el conteo de personas. Incluye pruebas de identidad, proporciones, límites, totales y recálculo del Excel; no requiere migraciones ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.638',
             'title' => 'Nivel docente del PAL según clases, Especial y EPJA',

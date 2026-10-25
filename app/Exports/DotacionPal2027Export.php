@@ -43,7 +43,8 @@ class DotacionPal2027Export
                     if (! is_numeric($aula) || ! is_numeric($lectivas) || ! is_numeric($noLectivas)) { continue; }
                     $key = number_format((float) $aula, 4, '.', '');
                     // BUSCARV exacto toma la primera coincidencia.
-                    $tablas[$proporcion][$key] ??= ['contrato' => (float) $lectivas + (float) $noLectivas];
+                    $tablas[$proporcion][$key] ??= ['contrato' => (float) $lectivas + (float) $noLectivas,
+                        'lectivas' => (float) $lectivas, 'no_lectivas' => (float) $noLectivas];
                 }
             }
             return $tablas;
