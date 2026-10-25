@@ -6457,8 +6457,34 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.634',
+    'current_version' => '2026.10.25.636',
     'entries' => [
+        [
+            'version' => '2026.10.25.636',
+            'title' => 'Parvularia con equivalencia 65/35 en el informe PAL',
+            'summary' => 'Representa el contrato de regla especial mediante horas aula equivalentes 65/35, conservando el valor contractual en el Excel.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Aplica exclusivamente a docentes con título reconocido de Pedagogía en Educación de Párvulos, aula financiada por General y asignaciones de regla especial en Educación Parvularia. Conserva las asignaciones y reglas del SGA.',
+                'Invierte la tabla efectiva del formato PAL para obtener las horas aula que devuelven el contrato original. Por ejemplo, 37 horas de contrato se representan con 32 horas aula equivalentes 65/35, manteniendo aparte las horas PIE, SEP y funciones.',
+                'Agrupa las reglas especiales de NT1/NT2 y respeta el reparto titular/contrata. Si se necesitan varias filas por el máximo de la tabla o aulas repetidas, conserva exactamente el contrato total y la identidad del docente.',
+                'Registra las horas aula reales, la regla original y la equivalencia en Observaciones. Mantiene marcados los excesos y fracciones sin equivalencia exacta, sin inventar redondeos. Incluye pruebas del ejemplo, lectura y cálculo de las fórmulas del Excel individual y consolidado, perfiles, contratos y preservación de datos. No requiere migraciones ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
+        [
+            'version' => '2026.10.25.635',
+            'title' => 'PAL 2027 consolidado de todos los establecimientos',
+            'summary' => 'Genera un único Excel de todo el proceso, sin limitarlo a un establecimiento, a los filtros ni a la página visible.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade Excel PAL 2027 consolidado en el listado general y dirige el botón del detalle a la misma descarga. Incluye todos los establecimientos participantes, también los que aún no tienen cursos 2027, conservando el alcance sin salas cuna/VTF.',
+                'La hoja Resumen obtiene los RBD desde Info Establecimiento para mostrar también establecimientos sin docentes. Amplía las filas y referencias para todos los RBD y conserva los cálculos originales de personas y horas.',
+                'Procesa los establecimientos por lotes y escribe filas a temporales privados sin acumular las nóminas. Genera completamente el archivo antes de enviarlo y cancela toda la descarga si falla un establecimiento.',
+                'Conserva las reglas de contratos, fórmulas, pendientes e incompatibilidades del borrador anterior. Incluye pruebas de permisos por rol activo, catálogo vacío, filtros, limpieza ante errores y un consolidado sintético de 110 establecimientos y 11.000 filas docentes. No requiere migraciones ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.634',
             'title' => 'Borrador PAL 2027 por establecimiento',

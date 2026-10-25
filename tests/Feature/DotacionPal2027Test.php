@@ -3,16 +3,20 @@
 namespace Tests\Feature;
 
 use App\Exports\DotacionPal2027Export;
+use App\Exports\DotacionPal2027ConsolidadoExport;
 use App\Models\Curso;
 use App\Models\DotacionDocenteAsignacion;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
 use App\Support\DotacionPal2027;
+use App\Support\DotacionPalParvularia65;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use Tests\Support\IsolatedSecurityTestCase;
 use ZipArchive;
 
@@ -143,6 +147,123 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $this->assertNull($row['R']);
     }
 
+    public function test_parvularia_conserva_37_contrato_convierte_a_32_aula_y_mantiene_3_pie_y_4_pendientes(): void
+    {
+        $aula = $this->asignacionNt(['horas_contrato' => 37, 'horas_plan_pedagogicas' => 25]);
+        $pie = $this->asignacionNt(['id' => 2, 'tipo_asignacion' => 'pie_colaborativo', 'subvencion' => 'PIE', 'horas_contrato' => 3, 'horas_plan_pedagogicas' => 0]);
+        $antes = $aula->getAttributes();
+        $report = $this->reporte(['docentes' => [$this->docente(['titulo' => 'Pedagogía en Educación de Párvulos', 'asignaciones' => [$aula, $pie]])]]);
+        $this->assertCount(2, $report['docentes']);
+        $row = $report['docentes'][0];
+        $this->assertSame(32.0, $row['K']); $this->assertSame('65/35', $row['M']);
+        $this->assertSame('Educación Parvularia', $row['D']); $this->assertSame('Educadora de Parvulos', $row['E']);
+        $this->assertStringContainsString('25 h aula real y 37 h contrato', $row['S']);
+        $this->assertStringContainsString('4 h', $row['S']);
+        $this->assertStringNotContainsString('INCOMPATIBLE:', $row['S']);
+        $this->assertEquals(3, $report['docentes'][1]['P']); $this->assertNull($report['docentes'][1]['K']);
+        $this->assertSame(0, $report['incompatibles']); $this->assertSame($antes, $aula->getAttributes());
+        foreach ([false, true] as $consolidado) {
+            $path = Storage::disk('local')->path($consolidado ? 'parv-global.xlsx' : 'parv.xlsx');
+            if ($consolidado) { app(DotacionPal2027ConsolidadoExport::class)->guardarTodos([$report], $path); }
+            else { app(DotacionPal2027Export::class)->guardar($report, $path); }
+            $reader = IOFactory::createReader('Xlsx');
+            $reader->setLoadSheetsOnly(['Info Funcionario (DOCENTE)','Tabla 65-35','Tabla 60-40']);
+            $reader->setReadFilter(new class implements IReadFilter {
+                public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool { return $row <= 94; }
+            });
+            $book = $reader->load($path);
+            try {
+                $sheet = $book->getSheetByName('Info Funcionario (DOCENTE)');
+                $this->assertEquals(37, $sheet->getCell('J3')->getCalculatedValue());
+                $this->assertEquals(24, $sheet->getCell('N3')->getCalculatedValue());
+                $this->assertEquals(13, $sheet->getCell('O3')->getCalculatedValue());
+                $this->assertEquals(3, $sheet->getCell('J4')->getCalculatedValue());
+                $this->assertStringStartsWith('=', $sheet->getCell('J3')->getValue());
+            } finally { $book->disconnectWorksheets(); }
+        }
+    }
+
+    public static function contratosParvularia(): array
+    {
+        return [[31, 27, 'NT Sin JEC · base contractual 31 h'], [35, 30, 'NT Sin JEC · base contractual 35 h'],
+            [37, 32, 'NT Con JEC · base contractual 55 h'], [44, 38, 'NT JEC · CPEIP 65/35']];
+    }
+
+    #[DataProvider('contratosParvularia')]
+    public function test_inversion_65_35_conserva_contrato_para_titulo_y_aula_parvularia(int $contrato, int $aula, string $regla): void
+    {
+        $doc = $this->docente(['titulo' => 'PEDAGOGIA EN EDUCACION DE PARVULOS', 'horas_contrato' => $contrato, 'horas_planta' => $contrato,
+            'asignaciones' => [$this->asignacionNt(['horas_contrato' => $contrato, 'horas_plan_pedagogicas' => 20, 'proporcion_aplicada' => $regla])]]);
+        $row = $this->reporte(['docentes' => [$doc]])['docentes'][0];
+        $this->assertEquals($aula, $row['K']); $this->assertSame('65/35', $row['M']);
+        $this->assertStringNotContainsString('INCOMPATIBLE:', $row['S']);
+        $this->assertEquals($contrato, app(DotacionPal2027Export::class)->tablas()['65/35'][number_format($aula, 4, '.', '')]['contrato']);
+    }
+
+    public function test_reparte_equivalencia_entre_titular_y_contrata_y_admite_mas_de_44_h_sin_duplicar(): void
+    {
+        $doc = $this->docente(['titulo' => 'Pedagogía en Educación de Párvulos', 'horas_planta' => 20, 'horas_contrata' => 24,
+            'asignaciones' => [$this->asignacionNt(['horas_contrato' => 44, 'horas_plan_pedagogicas' => 30.4])]]);
+        $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
+        $this->assertSame(['Titular','Plazo Fijo'], array_column($rows, 'H'));
+        $this->assertEquals(44, $this->contratoRepresentado($rows));
+        $doc['horas_contrato'] = $doc['horas_planta'] = 55; $doc['horas_contrata'] = 0;
+        $doc['asignaciones'] = [$this->asignacionNt(['horas_contrato' => 55, 'horas_plan_pedagogicas' => 38])];
+        $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
+        $this->assertCount(2, $rows); $this->assertEquals(55, $this->contratoRepresentado($rows));
+        foreach ($rows as $row) { $this->assertStringContainsString('de 2', $row['S']); }
+    }
+
+    public function test_suma_reglas_especiales_de_nt1_y_nt2_antes_de_convertir_y_conserva_referencia(): void
+    {
+        $doc = $this->docente(['titulo' => 'Pedagogía en Educación de Párvulos', 'asignaciones' => [
+            $this->asignacionNt(['id' => 1, 'horas_contrato' => 12.5, 'horas_plan_pedagogicas' => 8, 'proporcion_aplicada' => 'NT Sin JEC · base contractual 31 h']),
+            $this->asignacionNt(['id' => 2, 'horas_contrato' => 24.5, 'horas_plan_pedagogicas' => 17, 'proporcion_aplicada' => 'NT Sin JEC · base contractual 35 h'])]]);
+        $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
+        $this->assertCount(1, $rows); $this->assertSame(32.0, $rows[0]['K']);
+        $this->assertStringContainsString('25 h aula real y 37 h contrato', $rows[0]['S']);
+        $this->assertStringContainsString('contractual 31 h / NT Sin JEC', $rows[0]['S']);
+    }
+
+    public function test_conversion_exige_titulo_nivel_financiamiento_y_regla_y_no_oculta_excesos(): void
+    {
+        $a = $this->asignacionNt(['horas_contrato' => 37, 'horas_plan_pedagogicas' => 25]);
+        $doc = $this->docente(['titulo' => 'Pedagogía en Educación de Párvulos', 'asignaciones' => [$a]]);
+        foreach (['Sin título declarado','Pedagogía en Inglés'] as $titulo) {
+            $row = $this->reporte(['docentes' => [array_replace($doc, ['titulo' => $titulo])]])['docentes'][0];
+            $this->assertNull($row['K']); $this->assertStringContainsString('INCOMPATIBLE:', $row['S']);
+        }
+        $a->setRelation('establecimientoCurso', $this->asignacion()->establecimientoCurso);
+        $this->assertNull($this->reporte(['docentes' => [$doc]])['docentes'][0]['K']);
+        $doc['asignaciones'] = [$this->asignacionNt(['subvencion' => 'PIE', 'horas_contrato' => 37])];
+        $row = $this->reporte(['docentes' => [$doc]])['docentes'][0];
+        $this->assertNull($row['K']); $this->assertEquals(37, $row['P']);
+        $doc['asignaciones'] = [$this->asignacionNt(['tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 37])];
+        $row = $this->reporte(['docentes' => [$doc]])['docentes'][0];
+        $this->assertNull($row['K']); $this->assertEquals(37, $row['R']);
+        $doc['asignaciones'] = [$this->asignacionNt(['proporcion_aplicada' => 'Otra regla especial', 'horas_contrato' => 37])];
+        $this->assertNull($this->reporte(['docentes' => [$doc]])['docentes'][0]['K']);
+        $doc['asignaciones'] = [$this->asignacionNt(['horas_contrato' => 55, 'horas_plan_pedagogicas' => 38])];
+        $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
+        $this->assertSame(38.0, $rows[0]['K']);
+        $this->assertStringContainsString('exceden el contrato', $rows[1]['S']); $this->assertNull($rows[1]['K']);
+    }
+
+    public function test_todas_las_horas_enteras_hasta_132_tienen_equivalencia_exacta_y_no_se_redondean_fracciones(): void
+    {
+        $tabla = app(DotacionPal2027Export::class)->tablas()['65/35'];
+        for ($horas = 1; $horas <= 132; $horas++) {
+            $bloques = DotacionPalParvularia65::convertir($horas, $tabla);
+            $this->assertNotNull($bloques); $this->assertEquals($horas, array_sum(array_column($bloques, 'contrato')));
+            foreach ($bloques as $bloque) {
+                $this->assertGreaterThan(0, $bloque['aula']);
+                $this->assertEquals($bloque['contrato'], $tabla[number_format($bloque['aula'], 4, '.', '')]['contrato']);
+            }
+        }
+        foreach ([0, -1, 0.5, 37.5, INF, NAN, 10001] as $valor) { $this->assertNull(DotacionPalParvularia65::convertir($valor, $tabla)); }
+        $this->assertNull(DotacionPalParvularia65::convertir(37, []));
+    }
+
     public function test_planes_mixtos_y_combinados_no_simulan_una_carga_uniforme(): void
     {
         $data = $this->data();
@@ -215,6 +336,16 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         return (new DotacionDocenteAsignacion)->forceFill(array_replace(['id' => 1, 'docente_rut' => '99000001-K',
             'tipo_asignacion' => 'plan_estudio', 'subvencion' => 'General', 'horas_contrato' => 44,
             'horas_plan_pedagogicas' => 38, 'proporcion_aplicada' => '65/35', 'estado' => 'activa'], $changes))->setRelation('establecimientoCurso', $curso);
+    }
+    private function asignacionNt(array $changes = []): DotacionDocenteAsignacion
+    {
+        $curso = (new EstablecimientoCurso)->setRelation('curso', (new Curso)->forceFill(['codigo' => 'NT1', 'nivel_educativo' => 'Educación Parvularia']));
+        return $this->asignacion(['proporcion_aplicada' => 'NT Con JEC · base contractual 55 h', ...$changes])->setRelation('establecimientoCurso', $curso);
+    }
+    private function contratoRepresentado(array $rows): float
+    {
+        $tabla = app(DotacionPal2027Export::class)->tablas()['65/35'];
+        return (float) array_sum(array_map(fn ($r) => $tabla[number_format($r['K'], 4, '.', '')]['contrato'], $rows));
     }
     private function zip(string $path): ZipArchive { $zip = new ZipArchive; $this->assertTrue($zip->open($path)); return $zip; }
     private function xml(string $xml): \SimpleXMLElement { $d = simplexml_load_string($xml); $d->registerXPathNamespace('m', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'); return $d; }

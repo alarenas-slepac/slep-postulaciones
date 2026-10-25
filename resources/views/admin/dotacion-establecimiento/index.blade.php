@@ -36,6 +36,11 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
+                @if ((int) $anio === 2027 && \App\Support\DotacionPal2027::canView($activeRole))
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.pal-2027.todos') }}">
+                        <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Excel PAL 2027 consolidado
+                    </a>
+                @endif
                 @if (\App\Support\DotacionInformeFunciones::puedeVer($activeRole))
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.index', ['informe_cursos' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}">
                         <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Informe de cursos por nivel

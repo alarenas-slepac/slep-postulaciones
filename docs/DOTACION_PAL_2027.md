@@ -1,8 +1,11 @@
 # Exportación del borrador PAL 2027
 
-En Dotación Establecimiento, seleccionar **2027 → establecimiento → Excel PAL 2027**.
-La pantalla permite revisar los totales del SGA y descargar un borrador del formato
-«Resumen Dotación PAL 2027». Acceso por rol activo: administrador, coordinador UATP,
+En Dotación Establecimiento, seleccionar **2027 → Excel PAL 2027 consolidado**.
+Se descarga **un único archivo con todos los establecimientos participantes**, sin
+limitarlo al establecimiento abierto, la búsqueda, la comuna o la página visible.
+El botón del detalle conduce al mismo consolidado. La pantalla muestra el listado
+completo incluido, sin ejecutar cálculos de nóminas durante su carga.
+Acceso por rol activo: administrador, coordinador UATP,
 coordinador GDP y supervisor de Planificación, como los informes consolidados de
 dotación. No habilita datos de matrícula para el rol directivo.
 
@@ -17,11 +20,22 @@ dotación. No habilita datos de matrícula para el rol directivo.
   La lectura se encapsula en `DotacionLecturaCache` y no modifica registros.
 - Cursos y asignaciones: sólo 2027. El padrón puede corresponder al año previo,
   conforme al servicio de períodos y a las reglas de continuidad vigentes del SGA.
-  El año de padrón se indica en la revisión previa. No se supone que Git sincronice
+  Esta selección se aplica por establecimiento. No se supone que Git sincronice
   bases de datos ni que el ambiente local tenga lo ingresado en producción.
 - Se completan **Info Establecimiento** e **Info Funcionario (DOCENTE)**.
   Asistentes y VTF conservan encabezados, pero quedan sin registros. No se presentan
   vacantes, plazas por asumir o cupos sin RUT real como funcionarios.
+- Universo: los mismos establecimientos del listado de Dotación, con `sala_cuna`
+  falso o nulo. Se procesan ordenados por RBD. Las salas cuna/VTF mantienen su
+  exclusión anterior. Un establecimiento sin cursos 2027 aparece en
+  **Info Establecimiento** con su RBD y la indicación de que faltan registros.
+- **Resumen** obtiene los RBD desde **Info Establecimiento**, a solicitud del
+  usuario, para incluir también los establecimientos sin funcionarios. Se conserva
+  la lógica de conteo por RUT y RBD y de suma de horas. Las filas de resultados y
+  los rangos de referencia se amplían para todo el consolidado; las sumas usan
+  rangos finitos que abarcan todas las filas docentes.
+- Las rutas individuales existentes se conservan por compatibilidad. Los accesos
+  visibles del listado y del detalle generan el consolidado.
 
 ## Mapeo
 
@@ -38,7 +52,7 @@ dotación. No habilita datos de matrícula para el rol directivo.
 | Docentes I | «si» sólo si existe la situación anual explícita `horas_catedra_art_69` |
 | Docentes J, N, O | Fórmulas originales de suma y búsqueda en las tablas auxiliares |
 | Docentes K–L | Horas pedagógicas de aula financiadas por General, separadas por nivel, cuando la regla es representable |
-| Docentes M | 65/35 o 60/40 registrados en la asignación; no se convierten reglas especiales a una proporción genérica |
+| Docentes M | 65/35 o 60/40 de la asignación; las educadoras elegibles de Parvularia representan el contrato especial como 65/35 según la excepción siguiente |
 | Docentes P–Q | Horas cronológicas asignadas y financiadas por PIE o SEP |
 | Docentes R | Funciones efectivamente asignadas financiadas por General; nunca el saldo sin asignar |
 | Docentes S | Contrato de referencia, tramo distribuido, pendientes, detalle e incompatibilidades |
@@ -48,7 +62,8 @@ proporción. Se consumen primero sus horas titulares y después las de plazo fij
 Los grupos se recorren en orden estable de sus primeras asignaciones por ID. El
 reparto es sólo una representación para el informe y no actualiza asignaciones ni
 la calidad jurídica del padrón. El conteo de personas se obtiene de la nómina, no
-de la cantidad de filas.
+de la cantidad de filas. Las personas que trabajan en dos establecimientos se
+mantienen en cada RBD, conforme al formato original.
 
 ## Fórmulas originales y borradores
 
@@ -65,24 +80,61 @@ entradas numéricas incompatibles quedan vacías. S conserva las horas pedagógi
 y cronológicas que motivan el problema. J/N/O pueden calcular cero: ese cero **no
 representa ausencia de horas**. No usar esas filas como dotación definitiva.
 
-Esto puede ocurrir con Parvularia, reglas especiales, fracciones producidas al
+Esto puede ocurrir con reglas especiales sin la equivalencia autorizada siguiente, fracciones producidas al
 separar contratos, niveles sin desglose, reservas sin función y financiamientos
 sin equivalencia. Los excesos de asignación se marcan y no se transforman en otro
 contrato real.
 
+### Educadoras de Párvulos: contrato especial a horas aula equivalentes 65/35
+
+El usuario solicitó conservar en el PAL las horas de contrato calculadas por la
+regla especial y obtener las horas aula equivalentes para que las fórmulas del
+formato devuelvan ese mismo contrato. Esta excepción se aplica sólo cuando:
+
+- El título es reconocido como **Pedagogía en Educación de Párvulos** por el
+  resolver de profesión del SGA, dando prioridad a la declaración de sostenedor.
+- La asignación corresponde a plan de estudio o acompañamiento en aula de
+  **Educación Parvularia**, financiada por General.
+- La proporción guardada identifica la regla especial NT con/sin JEC o su
+  antecedente histórico NT JEC CPEIP.
+
+Se suman las asignaciones elegibles del docente antes de separar la calidad
+contractual. Se conserva su contrato especial y se invierte la tabla **efectiva**
+que usa BUSCARV en el formato, respetando la primera coincidencia de aulas
+repetidas. K recibe horas aula **equivalentes**, M recibe `65/35`, y las fórmulas
+originales N/O/J calculan el contrato. S conserva las horas aula reales del SGA,
+el contrato especial, las reglas originales y el número de parte cuando hay
+varias filas. Los registros del SGA no se modifican.
+
+Ejemplo de comprobación con datos sintéticos: **25 h aula reales → 37 h contrato
+especial → 32 h aula equivalentes 65/35 → 37 h contrato PAL**. La plantilla relaciona
+34 h aula con 39 h contrato, por lo que no se usan 34 para representar 37. Si hay
+además 3 h PIE y un contrato base de 44, PIE queda aparte, el total representado
+es 40 h y se siguen informando 4 h pendientes.
+
+Cuando el contrato supera la fila máxima de la tabla o no tiene una equivalencia
+directa por aulas repetidas, se usan las mínimas filas necesarias cuya suma
+devuelve exactamente el contrato. Esto no crea nuevos funcionarios: las filas
+conservan el mismo RUT y RBD. No se aplican redondeos a fracciones sin equivalencia
+exacta; esos casos y los excesos sobre la base contractual siguen marcados para
+revisión. Las horas PIE, SEP, funciones y asignaciones de otros niveles mantienen
+su tratamiento anterior. La columna H de **Info Establecimiento** conserva la
+necesidad contractual calculada por el SGA.
+
 En establecimientos, un nivel con planes diferentes no se sustituye por un
 promedio. Los cursos combinados conservan sus alumnos y cursos, pero no se inventa
 un reparto del contrato compartido por nivel. F o H se dejan sin completar según
-corresponda y C señala la incompatibilidad. La revisión previa muestra además el
-total contractual de plan del SGA, calculado sin duplicar grupos combinados. La
+corresponda y C señala la incompatibilidad. La consulta individual conservada por
+compatibilidad permite contrastar el total contractual del plan con el SGA. La
 fórmula G permanece intacta aunque una entrada no esté disponible.
 
 Las filas se amplían copiando las fórmulas y estilos originales. Se extienden la
 tabla docente, las validaciones y los rangos finitos de Resumen cuando corresponde,
 sin cambiar sus funciones ni criterios. Sólo se ajustan el alto de las filas
 completadas y el ajuste de texto de nombre/nivel para que sean legibles, manteniendo
-los estilos originales y el orden de columnas. Límite defensivo por descarga: 10.000 filas
-docentes y 1.000 niveles. Los textos se escriben como texto, incluso si comienzan
+los estilos originales y el orden de columnas. Límite defensivo del consolidado:
+100.000 filas docentes, 10.000 niveles y 10.000 establecimientos. No se truncan
+datos si se supera: se cancela el archivo. Los textos se escriben como texto, incluso si comienzan
 con `=`. No se conserva un Excel con datos de usuarios en el repositorio.
 
 ## Instalación y verificación
@@ -95,6 +147,14 @@ temporal de PHP debe permitir archivos privados y escritura. La descarga se
 prepara completamente antes de enviarse y elimina su temporal al terminar o al
 cerrarse la petición.
 
+La lectura se hace por lotes de 10 establecimientos, con la caché de cálculo
+acotada a cada uno. Las filas se escriben progresivamente en archivos XML privados:
+no se retienen todas las nóminas ni todas las filas Excel en memoria. Primero se
+completa el ZIP y después se envía la descarga. Un fallo de cálculo cancela todo
+el consolidado e identifica el RBD que debe revisarse; los temporales se eliminan
+también ante errores. El límite solicitado para la petición de descarga es de
+240 segundos, sujeto a lo que permita el proveedor; la previa no calcula nóminas.
+
 La conservación de fórmulas y objetos se realiza editando sólo las partes XML
 necesarias del XLSX, para evitar que un motor de cálculo diferente cambie las
 fórmulas matriciales de Excel. `Resumen` requiere una versión de Excel compatible
@@ -103,9 +163,11 @@ completo al abrir. Las cachés de los ejemplos se eliminaron para no mostrar tot
 anteriores. Un visor sin recálculo puede mostrar celdas vacías o no representar
 estas fórmulas; abrir en Excel compatible y revisar antes de presentar el PAL.
 
-Pruebas: `php vendor/phpunit/phpunit/phpunit tests/Feature/DotacionPal2027Test.php`.
+Pruebas: `php vendor/phpunit/phpunit/phpunit tests/Feature/DotacionPal2027Test.php tests/Feature/DotacionPal2027ConsolidadoTest.php`.
 Usan SQLite en memoria y datos sintéticos: permisos por rol activo, validación del
 año, privacidad, contratos, pendientes, incompatibilidades, conservación de
-fórmulas/hojas/estilos y expansión a 220 filas. El recálculo nativo de Excel y un
+fórmulas/hojas/estilos, previa sin cálculos de personal, lotes, catálogo sin datos,
+cancelación y limpieza ante fallos y expansión a 110 establecimientos, 1.540 niveles
+y 11.000 filas docentes. El recálculo nativo de Excel y un
 archivo con datos reales de 2027 requieren validación adicional; no se da por
 comprobado el resultado en producción.

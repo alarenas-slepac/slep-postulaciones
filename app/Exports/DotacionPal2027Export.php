@@ -13,7 +13,7 @@ use ZipArchive;
 /** Edita únicamente entradas y extensiones de rangos; conserva las fórmulas y objetos nativos. */
 class DotacionPal2027Export
 {
-    private const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    protected const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 
     public function template(): string
     {
@@ -107,7 +107,7 @@ class DotacionPal2027Export
         } finally { $zip->close(); }
     }
 
-    private function partes(ZipArchive $zip): array
+    protected function partes(ZipArchive $zip): array
     {
         $rels = $this->xml($zip, 'xl/_rels/workbook.xml.rels');
         $targets = [];
@@ -122,7 +122,7 @@ class DotacionPal2027Export
         return $result;
     }
 
-    private function xml(ZipArchive $zip, string $part): DOMDocument
+    protected function xml(ZipArchive $zip, string $part): DOMDocument
     {
         $bytes = $zip->getFromName($part);
         $doc = new DOMDocument;
@@ -156,12 +156,21 @@ class DotacionPal2027Export
                 }
             }
             $entries = $datos[$numero - $inicio] ?? [];
+            $this->rellenarFila($doc, $row, $entries, $calculadas, $styles, $wrapped);
+        }
+        $dimension = $xpath->query('//m:dimension')->item(0);
+        if ($fin > $originalFin) { $dimension->setAttribute('ref', 'A1:'.($inicio === 3 ? 'S' : 'H').max($fin, (int) preg_replace('/.*[A-Z]/', '', $dimension->getAttribute('ref')))); }
+    }
+
+    protected function rellenarFila(DOMDocument $doc, DOMElement $row, array $entries, array $calculadas, ?DOMDocument $styles, array &$wrapped): void
+    {
+            $numero = (int) $row->getAttribute('r');
             foreach ($row->childNodes as $cell) {
                 if (! $cell instanceof DOMElement || $cell->localName !== 'c') { continue; }
                 $column = preg_replace('/\d+/', '', $cell->getAttribute('r'));
                 $cell->setAttribute('r', $column.$numero);
                 if (in_array($column, $calculadas, true)) {
-                    if ($nuevo && $column === 'G') {
+                    if ($numero > 34 && $column === 'G') {
                         while ($cell->firstChild) { $cell->removeChild($cell->firstChild); }
                         $cell->appendChild($doc->createElementNS(self::NS, 'f', '+E'.$numero.'*F'.$numero));
                     }
@@ -201,12 +210,9 @@ class DotacionPal2027Export
                     }
                 }
             }
-        }
-        $dimension = $xpath->query('//m:dimension')->item(0);
-        if ($fin > $originalFin) { $dimension->setAttribute('ref', 'A1:'.($inicio === 3 ? 'S' : 'H').max($fin, (int) preg_replace('/.*[A-Z]/', '', $dimension->getAttribute('ref')))); }
     }
 
-    private function validaciones(DOMDocument $doc, int $last): void
+    protected function validaciones(DOMDocument $doc, int $last): void
     {
         foreach ($doc->getElementsByTagNameNS(self::NS, 'dataValidation') as $rule) {
             $range = $rule->getAttribute('sqref');
