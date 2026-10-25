@@ -467,6 +467,8 @@
                                                     <input type="hidden" name="dotacion_funcion_regla_id" value="{{ $item['dotacion_funcion_regla_id'] ?? '' }}">
                                                     @if ($seleccionLibrePlan)
                                                         <div class="dotacion-selector-guide"><i class="bi bi-person-check"></i><span><strong>Selección sin prelación.</strong> Elija un docente asociado a esta asignatura, incluido uno de especialidad, con al menos 1 h de contrato disponible. No se exige prelación ni justificación. El orden se muestra como referencia. Se mantienen los límites del contrato y del bloque autorizado.</span></div>
+                                                    @elseif ($fasePlan === 'preferente')
+                                                        <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down" aria-hidden="true"></i><span><strong>Prioridad No Regido Ley 20903.</strong> Este grupo se asigna antes que titulares Avanzado/Experto, tanto con horas titulares como a contrata. Fuero maternal y horas gremiales mantienen el primer lugar. Los demás docentes usan su saldo titular; se muestran sólo personas asociadas con al menos 1 h asignable.</span></div>
                                                     @elseif ($proceso2027Asignacion['aplica'] ?? false)
                                                         <div class="dotacion-selector-guide"><i class="bi bi-sort-numeric-down"></i><span><strong>{{ $fasePlan === 'titular' ? 'Primero, horas titulares.' : 'Sin saldo titular asignable: sigue contrata.' }}</strong> Solo se muestran docentes asociados a esta asignatura con al menos 1 h {{ $fasePlan === 'titular' ? 'titular' : 'a contrata' }} disponible, en orden de prelación. Los saldos menores a 1 h se omiten. Si el saldo de un docente no cubre todas las horas pendientes, asigne primero una fracción del aula.</span></div>
                                                     @endif
@@ -476,7 +478,7 @@
                                                     <label class="form-label small mb-0" for="estamento-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Tipo de cobertura</label>
                                                     <select id="estamento-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="estamento_cobertura" class="form-select form-select-sm js-estamento-cobertura" required>
                                                         <option value="docente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'docente')>Cubierto por docente</option>
-                                                        @unless ($soloParvularia || ($fasePlan === 'titular' && !$esEpja))<option value="asistente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'asistente')>Cubierto por Asistente de la Educación</option>@endunless
+                                                        @unless ($soloParvularia || (in_array($fasePlan, ['titular', 'preferente'], true) && !$esEpja))<option value="asistente" @selected($valorFormulario($item, 'estamento_cobertura', 'docente') === 'asistente')>Cubierto por Asistente de la Educación</option>@endunless
                                                     </select>
                                                     <label class="form-label small mb-0" for="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}">Docente asociado o asistente</label>
                                                     <select id="docente-plan-{{ $cursoCollapseId }}-{{ $loop->iteration }}" name="docente_rut" class="form-select form-select-sm js-personal-cobertura js-dotacion-docente-select" data-placeholder="Buscar por nombre, RUT o título..." data-fase-plan="{{ $fasePlan }}" required>
@@ -489,11 +491,16 @@
                                                                 && (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'tipo_asignacion' => 'plan_estudio', 'establecimientoCurso' => $cursoNt], $doc))
                                                                 && (!$soloParvularia || $doc['es_parvularia'])
                                                             ),
-                                                            'grupoPersonal' => $fasePlan === 'titular' ? 'Docentes con horas titulares disponibles' : ($fasePlan === 'contrata' ? 'Docentes con horas a contrata disponibles' : 'Docentes vigentes y por contratar'),
+                                                            'grupoPersonal' => match ($fasePlan) {
+                                                                'preferente' => 'Docentes con saldo según prelación',
+                                                                'titular' => 'Docentes con horas titulares disponibles',
+                                                                'contrata' => 'Docentes con horas a contrata disponibles',
+                                                                default => 'Docentes vigentes y por contratar',
+                                                            },
                                                             'fasePersonal' => $fasePlan,
                                                             'seleccionPersonal' => $valorFormulario($item, 'docente_rut', ''),
                                                         ])
-                                                        @unless ($fasePlan === 'titular' && !$esEpja)
+                                                        @unless (in_array($fasePlan, ['titular', 'preferente'], true) && !$esEpja)
                                                             @include('admin.dotacion-establecimiento.partials._personal_select_referencia', ['opcionesPersonal' => $soloParvularia ? collect() : $asistentesPlan, 'grupoPersonal' => 'Asistentes de la Educación', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', '')])
                                                         @endunless
                                                     </select>
@@ -875,6 +882,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 prioridad: option.data('prioridad-label') || '',
                 antiguedad: option.data('antiguedad') || '',
                 fase: option.data('fase-plan') || '',
+                disponibleFase: option.data('fase-disponible'),
                 titular: option.data('titular-disponible'),
                 contrata: option.data('contrata-disponible'),
             };
@@ -905,6 +913,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? 'Contrato AAEE disponible: ' + (data.contrata || '0') + ' h'
                 : data.fase === 'titular'
                 ? 'Titular disponible: ' + (data.titular || '0') + ' h'
+                : data.fase === 'preferente'
+                ? 'Disponible para asignar: ' + (data.disponibleFase || '0') + ' h · ' + (data.titular || '0') + ' titular + ' + (data.contrata || '0') + ' contrata'
                 : (data.fase === 'contrata'
                     ? 'Contrata disponible: ' + (data.contrata || '0') + ' h'
                     : 'Disponible: ' + (data.titular || '0') + ' titular + ' + (data.contrata || '0') + ' contrata');
@@ -974,11 +984,13 @@ document.addEventListener('DOMContentLoaded', function () {
             const group = document.createElement('optgroup');
             group.label = selectedEstamento === 'asistente'
                 ? 'Asistentes de la Educación'
-                : (personal.dataset.fasePlan === 'titular'
+                : (personal.dataset.fasePlan === 'preferente'
+                    ? 'Docentes con saldo según prelación'
+                    : (personal.dataset.fasePlan === 'titular'
                     ? 'Docentes con horas titulares disponibles'
                     : (personal.dataset.fasePlan === 'contrata'
                         ? 'Docentes con horas a contrata disponibles'
-                        : 'Docentes vigentes y por contratar'));
+                        : 'Docentes vigentes y por contratar')));
             personal.replaceChildren(placeholder, group);
             personalOptions.forEach(function (option) {
                 if (option.dataset.estamento === selectedEstamento) {

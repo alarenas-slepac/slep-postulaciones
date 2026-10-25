@@ -485,15 +485,17 @@ class DotacionProceso2027Calculator
             $prioridad = match (true) {
                 DotacionDocenteExclusion::tieneFueroMaternal($docente['exclusion_docente'] ?? null)
                     || $motivo === 'horas_gremiales' => 1,
-                $planta > 0 && $tramoPreferente => 2,
-                $planta > 0 => 3,
-                default => 4,
+                TramoDocente::esNoRegidoLey20903($docente['tramo'] ?? null) => 2,
+                $planta > 0 && $tramoPreferente => 3,
+                $planta > 0 => 4,
+                default => 5,
             };
             $label = match ($prioridad) {
                 1 => '1. Fuero maternal u horas gremiales',
-                2 => '2. Titular · Avanzado / Experto 1 / Experto 2',
-                3 => '3. Titular Acceso, Inicial, Temprano',
-                default => '4. Horas a contrata',
+                2 => '2. No Regido Ley 20903 · Fuera de carrera docente',
+                3 => '3. Titular · Avanzado / Experto 1 / Experto 2',
+                4 => '4. Titular Acceso, Inicial, Temprano',
+                default => '5. Horas a contrata',
             };
 
             $docente['prioridad_2027'] = $prioridad;
@@ -540,7 +542,7 @@ class DotacionProceso2027Calculator
             }
 
             $prioridadDocente = (int) ($docente['prioridad_2027'] ?? 6);
-            $saldo = in_array($prioridadDocente, [2, 3], true)
+            $saldo = in_array($prioridadDocente, [3, 4], true)
                 ? min(
                     (float) ($docente['horas_disponibles'] ?? 0),
                     (float) ($docente['horas_titulares_disponibles'] ?? $docente['horas_disponibles'] ?? 0)
@@ -552,7 +554,7 @@ class DotacionProceso2027Calculator
 
             return $prioridadDocente < $prioridad
                 || ($prioridadDocente === $prioridad
-                    && in_array($prioridad, [2, 3], true)
+                    && in_array($prioridad, [2, 3, 4], true)
                     && self::fechaOrden($docente) < self::fechaOrden($seleccionado));
         });
     }

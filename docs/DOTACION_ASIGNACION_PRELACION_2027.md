@@ -1,6 +1,26 @@
 # Asignación de horas y prelación en Dotación 2027
 
-Reglas actualizadas en el parche `2026.10.13.599`. Se aplican al proceso 2027 y reutilizan el orden de prelación, tramo y antigüedad calculado por el SGA.
+Reglas actualizadas en el parche `2026.10.25.633`. Se aplican al proceso 2027 y reutilizan el orden de prelación, tramo y antigüedad calculado por el SGA.
+
+## Grupos de prelación
+
+1. Fuero maternal u horas gremiales.
+2. **No Regido Ley 20903**, tanto con horas titulares como a contrata: docentes fuera de carrera docente según el valor registrado en `tramo`.
+3. Titulares Avanzado, Experto 1 y Experto 2.
+4. Titulares Acceso, Inicial, Temprano y demás tramos titulares.
+5. Las demás horas a contrata.
+
+El grupo No Regido y los dos grupos titulares se ordenan internamente por antigüedad, dejando las fechas no informadas al final. Se reconoce el texto completo sin distinguir mayúsculas, espacios, guiones, guiones bajos ni el punto de `20.903`. Un tramo vacío, `Sin tramo`, otra ley o un texto con información adicional no otorga esta categoría. El cambio no modifica los tramos guardados ni reclasifica personas por edad o antigüedad.
+
+El actualizador de datos por Excel admite esta categoría y la guarda como `No Regido Ley 20903`. El ingreso individual también la ofrece entre las sugerencias de tramo.
+
+### Preferencia del nuevo grupo en asignaciones curriculares
+
+Cuando un docente No Regido asociado y elegible tiene al menos 1 h contractual disponible, se habilita la fase `preferente`: incluye sus horas titulares y a contrata antes de los titulares Avanzado/Experto. Fuero maternal y horas gremiales mantienen su precedencia. Para los demás docentes se utiliza sólo el saldo titular; las otras contratas conservan su etapa posterior. El selector y la validación usan la misma disponibilidad y no convierten horas a contrata en titulares.
+
+Al agotarse el saldo asignable del grupo No Regido se retoma la secuencia habitual de titulares y después contrata. Los saldos menores a 1 h, los perfiles profesionales, la asociación por asignatura, las reservas, los máximos de contrato/bloque y las excepciones de selección libre conservan sus reglas. Al editar, se restituye primero el saldo de la asignación actual para evaluar la fase y la prelación. No basta enviar el tramo o una prioridad desde el formulario.
+
+Esta prioridad no amplía la autorización para reservar horas a contrata: las reservas mantienen las condiciones específicas descritas abajo.
 
 ## Reglas por destino
 
@@ -15,7 +35,7 @@ Reglas actualizadas en el parche `2026.10.13.599`. Se aplican al proceso 2027 y 
 
 ### Reservas y saldo visible en el plan
 
-La prelación curricular utiliza los mismos candidatos que muestra el selector: docentes asociados, restricciones del curso y fase titular o contrata. También utiliza el saldo de esa fase, descontando asignaciones y reservas y omitiendo saldos individuales menores a una hora. Un docente mixto cuya reserva agotó el saldo titular deja de participar en la fase titular aunque conserve horas a contrata. Cuando se habilita la fase contrata, se compara el saldo a contrata de los candidatos que aparecen entonces.
+La prelación curricular utiliza los mismos candidatos que muestra el selector: docentes asociados, restricciones del curso y fase preferente, titular o contrata. También utiliza el saldo de esa fase, descontando asignaciones y reservas y omitiendo saldos individuales menores a una hora. Fuera de la fase preferente, un docente mixto cuya reserva agotó el saldo titular deja de participar en la fase titular aunque conserve horas a contrata. Cuando se habilita la fase contrata, se compara el saldo a contrata de los candidatos que aparecen entonces.
 
 La reserva utiliza primero el saldo titular asignable de cada docente. Sólo quien tenga una situación registrada de `fuero_maternal` o `horas_gremiales` puede reservar saldo a contrata cuando ya no tenga al menos una hora titular asignable. También se reconoce `horas_lactancia` con fuero maternal expresamente registrado; lactancia sola no habilita la excepción. Cada opción muestra su origen y máximo, respetando el saldo no normativo y las reservas anteriores. La autorización se verifica en el servidor; no basta enviar una situación desde el formulario.
 
@@ -31,7 +51,7 @@ El trabajo colaborativo PIE también permite elegir y reasignar sin bloqueo de p
 
 El selector mantiene el orden del proceso y permite seleccionar, por ejemplo, al profesor de Inglés situado detrás de las educadoras. Debe estar asociado a esa asignatura en la etapa correspondiente y contar con saldo contractual suficiente. Se conserva el mínimo de una hora cronológica y la conversión contractual según el perfil del docente.
 
-La excepción se determina por la necesidad real del plan, no por un subtipo enviado desde el navegador. Los componentes obligatorios conservan titularidad primero y prelación. Los cursos Sin JEC conservan la regla vigente que no permite asignar libre disposición; este parche se limita a Con JEC.
+La excepción se determina por la necesidad real del plan, no por un subtipo enviado desde el navegador. Los componentes obligatorios conservan prelación y titularidad primero, con la fase preferente del grupo No Regido descrita arriba. Los cursos Sin JEC conservan la regla vigente que no permite asignar libre disposición; la selección libre se limita a Con JEC.
 
 ### Bolsa Educadoras Diferenciales
 
@@ -96,6 +116,14 @@ Las pruebas de la vista verifican que la opción de Parvularia y el botón queda
 
 Este parche modifica el controlador de asignaciones, el resumen del proceso 2027, el cálculo de reservas, la vista de reservas, las dos pruebas de Parvularia y saldos titulares, esta guía y el changelog. Mantiene los registros históricos; las nuevas vinculaciones desde reservas titulares de Parvularia identifican su origen en `fuente_calculo`, generado por el servidor y conservado al editar para la misma persona.
 
+## Validación del parche 2026.10.25.633
+
+Se ejecutaron **270 pruebas y 1.965 aserciones**, aprobadas con SQLite en memoria, datos sintéticos y configuración aislada. Cubren reconocimiento de la categoría, titulares/contrata/mixtos, antigüedad y fechas ausentes, precedencia de fuero/gremiales, saldos, edición, retorno a las fases habituales, creación de asignaciones y rechazo de prioridades falsificadas desde el formulario. También incluyen las regresiones de reservas, situaciones anuales, bolsa diferencial, asociación por asignatura, selección libre, ingreso individual y actualización por Excel.
+
+La revisión de un selector real renderizado en una vista aislada con datos sintéticos pasó a **1440 × 1080** y **390 × 844**: No Regido a contrata aparece antes de titular Avanzado; el selector informa 44 h asignables con 0 h titulares y 44 h a contrata. Se comprobaron búsqueda por la categoría, teclado, alternativa nativa sin Select2 y ausencia de errores JavaScript o desborde horizontal. Los envíos de formularios estaban bloqueados y no se consultaron endpoints productivos.
+
+Pasaron la sintaxis PHP de los archivos modificados/nuevos, la sintaxis del JavaScript incrustado y `git diff --check`; se ejecutó `artisan optimize:clear` localmente. No se modifican rutas ni recursos compilados y no se requieren migraciones. La integración y el despliegue en producción quedan pendientes.
+
 ## Despliegue en cPanel
 
 Después de publicar el parche, actualizar el código mediante el procedimiento habitual y ejecutar:
@@ -114,6 +142,6 @@ Comprobación tras desplegar, con un usuario que tenga permiso para asignar en e
 1. En un curso NT Con JEC, abrir libre disposición y verificar que se puede seleccionar un especialista asociado aunque las educadoras aparezcan primero.
 2. En la bolsa PIE con cobertura docente, verificar Educación Diferencial y ausencia de título; los docentes de otras especialidades no deben aparecer.
 3. En una función, verificar que el selector mantiene el orden y permite un docente de menor prioridad con saldo, dentro de las horas definidas.
-4. Verificar que los componentes obligatorios siguen respetando titularidad primero y prelación.
+4. Verificar que No Regido a contrata aparece antes de titulares Avanzado/Experto en componentes obligatorios y que, al agotar su saldo, se retoma titularidad primero. Fuero/gremiales conserva prioridad superior y siguen vigentes los perfiles, asociaciones y límites.
 
 El despliegue y estas comprobaciones en el servidor quedan a cargo del usuario; el desarrollo y las pruebas de este parche no modifican producción.

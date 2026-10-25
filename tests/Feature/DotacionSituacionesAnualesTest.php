@@ -265,7 +265,7 @@ class DotacionSituacionesAnualesTest extends IsolatedSecurityTestCase
         $this->assertSame([
             'Gremial', 'Maternal', 'Experto antiguo', 'Avanzado reciente', 'Titular inicial', 'Lactancia', 'Contrata',
         ], $priorizados->pluck('nombre')->all());
-        $this->assertSame([1, 1, 2, 2, 3, 3, 4], $priorizados->pluck('prioridad_2027')->all());
+        $this->assertSame([1, 1, 3, 3, 4, 4, 5], $priorizados->pluck('prioridad_2027')->all());
         foreach ($priorizados->take(2) as $docente) {
             $this->assertSame('1. Fuero maternal u horas gremiales', $docente['prioridad_2027_label']);
             $this->assertSame(38.0, $docente['horas_disponibles']);
@@ -273,7 +273,7 @@ class DotacionSituacionesAnualesTest extends IsolatedSecurityTestCase
         $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
             $priorizados, $priorizados->firstWhere('nombre', 'Experto antiguo'), 2));
         foreach (array_diff(array_keys(DotacionDocenteExclusion::MOTIVOS), ['fuero_maternal', 'horas_gremiales']) as $motivo) {
-            $this->assertSame(3, DotacionProceso2027Calculator::docentesPriorizados(
+            $this->assertSame(4, DotacionProceso2027Calculator::docentesPriorizados(
                 collect([$this->docente('Otra situación', $motivo, 'Inicial', '2000-01-01')])
             )->sole()['prioridad_2027']);
         }

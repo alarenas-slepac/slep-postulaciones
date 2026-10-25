@@ -1388,4 +1388,75 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         DocenteHorasNoLectivasCalculator::clearExceptionCache();
         DotacionCursoCombinadoCalculator::clearCache();
     }
+
+    private function planConNoRegido(): array
+    {
+        Schema::table('reemplazos_personal', fn (Blueprint $table) => $table->string('tramo')->nullable());
+        DB::table('reemplazos_personal')->update(['tramo' => 'Avanzado']);
+        DB::table('reemplazos_personal')->where('rut', '99000002-K')->update(['tramo' => 'No Regido Ley 20903']);
+        $this->resetCalculators();
+        return $this->basicSubject('Matemática');
+    }
+
+    public function test_no_regido_contrata_se_asigna_antes_de_titular_avanzado_y_puede_editarse(): void
+    {
+        $need = $this->planConNoRegido();
+        $this->store([], $need);
+        $assignment = DotacionDocenteAsignacion::sole();
+        $this->assertSame('99000002K', $assignment->docente_rut_normalizado);
+        $this->assertGreaterThan(0, $assignment->horas_contrato);
+        app(DotacionAsignacionController::class)->update($this->request([
+            'docente_rut' => '99000002-K', 'horas_plan_pedagogicas' => 3,
+        ]), $this->ee, $assignment);
+        $this->assertSame('99000002K', $assignment->fresh()->docente_rut_normalizado);
+        $this->assertEquals(3, $assignment->fresh()->horas_plan_pedagogicas);
+    }
+
+    public function test_no_regido_contrata_bloquea_titular_avanzado_con_saldo_suficiente(): void
+    {
+        $need = $this->planConNoRegido();
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Existen docentes de prioridad superior');
+        $this->store(['docente_rut' => '99000001-K'], $need);
+    }
+
+    public function test_enviar_tramo_no_regido_en_formulario_no_otorga_prioridad(): void
+    {
+        $need = $this->planConNoRegido();
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Seleccione un docente asociado con saldo titular');
+        $this->store(['docente_rut' => '99000003-K', 'tramo' => 'No Regido Ley 20903'], $need);
+    }
+
+    public function test_nuevo_grupo_no_elimina_asociacion_y_tampoco_bloquea_libre_disposicion_nt(): void
+    {
+        $need = $this->planConNoRegido();
+        DB::table('dotacion_docente_subsectores')->where('asignatura_key', DotacionDocentesSubsector::keyParaNecesidad($need))
+            ->where('docente_rut_normalizado', '99000002K')->delete();
+        try {
+            $this->store([], $need);
+            $this->fail('El grupo no permite asignar un docente sin asociación.');
+        } catch (ValidationException $exception) { $this->assertStringContainsString('no está asociado', $exception->getMessage()); }
+        $this->associate('99000003K');
+        $this->store(['docente_rut' => '99000003-K']);
+        $this->assertSame('99000003K', DotacionDocenteAsignacion::sole()->docente_rut_normalizado);
+    }
+
+    public function test_selector_muestra_no_regido_contrata_antes_de_avanzado_y_saldo_correcto(): void
+    {
+        $need = $this->planConNoRegido();
+        $xpath = $this->assignmentXpath();
+        $form = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$need['key'].'"]]')->item(0);
+        $this->assertNotNull($form);
+        $select = $xpath->query('.//select[@name="docente_rut"]', $form)->item(0);
+        $this->assertSame('preferente', $select->getAttribute('data-fase-plan'));
+        $options = $this->catalogOptions($xpath, $select);
+        $this->assertSame(2, $options->length);
+        $this->assertSame('99000002-K', $options[0]->getAttribute('value'));
+        $this->assertStringContainsString('No Regido Ley 20903', $options[0]->getAttribute('data-prioridad-label'));
+        $this->assertSame('44', $options[0]->getAttribute('data-fase-disponible'));
+        $this->assertSame('0', $options[0]->getAttribute('data-titular-disponible'));
+        $this->assertSame('99000001-K', $options[1]->getAttribute('value'));
+        $this->assertStringContainsString('Prioridad No Regido Ley 20903', $form->textContent);
+    }
 }

@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.632',
+    'current_version' => '2026.10.25.633',
     'entries' => [
+        [
+            'version' => '2026.10.25.633',
+            'title' => 'Nuevo grupo de prelación No Regido Ley 20903',
+            'summary' => 'Prioriza a los docentes No Regido Ley 20903, tanto titulares como a contrata, antes de titulares Avanzado y Experto en el proceso 2027.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani', 'funcionario_directivo_estab'],
+            'items' => [
+                'Incorpora el grupo 2 No Regido Ley 20903 después de fuero maternal/horas gremiales. Avanzado/Experto pasa a grupo 3, otros titulares a grupo 4 y las demás contratas a grupo 5. El grupo nuevo utiliza la antigüedad y conserva el saldo contractual de origen.',
+                'Habilita sus horas a contrata antes de titulares Avanzado/Experto en asignaturas obligatorias, verificando en el servidor asociación, elegibilidad, saldos y prioridad. Al editar se restituye el saldo de la asignación y al agotarse el grupo se retoma titularidad primero.',
+                'Actualiza las guías y selectores con el saldo realmente asignable. Mantiene las excepciones de libre disposición NT, Religión, PIE colaborativo y funciones, además de los requisitos de perfil para la bolsa diferencial y las restricciones de reservas.',
+                'Reconoce variantes de espacios, mayúsculas y 20.903 sin alterar registros existentes. Admite el valor en la actualización por Excel y lo ofrece en el ingreso individual. Incluye pruebas aisladas y no requiere migraciones ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.632',
             'title' => 'Fecha de antigüedad y tramo en la exportación del padrón',
