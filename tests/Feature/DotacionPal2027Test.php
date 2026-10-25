@@ -147,6 +147,61 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $this->assertNull($row['R']);
     }
 
+    public function test_situaciones_2027_informan_contrato_completo_sin_completar_horas_distribuidas(): void
+    {
+        foreach (\App\Models\DotacionDocenteExclusion::MOTIVOS as $motivo => $label) {
+            if ($motivo === 'proceso_bir') { continue; }
+            $doc = $this->docente(['horas_contrato_base' => 44, 'horas_contrato' => 20, 'horas_excluidas' => 24,
+                'exclusion_docente' => ['motivo' => $motivo, 'motivo_label' => $label, 'horas' => 24],
+                'asignaciones' => [$this->asignacion(['tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 20])]]);
+            $antes = json_encode($doc);
+            $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
+            $this->assertCount(1, $rows);
+            $this->assertSame(20.0, $rows[0]['R']);
+            $this->assertNull($rows[0]['K']); $this->assertNull($rows[0]['P']);
+            $this->assertStringContainsString('Situación 2027: '.$label, $rows[0]['S']);
+            $this->assertStringContainsString('Contrato completo del docente: 44 h', $rows[0]['S']);
+            $this->assertStringContainsString('Horas consideradas para la situación contractual: 20 h', $rows[0]['S']);
+            $this->assertStringContainsString('Horas no necesarias por la situación: 24 h', $rows[0]['S']);
+            $this->assertSame($antes, json_encode($doc));
+        }
+        // Los DTO históricos conservan la base como suma de consideradas y excluidas.
+        unset($doc['horas_contrato_base'], $doc['horas_excluidas']);
+        $this->assertStringContainsString('Contrato completo del docente: 44 h', $this->reporte(['docentes' => [$doc]])['docentes'][0]['S']);
+        $doc['horas_contrato'] = 0; $doc['exclusion_docente']['horas'] = 44; $doc['asignaciones'] = [];
+        $row = $this->reporte(['docentes' => [$doc]])['docentes'][0];
+        $this->assertStringContainsString('Contrato completo del docente: 44 h', $row['S']);
+        $this->assertStringContainsString('situación contractual: 0 h', $row['S']);
+        $this->assertNull($row['R']);
+    }
+
+    public function test_bir_2027_se_excluye_de_personas_y_excel_individual_y_consolidado(): void
+    {
+        $normal = $this->docente(['rut' => '99000002-8', 'horas_contrato_base' => 44, 'horas_contrato' => 20,
+            'exclusion_docente' => ['motivo' => 'horas_gremiales', 'horas' => 24],
+            'asignaciones' => [$this->asignacion(['tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 20])]]);
+        $bir = $this->docente(['exclusion_docente' => ['motivo' => 'proceso_bir', 'horas_traspaso_bir' => 12]]);
+        $report = $this->reporte(['docentes' => [$bir, $normal]]);
+        $this->assertSame(1, $report['personas']);
+        $this->assertSame(['99000002-8'], array_column($report['docentes'], 'A'));
+        $this->assertStringContainsString('1 docente(s) con situación Proceso BIR 2027', implode(' ', $report['advertencias']));
+        foreach ([false, true] as $global) {
+            $path = Storage::disk('local')->path($global ? 'situaciones-todos.xlsx' : 'situaciones.xlsx');
+            if ($global) { app(DotacionPal2027ConsolidadoExport::class)->guardarTodos([$report], $path); }
+            else { app(DotacionPal2027Export::class)->guardar($report, $path); }
+            $book = IOFactory::createReader('Xlsx')->setLoadSheetsOnly(['Info Funcionario (DOCENTE)'])->load($path);
+            try {
+                $sheet = $book->getSheetByName('Info Funcionario (DOCENTE)');
+                $this->assertSame('99000002-8', (string) $sheet->getCell('A3')->getValue());
+                $this->assertNull($sheet->getCell('A4')->getValue());
+                $this->assertStringContainsString('Contrato completo del docente: 44 h', (string) $sheet->getCell('S3')->getValue());
+                $this->assertEquals(20, $sheet->getCell('J3')->getCalculatedValue());
+            } finally { $book->disconnectWorksheets(); }
+        }
+        $soloBir = $this->reporte(['docentes' => [$bir]]);
+        $this->assertSame(0, $soloBir['personas']); $this->assertSame([], $soloBir['docentes']);
+    }
+
     public function test_parvularia_conserva_37_contrato_convierte_a_32_aula_y_mantiene_3_pie_y_4_pendientes(): void
     {
         $aula = $this->asignacionNt(['horas_contrato' => 37, 'horas_plan_pedagogicas' => 25]);
@@ -267,12 +322,101 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
     public function test_planes_mixtos_y_combinados_no_simulan_una_carga_uniforme(): void
     {
         $data = $this->data();
-        $data['cursos']['rows']['1B']['horas_variable'] = true;
-        $data['cursos_combinados']['grupos'] = [['activo' => true, 'miembros' => [['id' => 1]]]];
+        $segundo = $data['cursos']['rows']['1B'];
+        $segundo['label'] = '2° Básico';
+        $segundo['detalles'][0] = array_replace($segundo['detalles'][0], ['establecimiento_curso_id' => 2,
+            'nombre_seccion' => '2° Básico A', 'horas_plan_base' => 40, 'horas_contrato_base' => 46]);
+        $data['cursos']['rows']['2B'] = $segundo;
+        $data['cursos_combinados']['grupos'] = [['activo' => true, 'nombre' => 'Multigrado A & B',
+            'miembros' => [['id' => 1, 'label' => '1° Básico A', 'matricula' => 25], ['id' => 2, 'label' => '2° Básico A', 'matricula' => 25]],
+            'totales' => ['horas_requeridas' => 46, 'horas_contrato' => 54, 'asignadas' => 9, 'pendientes' => 37]]];
+        $report = $this->reporte($data);
+        $this->assertCount(1, $report['cursos']);
+        $row = $report['cursos'][0];
+        $this->assertSame(46.0, $row['F']); $this->assertSame(54.0, $row['H']);
+        $this->assertSame(50, $row['D']); $this->assertSame(1, $row['E']);
+        $this->assertStringContainsString('Multigrado A & B', $row['C']);
+        $this->assertStringContainsString('1° Básico A + 2° Básico A', $row['C']);
+        $this->assertStringNotContainsString('INCOMPATIBLE', $row['C']);
+        foreach ([false, true] as $global) {
+            $path = Storage::disk('local')->path($global ? 'combinados-todos.xlsx' : 'combinados.xlsx');
+            if ($global) { app(DotacionPal2027ConsolidadoExport::class)->guardarTodos([$report], $path); }
+            else { app(DotacionPal2027Export::class)->guardar($report, $path); }
+            $reader = IOFactory::createReader('Xlsx')->setLoadSheetsOnly(['Info Establecimiento']);
+            $book = $reader->load($path);
+            try {
+                $sheet = $book->getSheetByName('Info Establecimiento');
+                $this->assertSame($row['C'], (string) $sheet->getCell('C4')->getValue());
+                $this->assertEquals(46, $sheet->getCell('G4')->getCalculatedValue());
+                $this->assertEquals(54, $sheet->getCell('H4')->getValue());
+                $this->assertSame('=+E4*F4', $sheet->getCell('G4')->getValue());
+            } finally { $book->disconnectWorksheets(); }
+        }
+    }
+
+    public function test_cursos_con_planes_distintos_tienen_sus_propias_horas_sin_promediar_y_sin_asignadas(): void
+    {
+        $data = $this->data();
+        $row = &$data['cursos']['rows']['1B'];
+        $row['cursos'] = 2; $row['matricula'] = 45;
+        $row['detalles'][0] += ['horas' => 42, 'horas_plan_refuerzo_ld_otro_docente' => 4,
+            'horas_contrato_equivalente_redondeado' => 49, 'horas_contrato_refuerzo_ld_otro_docente' => 5, 'horas_asignadas' => 6];
+        $row['detalles'][] = array_replace($row['detalles'][0], ['establecimiento_curso_id' => 2, 'nombre_seccion' => '1° Básico B',
+            'matricula' => 20, 'horas_plan_base' => 40, 'horas_contrato_base' => 46, 'horas' => 44,
+            'horas_contrato_equivalente_redondeado' => 51, 'horas_asignadas' => 0]);
+        unset($row);
+        $rows = $this->reporte($data)['cursos'];
+        $this->assertCount(2, $rows);
+        $this->assertSame([38.0,40.0], array_column($rows, 'F'));
+        $this->assertSame([44.0,46.0], array_column($rows, 'H'));
+        $this->assertSame([25,20], array_column($rows, 'D'));
+        $this->assertSame([1,1], array_column($rows, 'E'));
+        $this->assertSame(['1° Básico A','1° Básico B'], array_column($rows, 'C'));
+        // Datos históricos del DTO: quitar las claves base conserva el plan
+        // restando el refuerzo contabilizado, sin usar las horas asignadas.
+        unset($data['cursos']['rows']['1B']['detalles'][0]['horas_plan_base'], $data['cursos']['rows']['1B']['detalles'][0]['horas_contrato_base']);
+        $this->assertSame(38.0, $this->reporte($data)['cursos'][0]['F']);
+        $this->assertSame(44.0, $this->reporte($data)['cursos'][0]['H']);
+    }
+
+    public function test_combina_una_vez_por_grupo_conserva_cursos_independientes_e_ignora_grupos_inactivos(): void
+    {
+        $data = $this->data();
+        $base = $data['cursos']['rows']['1B'];
+        for ($i = 1; $i <= 4; $i++) {
+            $nivel = $base; $nivel['label'] = $i.'° Básico';
+            $nivel['detalles'][0]['establecimiento_curso_id'] = $i;
+            $nivel['detalles'][0]['nombre_seccion'] = $i.'° Básico A';
+            $data['cursos']['rows'][$i.'B'] = $nivel;
+        }
+        $data['cursos']['rows']['1B']['cursos'] = 2;
+        $data['cursos']['rows']['1B']['detalles'][] = array_replace($base['detalles'][0], ['establecimiento_curso_id' => 5, 'nombre_seccion' => '1° Básico B']);
+        $data['cursos_combinados']['grupos'] = [
+            ['nombre' => 'Grupo compartido', 'activo' => true, 'miembros' => [['id'=>1], ['id'=>2]], 'totales' => ['horas_requeridas'=>38, 'horas_contrato'=>44]],
+            ['nombre' => 'Grupo inactivo', 'activo' => false, 'miembros' => [['id'=>3], ['id'=>4]], 'totales' => ['horas_requeridas'=>60, 'horas_contrato'=>70]],
+        ];
+        $rows = $this->reporte($data)['cursos'];
+        $this->assertCount(4, $rows);
+        $this->assertSame('1° Básico B', $rows[0]['C']);
+        $this->assertSame(['3° Básico','4° Básico'], [$rows[1]['C'],$rows[2]['C']]);
+        $this->assertStringContainsString('1° Básico A + 2° Básico A', $rows[3]['C']);
+        $this->assertStringNotContainsString('Grupo inactivo', implode(' ', array_column($rows, 'C')));
+        $this->assertEquals(125, array_sum(array_column($rows, 'D')));
+        $this->assertEquals(152, array_sum(array_map(fn ($r) => $r['E'] * $r['F'], $rows)));
+    }
+
+    public function test_combinacion_sin_plan_queda_pendiente_y_doble_pertenencia_no_duplica_horas(): void
+    {
+        $data = $this->data();
+        $data['cursos_combinados']['grupos'] = [['nombre'=>'Grupo pendiente', 'activo'=>true, 'miembros'=>[['id'=>1]]]];
         $row = $this->reporte($data)['cursos'][0];
+        $this->assertStringContainsString('Curso combinado', $row['C']);
+        $this->assertStringContainsString('plan pendiente', $row['C']);
+        $this->assertStringNotContainsString('INCOMPATIBLE', $row['C']);
         $this->assertNull($row['F']); $this->assertNull($row['H']);
-        $this->assertSame(25, $row['D']);
-        $this->assertStringContainsString('INCOMPATIBLE', $row['C']);
+        $data['cursos_combinados']['grupos'][] = ['nombre'=>'Segundo grupo', 'activo'=>true, 'miembros'=>[['id'=>1]]];
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->reporte($data);
     }
 
     public function test_220_filas_amplian_formulas_tabla_resumen_y_validaciones_sin_truncar(): void
@@ -322,7 +466,8 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
     private function data(): array
     {
         return ['docentes' => [$this->docente()], 'cursos' => ['resumen_cursos_planes' => ['totales' => ['horas' => 38, 'horas_contrato_equivalente' => 44]], 'rows' => ['1B' => ['label' => '1° Básico', 'matricula' => 25,
-            'cursos' => 1, 'horas_por_nivel' => 38, 'total_horas_contrato_equivalente' => 44, 'detalles' => [['establecimiento_curso_id' => 1]]]]]];
+            'cursos' => 1, 'horas_por_nivel' => 38, 'total_horas_contrato_equivalente' => 44, 'detalles' => [['establecimiento_curso_id' => 1,
+                'nombre_seccion' => '1° Básico A', 'matricula' => 25, 'horas_plan_base' => 38, 'horas_contrato_base' => 44]]]]]];
     }
     private function docente(array $changes = []): array
     {

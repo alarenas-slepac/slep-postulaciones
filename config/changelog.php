@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.636',
+    'current_version' => '2026.10.25.637',
     'entries' => [
+        [
+            'version' => '2026.10.25.637',
+            'title' => 'PAL 2027: planes, cursos combinados y situaciones docentes',
+            'summary' => 'Detalla los planes requeridos y los cursos combinados, informa el contrato completo de las situaciones 2027 y excluye a los docentes BIR del PAL.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Reemplaza la marca de incompatibilidad de los combinados por el nombre del grupo y sus cursos integrantes. Suma su matrícula y representa una unidad de plan compartida para contar sus horas una sola vez, conservando la fórmula original.',
+                'Informa las horas requeridas y el contrato necesario del plan consolidado de cada grupo activo. En cursos independientes utiliza el plan base, sin agregar refuerzos que dependen de asignaciones a otro docente, y separa los planes distintos en filas propias.',
+                'Identifica planes pendientes y cancela la descarga ante cursos presentes en dos grupos activos. Conserva las reglas de docentes y las fórmulas de la plantilla; incluye pruebas del Excel individual y consolidado. No requiere migraciones ni cambios de entorno.',
+                'Para situaciones docentes 2027 informa en Observaciones el contrato completo, las horas consideradas y las no necesarias; J conserva las horas distribuidas. Excluye a los docentes con situación Proceso BIR 2027 de las filas y del conteo del PAL, sin modificar registros ni las necesidades del plan.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.636',
             'title' => 'Parvularia con equivalencia 65/35 en el informe PAL',

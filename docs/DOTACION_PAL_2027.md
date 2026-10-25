@@ -41,9 +41,9 @@ dotación. No habilita datos de matrícula para el rol directivo.
 
 | Hoja / columnas | Fuente y criterio |
 | --- | --- |
-| Establecimiento A–C | Nombre y RBD de establecimientos; nivel del curso |
-| Establecimiento D–E | Matrícula y cantidad de cursos activos con matrícula 2027 |
-| Establecimiento F | Horas semanales del plan vigente del nivel, si es uniforme y representable |
+| Establecimiento A–C | Nombre y RBD de establecimientos; nivel o nombre del grupo combinado con sus cursos integrantes |
+| Establecimiento D–E | Matrícula y cantidad de cursos independientes del mismo plan; cada grupo combinado cuenta como una unidad de plan compartida |
+| Establecimiento F | Horas semanales requeridas por el plan de cada curso independiente o por el plan consolidado del grupo combinado; no usa horas asignadas |
 | Establecimiento G | Fórmula original `E × F`, sin reemplazar su cálculo |
 | Establecimiento H | Horas de contrato necesarias para cubrir el plan del nivel; excluye PIE y funciones |
 | Docentes A–C | RUT de la nómina del proceso, establecimiento y RBD |
@@ -55,7 +55,7 @@ dotación. No habilita datos de matrícula para el rol directivo.
 | Docentes M | 65/35 o 60/40 de la asignación; las educadoras elegibles de Parvularia representan el contrato especial como 65/35 según la excepción siguiente |
 | Docentes P–Q | Horas cronológicas asignadas y financiadas por PIE o SEP |
 | Docentes R | Funciones efectivamente asignadas financiadas por General; nunca el saldo sin asignar |
-| Docentes S | Contrato de referencia, tramo distribuido, pendientes, detalle e incompatibilidades |
+| Docentes S | Contrato de referencia, tramo distribuido, situación 2027 con contrato completo y horas consideradas/no necesarias, pendientes, detalle e incompatibilidades |
 
 Un docente puede tener varias filas por calidad contractual, función, nivel y
 proporción. Se consumen primero sus horas titulares y después las de plazo fijo.
@@ -64,6 +64,28 @@ reparto es sólo una representación para el informe y no actualiza asignaciones
 la calidad jurídica del padrón. El conteo de personas se obtiene de la nómina, no
 de la cantidad de filas. Las personas que trabajan en dos establecimientos se
 mantienen en cada RBD, conforme al formato original.
+
+### Situaciones docentes 2027
+
+Los docentes con situación **Proceso BIR en 2027 se excluyen del PAL**, de sus
+filas y del conteo de personas del informe, tanto individual como consolidado.
+No se excluye a alguien sólo por tener BIR en un año anterior: la fuente consulta
+la situación del año 2027. Esta exclusión no modifica la nómina del SGA ni las
+necesidades del plan informadas en Info Establecimiento.
+
+Para las demás situaciones 2027, Observaciones informa el **contrato completo**
+del padrón (`horas_contrato_base`), el motivo, las **horas consideradas** para la
+situación contractual (`horas_contrato`) y las **horas no necesarias** por la
+situación (`horas_excluidas`). Por compatibilidad, si un DTO antiguo no trae la
+base se obtiene sumando las horas consideradas y excluidas.
+
+Por decisión del usuario, el contrato completo es una **referencia en S**: no
+se carga la diferencia automáticamente en aula, PIE, SEP ni otras funciones.
+J conserva su fórmula y las horas efectivamente distribuidas que el formato
+puede representar. Ejemplo: contrato completo 44 h, consideradas 20 h y situación
+24 h; con 20 h de funciones distribuidas, S informa los tres valores y J suma
+20 h. También se mantiene el detalle de situaciones que dejan cero horas
+consideradas, sin inventar asignaciones.
 
 ## Fórmulas originales y borradores
 
@@ -121,12 +143,31 @@ revisión. Las horas PIE, SEP, funciones y asignaciones de otros niveles mantien
 su tratamiento anterior. La columna H de **Info Establecimiento** conserva la
 necesidad contractual calculada por el SGA.
 
-En establecimientos, un nivel con planes diferentes no se sustituye por un
-promedio. Los cursos combinados conservan sus alumnos y cursos, pero no se inventa
-un reparto del contrato compartido por nivel. F o H se dejan sin completar según
-corresponda y C señala la incompatibilidad. La consulta individual conservada por
-compatibilidad permite contrastar el total contractual del plan con el SGA. La
-fórmula G permanece intacta aunque una entrada no esté disponible.
+### Planes y cursos combinados en Info Establecimiento
+
+Las horas de esta hoja corresponden a la **necesidad del plan**, incluso cuando
+todavía no hay docentes asignados. Para cursos independientes se utiliza el plan
+base y su contrato necesario, sin sumar refuerzos de libre disposición que
+dependen de asignaciones a otro docente. Los cursos de un nivel con planes
+diferentes se separan en filas con sus secciones y sus horas propias, sin promedios.
+
+Cada grupo combinado activo aparece una sola vez. **Nivel** identifica el nombre
+del grupo y todos sus cursos, por ejemplo `Curso combinado «Multigrado A»:
+1° Básico A + 2° Básico A`. D suma la matrícula de sus integrantes; E vale **1**
+porque representa una unidad curricular compartida, no la cantidad de cursos
+administrativos que la componen. Estos integrantes no vuelven a aparecer como
+cursos independientes. F informa `totales.horas_requeridas` del plan consolidado
+del grupo y H su necesidad contractual `totales.horas_contrato`; no se utiliza
+`totales.asignadas`. La fórmula original G = E × F queda intacta y cuenta una sola
+vez las horas compartidas. Por ejemplo, un grupo con plan de 46 h y 9 h asignadas
+muestra F = 46 y G = 46, independientemente del avance de la asignación.
+
+Un curso sin plan queda identificado como **plan pendiente de configurar**, con
+las horas faltantes vacías, sin llamarlo INCOMPATIBLE. Si un curso pertenece a
+dos grupos activos se cancela la descarga para evitar duplicaciones y se solicita
+revisar sus combinaciones. Los grupos inactivos no alteran los cursos independientes.
+Estas reglas se aplican tanto al consolidado como a la descarga individual
+conservada por compatibilidad y no modifican registros del SGA.
 
 Las filas se amplían copiando las fórmulas y estilos originales. Se extienden la
 tabla docente, las validaciones y los rangos finitos de Resumen cuando corresponde,
@@ -167,7 +208,8 @@ Pruebas: `php vendor/phpunit/phpunit/phpunit tests/Feature/DotacionPal2027Test.p
 Usan SQLite en memoria y datos sintéticos: permisos por rol activo, validación del
 año, privacidad, contratos, pendientes, incompatibilidades, conservación de
 fórmulas/hojas/estilos, previa sin cálculos de personal, lotes, catálogo sin datos,
-cancelación y limpieza ante fallos y expansión a 110 establecimientos, 1.540 niveles
+cancelación y limpieza ante fallos, detalle y deduplicación de cursos combinados,
+planes diferentes, independencia de las horas asignadas y expansión a 110 establecimientos, 1.540 niveles
 y 11.000 filas docentes. El recálculo nativo de Excel y un
 archivo con datos reales de 2027 requieren validación adicional; no se da por
 comprobado el resultado en producción.
