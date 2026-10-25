@@ -147,8 +147,8 @@
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
                 @if ((int) $anio === 2027 && \App\Support\DotacionPal2027::canView($activeRole))
-                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.pal-2027', $establecimiento) }}">
-                        <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Excel PAL 2027
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.pal-2027.todos') }}">
+                        <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Excel PAL 2027 consolidado
                     </a>
                 @endif
                 @if (\App\Support\DotacionProyeccionCalculator::canView($activeRole))

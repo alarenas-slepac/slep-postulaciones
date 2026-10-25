@@ -89,7 +89,11 @@ class DotacionPal2027
                 $exceso = $indice >= count($capacidades);
                 $parte = $exceso ? $restante : min($restante, $capacidades[$indice]['horas'] - $capacidades[$indice]['usadas']);
                 $capacidad = $exceso ? ['calidad' => 'Otros', 'horas' => 0] : $capacidades[$indice];
-                $filas[] = $this->fila($ee, $docente, $grupo, round($parte, 2), $capacidad, $pendientes, $tablas, $exceso);
+                $convertidas = ! $exceso && ($grupo['convertir_parvularia'] ?? false)
+                    ? $this->filasParvularia($ee, $docente, $grupo, round($parte, 2), $capacidad, $pendientes, $tablas)
+                    : null;
+                if ($convertidas !== null) { array_push($filas, ...$convertidas); }
+                else { $filas[] = $this->fila($ee, $docente, $grupo, round($parte, 2), $capacidad, $pendientes, $tablas, $exceso); }
                 if (! $exceso) { $capacidades[$indice]['usadas'] += $parte; }
                 $restante = round($restante - $parte, 4);
             }
@@ -104,6 +108,7 @@ class DotacionPal2027
     private function grupos(array $docente): array
     {
         $grupos = [];
+        $esParvulos = DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos'];
         foreach (collect($docente['asignaciones'] ?? [])->sortBy(fn ($a) => (int) data_get($a, 'id', 0)) as $a) {
             if ((data_get($a, 'estado') ?? 'activa') !== 'activa' || ! DotacionAsignacionCalculator::esAsignacionDocenteReal($a)) { continue; }
             $tipo = (string) data_get($a, 'tipo_asignacion');
@@ -121,14 +126,36 @@ class DotacionPal2027
                 'plan_estudio', 'acompanamiento_parvularia', 'pie_colaborativo', 'pie_educadora_diferencial' => 'Docente aula',
                 default => 'Otros (Talleristas / Apoyo / etc.)',
             };
-            $key = implode('|', [$columna, $funcion, $columna === 'aula' ? $proporcion : '', $nivel]);
+            $convertir = $esParvulos && $columna === 'aula' && $nivel === 'Educación Parvularia'
+                && DotacionProfesionDocenteResolver::esAsignacionParvularia(['proporcion_aplicada' => $proporcion]);
+            $key = implode('|', [$columna, $funcion, $columna === 'aula' ? ($convertir ? 'PAL_PARVULARIA_65_35' : $proporcion) : '', $nivel]);
             $grupos[$key] ??= ['columna' => $columna, 'funcion' => $funcion, 'nivel' => $nivel,
-                'proporcion' => $proporcion, 'contrato' => 0.0, 'pedagogicas' => 0.0, 'detalle' => []];
+                'proporcion' => $proporcion, 'contrato' => 0.0, 'pedagogicas' => 0.0, 'detalle' => [],
+                'convertir_parvularia' => $convertir, 'reglas_originales' => []];
+            $grupos[$key]['reglas_originales'][] = $proporcion;
             $grupos[$key]['contrato'] += max(0, (float) data_get($a, 'horas_contrato', 0));
             $grupos[$key]['pedagogicas'] += max(0, (float) data_get($a, 'horas_plan_pedagogicas', 0));
             $grupos[$key]['detalle'][] = (string) (data_get($a, 'asignatura_nombre') ?: data_get($a, 'observacion') ?: (\App\Models\DotacionDocenteAsignacion::TIPOS[$tipo] ?? $tipo));
         }
         return array_values($grupos);
+    }
+
+    private function filasParvularia(Establecimiento $ee, array $docente, array $grupo, float $parte, array $capacidad, float $pendientes, array $tablas): ?array
+    {
+        $bloques = DotacionPalParvularia65::convertir($parte, $tablas['65/35'] ?? []);
+        if ($bloques === null) { return null; }
+        $aulaOriginal = round($grupo['pedagogicas'] * $parte / $grupo['contrato'], 4);
+        $filas = [];
+        foreach ($bloques as $indice => $bloque) {
+            $representacion = array_replace($grupo, ['proporcion' => '65/35', 'contrato' => $bloque['contrato'], 'pedagogicas' => $bloque['aula']]);
+            $fila = $this->fila($ee, $docente, $representacion, $bloque['contrato'], $capacidad, $pendientes, $tablas);
+            $fila['S'] .= ' Conversión PAL de Parvularia a 65/35: '.$bloque['aula'].' h aula equivalentes = '.$bloque['contrato'].' h contrato.'
+                .' Referencia SGA: '.$aulaOriginal.' h aula real y '.$parte.' h contrato de regla especial.'
+                .' Parte '.($indice + 1).' de '.count($bloques).' para esta calidad contractual. Regla original: '
+                .implode(' / ', array_unique($grupo['reglas_originales'])).'.';
+            $filas[] = $fila;
+        }
+        return $filas;
     }
 
     private function nivel(object|array $a, array $docente): string

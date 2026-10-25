@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+@php $esConsolidado = isset($establecimientos); @endphp
 <div class="container-fluid py-4 pal-2027">
     <style>
         .pal-2027 .pal-muted { color: #64748b; }
@@ -12,12 +13,12 @@
     <header class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
         <div>
             <div class="pal-muted small mb-1">Dotación · Plan Anual Local 2027</div>
-            <h1 class="h2 fw-bold">Resumen de dotación PAL</h1>
-            <p class="pal-muted mb-0">RBD {{ $establecimiento->rbd }} · {{ $establecimiento->nombre_establecimiento }}</p>
+            <h1 class="h2 fw-bold">{{ $esConsolidado ? 'PAL 2027 · Todos los establecimientos' : 'Resumen de dotación PAL' }}</h1>
+            <p class="pal-muted mb-0">{{ $esConsolidado ? 'Un solo Excel con todos los establecimientos participantes en Dotación, incluidos los que aún no tienen datos 2027.' : 'RBD '.$establecimiento->rbd.' · '.$establecimiento->nombre_establecimiento }}</p>
         </div>
         <div class="d-flex flex-wrap align-items-start gap-2">
-            <a class="btn pal-back rounded-3" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => 2027]) }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a Dotación</a>
-            <a class="btn btn-primary rounded-3 fw-semibold" href="{{ route('admin.dotacion-establecimiento.pal-2027', [$establecimiento, 'descargar' => 1]) }}"><i class="bi bi-download" aria-hidden="true"></i> Descargar borrador Excel</a>
+            <a class="btn pal-back rounded-3" href="{{ $esConsolidado ? route('admin.dotacion-establecimiento.index', ['anio' => 2027]) : route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => 2027]) }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a Dotación</a>
+            <a class="btn btn-primary rounded-3 fw-semibold {{ $esConsolidado && $establecimientos->isEmpty() ? 'disabled' : '' }}" @if($esConsolidado && $establecimientos->isEmpty()) aria-disabled="true" @else href="{{ $esConsolidado ? route('admin.dotacion-establecimiento.pal-2027.todos', ['descargar' => 1]) : route('admin.dotacion-establecimiento.pal-2027', [$establecimiento, 'descargar' => 1]) }}" @endif><i class="bi bi-download" aria-hidden="true"></i> {{ $esConsolidado ? 'Descargar Excel consolidado' : 'Descargar borrador Excel' }}</a>
         </div>
     </header>
     @if ($errors->any())
@@ -28,25 +29,52 @@
         Se conservan las fórmulas originales. Las horas que no pueden representarse se explican en la columna Nivel o en Observaciones y quedan sin cargar en las entradas numéricas.
         En esas filas, los ceros calculados por Excel no significan ausencia de horas. Revise estos casos antes de utilizar «Resumen».
     </div>
+    @unless ($esConsolidado)
     <div class="row g-3 mb-4">
         @foreach ([['Docentes identificados', $reporte['personas']], ['Filas contractuales', count($reporte['docentes'])], ['Filas incompatibles', $reporte['incompatibles']], ['Horas de contrato necesarias para el plan', number_format($reporte['contrato_plan_sga'], 2, ',', '.')]] as [$label, $value])
             <div class="col-12 col-sm-6 col-xl-3"><div class="card rounded-4 shadow-sm h-100"><div class="card-body"><div class="small pal-muted">{{ $label }}</div><div class="h3 fw-bold mb-0 mt-2">{{ $value }}</div></div></div></div>
         @endforeach
     </div>
+    @endunless
     <section class="card rounded-4 shadow-sm mb-4" aria-labelledby="pal-contenido">
         <div class="card-body p-4">
             <h2 class="h5 fw-bold" id="pal-contenido">Contenido y criterios de la descarga</h2>
             <ul class="mb-0">
+                @if ($esConsolidado)
+                    <li>Incluye todos los establecimientos del proceso. Los filtros de búsqueda, comuna, página y establecimiento del listado no limitan este archivo.</li>
+                    <li>«Resumen» obtiene sus RBD desde «Info Establecimiento» e incluye también los que aún no tienen docentes cargados. Conserva los cálculos de personas y horas por RBD.</li>
+                @endif
                 <li>Completa «Info Establecimiento» e «Info Funcionario (DOCENTE)» con los datos del proceso 2027.</li>
                 <li>Columna H de establecimientos: contrato necesario para el plan de estudios, sin agregar PIE ni funciones.</li>
                 <li>Separa titular y plazo fijo. La distribución cubre primero titular y luego contrata; se identifica cada función y proporción.</li>
+                <li>Para educadoras con título de Párvulos y aula asignada en Parvularia, convierte el contrato especial a horas aula equivalentes 65/35. Conserva el contrato y deja las horas aula reales en Observaciones.</li>
                 <li>Las horas pendientes se informan en Observaciones. No se convierten en otras funciones.</li>
                 <li>Asistentes y VTF quedan vacías. Las plazas sin persona identificada no se presentan como funcionarios.</li>
                 <li>La hoja «Resumen» conserva sus fórmulas y necesita Excel compatible con FILTER, UNIQUE, VSTACK y LET. Revise el recálculo al abrir.</li>
             </ul>
-            <p class="small pal-muted mt-3 mb-0">Año del padrón utilizado por el SGA: {{ $reporte['anio_padron'] ?: 'Sin datos' }}. Los cursos y asignaciones corresponden exclusivamente a 2027. Descargar no modifica registros.</p>
+            <p class="small pal-muted mt-3 mb-0">@unless($esConsolidado) Año del padrón utilizado por el SGA: {{ $reporte['anio_padron'] ?: 'Sin datos' }}. @endunless Los cursos y asignaciones corresponden exclusivamente a 2027. Asistentes y VTF conservan el alcance anterior: las salas cuna no participan en este proceso. Descargar no modifica registros.</p>
         </div>
     </section>
+    @if ($esConsolidado)
+    <section class="card rounded-4 shadow-sm" aria-labelledby="pal-establecimientos">
+        <div class="card-body p-4">
+            <h2 class="h5 fw-bold" id="pal-establecimientos">{{ $establecimientos->count() }} establecimientos incluidos</h2>
+            <p class="pal-muted mb-3">Los casos incompatibles y las horas pendientes se indican en el Excel. Un establecimiento sin cursos 2027 aparece identificado para su revisión.</p>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light"><tr><th scope="col">RBD</th><th scope="col">Establecimiento</th><th scope="col">Comuna</th></tr></thead>
+                    <tbody>
+                        @forelse($establecimientos as $ee)
+                            <tr><td class="text-nowrap">{{ $ee->rbd }}</td><td class="fw-semibold">{{ $ee->nombre_establecimiento }}</td><td>{{ $ee->comuna ?: 'Sin comuna' }}</td></tr>
+                        @empty
+                            <tr><td colspan="3" class="pal-muted py-4">No hay establecimientos participantes en Dotación.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+    @else
     <section class="card rounded-4 shadow-sm" aria-labelledby="pal-observaciones">
         <div class="card-body p-4">
             <h2 class="h5 fw-bold" id="pal-observaciones">Observaciones para la revisión</h2>
@@ -57,5 +85,6 @@
             @endforelse
         </div>
     </section>
+    @endif
 </div>
 @endsection
