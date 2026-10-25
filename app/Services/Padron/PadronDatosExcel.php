@@ -2,6 +2,7 @@
 
 namespace App\Services\Padron;
 
+use App\Support\TramoDocente;
 use DateTimeImmutable;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -127,11 +128,14 @@ class PadronDatosExcel
             }
             return (int) $valor;
         }
+        if (TramoDocente::esNoRegidoLey20903($valor)) {
+            return TramoDocente::NO_REGIDO_LEY_20903;
+        }
         $key = preg_replace('/[\s_]+/', '', Str::lower(Str::ascii($valor)));
         $tramos = ['acceso' => 'Acceso', 'inicial' => 'Inicial', 'temprano' => 'Temprano', 'avanzado' => 'Avanzado',
             'experto1' => 'Experto 1', 'expertoi' => 'Experto 1', 'experto2' => 'Experto 2', 'expertoii' => 'Experto 2', 'sintramo' => 'Sin tramo'];
         if (! isset($tramos[$key])) {
-            $this->fallar('Fila '.$linea.': Tramo debe ser Acceso, Inicial, Temprano, Avanzado, Experto 1, Experto 2 o Sin tramo.');
+            $this->fallar('Fila '.$linea.': Tramo debe ser Acceso, Inicial, Temprano, Avanzado, Experto 1, Experto 2, Sin tramo o No Regido Ley 20903.');
         }
         return $tramos[$key];
     }
@@ -148,7 +152,7 @@ class PadronDatosExcel
             ['Un RUT con varios contratos en ese mes actualiza todas sus líneas. Otros meses se conservan.'],
             ['Las celdas vacías conservan sus valores actuales. Para Bienios, cero es un valor válido.'],
             ['Fechas: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY o fecha Excel. fechaing se admite como alias de fecha_antiguedad.'],
-            ['Tramo: Acceso, Inicial, Temprano, Avanzado, Experto 1, Experto 2 o Sin tramo. Bienios: entero de 0 a 50.'],
+            ['Tramo: Acceso, Inicial, Temprano, Avanzado, Experto 1, Experto 2, Sin tramo o No Regido Ley 20903. Bienios: entero de 0 a 50.'],
             ['El informe Excel incluye RUT únicos modificados, sin cambios y no encontrados, además de un resumen de modificaciones por RBD.'],
             ['Seleccione en el modal los mismos campos que completará. Las demás columnas no se actualizan. No use fórmulas.'],
             ['Fechas iguales a las registradas no se modifican. Tramo y Bienios deben coincidir si el RUT se repite. Se conservan contratos y asignaciones.'],

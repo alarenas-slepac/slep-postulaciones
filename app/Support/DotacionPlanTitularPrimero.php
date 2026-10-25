@@ -64,6 +64,13 @@ class DotacionPlanTitularPrimero
     /** @param Collection<int, array<string, mixed>> $docentes */
     public static function fase(Collection $docentes): string
     {
+        if ($docentes->contains(fn (array $docente) =>
+            TramoDocente::esNoRegidoLey20903($docente['tramo'] ?? null)
+            && (float) ($docente['horas_disponibles'] ?? 0) >= self::MINIMO_SALDO_ASIGNABLE
+        )) {
+            return 'preferente';
+        }
+
         return $docentes->contains(fn (array $docente) => self::disponibles($docente, 'titular') >= self::MINIMO_SALDO_ASIGNABLE)
             ? 'titular'
             : 'contrata';
@@ -72,6 +79,14 @@ class DotacionPlanTitularPrimero
     /** @param array<string, mixed> $docente */
     public static function disponibles(array $docente, string $fase): float
     {
+        if ($fase === 'preferente') {
+            // El nuevo grupo usa todo su saldo contractual. Fuero/gremiales
+            // conserva la precedencia; los demás docentes sólo usan titulares.
+            return in_array((int) ($docente['prioridad_2027'] ?? 0), [1, 2], true)
+                ? max(0.0, (float) ($docente['horas_disponibles'] ?? 0))
+                : self::disponibles($docente, 'titular');
+        }
+
         $campo = $fase === 'titular' ? 'horas_titulares_disponibles' : 'horas_contrata_disponibles';
 
         return max(0.0, min(
@@ -109,9 +124,11 @@ class DotacionPlanTitularPrimero
     {
         $fase = self::fase($docentes);
         if ($esAsistente) {
-            if ($fase === 'titular') {
+            if ($fase !== 'contrata') {
                 throw ValidationException::withMessages([
-                    'docente_rut' => 'Primero asigne las horas titulares disponibles de los docentes asociados a esta asignatura. La cobertura por asistente se habilita después.',
+                    'docente_rut' => $fase === 'preferente'
+                        ? 'Primero asigne el saldo de los docentes con prelación, incluido No Regido Ley 20903. La cobertura por asistente se habilita después.'
+                        : 'Primero asigne las horas titulares disponibles de los docentes asociados a esta asignatura. La cobertura por asistente se habilita después.',
                 ]);
             }
 
@@ -121,15 +138,18 @@ class DotacionPlanTitularPrimero
         $disponibles = $seleccionado ? self::disponibles($seleccionado, $fase) : 0.0;
         if ($disponibles < self::MINIMO_SALDO_ASIGNABLE) {
             throw ValidationException::withMessages([
-                'docente_rut' => $fase === 'titular'
-                    ? 'Esta asignatura aún tiene docentes con al menos 1 h titular disponible. Seleccione uno de ellos.'
-                    : 'Seleccione un docente con al menos 1 h a contrata disponible para esta asignatura.',
+                'docente_rut' => match ($fase) {
+                    'preferente' => 'Seleccione un docente asociado con saldo titular o con prioridad No Regido Ley 20903, fuero maternal u horas gremiales y al menos 1 h disponible.',
+                    'titular' => 'Esta asignatura aún tiene docentes con al menos 1 h titular disponible. Seleccione uno de ellos.',
+                    default => 'Seleccione un docente con al menos 1 h a contrata disponible para esta asignatura.',
+                },
             ]);
         }
         if ($horasContrato > $disponibles + 0.001) {
             $saldo = DotacionEstablecimientoCalculator::formatHoras($disponibles);
+            $origen = $fase === 'preferente' ? 'de contrato asignable' : $fase;
             throw ValidationException::withMessages([
-                'horas_plan_pedagogicas' => "La asignación requiere {$horasContrato} h de contrato, pero el docente tiene {$saldo} h {$fase} disponibles. Reduzca las horas aula para asignar primero ese saldo y registre el resto después.",
+                'horas_plan_pedagogicas' => "La asignación requiere {$horasContrato} h de contrato, pero el docente tiene {$saldo} h {$origen} disponibles. Reduzca las horas aula para asignar primero ese saldo y registre el resto después.",
             ]);
         }
     }

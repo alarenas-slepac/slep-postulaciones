@@ -81,7 +81,7 @@
             <span class="badge text-bg-warning">Sin info: {{ $countSinInfo }}</span>
         </div>
         @if ($proceso2027Docentes['aplica'] ?? false)
-            <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-sort-numeric-down" aria-hidden="true"></i> La nómina conserva la prelación 2027: fuero maternal u horas gremiales; titulares Avanzado, Experto 1 y Experto 2; Titular Acceso, Inicial, Temprano; y contrata. Las horas de lactancia por sí solas no otorgan prioridad. Cada grupo titular se ordena por antigüedad, con las fechas no informadas al final. Los filtros conservan ese orden.</div>
+            <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-sort-numeric-down" aria-hidden="true"></i> La nómina conserva la prelación 2027: fuero maternal u horas gremiales; No Regido Ley 20903, tanto titulares como a contrata; titulares Avanzado, Experto 1 y Experto 2; Titular Acceso, Inicial, Temprano; y las demás horas a contrata. Las horas de lactancia por sí solas no otorgan prioridad. El grupo No Regido y los grupos titulares se ordenan por antigüedad, con las fechas no informadas al final. Los filtros conservan ese orden.</div>
         @endif
     </div>
 </div>

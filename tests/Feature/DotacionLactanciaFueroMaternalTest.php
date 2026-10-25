@@ -73,9 +73,11 @@ class DotacionLactanciaFueroMaternalTest extends IsolatedSecurityTestCase
     public static function prelaciones(): array
     {
         return [
-            'lactancia titular avanzado' => [44, 'Avanzado', false, 2],
-            'lactancia titular inicial' => [44, 'Inicial', false, 3],
-            'lactancia contrata' => [0, 'Experto 2', false, 4],
+            'lactancia titular avanzado' => [44, 'Avanzado', false, 3],
+            'lactancia titular inicial' => [44, 'Inicial', false, 4],
+            'lactancia contrata' => [0, 'Experto 2', false, 5],
+            'lactancia titular no regido' => [44, 'No Regido Ley 20903', false, 2],
+            'lactancia contrata no regido' => [0, 'No Regido Ley 20903', false, 2],
             'fuero titular avanzado' => [44, 'Avanzado', true, 1],
             'fuero titular inicial' => [44, 'Inicial', true, 1],
             'fuero contrata' => [0, 'Experto 2', true, 1],
@@ -99,11 +101,11 @@ class DotacionLactanciaFueroMaternalTest extends IsolatedSecurityTestCase
         unset($lactancia['exclusion_docente']['posee_fuero_maternal']);
         $titular = $this->docente(['exclusion_docente' => null]);
         $priorizados = DotacionProceso2027Calculator::docentesPriorizados(collect([$lactancia, $titular]));
-        $this->assertSame([2, 4], $priorizados->pluck('prioridad_2027')->all());
+        $this->assertSame([3, 5], $priorizados->pluck('prioridad_2027')->all());
         $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($priorizados, $priorizados->first(), 2));
         $lactancia['exclusion_docente']['posee_fuero_maternal'] = true;
         $conFuero = DotacionProceso2027Calculator::docentesPriorizados(collect([$lactancia, $titular]));
-        $this->assertSame([1, 2], $conFuero->pluck('prioridad_2027')->all());
+        $this->assertSame([1, 3], $conFuero->pluck('prioridad_2027')->all());
         $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($conFuero, $conFuero->last(), 2));
         $this->assertFalse(DotacionDocenteExclusion::tieneFueroMaternal(['motivo' => 'traslado', 'posee_fuero_maternal' => true]));
         $this->assertTrue(DotacionDocenteExclusion::tieneFueroMaternal(['motivo' => 'fuero_maternal']));
@@ -137,7 +139,7 @@ class DotacionLactanciaFueroMaternalTest extends IsolatedSecurityTestCase
         $this->assertFalse(DotacionDocenteExclusion::query()->sole()->posee_fuero_maternal);
         $docente = DotacionEstablecimientoCalculator::docentes($ee, 2027)->sole();
         $this->assertSame(42.0, $docente['horas_contrato']);
-        $this->assertSame(3, DotacionProceso2027Calculator::docentesPriorizados(collect([$docente]))->sole()['prioridad_2027']);
+        $this->assertSame(4, DotacionProceso2027Calculator::docentesPriorizados(collect([$docente]))->sole()['prioridad_2027']);
     }
 
     public function test_al_cambiar_motivo_se_limpia_fuero_y_no_se_reactiva_al_volver_a_lactancia(): void

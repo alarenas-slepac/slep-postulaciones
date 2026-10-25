@@ -204,14 +204,14 @@ class DotacionProceso2027CalculatorTest extends TestCase
             'Gremial', 'Avanzado', 'Experto 2', 'Experto 1', 'Experto I', 'Experto II',
             'Resto titular', 'Lactancia', 'Contrata experto',
         ], $docentes->pluck('nombre')->all());
-        $this->assertSame([1, 2, 2, 2, 2, 2, 3, 3, 4], $docentes->pluck('prioridad_2027')->all());
-        $this->assertSame('3. Titular Acceso, Inicial, Temprano', $docentes->firstWhere('nombre', 'Resto titular')['prioridad_2027_label']);
-        $this->assertCount(1, $docentes->filter(fn ($docente) => $docente['prioridad_2027'] === 2)->pluck('prioridad_2027_label')->unique());
+        $this->assertSame([1, 3, 3, 3, 3, 3, 4, 4, 5], $docentes->pluck('prioridad_2027')->all());
+        $this->assertSame('4. Titular Acceso, Inicial, Temprano', $docentes->firstWhere('nombre', 'Resto titular')['prioridad_2027_label']);
+        $this->assertCount(1, $docentes->filter(fn ($docente) => $docente['prioridad_2027'] === 3)->pluck('prioridad_2027_label')->unique());
         $this->assertStringContainsString('Experto 1 / Experto 2', $docentes->firstWhere('nombre', 'Experto II')['prioridad_2027_label']);
         $experto = $docentes->firstWhere('nombre', 'Experto II');
         $this->assertSame(35.0, $experto['horas_titulares_disponibles']);
         $this->assertSame(35.0, $experto['horas_disponibles']);
-        $this->assertSame(4, $docentes->last()['prioridad_2027']);
+        $this->assertSame(5, $docentes->last()['prioridad_2027']);
     }
 
     public function test_ordena_el_resto_titular_por_antiguedad_y_exige_justificacion_al_omitirla(): void
@@ -228,7 +228,7 @@ class DotacionProceso2027CalculatorTest extends TestCase
         $this->assertSame([
             'Titular antiguo', 'Titular intermedio', 'Titular reciente', 'Sin fecha',
         ], $docentes->pluck('nombre')->all());
-        $this->assertSame([3, 3, 3, 3], $docentes->pluck('prioridad_2027')->all());
+        $this->assertSame([4, 4, 4, 4], $docentes->pluck('prioridad_2027')->all());
         $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible(
             $docentes, $docentes->firstWhere('nombre', 'Titular reciente')
         ));
