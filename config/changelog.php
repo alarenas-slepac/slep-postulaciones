@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.645',
+    'current_version' => '2026.10.26.646',
     'entries' => [
+        [
+            'version' => '2026.10.26.646',
+            'title' => 'Plantillas y actualización parcial del padrón de votación',
+            'summary' => 'Permite descargar plantillas, actualizar algunos votantes y agregar RUT nuevos sin sustituir el resto del padrón ni los locales de la jornada.',
+            'roles' => ['admin'],
+            'items' => [
+                'Añade la plantilla de importación completa con las hojas Padrón votación, Locales votación e instrucciones. Precarga los locales existentes de la jornada.',
+                'Permite elegir Nombre, Tipo de contrato, Grupo y Origen/local para descargar una plantilla dinámica, vacía o precargada con los votantes actuales. Identifica cada asignación por ID_REGISTRO y RUT, conservando múltiples establecimientos para una misma persona.',
+                'Actualiza únicamente las filas y campos seleccionados y permite incorporar RUT nuevos con sus datos completos y un local ya cargado. Descarga un reporte de actualizados, agregados, sin cambios y omitidos; conserva los demás votantes y las otras jornadas.',
+                'Valida formato, filas, fórmulas, RUT, ambigüedades y duplicados. Procesa en transacción con bloqueo de jornada, escrituras en lotes y bitácora de conteos sin datos personales. Sólo los cambios efectivos retiran la publicación para revisión.',
+                'Mantiene acceso exclusivo de administrador, CSRF y respuestas privadas sin caché. Incluye pruebas aisladas y no requiere migraciones ni nuevas variables de entorno.',
+            ],
+            'published_at' => '2026-10-26',
+        ],
         [
             'version' => '2026.10.25.645',
             'title' => 'PAL: cupos y directivos por asumir con identidad sintética y redondeo de aula',

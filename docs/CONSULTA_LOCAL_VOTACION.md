@@ -45,6 +45,25 @@ Las fechas de texto `MM/DD/AAAA` se detectan si al menos una de ellas tiene un d
 
 ## Validación y reemplazo
 
+### Plantillas y actualización de algunos votantes
+
+En **Padrón y locales**, seleccione la jornada y pulse **Descargar plantilla de padrón y locales** para preparar una importación completa. Incluye los encabezados requeridos, los locales existentes y una hoja de instrucciones. La carga completa conserva su confirmación de reemplazo.
+
+Para cambiar sólo parte del padrón, despliegue **Actualizar o agregar algunos votantes mediante Excel**:
+
+1. Marque los campos que desea tratar: Nombre, Tipo de contrato, Grupo y Establecimiento de origen/local.
+2. Mantenga **Precargar la plantilla** para obtener las asignaciones actuales, o desmárquelo para un archivo vacío. Pulse **Descargar plantilla de actualización**.
+3. En **ACTUALIZAR PADRON**, conserve sólo las filas que desea cambiar. No altere su ID_REGISTRO ni RUT. Para un RUT nuevo deje el ID vacío y complete Nombre, Tipo de contrato y RBD de origen/local. Seleccione esos tres campos en la pantalla para incorporar votantes nuevos.
+4. Si no se informa ID, un RUT existente sólo se actualiza cuando tiene una única asignación en esa jornada. Las coincidencias múltiples se omiten y se informan en el reporte. Un ID inexistente o que no corresponde al RUT/jornada nunca se utiliza para crear otro registro.
+5. Seleccione el archivo, confirme la operación y pulse **Aplicar cambios y descargar reporte**. Obtendrá un Excel con el resultado de cada fila. La pantalla muestra los conteos; si el navegador conserva la vista anterior después de la descarga, pulse **revise el estado de la consulta**.
+6. Revise los resultados y vuelva a publicar la consulta si se actualizó o agregó algún votante. Una carga sin cambios efectivos conserva su publicación.
+
+Sólo se modifican los campos seleccionados. Grupo vacío quita el grupo; otros valores seleccionados son obligatorios. Los RBD deben corresponder a una pareja de origen/local ya cargada en la jornada: de ella se obtienen el nombre del establecimiento, local, día y horario. La hoja **LOCALES VOTACION** de la plantilla de actualización es sólo una referencia y no se importa. Para cambiar locales compartidos se utiliza la importación completa existente.
+
+La actualización admite hasta 20.000 filas y 10 MB, sin fórmulas. Una estructura inválida bloquea la carga completa; los problemas de una fila se informan como omitidos sin alterar ese registro. Las identificaciones repetidas se omiten, y se impide duplicar otra asignación. Los demás votantes, locales y jornadas se conservan. La transacción comparte el bloqueo de jornada con importación y publicación, escribe en lotes y revierte el conjunto ante un fallo de base o bitácora. El reporte contiene únicamente los identificadores aportados por el administrador, se descarga de forma privada y no se conserva en archivos públicos, sesión ni logs. La sesión y la bitácora sólo contienen conteos y campos seleccionados.
+
+### Importación completa
+
 - Cualquier error bloqueante impide modificar los datos existentes. Se muestran hasta 100 observaciones con hoja y fila, además del total de errores.
 - Se validan obligatoriedad, longitud de texto, RBD numéricos, dígito verificador, fechas reales, horas y correspondencia entre hojas. Las fórmulas se rechazan sin calcularlas.
 - Se omiten filas idénticas de padrón. Varias filas para un mismo RUT se conservan cuando representan asignaciones diferentes; la consulta presenta todas sus asignaciones de la jornada.
