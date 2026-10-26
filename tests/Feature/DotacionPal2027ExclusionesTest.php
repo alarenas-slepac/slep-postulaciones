@@ -94,13 +94,14 @@ class DotacionPal2027ExclusionesTest extends IsolatedSecurityTestCase
             'plazas_por_asumir' => [['horas_contrato' => 5, 'nombre' => 'Plaza sintética']]]];
         $report = app(DotacionPal2027::class)->construir($this->ee, $datos, app(DotacionPal2027Export::class)->tablas());
         $excl = collect($report['excluidos'])->keyBy('motivo');
-        $this->assertCount(5, $excl);
+        $this->assertCount(3, $excl);
         $this->assertEquals(44, $excl['Proceso BIR 2027']['horas']);
         $this->assertEquals(4, $excl['Horas titulares justificadas en Sobredotación 2027']['horas']);
         $this->assertStringContainsString('Detalle sintético registrado.', $excl['Horas titulares justificadas en Sobredotación 2027']['detalle']);
         $this->assertSame('Asignación excedente', $excl['Asignación excede capacidad contractual']['base']);
         $this->assertEquals(2, $excl['Asignación excede capacidad contractual']['horas']);
-        $this->assertEquals(15, $excl->where('base', 'Cupo o plaza sin persona')->sum('horas'));
+        $this->assertEquals(0, $excl->where('base', 'Cupo o plaza sin persona')->sum('horas'));
+        $this->assertSame(1, $report['cupos_por_contratar']); $this->assertSame(1, $report['plazas_por_asumir']);
         $this->assertEquals(48, $excl->where('base', 'Contrato docente')->sum('horas'));
         foreach ($report['docentes'] as $fila) { $this->assertArrayNotHasKey('_pal_exclusiones', $fila); }
     }

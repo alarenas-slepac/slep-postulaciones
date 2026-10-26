@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.644',
+    'current_version' => '2026.10.25.645',
     'entries' => [
+        [
+            'version' => '2026.10.25.645',
+            'title' => 'PAL: cupos y directivos por asumir con identidad sintética y redondeo de aula',
+            'summary' => 'Incluye cupos por contratar y directivos por asumir, y representa los contratos de aula decimales con el redondeo solicitado.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Incorpora los docentes por contratar de 2027 con el identificador estable VACANTE-<id>, manteniendo su título, bloque, asignaciones y saldo a plazo fijo en Otros/R.',
+                'Incorpora los Docentes Directivos por asumir como Función Directiva/Plazo Fijo con VACANTE-ADP-<establecimiento>-<regla>. Usa copias de las coberturas automáticas y conserva separados los espacios de identidad.',
+                'Antes de convertir un aula incompatible a la tabla PAL, redondea el contrato: fracción 0,5 o superior al entero siguiente; fracción menor se trunca. Conserva el contrato original, el ajuste y el aula real en Observaciones, sin modificar las fórmulas N/O/J ni datos del SGA.',
+                'Identifica los cupos y cargos pendientes en la previa y en Observaciones. Resumen cuenta sus identidades sintéticas y horas; la hoja de exclusiones sólo conserva los problemas restantes y su base de referencia.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.644',
             'title' => 'PAL: contrato completo a plazo fijo, aula equivalente y detalle de exclusiones',

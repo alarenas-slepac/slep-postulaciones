@@ -87,7 +87,7 @@ class DotacionPal2027Export
             $exclusiones->agregar($reporte['excluidos'] ?? []);
             $last = max(94, count($reporte['docentes']) + 2);
             $doc = $this->xml($zip, $partes['Info Funcionario (DOCENTE)']);
-            $this->rellenar($doc, $reporte['docentes'], 3, 94, ['J','N','O']);
+            $this->rellenar($doc, $reporte['docentes'], 3, 94, ['J','N','O'], $styles);
             $this->validaciones($doc, $last);
             $zip->addFromString($partes['Info Funcionario (DOCENTE)'], $doc->saveXML());
             $ee = $this->xml($zip, $partes['Info Establecimiento']);
@@ -195,7 +195,9 @@ class DotacionPal2027Export
                     if (mb_strlen($clean) > 32767) { $clean = mb_substr($clean, 0, 32720).' [Detalle abreviado; revisar SGA]'; }
                     $text->appendChild($doc->createTextNode($clean));
                     $is->appendChild($text); $cell->appendChild($is);
-                    if ($column === 'S' || ($styles && in_array($column, ['A','C'], true))) {
+                    $esDocente = in_array('J', $calculadas, true);
+                    $identidadSintetica = $column === 'A' && str_starts_with((string) $value, 'VACANTE-');
+                    if ($column === 'S' || ($styles && ($esDocente ? $identidadSintetica : in_array($column, ['A','C'], true)))) {
                         $porLinea = $column === 'A' ? 13 : ($column === 'C' ? 25 : 50);
                         $height = min(409, max((float) $row->getAttribute('ht'), ceil(mb_strlen($clean) / $porLinea) * 14 + 6));
                         $row->setAttribute('ht', (string) $height); $row->setAttribute('customHeight', '1');
