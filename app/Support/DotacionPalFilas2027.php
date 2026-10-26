@@ -10,7 +10,7 @@ class DotacionPalFilas2027
         $grupos = [];
         foreach ($filas as $i => $fila) {
             $fila['_pal_orden'] = $i;
-            $rut = DotacionEstablecimientoCalculator::normalizeRut($fila['A'] ?? null);
+            $rut = DotacionPal2027::identidad($fila['A'] ?? null);
             $key = $rut !== '' && isset($fila['C']) && (string) $fila['C'] !== ''
                 ? json_encode([$rut, (string) $fila['C'], $fila['G'] ?? '', $fila['H'] ?? '']) : 'sin_identidad_'.$i;
             $grupos[$key][] = $fila;
@@ -112,6 +112,17 @@ class DotacionPalFilas2027
         $nativas = $this->calcular($fila, $tablas);
         if ($nativas === null || abs(array_sum($nativas) - $contrato) > 0.00001) {
             $aula = (float) ($fila['K'] ?? 0) + (float) ($fila['L'] ?? 0);
+            $original = $contrato;
+            $contrato = round($contrato, 0, PHP_ROUND_HALF_UP);
+            if (abs($original - $contrato) > 0.00001) {
+                $fila['S'] .= ' Redondeo PAL del contrato de aula: '.$original.' h SGA → '.$contrato.' h PAL (fracción >= 0,5 sube; fracción < 0,5 se trunca).'
+                    .' Ajuste de representación: '.round($contrato - $original, 4).' h. Aula real SGA: '.$aula.' h pedagógicas. No modifica el contrato SGA.';
+            }
+            if ($contrato === 0.0 && $original > 0 && $aula > 0) {
+                $fila['K'] = $fila['L'] = $fila['M'] = null;
+                $fila['S'] .= ' Tramo de aula representado como 0 h por el redondeo solicitado.';
+                return [$fila];
+            }
             // Se invierte el BUSCARV efectivo, igual que para Parvularia, pero
             // conservando la proporción 65/35 o 60/40 de este tramo.
             $bloques = $aula > 0 && in_array($fila['M'] ?? null, ['65/35', '60/40'], true)
@@ -126,14 +137,14 @@ class DotacionPalFilas2027
                     $parte['L'] = $media > 0 ? round($bloque['aula'] - (float) $parte['K'], 4) : null;
                     if ($i > 0) { $parte['P'] = $parte['Q'] = $parte['R'] = null; unset($parte['_pal_exclusiones']); }
                     $parte['S'] .= ' Conversión PAL de aula a '.$fila['M'].': '.$bloque['aula'].' h aula equivalentes = '.$bloque['contrato'].' h contrato.'
-                        .' Referencia SGA del tramo: '.$aula.' h pedagógicas reales (K: '.$basica.'; L: '.$media.') y '.$contrato.' h contrato.'
+                        .' Referencia SGA del tramo: '.$aula.' h pedagógicas reales (K: '.$basica.'; L: '.$media.') y '.$original.' h contrato.'
                         .' Parte '.($i + 1).' de '.count($bloques).'. Se conservan las fórmulas originales N/O/J; las horas aula equivalentes no son el aula real del SGA.';
                     $resultado[] = $parte;
                 }
                 return $resultado;
             }
             $fila['S'] .= ' INCOMPATIBLE: la fórmula original no representa '.$aula.' h pedagógicas / '.$contrato.' h de contrato SGA ('.$fila['M'].'). Estas horas no se cargan en las entradas numéricas; J/N/O no representan este tramo.';
-            $fila['_pal_exclusiones'][] = ['motivo' => 'Aula '.$fila['M'].' sin equivalencia exacta', 'horas' => $contrato,
+            $fila['_pal_exclusiones'][] = ['motivo' => 'Aula '.$fila['M'].' sin equivalencia exacta', 'horas' => $original,
                 'detalle' => $fila['S']];
             $fila['K'] = $fila['L'] = $fila['M'] = null;
         }

@@ -23,8 +23,9 @@ dotación. No habilita datos de matrícula para el rol directivo.
   Esta selección se aplica por establecimiento. No se supone que Git sincronice
   bases de datos ni que el ambiente local tenga lo ingresado en producción.
 - Se completan **Info Establecimiento** e **Info Funcionario (DOCENTE)**.
-  Asistentes y VTF conservan encabezados, pero quedan sin registros. No se presentan
-  vacantes, plazas por asumir o cupos sin RUT real como funcionarios.
+  Asistentes y VTF conservan encabezados, pero quedan sin registros. Los docentes
+  por contratar y directivos por asumir se incorporan con identidades sintéticas
+  y una indicación explícita de su condición pendiente.
 - Universo: los mismos establecimientos del listado de Dotación, con `sala_cuna`
   falso o nulo. Se procesan ordenados por RBD. Las salas cuna/VTF mantienen su
   exclusión anterior. Un establecimiento sin cursos 2027 aparece en
@@ -46,7 +47,7 @@ dotación. No habilita datos de matrícula para el rol directivo.
 | Establecimiento F | Horas semanales requeridas por el plan de cada curso independiente o por el plan consolidado del grupo combinado; no usa horas asignadas |
 | Establecimiento G | Fórmula original `E × F`, sin reemplazar su cálculo |
 | Establecimiento H | Horas de contrato necesarias para cubrir el plan del nivel; excluye PIE y funciones |
-| Docentes A–C | RUT de la nómina del proceso, establecimiento y RBD |
+| Docentes A–C | RUT de la nómina o identificador sintético del cupo/plaza, establecimiento y RBD |
 | Docentes D–G | Nivel según clases asignadas y reglas de Especial/EPJA, estamento/título, cargo declarado y función asignada |
 | Docentes H | Titular, Plazo Fijo u Otros, según las capacidades contractuales del proceso |
 | Docentes I | «si» sólo si existe la situación anual explícita `horas_catedra_art_69` |
@@ -54,7 +55,7 @@ dotación. No habilita datos de matrícula para el rol directivo.
 | Docentes K–L | Horas pedagógicas de aula financiadas por General, separadas por nivel, cuando la regla es representable |
 | Docentes M | 65/35 o 60/40 de la asignación; las educadoras elegibles de Parvularia representan el contrato especial como 65/35 según la excepción siguiente |
 | Docentes P–Q | Horas cronológicas asignadas y financiadas por PIE o SEP |
-| Docentes R | Funciones asignadas de General, horas excluidas por situaciones 2027 y reservas/saldos titulares elegibles sin justificación de Sobredotación, clasificados como Otros |
+| Docentes R | Funciones de General, situaciones 2027 y reservas/saldos titulares elegibles o a plazo fijo, clasificados como Otros |
 | Docentes S | Contrato de referencia, tramo distribuido, situación 2027 con contrato completo y horas consideradas/no necesarias, pendientes, detalle e incompatibilidades |
 
 Se consumen primero las horas titulares del docente y después las de plazo fijo.
@@ -65,6 +66,28 @@ reparto es sólo una representación para el informe y no actualiza asignaciones
 la calidad jurídica del padrón. El conteo de personas se obtiene de la nómina, no
 de la cantidad de filas. Las personas que trabajan en dos establecimientos se
 mantienen en cada RBD, conforme al formato original.
+
+### Docentes por contratar y directivos por asumir
+
+Se incluyen los cupos habilitados de 2027 en plan de estudio, Parvularia y PIE,
+reutilizando **VACANTE-\<id\>**, la identidad virtual estable del SGA. El título,
+cargo, bloque, horas y asignaciones provienen del cupo vigente. El saldo todavía
+sin asignar se incorpora en Otros/R como plazo fijo. El mismo cupo no se repite
+si aparece en ambas colecciones de la fuente.
+
+Los **Docentes Directivos por asumir** usan la identidad separada
+**VACANTE-ADP-\<establecimiento\>-\<regla\>** y sus horas se representan como
+Función Directiva / Plazo Fijo. Se usan copias de las coberturas automáticas para
+el informe; no se altera su estado ni su exclusión de las asignaciones a personas
+en el resto del SGA. No se mezclan sus identidades con RUT reales o cupos.
+
+Estos identificadores son sintéticos, no RUT personales. Observaciones conserva
+la referencia del cupo o cargo y su condición pendiente. Resumen cuenta estas
+identidades y sus horas además de las del padrón; la previa mantiene separado
+el número de personas identificadas y las cantidades de cupos y plazas. Descargar
+no crea personas, contratos ni asignaciones. Los cupos o plazas incorporados no
+vuelven a figurar como excluidos; sólo se detallan sus incompatibilidades restantes
+con una base distinta del contrato del padrón.
 
 ### Consolidación de filas docentes
 
@@ -100,12 +123,13 @@ Con mismo docente, establecimiento, función, calidad contractual y 65/35, se
 valida primero el conjunto: **12 h pedagógicas → 14 h de contrato**. Si las
 asignaciones corresponden a Básica y Media respectivamente, quedan K=4, L=8,
 N=9, O=5 y J=14. Observaciones conserva las cantidades de origen y explica la
-validación conjunta. Una hora pendiente de un contrato a plazo fijo de 15 h
-continúa fuera de Otros, conforme a la regla de saldos exclusivamente titulares.
+validación conjunta. La hora pendiente de un contrato a plazo fijo de 15 h se
+incorpora en Otros/R conforme a la regla actual de saldos a plazo fijo.
 
 Si el conjunto tampoco es representable, se intentan subconjuntos compatibles
-y se valida individualmente lo que queda. Sólo entonces se marcan las
-incompatibilidades de equivalencia y se vacían las entradas numéricas afectadas.
+y se valida individualmente lo que queda. Se aplica el redondeo y la conversión
+a aula equivalente descritos más adelante; las incompatibilidades que persistan
+se marcan y quedan sin entradas numéricas.
 Los problemas de nivel sin identificar, proporción no admitida, financiamiento
 o exceso contractual no se corrigen mediante una unión. La referencia interna
 del contrato de aula se retira del resultado antes de escribir el Excel.
@@ -252,11 +276,16 @@ fijo también se incorpora; las horas titulares justificadas quedan excluidas.
 Cada fila lectiva resultante, consolidada cuando corresponde, se contrasta con
 el mismo rango exacto de BUSCARV que usa el Excel (`A4:D47` en cada tabla). Si
 no existe una equivalencia, o no coincide con el contrato consolidado del SGA,
-se invierte esa misma tabla para representar exactamente el contrato con **horas
-aula equivalentes**, manteniendo la proporción original 65/35 o 60/40. Se usa el
-menor número de bloques exactos, sin redondear el contrato a otro valor. El aula
+se redondea primero el contrato de aula al entero: fracción **0,5 o superior sube**;
+fracción **menor de 0,5 se trunca**. Por ejemplo, 10,75 → 11 h y 24,25 → 24 h.
+Después se invierte esa misma tabla para representar el contrato redondeado con
+**horas aula equivalentes**, manteniendo la proporción original 65/35 o 60/40.
+Se usa el menor número de bloques exactos para ese entero. Un tramo inferior a
+0,5 h se representa como cero, conservando su referencia en Observaciones. El aula
 real del SGA, el desglose por nivel, el contrato de referencia y cada parte de
-la conversión se conservan en S. Las fórmulas originales N/O/J no cambian.
+la conversión, el contrato SGA original y la diferencia por redondeo se conservan
+en S. Las fórmulas originales N/O/J no cambian. Este ajuste puede cambiar el total
+representado por calidad respecto del contrato SGA y sólo afecta al informe.
 Las equivalencias son una adaptación del informe y no representan el aula real.
 Las filas 60/40 siguen separadas; las horas PIE, SEP u Otras de una fila dividida
 se informan una sola vez. Si ni siquiera se puede invertir la tabla exactamente,
@@ -273,9 +302,10 @@ incompatibilidades que permanezcan. La no renovación tiene prioridad si una
 persona también está marcada sin continuidad, evitando duplicar su contrato.
 El padrón propio de 2027 prevalece sobre decisiones de continuidad de 2026.
 
-La base **Contrato docente** puede conciliarse con el padrón. Los **Cupos o
-plazas sin persona** y las **Asignaciones excedentes** se identifican con otra
-base y no se descuentan nuevamente de las horas del padrón nominal. No se
+La base **Contrato docente** corresponde al padrón. Los motivos restantes de
+**Cupo por contratar**, **Plaza por asumir** y **Asignación excedente** tienen
+otra base y no se descuentan nuevamente del padrón nominal. El redondeo de aula
+se concilia aparte de las exclusiones usando el ajuste informado en S. No se
 reincorporan las personas retiradas a la nómina ni se modifican situaciones,
 asignaciones o justificaciones. El consolidado escribe por establecimiento,
 sin acumular todos los excluidos en memoria; supera 100.000 filas sólo mediante

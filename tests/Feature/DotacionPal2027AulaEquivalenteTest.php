@@ -61,15 +61,16 @@ class DotacionPal2027AulaEquivalenteTest extends IsolatedSecurityTestCase
         $this->assertSame([4, null], array_column($filas, 'R')); $this->assertSame([34.0, 1.0], array_column($filas, 'K'));
     }
 
-    public function test_no_descarta_centesimas_del_contrato_para_aceptar_una_coincidencia_aproximada(): void
+    public function test_trunca_centesimas_con_regla_explicita_y_conserva_contrato_original_en_observaciones(): void
     {
         $filas = (new DotacionPalFilas2027)->consolidar([$this->fila(['K' => 1, 'M' => '65/35', '_pal_contrato_aula' => 1.01])],
             app(DotacionPal2027Export::class)->tablas());
-        $this->assertNull($filas[0]['K']);
-        $this->assertEquals(1.01, $filas[0]['_pal_exclusiones'][0]['horas']);
+        $this->assertEquals(1, $filas[0]['K']);
+        $this->assertStringContainsString('1.01 h SGA → 1 h PAL', $filas[0]['S']);
+        $this->assertArrayNotHasKey('_pal_exclusiones', $filas[0]);
     }
 
-    public function test_cuartos_de_hora_no_se_redondean_ni_cruzan_calidades_y_se_detallan_como_excluidos(): void
+    public function test_cuartos_de_hora_se_redondean_separados_por_calidad_y_se_incorporan(): void
     {
         (require database_path('migrations/2026_01_23_000001_create_establecimientos_table.php'))->up();
         $ee = Establecimiento::create(['cod_estab' => 99001, 'rbd' => 99001, 'nombre_establecimiento' => 'Escuela sintética']);
@@ -81,9 +82,14 @@ class DotacionPal2027AulaEquivalenteTest extends IsolatedSecurityTestCase
                     'subvencion' => 'General', 'horas_contrato' => 1.25],
             ]];
         $report = app(DotacionPal2027::class)->construir($ee, ['docentes' => [$doc]], app(DotacionPal2027Export::class)->tablas());
-        $this->assertSame(2, $report['incompatibles']); $this->assertCount(2, $report['excluidos']);
-        $this->assertSame([10.75, 24.25], array_column($report['excluidos'], 'horas'));
-        $this->assertSame(['Titular', 'Plazo Fijo'], array_column($report['excluidos'], 'calidad'));
+        $this->assertSame(0, $report['incompatibles']); $this->assertCount(0, $report['excluidos']);
+        $tabla = app(DotacionPal2027Export::class)->tablas()['65/35']; $sumas = [];
+        foreach ($report['docentes'] as $fila) {
+            if ($fila['M'] === null) { continue; }
+            $sumas[$fila['H']] = ($sumas[$fila['H']] ?? 0) + $tabla[number_format((float) $fila['K'] + (float) $fila['L'], 4, '.', '')]['contrato'];
+            $this->assertStringContainsString($fila['H'] === 'Titular' ? '10.75 h SGA → 11 h PAL' : '24.25 h SGA → 24 h PAL', $fila['S']);
+        }
+        $this->assertEquals(['Titular' => 11, 'Plazo Fijo' => 24], $sumas);
         $this->assertEquals(9, array_sum(array_column($report['docentes'], 'R')));
     }
 

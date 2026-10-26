@@ -46,7 +46,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             if (! $eeHandle || ! $docHandle) { throw new \RuntimeException('No se pudieron preparar las hojas PAL.'); }
             foreach ($ee['encabezados'] as $row) { $this->escribir($eeHandle, $ee['doc']->saveXML($row)); }
             foreach ($docs['encabezados'] as $row) { $this->escribir($docHandle, $docs['doc']->saveXML($row)); }
-            $eeNumero = 4; $docNumero = 3; $cantidad = 0; $wrapped = []; $sinEstilos = [];
+            $eeNumero = 4; $docNumero = 3; $cantidad = 0; $wrapped = []; $wrappedDocs = [];
             foreach ($reportes as $reporte) {
                 $cantidad++;
                 $exclusiones->agregar($reporte['excluidos'] ?? []);
@@ -54,7 +54,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
                     $this->fila($eeHandle, $ee, $eeNumero++, $entry, ['G'], $styles, $wrapped);
                 }
                 foreach ($reporte['docentes'] as $entry) {
-                    $this->fila($docHandle, $docs, $docNumero++, $entry, ['J','N','O'], null, $sinEstilos);
+                    $this->fila($docHandle, $docs, $docNumero++, $entry, ['J','N','O'], $styles, $wrappedDocs);
                 }
                 if ($eeNumero > 10004 || $docNumero > 100003 || $cantidad > 10000) {
                     throw ValidationException::withMessages(['pal' => 'El consolidado supera el límite de 100.000 filas docentes, 10.000 niveles o 10.000 establecimientos. No se generó un archivo incompleto.']);
@@ -63,7 +63,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             if ($cantidad === 0) { throw ValidationException::withMessages(['pal' => 'No hay establecimientos participantes en Dotación para generar el PAL.']); }
             $eeDatos = $eeNumero - 4; $docDatos = $docNumero - 3;
             while ($eeNumero <= 34) { $this->fila($eeHandle, $ee, $eeNumero++, [], ['G'], $styles, $wrapped); }
-            while ($docNumero <= 94) { $this->fila($docHandle, $docs, $docNumero++, [], ['J','N','O'], null, $sinEstilos); }
+            while ($docNumero <= 94) { $this->fila($docHandle, $docs, $docNumero++, [], ['J','N','O'], $styles, $wrappedDocs); }
             fclose($eeHandle); $eeHandle = null; fclose($docHandle); $docHandle = null;
             $eeLast = $eeNumero - 1; $docLast = $docNumero - 1;
             $eeSheet = $temporales[] = $this->temporal(); $docSheet = $temporales[] = $this->temporal();

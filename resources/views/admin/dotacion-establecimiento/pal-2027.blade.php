@@ -32,7 +32,7 @@
     @unless ($esConsolidado)
     <div class="row g-3 mb-4">
         @foreach ([['Docentes identificados', $reporte['personas']], ['Filas contractuales', count($reporte['docentes'])], ['Filas incompatibles', $reporte['incompatibles']], ['Horas de contrato necesarias para el plan', number_format($reporte['contrato_plan_sga'], 2, ',', '.')]] as [$label, $value])
-            <div class="col-12 col-sm-6 col-xl-3"><div class="card rounded-4 shadow-sm h-100"><div class="card-body"><div class="small pal-muted">{{ $label }}</div><div class="h3 fw-bold mb-0 mt-2">{{ $value }}</div></div></div></div>
+            <div class="col-12 col-sm-6 col-xl-3"><div class="card rounded-4 shadow-sm h-100"><div class="card-body"><div class="small pal-muted">{{ $label }}</div><div class="h3 fw-bold mb-0 mt-2">{{ $value }}</div>@if($label === 'Docentes identificados')<p class="small pal-muted mb-0 mt-2">Además: {{ $reporte['cupos_por_contratar'] ?? 0 }} por contratar y {{ $reporte['plazas_por_asumir'] ?? 0 }} directivos por asumir, con RUT sintético.</p>@endif</div></div></div>
         @endforeach
     </div>
     @endunless
@@ -49,12 +49,12 @@
                 <li>Columna H de establecimientos: contrato necesario para el plan de estudios, sin agregar PIE ni funciones.</li>
                 <li>Separa titular y plazo fijo. Las reservas conservan su calidad contractual y el resto se distribuye primero en titular y luego contrata; se identifica cada función y proporción.</li>
                 <li>Para educadoras con título de Párvulos y aula asignada en Parvularia, convierte el contrato especial a horas aula equivalentes 65/35. Conserva el contrato y deja las horas aula reales en Observaciones.</li>
-                <li>El aula 65/35 y 60/40 sin equivalencia directa se representa con horas aula equivalentes de su misma tabla. Conserva el contrato y las fórmulas N/O/J; Observaciones distingue el aula real SGA de la equivalencia PAL. Las filas 60/40 permanecen separadas.</li>
+                <li>El aula 65/35 y 60/40 sin equivalencia directa se representa con horas aula equivalentes de su misma tabla. Si el contrato de aula tiene decimales, la fracción 0,5 o superior sube al entero siguiente; una fracción menor se trunca. Observaciones conserva el contrato SGA, el ajuste y el aula real. Las fórmulas N/O/J se mantienen y las filas 60/40 permanecen separadas.</li>
                 <li>Los saldos titulares y a plazo fijo sin asignar se clasifican en FUNCIÓN «Otros (Talleristas / Apoyo / etc.)», columna R. Del saldo titular se descuentan las horas justificadas en Sobredotación 2027.</li>
                 <li>Las reservas de General «Horas para otras funciones», titulares y a plazo fijo, se incorporan en FUNCIÓN «Otros», columna R. La justificación titular en Sobredotación se descuenta una sola vez entre saldo y reservas titulares.</li>
                 <li>Las horas excluidas por situaciones 2027 se incorporan en FUNCIÓN «Otros», respetando titular y contrata. Observaciones detalla el motivo, el contrato y las horas incorporadas o excluidas. Los docentes con situación BIR 2027 se excluyen del PAL.</li>
-                <li>Asistentes y VTF quedan vacías. Las plazas sin persona identificada no se presentan como funcionarios.</li>
-                <li>«Excluidos PAL 2027» detalla personas y horas excluidas, motivo, calidad contractual y año base. Incluye quienes no continúan en 2027 según la situación del padrón anterior, no renovaciones, BIR y Sobredotación justificada. Los cupos sin persona y los excesos de asignación se identifican con una base de referencia distinta.</li>
+                <li>Incluye docentes por contratar con RUT sintético VACANTE-&lt;id&gt; y Docentes Directivos por asumir con VACANTE-ADP-&lt;establecimiento&gt;-&lt;regla&gt;. Observaciones identifica su condición pendiente. «Resumen» cuenta estas identidades además de las personas del padrón. Asistentes y VTF quedan vacías.</li>
+                <li>«Excluidos PAL 2027» detalla personas y horas excluidas, motivo, calidad contractual y año base. Incluye quienes no continúan en 2027 según la situación del padrón anterior, no renovaciones, BIR y Sobredotación justificada. Sólo las incompatibilidades restantes de cupos o plazas se mantienen allí, con una base distinta del padrón.</li>
                 <li>La hoja «Resumen» conserva sus fórmulas y necesita Excel compatible con FILTER, UNIQUE, VSTACK y LET. Revise el recálculo al abrir.</li>
             </ul>
             <p class="small pal-muted mt-3 mb-0">@unless($esConsolidado) Año del padrón utilizado por el SGA: {{ $reporte['anio_padron'] ?: 'Sin datos' }}. @endunless Los cursos y asignaciones corresponden exclusivamente a 2027. Asistentes y VTF conservan el alcance anterior: las salas cuna no participan en este proceso. Descargar no modifica registros.</p>

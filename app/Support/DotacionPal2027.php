@@ -15,6 +15,15 @@ class DotacionPal2027
         return in_array($role, self::ROLES, true);
     }
 
+    /** Mantiene el espacio sintético separado de los RUT reales y los cupos. */
+    public static function identidad(?string $rut): string
+    {
+        if (preg_match('/^VACANTE-ADP-(\d+)-(\d+)$/i', trim((string) $rut), $m)) {
+            return 'VACANTE_ADP_'.$m[1].'_'.$m[2];
+        }
+        return DotacionEstablecimientoCalculator::normalizeRut($rut);
+    }
+
     public function datos(Establecimiento $ee): array
     {
         return DotacionLecturaCache::ejecutar(fn () => DotacionEstablecimientoCalculator::build($ee, 2027, false, false));
@@ -27,7 +36,9 @@ class DotacionPal2027
         $filasCursos = $cursosPal['filas'];
         $filasDocentes = [];
         // La fuente ya consulta las situaciones exclusivamente del año 2027.
-        $docentes = collect($data['docentes'] ?? []);
+        $docentes = collect($data['docentes'] ?? [])->reject(fn ($d) => isset($d['cupo_contrata_id']) || ! empty($d['es_plaza_por_asumir']));
+        $cupos = $this->cuposPorContratar($data);
+        $plazas = $this->plazasPorAsumir($ee, $data);
         $catalogo = new DotacionPalExclusiones2027;
         $excluidos = $catalogo->proyeccion($ee);
         foreach ($docentes->where('exclusion_docente.motivo', 'proceso_bir') as $docente) {
@@ -40,46 +51,95 @@ class DotacionPal2027
         $justificadas = $this->titularesJustificados($ee);
         $detalleJustificaciones = $justificadas === [] ? [] : $catalogo->justificaciones($ee);
         if ($cantidadBir > 0) { $advertencias[] = 'Se excluyen del PAL '.$cantidadBir.' docente(s) con situación Proceso BIR 2027.'; }
-        foreach ($docentes as $docente) {
-            $docente['pal_titulares_justificadas'] = $justificadas[DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? null)] ?? 0.0;
-            $docente['pal_detalle_justificaciones'] = $detalleJustificaciones[DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? null)] ?? '';
+        $nomina = $docentes->concat($cupos)->concat($plazas);
+        foreach ($nomina as $docente) {
+            $sintetico = isset($docente['cupo_contrata_id']) || ! empty($docente['es_plaza_por_asumir']);
+            $docente['pal_titulares_justificadas'] = $sintetico ? 0.0 : ($justificadas[self::identidad($docente['rut'] ?? null)] ?? 0.0);
+            $docente['pal_detalle_justificaciones'] = $sintetico ? '' : ($detalleJustificaciones[self::identidad($docente['rut'] ?? null)] ?? '');
             $filas = $this->docente($ee, $docente, $tablas);
             $this->registrarExclusiones($ee, $filas, [$docente], $excluidos, $catalogo);
             array_push($filasDocentes, ...$filas);
         }
         $filasDocentes = (new DotacionPalFilas2027)->consolidar($filasDocentes, $tablas);
-        $this->registrarExclusiones($ee, $filasDocentes, $docentes->all(), $excluidos, $catalogo);
+        $this->registrarExclusiones($ee, $filasDocentes, $nomina->all(), $excluidos, $catalogo);
         $incompatibles = count(array_filter($filasDocentes, fn ($row) => str_contains($row['S'], 'INCOMPATIBLE:')));
         if ($incompatibles) { $advertencias[] = $incompatibles.' fila(s) docentes incompatibles: sus horas se describen en Observaciones y no se fuerzan a otra regla.'; }
         if ($docentes->isEmpty()) { $advertencias[] = 'No hay docentes del padrón incluidos en el PAL 2027.'; }
-        $virtuales = collect(data_get($data, 'asignacion.docentes', []))->filter(fn ($d) => isset($d['cupo_contrata_id']))->count();
-        if ($virtuales || count(data_get($data, 'asignacion.plazas_por_asumir', []))) {
-            $advertencias[] = 'Las plazas por asumir y cupos sin persona identificada no se exportan como funcionarios.';
+        if ($cupos->isNotEmpty()) {
+            $advertencias[] = 'Se incluyen '.$cupos->count().' docente(s) por contratar con RUT sintético VACANTE-<id>. Resumen cuenta estos cupos además de las personas del padrón.';
         }
-        foreach (collect(data_get($data, 'asignacion.docentes', []))->filter(fn ($d) => isset($d['cupo_contrata_id']))
-            ->concat(data_get($data, 'asignacion.plazas_por_asumir', [])) as $cupo) {
-            $cupo['rut'] = '';
-            $horas = (float) ($cupo['horas_contrato'] ?? 0);
-            $excluidos[] = $catalogo->fila($ee, $cupo, isset($cupo['cupo_contrata_id']) ? 'Cupo por contratar sin persona' : 'Plaza por asumir sin persona',
-                $horas, 'Sin persona identificada para informar en la nómina PAL. '.($cupo['nombre'] ?? ''),
-                'Plazo Fijo', 'Cupo o plaza sin persona', 2027);
+        if ($plazas->isNotEmpty()) {
+            $advertencias[] = 'Se incluyen '.$plazas->count().' directivo(s) por asumir con RUT sintético VACANTE-ADP-<establecimiento>-<regla>. Resumen suma estas identidades a las personas del padrón.';
         }
         return ['cursos' => $filasCursos, 'docentes' => $filasDocentes, 'advertencias' => array_values(array_unique($advertencias)),
             'excluidos' => $excluidos,
             'personas' => $docentes->count(), 'incompatibles' => $incompatibles,
+            'cupos_por_contratar' => $cupos->count(), 'horas_cupos_por_contratar' => (float) $cupos->sum('horas_contrato'),
+            'plazas_por_asumir' => $plazas->count(), 'horas_plazas_por_asumir' => (float) $plazas->sum('horas_contrato'),
             'anio_padron' => data_get($data, 'resumen.anio_padron'),
             'horas_plan_sga' => (float) data_get($data, 'cursos.resumen_cursos_planes.totales.horas', 0),
             'contrato_plan_sga' => (float) data_get($data, 'cursos.resumen_cursos_planes.totales.horas_contrato_equivalente', 0)];
     }
 
+    /** Copias del cargo automático para el PAL; nunca modifica su cobertura en el SGA. */
+    private function plazasPorAsumir(Establecimiento $ee, array $data): \Illuminate\Support\Collection
+    {
+        return collect(data_get($data, 'asignacion.plazas_por_asumir', []))
+            ->filter(fn ($d) => (int) ($d['anio'] ?? 2027) === 2027 && ($d['estamento_cobertura'] ?? 'docente') === 'docente')
+            ->map(function ($plaza) use ($ee): array {
+                $asignaciones = collect($plaza['asignaciones'] ?? []);
+                $regla = (int) data_get($asignaciones->first(), 'dotacion_funcion_regla_id', 0);
+                $rut = 'VACANTE-ADP-'.$ee->id.'-'.$regla;
+                $horas = max(0.0, (float) ($plaza['horas_contrato'] ?? 0));
+                if ($asignaciones->isEmpty()) {
+                    $asignaciones->push(['id' => 0, 'tipo_asignacion' => 'funcion_directiva', 'subvencion' => 'General',
+                        'horas_contrato' => $horas, 'estado' => 'activa', 'asignatura_nombre' => 'Docente Directivo por asumir']);
+                }
+                $copias = $asignaciones->map(function ($asignacion) use ($rut) {
+                    $cambios = ['docente_rut' => $rut, 'docente_rut_normalizado' => self::identidad($rut), 'asignacion_automatica' => false];
+                    if ($asignacion instanceof \Illuminate\Database\Eloquent\Model) { return (clone $asignacion)->forceFill($cambios); }
+                    return array_replace((array) $asignacion, $cambios);
+                });
+                return array_replace($plaza, ['rut' => $rut, 'rut_normalizado' => self::identidad($rut), 'anio' => 2027,
+                    'es_plaza_por_asumir' => true, 'nombre' => $plaza['nombre'] ?? 'Docente Directivo por asumir',
+                    'funcion' => 'Docente Directivo por asumir', 'horas_contrato_base' => $horas, 'horas_contrato' => $horas,
+                    'horas_planta' => 0.0, 'horas_contrata' => $horas, 'horas_excluidas' => 0.0, 'exclusion_docente' => null,
+                    'asignaciones' => $copias]);
+            })->unique('rut')->sortBy('rut')->values();
+    }
+
+    /** Reutiliza la identidad virtual del SGA sólo dentro del informe. */
+    private function cuposPorContratar(array $data): \Illuminate\Support\Collection
+    {
+        return collect(data_get($data, 'asignacion.docentes', []))->concat($data['docentes'] ?? [])
+            ->filter(fn ($d) => is_array($d) && (int) ($d['cupo_contrata_id'] ?? 0) > 0
+                && (int) ($d['anio'] ?? 2027) === 2027 && ($d['estamento_cobertura'] ?? 'docente') === 'docente')
+            ->unique('cupo_contrata_id')->sortBy('cupo_contrata_id')->values()->map(function ($cupo): array {
+                $id = (int) $cupo['cupo_contrata_id'];
+                $rut = \App\Services\Dotacion\ContratacionHabilitacionService::rutVirtual($id);
+                $horas = max(0.0, (float) ($cupo['horas_contrato'] ?? 0));
+                return array_replace($cupo, ['rut' => $rut, 'rut_normalizado' => DotacionEstablecimientoCalculator::normalizeRut($rut),
+                    'nombre' => $cupo['nombre'] ?? 'Docente por contratar #'.$id,
+                    'funcion' => $cupo['funcion'] ?? 'Docente por contratar',
+                    'horas_contrato_base' => $horas, 'horas_contrato' => $horas, 'horas_planta' => 0.0, 'horas_contrata' => $horas,
+                    'horas_excluidas' => 0.0, 'exclusion_docente' => null, 'anio' => 2027,
+                    'niveles_declarados' => $cupo['niveles_declarados'] ?? (($cupo['cupo_bloque'] ?? '') === 'parvularia' ? ['Parvularia'] : [])]);
+            });
+    }
+
     private function registrarExclusiones(Establecimiento $ee, array &$filas, array $docentes, array &$excluidos, DotacionPalExclusiones2027 $catalogo): void
     {
-        $nomina = collect($docentes)->keyBy(fn ($d) => DotacionEstablecimientoCalculator::normalizeRut($d['rut'] ?? null));
+        $nomina = collect($docentes)->keyBy(fn ($d) => self::identidad($d['rut'] ?? null));
         foreach ($filas as &$fila) {
             foreach ($fila['_pal_exclusiones'] ?? [] as $exclusion) {
-                $docente = $nomina->get(DotacionEstablecimientoCalculator::normalizeRut($fila['A'] ?? null), []);
+                $docente = $nomina->get(self::identidad($fila['A'] ?? null), []);
+                $base = $exclusion['base'] ?? 'Contrato docente';
+                if ($base === 'Contrato docente') {
+                    $base = isset($docente['cupo_contrata_id']) ? 'Cupo por contratar'
+                        : (! empty($docente['es_plaza_por_asumir']) ? 'Plaza por asumir' : $base);
+                }
                 $excluidos[] = $catalogo->fila($ee, $docente, $exclusion['motivo'], $exclusion['horas'], $exclusion['detalle'],
-                    $exclusion['calidad'] ?? $fila['H'], $exclusion['base'] ?? 'Contrato docente');
+                    $exclusion['calidad'] ?? $fila['H'], $base);
             }
             unset($fila['_pal_exclusiones']);
         }
@@ -360,6 +420,13 @@ class DotacionPal2027
             'F' => (string) ($docente['funcion'] ?? ''), 'G' => $grupo['funcion'] ?? '', 'H' => $capacidad['calidad'],
             'I' => data_get($docente, 'exclusion_docente.motivo') === 'horas_catedra_art_69' ? 'si' : null]);
         $notas = ['Borrador PAL 2027. Contrato '.$capacidad['calidad'].': '.$capacidad['horas'].' h.'];
+        if (isset($docente['cupo_contrata_id'])) {
+            $notas[] = 'Docente por contratar: '.$docente['nombre'].'. RUT sintético '.$docente['rut'].'; cupo #'.$docente['cupo_contrata_id']
+                .'. Bloque SGA: '.($docente['cupo_bloque'] ?? 'sin identificar').'. Pendiente de contratación; no corresponde a una persona del padrón.';
+        }
+        if (! empty($docente['es_plaza_por_asumir'])) {
+            $notas[] = 'Docente Directivo por asumir. RUT sintético '.$docente['rut'].'. Cargo pendiente de asumir; no corresponde a una persona del padrón.';
+        }
         $situacion = $docente['exclusion_docente'] ?? null;
         if (! empty($situacion['motivo'])) {
             $consideradas = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
