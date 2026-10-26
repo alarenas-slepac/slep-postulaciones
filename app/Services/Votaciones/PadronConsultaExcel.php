@@ -149,7 +149,7 @@ class PadronConsultaExcel
         }
     }
 
-    private function filas(Worksheet $sheet, array $expected): array
+    protected function filas(Worksheet $sheet, array $expected): array
     {
         $columns = [];
         $lastColumn = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
@@ -186,12 +186,12 @@ class PadronConsultaExcel
         return $rows;
     }
 
-    private function clave(string $value): string
+    protected function clave(string $value): string
     {
         return trim(preg_replace('/[^A-Z0-9]+/', '_', strtoupper(Str::ascii(trim($value)))), '_');
     }
 
-    private function texto(mixed $value, string $column, int $max = 255): string
+    protected function texto(mixed $value, string $column, int $max = 255): string
     {
         $text = trim((string) $value);
         if ($text === '' || mb_strlen($text) > $max) {
@@ -201,7 +201,7 @@ class PadronConsultaExcel
         return $text;
     }
 
-    private function rbd(mixed $value, string $column): int
+    protected function rbd(mixed $value, string $column): int
     {
         if (! preg_match('/^[0-9]{1,7}$/', trim((string) $value))) {
             throw new InvalidArgumentException("{$column} debe ser un identificador numérico de hasta 7 dígitos.");
@@ -239,7 +239,7 @@ class PadronConsultaExcel
         throw new InvalidArgumentException('HORARIO debe indicar una hora de inicio válida, por ejemplo 09:00.');
     }
 
-    private function validarContenedor(string $path): void
+    protected function validarContenedor(string $path): void
     {
         $zip = new ZipArchive;
         if (! is_file($path) || filesize($path) > 10 * 1024 * 1024 || $zip->open($path) !== true) {
