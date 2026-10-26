@@ -57,38 +57,80 @@ class DotacionPal2027
         $base = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
         $capacidades = $this->capacidadesContrato($base, $docente);
         $grupos = $this->grupos($docente);
+        // Una reserva con origen explícito conserva su calidad aun si fue
+        // creada antes o después de las asignaciones de aula.
+        foreach ($capacidades as &$capacidad) {
+            $capacidad['reservadas'] = min($capacidad['horas'], (float) collect($grupos)
+                ->where('reserva_origen', $capacidad['calidad'])->sum('contrato'));
+        }
+        unset($capacidad);
         $asignadas = round((float) collect($grupos)->sum('contrato'), 2);
         $pendientes = max(0, round($base - $asignadas, 2));
         $filas = [];
-        $indice = 0;
         foreach ($grupos as $grupo) {
+            $indices = array_keys(array_filter($capacidades, fn ($c) =>
+                $grupo['reserva_origen'] === null || $c['calidad'] === $grupo['reserva_origen']));
+            $indice = 0;
             $restante = $grupo['contrato'];
             while ($restante > 0.001) {
-                while ($indice < count($capacidades) && $capacidades[$indice]['horas'] - $capacidades[$indice]['usadas'] < 0.001) { $indice++; }
-                $exceso = $indice >= count($capacidades);
-                $parte = $exceso ? $restante : min($restante, $capacidades[$indice]['horas'] - $capacidades[$indice]['usadas']);
-                $capacidad = $exceso ? ['calidad' => 'Otros', 'horas' => 0] : $capacidades[$indice];
+                while ($indice < count($indices) && $this->disponible($capacidades[$indices[$indice]], $grupo) < 0.001) { $indice++; }
+                $exceso = $indice >= count($indices);
+                $capacidad = $exceso ? ['calidad' => 'Otros', 'horas' => 0] : $capacidades[$indices[$indice]];
+                $parte = $exceso ? $restante : min($restante, $this->disponible($capacidad, $grupo));
                 $convertidas = ! $exceso && ($grupo['convertir_parvularia'] ?? false)
                     ? $this->filasParvularia($ee, $docente, $grupo, round($parte, 2), $capacidad, $pendientes, $tablas)
                     : null;
                 if ($convertidas !== null) { array_push($filas, ...$convertidas); }
                 else { $filas[] = $this->fila($ee, $docente, $grupo, round($parte, 2), $capacidad, $pendientes, $tablas, $exceso); }
-                if (! $exceso) { $capacidades[$indice]['usadas'] += $parte; }
+                if (! $exceso) {
+                    $capacidades[$indices[$indice]]['usadas'] += $parte;
+                    if ($grupo['reserva_origen'] !== null) {
+                        $capacidades[$indices[$indice]]['reservadas'] = max(0.0, $capacidad['reservadas'] - $parte);
+                    }
+                }
                 $restante = round($restante - $parte, 4);
             }
         }
         $titular = collect($capacidades)->firstWhere('calidad', 'Titular');
         $docente['pal_sobredotacion_excluida'] = min((float) $docente['pal_titulares_justificadas'],
             max(0.0, round(($titular['horas'] ?? 0) - ($titular['usadas'] ?? 0), 2)));
+        [$filas, $reservasExcluidas] = $this->incorporarReservas($filas,
+            (float) $docente['pal_titulares_justificadas'] - $docente['pal_sobredotacion_excluida']);
         array_push($filas, ...$this->filasOtrasHoras($ee, $docente, $capacidades, $pendientes, $tablas));
         if ($filas === []) { $filas[] = $this->fila($ee, $docente, null, 0, $capacidades[0], $pendientes, $tablas); }
-        if ($docente['pal_sobredotacion_excluida'] > 0) {
+        $justificadasExcluidas = round($docente['pal_sobredotacion_excluida'] + $reservasExcluidas, 2);
+        if ($justificadasExcluidas > 0) {
             foreach ($filas as &$fila) {
-                $fila['S'] .= ' Sobredotación 2027: '.$docente['pal_sobredotacion_excluida'].' h titulares justificadas excluidas de la incorporación del saldo en FUNCIÓN '.self::FUNCION_OTROS.'.';
+                $fila['S'] .= ' Sobredotación 2027: '.$justificadasExcluidas.' h titulares justificadas excluidas de la incorporación del saldo y las reservas en FUNCIÓN '.self::FUNCION_OTROS.'.';
             }
             unset($fila);
         }
         return $filas;
+    }
+
+    private function disponible(array $capacidad, array $grupo): float
+    {
+        return max(0.0, round($capacidad['horas'] - $capacidad['usadas']
+            - ($grupo['reserva_origen'] === null ? $capacidad['reservadas'] : 0), 4));
+    }
+
+    /** La misma justificación se descuenta una vez entre saldo y reservas. */
+    private function incorporarReservas(array $filas, float $justificadas): array
+    {
+        $excluidas = 0.0;
+        foreach ($filas as &$fila) {
+            if (! array_key_exists('_pal_reserva_titular', $fila)) { continue; }
+            $reserva = (float) $fila['_pal_reserva_titular'];
+            $descuento = min($reserva, max(0.0, round($justificadas - $excluidas, 2)));
+            $incorporadas = round($reserva - $descuento, 2);
+            if ($incorporadas > 0) { $fila['R'] = $incorporadas; }
+            $fila['S'] .= ' Clasificación para el informe PAL: '.$incorporadas.' h de reserva titular en FUNCIÓN '.self::FUNCION_OTROS.' y columna R.';
+            if ($descuento > 0) { $fila['S'] .= ' De esta reserva se excluyen '.$descuento.' h titulares justificadas en Sobredotación 2027.'; }
+            $excluidas = round($excluidas + $descuento, 2);
+            unset($fila['_pal_reserva_titular']);
+        }
+        unset($fila);
+        return [$filas, $excluidas];
     }
 
     /** Una lectura acotada al establecimiento/año, nunca una consulta por docente. */
@@ -162,10 +204,16 @@ class DotacionPal2027
             $tipo = (string) data_get($a, 'tipo_asignacion');
             $fondos = trim((string) data_get($a, 'subvencion', ''));
             $plan = in_array($tipo, ['plan_estudio', 'acompanamiento_parvularia'], true);
+            $reserva = $tipo === 'reserva_no_normativa';
+            $reservaOrigen = $reserva ? match (data_get($a, 'subtipo_asignacion')) {
+                'titular' => 'Titular', 'contrata' => 'Plazo Fijo', default => null,
+            } : null;
             $proporcion = (string) data_get($a, 'proporcion_aplicada', '');
             $columna = match (true) {
+                $reserva && strcasecmp($fondos, 'General') === 0 => 'reserva',
+                $reserva => 'incompatible',
                 strcasecmp($fondos, 'PIE') === 0 => 'P', strcasecmp($fondos, 'SEP') === 0 => 'Q',
-                strcasecmp($fondos, 'General') === 0 && ! $plan && $tipo !== 'reserva_no_normativa' => 'R',
+                strcasecmp($fondos, 'General') === 0 && ! $plan => 'R',
                 strcasecmp($fondos, 'General') === 0 && $plan => 'aula', default => 'incompatible',
             };
             $nivel = $this->nivel($a, $docente);
@@ -176,10 +224,11 @@ class DotacionPal2027
             };
             $convertir = $esParvulos && $columna === 'aula' && $nivel === 'Educación Parvularia'
                 && DotacionProfesionDocenteResolver::esAsignacionParvularia(['proporcion_aplicada' => $proporcion]);
-            $key = implode('|', [$columna, $funcion, $columna === 'aula' ? ($convertir ? 'PAL_PARVULARIA_65_35' : $proporcion) : '', $nivel]);
+            $key = implode('|', [$columna, $funcion, $columna === 'aula' ? ($convertir ? 'PAL_PARVULARIA_65_35' : $proporcion) : '', $nivel,
+                $reserva ? 'reserva:'.($reservaOrigen ?? 'sin_origen') : '']);
             $grupos[$key] ??= ['columna' => $columna, 'funcion' => $funcion, 'nivel' => $nivel,
                 'proporcion' => $proporcion, 'contrato' => 0.0, 'pedagogicas' => 0.0, 'detalle' => [],
-                'convertir_parvularia' => $convertir, 'reglas_originales' => []];
+                'convertir_parvularia' => $convertir, 'reglas_originales' => [], 'reserva_origen' => $reservaOrigen];
             $grupos[$key]['reglas_originales'][] = $proporcion;
             $grupos[$key]['contrato'] += max(0, (float) data_get($a, 'horas_contrato', 0));
             $grupos[$key]['pedagogicas'] += max(0, (float) data_get($a, 'horas_plan_pedagogicas', 0));
@@ -278,18 +327,25 @@ class DotacionPal2027
         if ($grupo) {
             $factor = $grupo['contrato'] > 0 ? $parte / $grupo['contrato'] : 0;
             $pedagogicas = round($grupo['pedagogicas'] * $factor, 4);
-            if ($exceso) { $problemas[] = 'asignaciones exceden el contrato del padrón'; }
+            if ($exceso) { $problemas[] = $grupo['reserva_origen'] !== null
+                ? 'la reserva excede las horas de su calidad contractual en el padrón' : 'asignaciones exceden el contrato del padrón'; }
             if ($grupo['columna'] === 'aula') {
                 $proporcion = in_array($grupo['proporcion'], ['65/35','60/40'], true) ? $grupo['proporcion'] : null;
-                $regla = $proporcion ? ($tablas[$proporcion][number_format($pedagogicas, 4, '.', '')] ?? null) : null;
-                if ($regla === null || abs($regla['contrato'] - $parte) > 0.01) { $problemas[] = 'la fórmula original no representa '.$pedagogicas.' h pedagógicas / '.$parte.' h de contrato SGA ('.$grupo['proporcion'].')'; }
+                if ($proporcion === null || ! isset($tablas[$proporcion])) { $problemas[] = 'la fórmula original no representa '.$pedagogicas.' h pedagógicas / '.$parte.' h de contrato SGA ('.$grupo['proporcion'].')'; }
                 if ($grupo['nivel'] === '' || $grupo['nivel'] === 'Ed. Básica/Media') { $problemas[] = 'falta desglose del nivel de las horas lectivas'; }
                 if ($problemas === []) {
                     $fila[$grupo['nivel'] === 'Educación Media' ? 'L' : 'K'] = $pedagogicas;
                     $fila['M'] = $proporcion;
+                    // Validar la equivalencia después de intentar consolidar;
+                    // cada tramo del SGA puede contener sólo un incremento del contrato.
+                    $fila['_pal_contrato_aula'] = $parte;
                 }
+            } elseif ($grupo['columna'] === 'reserva') {
+                if (! $exceso && $capacidad['calidad'] === 'Titular') { $fila['_pal_reserva_titular'] = $parte; }
+                elseif (! $exceso) { $notas[] = 'Reserva '.$capacidad['calidad'].' excluida de las entradas numéricas del PAL: sólo se incorporan reservas titulares sin justificación en Sobredotación.'; }
+                if ($grupo['reserva_origen'] === null) { $notas[] = 'Reserva histórica sin origen contractual: calidad inferida del contrato disponible, primero titular.'; }
             } elseif ($grupo['columna'] === 'incompatible') {
-                $problemas[] = 'financiamiento o reserva sin equivalencia en el formato';
+                $problemas[] = 'financiamiento sin equivalencia en el formato';
             } elseif (! $exceso) { $fila[$grupo['columna']] = $parte; }
             $notas[] = 'Asignación SGA: '.$parte.' h cronológicas. '.implode('; ', array_unique($grupo['detalle'])).'.';
         }

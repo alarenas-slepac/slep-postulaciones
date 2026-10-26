@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-/** Consolida entradas únicamente si las fórmulas nativas conservan todos los totales. */
+/** Consolida la docencia antes de validar su equivalencia con las fórmulas nativas. */
 class DotacionPalFilas2027
 {
     public function consolidar(array $filas, array $tablas): array
@@ -40,7 +40,10 @@ class DotacionPalFilas2027
             }
         }
         usort($resultado, fn ($a, $b) => $a['_pal_orden'] <=> $b['_pal_orden']);
-        foreach ($resultado as &$fila) { unset($fila['_pal_orden']); }
+        foreach ($resultado as &$fila) {
+            $fila = $this->finalizar($fila, $tablas);
+            unset($fila['_pal_orden']);
+        }
         unset($fila);
         return $resultado;
     }
@@ -48,6 +51,7 @@ class DotacionPalFilas2027
     private function combinar(array $filas, array $tablas): ?array
     {
         $fila = $filas[0]; $niveles = []; $proporciones = []; $lectivas = 0.0; $noLectivas = 0.0;
+        $referenciaSga = false; $contratoAula = 0.0;
         foreach ($filas as $origen) {
             if (($origen['M'] ?? null) === '60/40') { return null; }
             if (str_contains($origen['S'] ?? '', 'INCOMPATIBLE:')) { return null; }
@@ -56,9 +60,12 @@ class DotacionPalFilas2027
             }
             $niveles[(string) ($origen['D'] ?? '')] = true;
             if (! empty($origen['M'])) { $proporciones[$origen['M']] = true; }
-            $calculadas = $this->calcular($origen, $tablas);
+            $calculadas = $this->calcularOrigen($origen, $tablas);
             if ($calculadas === null) { return null; }
             $lectivas += $calculadas[0]; $noLectivas += $calculadas[1];
+            if (array_key_exists('_pal_contrato_aula', $origen)) {
+                $referenciaSga = true; $contratoAula += (float) $origen['_pal_contrato_aula'];
+            } else { $contratoAula += array_sum($calculadas); }
         }
         if (count($proporciones) > 1) { return null; }
         if (count($niveles) > 1) {
@@ -73,8 +80,41 @@ class DotacionPalFilas2027
         // N y O buscan K+L una sola vez, no una búsqueda por cada nivel.
         $calculadas = $this->calcular($fila, $tablas);
         if ($calculadas === null || abs($calculadas[0] - $lectivas) > 0.00001 || abs($calculadas[1] - $noLectivas) > 0.00001) { return null; }
+        if ($referenciaSga && abs(array_sum($calculadas) - $contratoAula) > 0.01) { return null; }
         $notas = array_values(array_unique(array_filter(array_column($filas, 'S'))));
         $fila['S'] = 'Consolidado PAL de '.count($filas).' filas de origen. '.implode("\n", $notas);
+        if ($referenciaSga) {
+            $fila['_pal_contrato_aula'] = round($contratoAula, 4);
+            $aula = (float) ($fila['K'] ?? 0) + (float) ($fila['L'] ?? 0);
+            $fila['S'] .= ' Docencia validada en conjunto: '.$aula.' h pedagógicas / '.$fila['_pal_contrato_aula'].' h de contrato SGA ('.$fila['M'].').';
+        }
+        return $fila;
+    }
+
+    private function calcularOrigen(array $fila, array $tablas): ?array
+    {
+        $nativas = $this->calcular($fila, $tablas);
+        if (! array_key_exists('_pal_contrato_aula', $fila)) { return $nativas; }
+        $contrato = (float) $fila['_pal_contrato_aula'];
+        if ($nativas !== null && abs(array_sum($nativas) - $contrato) <= 0.01) { return $nativas; }
+        // El SGA acumula aula y reparte incrementos contractuales. Un tramo
+        // puede no equivaler por sí solo a BUSCARV; conserva sus horas reales
+        // (45 minutos por hora pedagógica) y su contrato hasta validar el grupo.
+        $lectivas = ((float) ($fila['K'] ?? 0) + (float) ($fila['L'] ?? 0)) * 0.75;
+        return [$lectivas, $contrato - $lectivas];
+    }
+
+    private function finalizar(array $fila, array $tablas): array
+    {
+        if (! array_key_exists('_pal_contrato_aula', $fila)) { return $fila; }
+        $contrato = (float) $fila['_pal_contrato_aula'];
+        $nativas = $this->calcular($fila, $tablas);
+        if ($nativas === null || abs(array_sum($nativas) - $contrato) > 0.01) {
+            $aula = (float) ($fila['K'] ?? 0) + (float) ($fila['L'] ?? 0);
+            $fila['S'] .= ' INCOMPATIBLE: la fórmula original no representa '.$aula.' h pedagógicas / '.$contrato.' h de contrato SGA ('.$fila['M'].'). Estas horas no se cargan en las entradas numéricas; J/N/O no representan este tramo.';
+            $fila['K'] = $fila['L'] = $fila['M'] = null;
+        }
+        unset($fila['_pal_contrato_aula']);
         return $fila;
     }
 

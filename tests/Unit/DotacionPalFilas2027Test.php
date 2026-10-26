@@ -69,6 +69,34 @@ class DotacionPalFilas2027Test extends TestCase
         }
     }
 
+    public function test_valida_incrementos_sga_en_conjunto_y_retira_la_referencia_interna(): void
+    {
+        $filas = [$this->fila(['K' => 4, '_pal_contrato_aula' => 4]),
+            $this->fila(['D' => 'Educación Media', 'L' => 8, '_pal_contrato_aula' => 10])];
+        $antes = $filas;
+        $out = (new DotacionPalFilas2027)->consolidar($filas, $this->tablaIncrementos());
+        $this->assertCount(1, $out); $this->assertSame($antes, $filas);
+        $this->assertSame(4.0, $out[0]['K']); $this->assertSame(8.0, $out[0]['L']);
+        $this->assertSame('Ed. Básica/Media', $out[0]['D']);
+        $this->assertStringContainsString('12 h pedagógicas / 14 h de contrato SGA', $out[0]['S']);
+        $this->assertStringNotContainsString('INCOMPATIBLE:', $out[0]['S']);
+        $this->assertArrayNotHasKey('_pal_contrato_aula', $out[0]);
+    }
+
+    public function test_no_consolida_incrementos_si_cambian_lectivas_y_no_lectivas_aunque_el_total_coincida(): void
+    {
+        $tablas = $this->tablaIncrementos();
+        $tablas['65/35']['12.0000'] = ['contrato' => 14, 'lectivas' => 9.25, 'no_lectivas' => 4.75];
+        $out = (new DotacionPalFilas2027)->consolidar([$this->fila(['K' => 4, '_pal_contrato_aula' => 4]),
+            $this->fila(['D' => 'Educación Media', 'L' => 8, '_pal_contrato_aula' => 10])], $tablas);
+        $this->assertCount(2, $out);
+        foreach ($out as $fila) {
+            $this->assertNull($fila['K']); $this->assertNull($fila['L']);
+            $this->assertStringContainsString('INCOMPATIBLE:', $fila['S']);
+            $this->assertArrayNotHasKey('_pal_contrato_aula', $fila);
+        }
+    }
+
     public function test_busca_k_mas_l_y_no_consolida_si_el_total_no_existe_en_la_tabla(): void
     {
         $out = (new DotacionPalFilas2027)->consolidar([$this->fila(['K' => 10]),
@@ -115,5 +143,14 @@ class DotacionPalFilas2027Test extends TestCase
             $tabla[number_format($aula, 4, '.', '')] = ['contrato' => $aula * 1.2, 'lectivas' => $aula * 0.75, 'no_lectivas' => $aula * 0.45];
         }
         return ['65/35' => $tabla, '60/40' => $tabla];
+    }
+
+    private function tablaIncrementos(): array
+    {
+        return ['65/35' => [
+            '4.0000' => ['contrato' => 5, 'lectivas' => 3, 'no_lectivas' => 2],
+            '8.0000' => ['contrato' => 9, 'lectivas' => 6, 'no_lectivas' => 3],
+            '12.0000' => ['contrato' => 14, 'lectivas' => 9, 'no_lectivas' => 5],
+        ]];
     }
 }
