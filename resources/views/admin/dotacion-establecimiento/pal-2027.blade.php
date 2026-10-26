@@ -47,9 +47,10 @@
                 <li>Completa «Info Establecimiento» e «Info Funcionario (DOCENTE)» con los datos del proceso 2027.</li>
                 <li>«Info Establecimiento» muestra las horas requeridas por el plan. Detalla los cursos de cada combinación y cuenta su plan compartido una sola vez; los planes distintos se presentan en filas separadas.</li>
                 <li>Columna H de establecimientos: contrato necesario para el plan de estudios, sin agregar PIE ni funciones.</li>
-                <li>Separa titular y plazo fijo. La distribución cubre primero titular y luego contrata; se identifica cada función y proporción.</li>
+                <li>Separa titular y plazo fijo. Las reservas conservan su calidad contractual y el resto se distribuye primero en titular y luego contrata; se identifica cada función y proporción.</li>
                 <li>Para educadoras con título de Párvulos y aula asignada en Parvularia, convierte el contrato especial a horas aula equivalentes 65/35. Conserva el contrato y deja las horas aula reales en Observaciones.</li>
                 <li>Los saldos titulares sin asignar se clasifican en FUNCIÓN «Otros (Talleristas / Apoyo / etc.)», descontando las horas justificadas en Sobredotación 2027. Los saldos a contrata no se incorporan por esta regla.</li>
+                <li>Las reservas de General «Horas para otras funciones» se incorporan en FUNCIÓN «Otros», columna R, sólo para horas titulares sin justificación en Sobredotación. El descuento se aplica una sola vez entre saldo y reservas; las reservas a plazo fijo se detallan únicamente en Observaciones.</li>
                 <li>Las horas excluidas por situaciones 2027 se incorporan en FUNCIÓN «Otros», respetando titular y contrata. Observaciones detalla el motivo, el contrato y las horas incorporadas o excluidas. Los docentes con situación BIR 2027 se excluyen del PAL.</li>
                 <li>Asistentes y VTF quedan vacías. Las plazas sin persona identificada no se presentan como funcionarios.</li>
                 <li>La hoja «Resumen» conserva sus fórmulas y necesita Excel compatible con FILTER, UNIQUE, VSTACK y LET. Revise el recálculo al abrir.</li>

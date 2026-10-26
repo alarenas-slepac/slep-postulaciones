@@ -54,11 +54,13 @@ dotación. No habilita datos de matrícula para el rol directivo.
 | Docentes K–L | Horas pedagógicas de aula financiadas por General, separadas por nivel, cuando la regla es representable |
 | Docentes M | 65/35 o 60/40 de la asignación; las educadoras elegibles de Parvularia representan el contrato especial como 65/35 según la excepción siguiente |
 | Docentes P–Q | Horas cronológicas asignadas y financiadas por PIE o SEP |
-| Docentes R | Funciones asignadas de General, horas excluidas por situaciones 2027 y saldos titulares sin asignar que no estén justificados en Sobredotación, clasificados como Otros |
+| Docentes R | Funciones asignadas de General, horas excluidas por situaciones 2027 y reservas/saldos titulares elegibles sin justificación de Sobredotación, clasificados como Otros |
 | Docentes S | Contrato de referencia, tramo distribuido, situación 2027 con contrato completo y horas consideradas/no necesarias, pendientes, detalle e incompatibilidades |
 
 Se consumen primero las horas titulares del docente y después las de plazo fijo.
-Los grupos se recorren en orden estable de sus primeras asignaciones por ID. El
+Los grupos se recorren en orden estable de sus primeras asignaciones por ID.
+Las reservas con origen contractual explícito apartan previamente su capacidad
+titular o a plazo fijo; las demás asignaciones consumen el contrato restante. El
 reparto es sólo una representación para el informe y no actualiza asignaciones ni
 la calidad jurídica del padrón. El conteo de personas se obtiene de la nómina, no
 de la cantidad de filas. Las personas que trabajan en dos establecimientos se
@@ -73,16 +75,40 @@ aparición de cada fila determina el orden del resultado; se conservan las notas
 de los registros de origen y se indica cuántas filas se unieron.
 
 Se suman K, L, P, Q y R, manteniendo el desglose por nivel y financiamiento. La
-columna M debe admitir una sola proporción. Antes de unir, se contrastan tanto
-las **horas lectivas (N)** como las **no lectivas (O)** calculadas con la tabla
-original; deben coincidir con las sumas de las filas originales. Es relevante
-porque N y O hacen **una búsqueda de K+L**, no una búsqueda independiente por
-cada nivel. Conservar sólo la suma del contrato no basta si cambia ese desglose.
-J conserva su fórmula y su total, incluyendo PIE, SEP y otras funciones.
+columna M debe admitir una sola proporción. La equivalencia de las horas de aula
+se valida **después de intentar consolidar**, porque el SGA acumula la docencia
+y reparte entre asignaciones los incrementos de contrato. Un incremento aislado
+puede no coincidir con una búsqueda independiente en la tabla del PAL.
+
+Si las entradas individuales ya son representables, se conservan sus sumas de
+**horas lectivas (N)** y **no lectivas (O)**. Para tramos incrementales se conserva
+el contrato informado por el SGA: las lectivas corresponden a 45 minutos por
+hora pedagógica y las no lectivas son su diferencia con el contrato. La fila
+conjunta debe coincidir tanto en contrato como en ambos componentes con la tabla
+original. N y O hacen **una búsqueda de K+L**, no una búsqueda independiente por
+cada nivel. J conserva su fórmula y su total, incluyendo PIE, SEP y otras funciones.
+No se modifican fórmulas ni se reparten contratos de nuevo en el SGA.
 
 Ejemplo: dos filas de Docente aula/Titular con 19 h pedagógicas en Básica y
 19 h en Media, 22 h contractuales cada una, y otra fila de 3 h PIE quedan en una
 fila con K=19, L=19, P=3, M=65/35 y J=47. Se conserva **Ed. Básica/Media**.
+
+Ejemplo de incrementos con datos sintéticos: una fila de Religión de 4 h
+pedagógicas y 4 h de contrato, junto con otra de 8 h pedagógicas y 10 h de
+contrato, no se descarta por sus equivalencias individuales 4→5 y 8→9 del PAL.
+Con mismo docente, establecimiento, función, calidad contractual y 65/35, se
+valida primero el conjunto: **12 h pedagógicas → 14 h de contrato**. Si las
+asignaciones corresponden a Básica y Media respectivamente, quedan K=4, L=8,
+N=9, O=5 y J=14. Observaciones conserva las cantidades de origen y explica la
+validación conjunta. Una hora pendiente de un contrato a plazo fijo de 15 h
+continúa fuera de Otros, conforme a la regla de saldos exclusivamente titulares.
+
+Si el conjunto tampoco es representable, se intentan subconjuntos compatibles
+y se valida individualmente lo que queda. Sólo entonces se marcan las
+incompatibilidades de equivalencia y se vacían las entradas numéricas afectadas.
+Los problemas de nivel sin identificar, proporción no admitida, financiamiento
+o exceso contractual no se corrigen mediante una unión. La referencia interna
+del contrato de aula se retira del resultado antes de escribir el Excel.
 
 La unión de filas de **Educación Básica y Educación Media** requiere **65/35
 en ambas**, además del mismo docente, establecimiento, función y calidad
@@ -94,8 +120,8 @@ horas lectivas continúan consolidándose entre sí cuando son compatibles.
 
 Por decisión del usuario, las excepciones permanecen separadas y se explican en
 Observaciones: filas 60/40, proporciones distintas, niveles sin opción común,
-horas fuera del rango de la tabla, diferencias en lectivas/no lectivas,
-incompatibilidades previas o datos de estamento, cargo y art. 69 que no coincidan.
+horas fuera del rango de la tabla, diferencias en lectivas/no lectivas que persisten
+en el conjunto, incompatibilidades estructurales o datos de estamento, cargo y art. 69 que no coincidan.
 Si no cabe todo el grupo, se intentan subconjuntos compatibles. No se fuerzan
 redondeos ni nuevas fórmulas; una jornada de Parvularia que necesita varias filas
 para representar su contrato conserva las que sean necesarias.
@@ -179,8 +205,36 @@ superior al saldo no resta horas ya asignadas ni vuelve negativos los totales.
 No se usan justificaciones de otros años, establecimientos ni tipo contrata.
 La lectura es una consulta por establecimiento, sin modificar las justificaciones.
 
+### Reservas para otras funciones
+
+Las reservas activas `reserva_no_normativa`, presentadas como **Horas para otras
+funciones** y financiadas por **General**, se incorporan en **FUNCIÓN Otros / R**
+únicamente por su porción **titular sin justificación en Sobredotación 2027**.
+No requieren equivalencia de aula en las tablas 65/35 o 60/40: son horas
+cronológicas de reserva. Se conserva la fórmula J = N+O+P+Q+R y se explica su
+clasificación en Observaciones. Las reservas a plazo fijo u otras calidades
+permanecen en Observaciones, sin entradas numéricas y sin confundir esta
+exclusión deliberada con una incompatibilidad de fórmula.
+
+Se respeta el origen `titular` o `contrata` guardado en la reserva, aunque el
+orden de sus ID difiera del de las clases o funciones. Se aparta su capacidad
+antes de repartir el resto; una reserva no puede consumir horas de otra calidad
+si supera la propia. Los registros históricos sin origen se reparten desde el
+contrato disponible, primero titular, y Observaciones identifica la inferencia.
+Un exceso de calidad o un financiamiento distinto de General conserva su
+incompatibilidad y no se transforma en horas de otra columna.
+
+Las justificaciones titulares se descuentan **una sola vez**: primero del saldo
+titular sin asignar y luego, por el remanente, de las reservas titulares. El
+descuento total queda limitado a la suma de ambos conceptos; no resta funciones
+asignadas ni horas de situaciones. Ejemplo sintético: 44 h titulares, 28 h de
+función, 10 h reservadas, 6 h pendientes y 8 h justificadas: se excluyen las 6 h
+pendientes y 2 h de reserva. El PAL representa 28 + 8 = **36 h**, sin duplicar
+el descuento. Las reservas no se suman de nuevo como saldo pendiente.
+
 Observaciones distingue las horas por situación, las titulares sin asignación
-incorporadas y las titulares justificadas que se excluyen del informe. Si ya
+incorporadas, las reservas incorporadas/excluidas y las titulares justificadas
+que se excluyen del informe. Si ya
 existe una fila Otros de igual función y calidad, se consolida con las nuevas
 horas cuando es compatible, sin duplicar los valores. El personal BIR continúa
 excluido. Si las horas consideradas y excluidas no coinciden con el contrato
@@ -196,15 +250,16 @@ con contrato titular de 44 h, 30 distribuidas y sin justificación de Sobredotac
 incluye las otras 14 h en FUNCIÓN Otros y suma 44 h en el PAL. Los saldos a
 contrata y las horas titulares justificadas no se añaden para completar el total.
 
-Cada entrada lectiva se contrasta con el mismo rango exacto de BUSCARV que usa el
-Excel (`A4:D47` en cada tabla). Si no existe una equivalencia, o no coincide con el
-contrato consolidado del SGA, la fila queda marcada **INCOMPATIBLE** en S y sus
+Cada fila lectiva resultante, consolidada cuando corresponde, se contrasta con
+el mismo rango exacto de BUSCARV que usa el Excel (`A4:D47` en cada tabla). Si
+no existe una equivalencia, o no coincide con el contrato consolidado del SGA,
+la fila queda marcada **INCOMPATIBLE** en S y sus
 entradas numéricas incompatibles quedan vacías. S conserva las horas pedagógicas
 y cronológicas que motivan el problema. J/N/O pueden calcular cero: ese cero **no
 representa ausencia de horas**. No usar esas filas como dotación definitiva.
 
 Esto puede ocurrir con reglas especiales sin la equivalencia autorizada siguiente, fracciones producidas al
-separar contratos, niveles sin desglose, reservas sin función y financiamientos
+separar contratos, niveles sin desglose y financiamientos
 sin equivalencia. Los excesos de asignación se marcan y no se transforman en otro
 contrato real.
 

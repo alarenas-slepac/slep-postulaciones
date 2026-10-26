@@ -6457,8 +6457,34 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.641',
+    'current_version' => '2026.10.25.643',
     'entries' => [
+        [
+            'version' => '2026.10.25.643',
+            'title' => 'Reservas titulares elegibles en función Otros del PAL',
+            'summary' => 'Incorpora las reservas titulares de General en Otros/R, descontando Sobredotación una sola vez entre reservas y saldo pendiente.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Clasifica las reservas activas Horas para otras funciones como horas cronológicas en FUNCIÓN Otros, columna R, únicamente para la porción titular sin justificación de Sobredotación 2027. Las reservas a plazo fijo se explican en Observaciones y quedan fuera de las entradas numéricas.',
+                'Respeta el origen titular o contrata registrado en la reserva, acota cada calidad a su capacidad y conserva el orden de presentación. Las reservas históricas sin origen se distribuyen desde el contrato disponible, primero titular.',
+                'Comparte el descuento de las horas titulares justificadas entre saldo pendiente y reservas, sin duplicarlo, sin restar funciones asignadas ni situaciones docentes. Conserva los errores de financiamiento, exceso y equivalencia que requieren revisión.',
+                'Incluye pruebas de ambos Excel, reservas fraccionarias, origen contractual, justificaciones, situaciones, datos históricos y reparto de aula entre titular y contrata. No cambia fórmulas, registros del SGA ni el esquema de base de datos.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
+        [
+            'version' => '2026.10.25.642',
+            'title' => 'Docencia del PAL validada después de consolidar',
+            'summary' => 'Evita incompatibilidades individuales cuando los incrementos contractuales del SGA sí coinciden con la tabla del PAL al consolidarlos.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Conserva las horas pedagógicas y el contrato de cada tramo de aula hasta intentar la consolidación por docente, establecimiento, función, calidad contractual y proporción. Valida después los totales contractuales, lectivos y no lectivos con las fórmulas originales.',
+                'Representa correctamente el ejemplo sintético de 4 h pedagógicas/4 h de contrato y 8 h pedagógicas/10 h de contrato como 12 h pedagógicas/14 h de contrato, con detalle en Observaciones. La hora pendiente a contrata no se incorpora a Otros.',
+                'Mantiene separados 60/40 y calidades distintas, conserva los límites de la tabla y los problemas estructurales, y marca las incompatibilidades que persisten después de consolidar. No altera asignaciones ni la plantilla Excel.',
+                'Incluye pruebas de ambos Excel, contratos incrementales, totales no representables, calidad contractual, niveles, desglose lectivo/no lectivo y eliminación de referencias internas. No requiere migraciones ni cambios de entorno.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.641',
             'title' => 'Situaciones y saldos titulares elegibles en función Otros del PAL',
