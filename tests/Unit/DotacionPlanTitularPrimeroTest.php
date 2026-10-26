@@ -105,6 +105,65 @@ class DotacionPlanTitularPrimeroTest extends TestCase
         ];
     }
 
+    public function test_completa_titular_insuficiente_con_contrata_del_mismo_docente(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('99000001K', 33, 2, 32),
+            $this->docente('99000002K', 0, 10, 0),
+        ]));
+        $seleccionado = $docentes->first();
+        $this->assertSame('titular', DotacionPlanTitularPrimero::fase($docentes));
+        $this->assertSame(['99000001K'], DotacionPlanTitularPrimero::opciones($docentes)->pluck('rut_normalizado')->all());
+        $this->assertSame(1.0, DotacionPlanTitularPrimero::disponibles($seleccionado, 'titular'));
+        $this->assertSame(3.0, DotacionPlanTitularPrimero::saldoAsignable($seleccionado, 'titular'));
+        DotacionPlanTitularPrimero::validar($docentes, $seleccionado, 2, false);
+        DotacionPlanTitularPrimero::validar($docentes, $seleccionado, 3, false);
+        $this->assertInvalidAssignment($docentes, $seleccionado, 3.01);
+        $this->assertInvalidAssignment($docentes, $docentes->last(), 2);
+        $this->assertInvalidAssignment($docentes, null, 2, true);
+    }
+
+    public function test_capacidad_mixta_respeta_saldo_total_y_no_suma_dos_veces_reservas(): void
+    {
+        $docente = [
+            'horas_disponibles' => 2.0, 'horas_titulares_disponibles' => 1.0,
+            'horas_contrata_disponibles' => 5.0,
+        ];
+        $this->assertSame(2.0, DotacionPlanTitularPrimero::saldoAsignable($docente, 'titular'));
+        $this->assertSame(2.0, DotacionPlanTitularPrimero::saldoAsignable($docente, 'contrata'));
+        $docente['horas_disponibles'] = 0;
+        $this->assertSame(0.0, DotacionPlanTitularPrimero::saldoAsignable($docente, 'titular'));
+    }
+
+    public function test_comparacion_de_prelacion_considera_la_capacidad_mixta_sin_alterar_los_saldos(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('99000001K', 33, 2, 32) + ['fecha_antiguedad' => '2000-01-01'],
+            $this->docente('99000002K', 44, 0, 0) + ['fecha_antiguedad' => '2020-01-01'],
+        ]));
+        $original = $docentes->all();
+        $candidatos = DotacionPlanTitularPrimero::candidatosParaPrelacion($docentes);
+        $this->assertTrue(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($candidatos, $candidatos->last(), 2));
+        $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($candidatos, $candidatos->last(), 4));
+        $this->assertSame($original, $docentes->all());
+    }
+
+    public function test_editar_restituye_titular_y_contrata_y_conserva_su_combinacion(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            $this->docente('99000001K', 33, 2, 34),
+        ]));
+        $current = new DotacionDocenteAsignacion([
+            'docente_rut_normalizado' => '99000001K', 'estamento_cobertura' => 'docente', 'horas_contrato' => 2,
+        ]);
+        $elegibles = DotacionPlanTitularPrimero::elegibles($docentes, ['99000001K'], [], $current);
+        $this->assertSame(1.0, $elegibles->first()['horas_titulares_disponibles']);
+        $this->assertSame(2.0, $elegibles->first()['horas_contrata_disponibles']);
+        $this->assertSame(3.0, DotacionPlanTitularPrimero::saldoAsignable($elegibles->first(), 'titular'));
+        DotacionPlanTitularPrimero::validar($elegibles, $elegibles->first(), 3, false);
+        $this->assertInvalidAssignment($elegibles, $elegibles->first(), 4);
+    }
+
     public function test_contrata_de_docente_protegido_sin_saldo_titular_no_bloquea_fase_titular(): void
     {
         $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([

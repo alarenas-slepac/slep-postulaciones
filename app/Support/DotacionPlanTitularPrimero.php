@@ -95,6 +95,23 @@ class DotacionPlanTitularPrimero
         ));
     }
 
+    /** Saldo para una asignación, manteniendo aparte la elegibilidad de la fase. */
+    public static function saldoAsignable(array $docente, string $fase): float
+    {
+        $saldoFase = self::disponibles($docente, $fase);
+        if (in_array($fase, ['titular', 'preferente'], true)
+            && self::disponibles($docente, 'titular') >= self::MINIMO_SALDO_ASIGNABLE) {
+            // El consumo contractual ya descuenta primero planta. Una misma
+            // asignación puede agotar ese saldo y completar con contrata propia.
+            return max($saldoFase, min(
+                (float) ($docente['horas_disponibles'] ?? 0),
+                self::disponibles($docente, 'titular') + self::disponibles($docente, 'contrata')
+            ));
+        }
+
+        return $saldoFase;
+    }
+
     /** @param Collection<int, array<string, mixed>> $docentes
      *  @return Collection<int, array<string, mixed>>
      */
@@ -105,13 +122,13 @@ class DotacionPlanTitularPrimero
         return $docentes->filter(fn (array $docente) => self::disponibles($docente, $fase) >= self::MINIMO_SALDO_ASIGNABLE)->values();
     }
 
-    /** Compara sólo las opciones y el saldo de la fase que muestra el selector. */
+    /** Compara sólo las opciones del selector, con su capacidad real de asignación. */
     public static function candidatosParaPrelacion(Collection $docentes): Collection
     {
         $fase = self::fase($docentes);
 
         return self::opciones($docentes)->map(function (array $docente) use ($fase): array {
-            $saldo = self::disponibles($docente, $fase);
+            $saldo = self::saldoAsignable($docente, $fase);
             // Proyección para la comparación de prioridad; no altera el saldo original.
             $docente['horas_disponibles'] = $saldo;
             $docente['horas_titulares_disponibles'] = $saldo;
@@ -145,11 +162,11 @@ class DotacionPlanTitularPrimero
                 },
             ]);
         }
-        if ($horasContrato > $disponibles + 0.001) {
-            $saldo = DotacionEstablecimientoCalculator::formatHoras($disponibles);
-            $origen = $fase === 'preferente' ? 'de contrato asignable' : $fase;
+        $saldoAsignable = self::saldoAsignable($seleccionado, $fase);
+        if ($horasContrato > $saldoAsignable + 0.001) {
+            $saldo = DotacionEstablecimientoCalculator::formatHoras($saldoAsignable);
             throw ValidationException::withMessages([
-                'horas_plan_pedagogicas' => "La asignación requiere {$horasContrato} h de contrato, pero el docente tiene {$saldo} h {$origen} disponibles. Reduzca las horas aula para asignar primero ese saldo y registre el resto después.",
+                'horas_plan_pedagogicas' => "La asignación requiere {$horasContrato} h de contrato, pero el docente dispone de {$saldo} h de contrato asignable. Revise sus saldos titular y a contrata y reduzca las horas aula o seleccione otro docente habilitado.",
             ]);
         }
     }
