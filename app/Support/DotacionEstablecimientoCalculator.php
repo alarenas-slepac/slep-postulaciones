@@ -932,7 +932,8 @@ class DotacionEstablecimientoCalculator
         ];
     }
 
-    public static function docentes(Establecimiento $establecimiento, int $anio, bool $incluirAsignaciones = true): Collection
+    /** El cuarto argumento permite sólo la trazabilidad de retiros en informes. */
+    public static function docentes(Establecimiento $establecimiento, int $anio, bool $incluirAsignaciones = true, bool $incluirExcluidosProyeccion = false): Collection
     {
         if (! self::schemaHasTable('reemplazos_personal')) {
             return collect();
@@ -955,14 +956,16 @@ class DotacionEstablecimientoCalculator
         $personalConsolidado = self::consolidarPersonalUltimoPeriodo($personal);
         $retirados = DotacionLecturaCache::recordar('no-renovaciones:'.$establecimiento->id.':'.$anio,
             fn () => DotacionNoRenovacion::rutsRetirados((int) $establecimiento->id, $anio));
-        $personalConsolidado = $personalConsolidado->reject(fn (array $grupo) =>
-            in_array(self::normalizeRut($grupo['representante']->rut), $retirados, true)
-        )->values();
+        if (! $incluirExcluidosProyeccion) {
+            $personalConsolidado = $personalConsolidado->reject(fn (array $grupo) =>
+                in_array(self::normalizeRut($grupo['representante']->rut), $retirados, true)
+            )->values();
+        }
         // Mientras 2027 use el padrón vigente de 2026, una situación marcada
         // como "no continúa" no puede reincorporar a la persona en la nómina
         // del año proyectado. Al existir padrón propio del año, éste es la fuente
         // autoritativa y se conserva sin este filtro.
-        if ($anioPadron < $anio && DotacionDocenteExclusion::continuidadDisponible()) {
+        if (! $incluirExcluidosProyeccion && $anioPadron < $anio && DotacionDocenteExclusion::continuidadDisponible()) {
             $continuidadPorRut = DotacionDocenteExclusion::continuidadPorRut(
                 (int) $establecimiento->id,
                 $anioPadron

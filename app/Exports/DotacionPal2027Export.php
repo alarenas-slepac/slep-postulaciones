@@ -79,9 +79,12 @@ class DotacionPal2027Export
         if (! copy($this->template(), $path)) { throw new \RuntimeException('No se pudo leer la plantilla PAL.'); }
         $zip = new ZipArchive;
         if ($zip->open($path) !== true) { throw new \RuntimeException('No se pudo abrir el archivo PAL.'); }
+        $exclusiones = null;
         try {
             $partes = $this->partes($zip);
             $styles = $this->xml($zip, 'xl/styles.xml');
+            $exclusiones = new DotacionPalExclusiones2027Export($styles);
+            $exclusiones->agregar($reporte['excluidos'] ?? []);
             $last = max(94, count($reporte['docentes']) + 2);
             $doc = $this->xml($zip, $partes['Info Funcionario (DOCENTE)']);
             $this->rellenar($doc, $reporte['docentes'], 3, 94, ['J','N','O']);
@@ -105,7 +108,8 @@ class DotacionPal2027Export
                 }
                 $zip->addFromString($partes['Resumen'], $summary->saveXML());
             }
-        } finally { $zip->close(); }
+            $exclusiones->incorporar($zip);
+        } finally { $zip->close(); $exclusiones?->cerrar(); }
     }
 
     protected function partes(ZipArchive $zip): array

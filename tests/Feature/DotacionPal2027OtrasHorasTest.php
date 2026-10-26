@@ -26,19 +26,21 @@ class DotacionPal2027OtrasHorasTest extends IsolatedSecurityTestCase
         $this->ee = Establecimiento::create(['cod_estab' => 99001, 'rbd' => 99001, 'nombre_establecimiento' => 'Escuela sintética']);
     }
 
-    public function test_saldo_sin_asignar_solo_se_incorpora_para_titulares(): void
+    public function test_saldo_sin_asignar_se_incorpora_separado_para_titulares_y_plazo_fijo(): void
     {
         $doc = $this->docente(['horas_planta' => 20, 'horas_contrata' => 24, 'asignaciones' => []]);
         $antes = json_encode($doc);
         $report = $this->reporte($doc);
-        $this->assertCount(1, $report['docentes']);
+        $this->assertCount(2, $report['docentes']);
+        $this->assertSame('Plazo Fijo', $report['docentes'][1]['H']); $this->assertSame(24.0, $report['docentes'][1]['R']);
         $row = $report['docentes'][0];
         $this->assertSame('Titular', $row['H']); $this->assertSame(20.0, $row['R']);
         $this->assertSame('Otros (Talleristas / Apoyo / etc.)', $row['G']);
         $this->assertStringContainsString('20 h titulares sin asignación', $row['S']);
         $this->assertSame($antes, json_encode($doc));
         $row = $this->reporte($this->docente(['horas_planta' => 0, 'horas_contrata' => 44, 'asignaciones' => []]))['docentes'][0];
-        $this->assertSame('Plazo Fijo', $row['H']); $this->assertSame('', $row['G']); $this->assertNull($row['R']);
+        $this->assertSame('Plazo Fijo', $row['H']); $this->assertSame('Otros (Talleristas / Apoyo / etc.)', $row['G']); $this->assertSame(44.0, $row['R']);
+        $this->assertStringContainsString('44 h a plazo fijo sin asignación', $row['S']);
     }
 
     public function test_situacion_se_separa_por_calidad_y_suma_el_contrato_en_los_dos_excel(): void
@@ -73,7 +75,7 @@ class DotacionPal2027OtrasHorasTest extends IsolatedSecurityTestCase
         }
     }
 
-    public function test_saldo_contrata_no_se_incorpora_aunque_exista_una_situacion(): void
+    public function test_saldo_contrata_y_situacion_se_incorporan_sin_duplicarse(): void
     {
         $doc = $this->docente(['horas_planta' => 20, 'horas_contrata' => 24, 'horas_contrato' => 30, 'horas_excluidas' => 14,
             'exclusion_docente' => ['motivo' => 'horas_gremiales', 'horas' => 14],
@@ -81,9 +83,9 @@ class DotacionPal2027OtrasHorasTest extends IsolatedSecurityTestCase
         $rows = $this->reporte($doc)['docentes'];
         $otros = array_values(array_filter($rows, fn ($r) => $r['G'] === 'Otros (Talleristas / Apoyo / etc.)'));
         $this->assertCount(1, $otros); $this->assertSame('Plazo Fijo', $otros[0]['H']);
-        $this->assertSame(14.0, $otros[0]['R']);
+        $this->assertSame(16.0, $otros[0]['R']);
         $this->assertStringNotContainsString('2 h titulares sin asignación', $otros[0]['S']);
-        $this->assertEquals(42, array_sum(array_column($rows, 'R')) + array_sum(array_column($rows, 'P')));
+        $this->assertEquals(44, array_sum(array_column($rows, 'R')) + array_sum(array_column($rows, 'P')));
     }
 
     public function test_descuenta_solo_justificaciones_titulares_del_establecimiento_y_2027(): void
@@ -98,10 +100,11 @@ class DotacionPal2027OtrasHorasTest extends IsolatedSecurityTestCase
         $this->justificar(['horas_detectadas' => 0]);
         $antes = DB::table('dotacion_sobredotacion_justificaciones')->orderBy('id')->get()->toJson();
         $rows = $this->reporte($this->docente(['horas_planta' => 32, 'horas_contrata' => 12]))['docentes'];
-        $this->assertCount(2, $rows); $this->assertSame(5.0, $rows[1]['R']);
+        $this->assertCount(3, $rows); $this->assertSame(5.0, $rows[1]['R']);
+        $this->assertSame('Plazo Fijo', $rows[2]['H']); $this->assertSame(12.0, $rows[2]['R']);
         $this->assertSame('Titular', $rows[1]['H']);
         $this->assertStringContainsString('7 h titulares justificadas excluidas', $rows[1]['S']);
-        $this->assertEquals(25, array_sum(array_column($rows, 'R')));
+        $this->assertEquals(37, array_sum(array_column($rows, 'R')));
         $this->assertSame($antes, DB::table('dotacion_sobredotacion_justificaciones')->orderBy('id')->get()->toJson());
     }
 

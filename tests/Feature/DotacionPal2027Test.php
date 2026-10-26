@@ -118,14 +118,14 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
                 $this->asignacion(['id' => 3, 'tipo_asignacion' => 'otra_funcion', 'subvencion' => 'SEP', 'horas_contrato' => 5])]]);
         $rows = $this->reporte(['docentes' => [$doc]])['docentes'];
         $this->assertSame(['Titular','Plazo Fijo','Plazo Fijo','Plazo Fijo'], array_column($rows, 'H'));
-        $this->assertEquals(22, array_sum(array_column($rows, 'R')));
+        $this->assertEquals(36, array_sum(array_column($rows, 'R')));
         $this->assertEquals(3, array_sum(array_column($rows, 'P')));
         $this->assertEquals(5, array_sum(array_column($rows, 'Q')));
         $this->assertStringContainsString('14 h', $rows[0]['S']);
-        $this->assertEquals(30, array_sum(array_column($rows, 'R')) + array_sum(array_column($rows, 'P')) + array_sum(array_column($rows, 'Q')));
+        $this->assertEquals(44, array_sum(array_column($rows, 'R')) + array_sum(array_column($rows, 'P')) + array_sum(array_column($rows, 'Q')));
     }
 
-    public function test_parvularia_y_reparto_no_representable_se_marcan_sin_forzar_tablas(): void
+    public function test_regla_especial_sin_titulo_sigue_excluida_y_reparto_6535_se_convierte(): void
     {
         $a = $this->asignacion(['proporcion_aplicada' => 'NT Con JEC · base contractual 55 h', 'horas_contrato' => 55, 'horas_plan_pedagogicas' => 38]);
         $doc = $this->docente(['horas_contrato' => 55, 'horas_planta' => 55, 'asignaciones' => [$a]]);
@@ -134,7 +134,8 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $this->assertNull($row['K']); $this->assertNull($row['M']); $this->assertNull($row['R']);
         $split = $this->reporte(['docentes' => [$this->docente(['horas_planta' => 20, 'horas_contrata' => 24])]])['docentes'];
         $this->assertCount(2, $split);
-        foreach ($split as $r) { $this->assertStringContainsString('INCOMPATIBLE:', $r['S']); }
+        foreach ($split as $r) { $this->assertStringContainsString('Conversión PAL de aula a 65/35:', $r['S']); }
+        $this->assertEquals(44, $this->contratoRepresentado($split));
     }
 
     public function test_saldo_titular_en_otros_conserva_nivel_pendiente_y_art69_expreso(): void

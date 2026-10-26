@@ -188,13 +188,12 @@ La suma de J por docente es 44. Si el contrato es 32 h titular y 12 h a contrata
 las 20 h consideradas consumen primero titular y las 24 h de situación se
 representan como 12 h Otros/Titular y 12 h Otros/Plazo Fijo.
 
-### Horas titulares sin asignar y Sobredotación
+### Horas sin asignar y Sobredotación
 
-Además de las situaciones, se incorpora en **FUNCIÓN Otros / R** únicamente
-el saldo **titular sin asignar**. Los saldos sin asignar de **contrata u otras
-calidades quedan fuera de esta incorporación**. Esta restricción no afecta las
-horas de situaciones docentes: éstas conservan su tratamiento en ambas calidades,
-según la aclaración del usuario.
+Además de las situaciones, se incorporan en **FUNCIÓN Otros / R** los saldos
+**titulares y a plazo fijo sin asignar**, conservando separadas ambas calidades.
+Las otras calidades contractuales sin correspondencia quedan excluidas y se
+detallan en la hoja de exclusiones. Esta representación no crea asignaciones.
 
 Del saldo titular se descuentan las horas con justificación registrada en
 **Sobredotación**, para el mismo establecimiento, RUT normalizado y año **2027**,
@@ -209,12 +208,12 @@ La lectura es una consulta por establecimiento, sin modificar las justificacione
 
 Las reservas activas `reserva_no_normativa`, presentadas como **Horas para otras
 funciones** y financiadas por **General**, se incorporan en **FUNCIÓN Otros / R**
-únicamente por su porción **titular sin justificación en Sobredotación 2027**.
+por su porción **titular sin justificación en Sobredotación 2027** y por su
+porción **a plazo fijo**, sin mezclar calidades.
 No requieren equivalencia de aula en las tablas 65/35 o 60/40: son horas
 cronológicas de reserva. Se conserva la fórmula J = N+O+P+Q+R y se explica su
-clasificación en Observaciones. Las reservas a plazo fijo u otras calidades
-permanecen en Observaciones, sin entradas numéricas y sin confundir esta
-exclusión deliberada con una incompatibilidad de fórmula.
+clasificación en Observaciones. Las reservas de otras calidades quedan fuera
+de las entradas numéricas y se detallan con su motivo en la hoja de exclusiones.
 
 Se respeta el origen `titular` o `contrata` guardado en la reserva, aunque el
 orden de sus ID difiera del de las clases o funciones. Se aparta su capacidad
@@ -245,18 +244,42 @@ completo, se cancela el informe para revisar los datos antes de informar cifras.
 El usuario solicitó conservar estrictamente los criterios de cálculo originales.
 Las instrucciones de la plantilla dicen informar el contrato completo en J, pero
 J en realidad suma N+O+P+Q+R. Se conserva esta fórmula y se completa R con las
-horas de situaciones y los saldos titulares elegibles descritos antes. Un docente
+horas de situaciones, reservas y saldos elegibles descritos antes. Un docente
 con contrato titular de 44 h, 30 distribuidas y sin justificación de Sobredotación
-incluye las otras 14 h en FUNCIÓN Otros y suma 44 h en el PAL. Los saldos a
-contrata y las horas titulares justificadas no se añaden para completar el total.
+incluye las otras 14 h en FUNCIÓN Otros y suma 44 h en el PAL. El saldo a plazo
+fijo también se incorpora; las horas titulares justificadas quedan excluidas.
 
 Cada fila lectiva resultante, consolidada cuando corresponde, se contrasta con
 el mismo rango exacto de BUSCARV que usa el Excel (`A4:D47` en cada tabla). Si
 no existe una equivalencia, o no coincide con el contrato consolidado del SGA,
-la fila queda marcada **INCOMPATIBLE** en S y sus
-entradas numéricas incompatibles quedan vacías. S conserva las horas pedagógicas
-y cronológicas que motivan el problema. J/N/O pueden calcular cero: ese cero **no
-representa ausencia de horas**. No usar esas filas como dotación definitiva.
+se invierte esa misma tabla para representar exactamente el contrato con **horas
+aula equivalentes**, manteniendo la proporción original 65/35 o 60/40. Se usa el
+menor número de bloques exactos, sin redondear el contrato a otro valor. El aula
+real del SGA, el desglose por nivel, el contrato de referencia y cada parte de
+la conversión se conservan en S. Las fórmulas originales N/O/J no cambian.
+Las equivalencias son una adaptación del informe y no representan el aula real.
+Las filas 60/40 siguen separadas; las horas PIE, SEP u Otras de una fila dividida
+se informan una sola vez. Si ni siquiera se puede invertir la tabla exactamente,
+la fila queda **INCOMPATIBLE**, sin entradas numéricas, y en la hoja de excluidos.
+
+### Hoja Excluidos PAL 2027
+
+Ambas descargas añaden esta pestaña con RBD, establecimiento, RUT, nombre,
+calidad contractual, motivo, horas excluidas, detalle, base de referencia y año
+base. Incluye no continuidad para 2027 según la situación registrada en el
+último padrón anterior (2026 mientras sea la fuente vigente), no renovación
+activa de 2027, BIR 2027, horas titulares justificadas en Sobredotación y las
+incompatibilidades que permanezcan. La no renovación tiene prioridad si una
+persona también está marcada sin continuidad, evitando duplicar su contrato.
+El padrón propio de 2027 prevalece sobre decisiones de continuidad de 2026.
+
+La base **Contrato docente** puede conciliarse con el padrón. Los **Cupos o
+plazas sin persona** y las **Asignaciones excedentes** se identifican con otra
+base y no se descuentan nuevamente de las horas del padrón nominal. No se
+reincorporan las personas retiradas a la nómina ni se modifican situaciones,
+asignaciones o justificaciones. El consolidado escribe por establecimiento,
+sin acumular todos los excluidos en memoria; supera 100.000 filas sólo mediante
+un error explícito que cancela la descarga completa.
 
 Esto puede ocurrir con reglas especiales sin la equivalencia autorizada siguiente, fracciones producidas al
 separar contratos, niveles sin desglose y financiamientos
