@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.26.646',
+    'current_version' => '2026.10.26.647',
     'entries' => [
+        [
+            'version' => '2026.10.26.647',
+            'title' => 'Asignaciones de aula completadas con saldo titular y contrata del mismo docente',
+            'summary' => 'Permite una sola asignación cuando el saldo titular es insuficiente y el docente cuenta con saldo propio a contrata para completarla.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Conserva la selección de docentes asociados con al menos una hora titular disponible y permite completar esa asignación con sus horas a contrata, consumiendo primero las titulares y respetando el saldo contractual total.',
+                'Compara la capacidad combinada de los candidatos habilitados al validar prelación, sin incorporar contratas exclusivas a la fase titular ni modificar prioridades, antigüedad o excepciones existentes.',
+                'Muestra en el selector el total asignable y el desglose titular y contrata. Actualiza la ayuda y los errores para evitar exigir que se divida una asignación cubierta por ambos saldos.',
+                'Incluye pruebas aisladas de carga fraccionada, edición, conciliación del bloque, reservas, asociación, límites y prelación. Conserva los contratos y las asignaciones históricas y no requiere migraciones.',
+            ],
+            'published_at' => '2026-10-26',
+        ],
         [
             'version' => '2026.10.26.646',
             'title' => 'Plantillas y actualización parcial del padrón de votación',

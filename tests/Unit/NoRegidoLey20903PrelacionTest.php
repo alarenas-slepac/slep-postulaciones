@@ -72,7 +72,7 @@ class NoRegidoLey20903PrelacionTest extends IsolatedSecurityTestCase
         $this->assertFalse(DotacionProceso2027Calculator::hayPrelacionAnteriorDisponible($docentes, $docentes[0], 5));
     }
 
-    public function test_fase_preferente_admite_contrata_no_regida_y_conserva_el_limite_titular_del_resto(): void
+    public function test_fase_preferente_admite_completar_saldo_titular_con_contrata_propia(): void
     {
         $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
             $this->docente('99000001K', 0, 12, 'No Regido Ley 20903'),
@@ -84,8 +84,10 @@ class NoRegidoLey20903PrelacionTest extends IsolatedSecurityTestCase
         $this->assertSame(12.0, DotacionPlanTitularPrimero::disponibles($docentes[0], 'preferente'));
         $this->assertSame(20.0, DotacionPlanTitularPrimero::disponibles($docentes[1], 'preferente'));
         DotacionPlanTitularPrimero::validar($docentes, $docentes[0], 12, false);
-        $this->expectException(ValidationException::class);
+        $this->assertSame(25.0, DotacionPlanTitularPrimero::saldoAsignable($docentes[1], 'preferente'));
         DotacionPlanTitularPrimero::validar($docentes, $docentes[1], 21, false);
+        $this->expectException(ValidationException::class);
+        DotacionPlanTitularPrimero::validar($docentes, $docentes[1], 26, false);
     }
 
     public function test_la_comparacion_usa_el_saldo_completo_no_regido_y_no_modifica_el_contrato(): void
