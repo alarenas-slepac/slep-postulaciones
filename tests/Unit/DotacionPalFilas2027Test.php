@@ -89,12 +89,14 @@ class DotacionPalFilas2027Test extends TestCase
         $tablas['65/35']['12.0000'] = ['contrato' => 14, 'lectivas' => 9.25, 'no_lectivas' => 4.75];
         $out = (new DotacionPalFilas2027)->consolidar([$this->fila(['K' => 4, '_pal_contrato_aula' => 4]),
             $this->fila(['D' => 'Educación Media', 'L' => 8, '_pal_contrato_aula' => 10])], $tablas);
-        $this->assertCount(2, $out);
-        foreach ($out as $fila) {
-            $this->assertNull($fila['K']); $this->assertNull($fila['L']);
-            $this->assertStringContainsString('INCOMPATIBLE:', $fila['S']);
+        $this->assertCount(3, $out);
+        $this->assertNull($out[0]['K']); $this->assertStringContainsString('INCOMPATIBLE:', $out[0]['S']);
+        foreach (array_slice($out, 1) as $fila) {
+            $this->assertStringContainsString('Conversión PAL de aula a 65/35:', $fila['S']);
             $this->assertArrayNotHasKey('_pal_contrato_aula', $fila);
         }
+        $this->assertSame([null, null, null], array_column($out, 'K'));
+        $this->assertSame([null, 4.0, 4.0], array_column($out, 'L'));
     }
 
     public function test_busca_k_mas_l_y_no_consolida_si_el_total_no_existe_en_la_tabla(): void

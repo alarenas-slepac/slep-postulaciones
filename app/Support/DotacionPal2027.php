@@ -28,15 +28,27 @@ class DotacionPal2027
         $filasDocentes = [];
         // La fuente ya consulta las situaciones exclusivamente del año 2027.
         $docentes = collect($data['docentes'] ?? []);
+        $catalogo = new DotacionPalExclusiones2027;
+        $excluidos = $catalogo->proyeccion($ee);
+        foreach ($docentes->where('exclusion_docente.motivo', 'proceso_bir') as $docente) {
+            $horas = (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0);
+            $excluidos[] = $catalogo->fila($ee, $docente, 'Proceso BIR 2027', $horas,
+                'Persona excluida del PAL por su situación Proceso BIR 2027. Contrato de referencia: '.$horas.' h.');
+        }
         $cantidadBir = $docentes->where('exclusion_docente.motivo', 'proceso_bir')->count();
         $docentes = $docentes->reject(fn ($d) => data_get($d, 'exclusion_docente.motivo') === 'proceso_bir')->values();
         $justificadas = $this->titularesJustificados($ee);
+        $detalleJustificaciones = $justificadas === [] ? [] : $catalogo->justificaciones($ee);
         if ($cantidadBir > 0) { $advertencias[] = 'Se excluyen del PAL '.$cantidadBir.' docente(s) con situación Proceso BIR 2027.'; }
         foreach ($docentes as $docente) {
             $docente['pal_titulares_justificadas'] = $justificadas[DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? null)] ?? 0.0;
-            array_push($filasDocentes, ...$this->docente($ee, $docente, $tablas));
+            $docente['pal_detalle_justificaciones'] = $detalleJustificaciones[DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? null)] ?? '';
+            $filas = $this->docente($ee, $docente, $tablas);
+            $this->registrarExclusiones($ee, $filas, [$docente], $excluidos, $catalogo);
+            array_push($filasDocentes, ...$filas);
         }
         $filasDocentes = (new DotacionPalFilas2027)->consolidar($filasDocentes, $tablas);
+        $this->registrarExclusiones($ee, $filasDocentes, $docentes->all(), $excluidos, $catalogo);
         $incompatibles = count(array_filter($filasDocentes, fn ($row) => str_contains($row['S'], 'INCOMPATIBLE:')));
         if ($incompatibles) { $advertencias[] = $incompatibles.' fila(s) docentes incompatibles: sus horas se describen en Observaciones y no se fuerzan a otra regla.'; }
         if ($docentes->isEmpty()) { $advertencias[] = 'No hay docentes del padrón incluidos en el PAL 2027.'; }
@@ -44,11 +56,34 @@ class DotacionPal2027
         if ($virtuales || count(data_get($data, 'asignacion.plazas_por_asumir', []))) {
             $advertencias[] = 'Las plazas por asumir y cupos sin persona identificada no se exportan como funcionarios.';
         }
+        foreach (collect(data_get($data, 'asignacion.docentes', []))->filter(fn ($d) => isset($d['cupo_contrata_id']))
+            ->concat(data_get($data, 'asignacion.plazas_por_asumir', [])) as $cupo) {
+            $cupo['rut'] = '';
+            $horas = (float) ($cupo['horas_contrato'] ?? 0);
+            $excluidos[] = $catalogo->fila($ee, $cupo, isset($cupo['cupo_contrata_id']) ? 'Cupo por contratar sin persona' : 'Plaza por asumir sin persona',
+                $horas, 'Sin persona identificada para informar en la nómina PAL. '.($cupo['nombre'] ?? ''),
+                'Plazo Fijo', 'Cupo o plaza sin persona', 2027);
+        }
         return ['cursos' => $filasCursos, 'docentes' => $filasDocentes, 'advertencias' => array_values(array_unique($advertencias)),
+            'excluidos' => $excluidos,
             'personas' => $docentes->count(), 'incompatibles' => $incompatibles,
             'anio_padron' => data_get($data, 'resumen.anio_padron'),
             'horas_plan_sga' => (float) data_get($data, 'cursos.resumen_cursos_planes.totales.horas', 0),
             'contrato_plan_sga' => (float) data_get($data, 'cursos.resumen_cursos_planes.totales.horas_contrato_equivalente', 0)];
+    }
+
+    private function registrarExclusiones(Establecimiento $ee, array &$filas, array $docentes, array &$excluidos, DotacionPalExclusiones2027 $catalogo): void
+    {
+        $nomina = collect($docentes)->keyBy(fn ($d) => DotacionEstablecimientoCalculator::normalizeRut($d['rut'] ?? null));
+        foreach ($filas as &$fila) {
+            foreach ($fila['_pal_exclusiones'] ?? [] as $exclusion) {
+                $docente = $nomina->get(DotacionEstablecimientoCalculator::normalizeRut($fila['A'] ?? null), []);
+                $excluidos[] = $catalogo->fila($ee, $docente, $exclusion['motivo'], $exclusion['horas'], $exclusion['detalle'],
+                    $exclusion['calidad'] ?? $fila['H'], $exclusion['base'] ?? 'Contrato docente');
+            }
+            unset($fila['_pal_exclusiones']);
+        }
+        unset($fila);
     }
 
     private function docente(Establecimiento $ee, array $docente, array $tablas): array
@@ -98,8 +133,20 @@ class DotacionPal2027
             (float) $docente['pal_titulares_justificadas'] - $docente['pal_sobredotacion_excluida']);
         array_push($filas, ...$this->filasOtrasHoras($ee, $docente, $capacidades, $pendientes, $tablas));
         if ($filas === []) { $filas[] = $this->fila($ee, $docente, null, 0, $capacidades[0], $pendientes, $tablas); }
+        foreach ($capacidades as $capacidad) {
+            $saldo = max(0.0, round($capacidad['horas'] - $capacidad['usadas'], 2));
+            if ($capacidad['calidad'] === 'Otros' && $saldo > 0) {
+                $filas[0]['_pal_exclusiones'][] = ['motivo' => 'Saldo con calidad contractual sin correspondencia',
+                    'calidad' => 'Otros', 'horas' => $saldo,
+                    'detalle' => 'Saldo sin asignar que no corresponde a horas titulares o a plazo fijo del padrón.'];
+            }
+        }
         $justificadasExcluidas = round($docente['pal_sobredotacion_excluida'] + $reservasExcluidas, 2);
         if ($justificadasExcluidas > 0) {
+            $filas[0]['_pal_exclusiones'][] = ['motivo' => 'Horas titulares justificadas en Sobredotación 2027',
+                'horas' => $justificadasExcluidas, 'calidad' => 'Titular',
+                'detalle' => 'Descuento aplicado una sola vez entre saldo y reservas titulares: '.$justificadasExcluidas.' h. '
+                    .($docente['pal_detalle_justificaciones'] ?? '')];
             foreach ($filas as &$fila) {
                 $fila['S'] .= ' Sobredotación 2027: '.$justificadasExcluidas.' h titulares justificadas excluidas de la incorporación del saldo y las reservas en FUNCIÓN '.self::FUNCION_OTROS.'.';
             }
@@ -178,8 +225,9 @@ class DotacionPal2027
         foreach ($this->capacidadesContrato($completo, $docente) as $capacidad) {
             $actual = $consideradas[$capacidad['calidad']] ?? ['horas' => 0.0, 'usadas' => 0.0];
             $porSituacion = max(0.0, round($capacidad['horas'] - $actual['horas'], 2));
-            $sinAsignar = $capacidad['calidad'] === 'Titular'
-                ? max(0.0, round($actual['horas'] - $actual['usadas'] - $docente['pal_sobredotacion_excluida'], 2)) : 0.0;
+            $sinAsignar = in_array($capacidad['calidad'], ['Titular', 'Plazo Fijo'], true)
+                ? max(0.0, round($actual['horas'] - $actual['usadas']
+                    - ($capacidad['calidad'] === 'Titular' ? $docente['pal_sobredotacion_excluida'] : 0), 2)) : 0.0;
             $total = round($porSituacion + $sinAsignar, 2);
             if ($total <= 0) { continue; }
             $fila = $this->fila($ee, $docente, null, 0, $capacidad, $pendientes, $tablas);
@@ -187,7 +235,8 @@ class DotacionPal2027
             $fila['R'] = $total;
             $detalle = [];
             if ($porSituacion > 0) { $detalle[] = $porSituacion.' h por situación 2027: '.$motivo; }
-            if ($sinAsignar > 0) { $detalle[] = $sinAsignar.' h titulares sin asignación, sin justificación en Sobredotación'; }
+            if ($sinAsignar > 0) { $detalle[] = $sinAsignar.($capacidad['calidad'] === 'Titular'
+                ? ' h titulares sin asignación, sin justificación en Sobredotación' : ' h a plazo fijo sin asignación'); }
             $fila['S'] .= ' Clasificación para el informe PAL: '.$total.' h cronológicas no lectivas en FUNCIÓN '.self::FUNCION_OTROS
                 .' ('.implode('; ', $detalle).'). Calidad contractual: '.$capacidad['calidad'].'.';
             $filas[] = $fila;
@@ -322,7 +371,7 @@ class DotacionPal2027
                 .' Horas no necesarias por la situación: '.$noNecesarias.' h.'
                 .' Las horas excluidas se incorporan en el PAL con FUNCIÓN '.self::FUNCION_OTROS.'.';
         }
-        if ($pendientes > 0) { $notas[] = 'Pendientes de distribución del docente: '.$pendientes.' h. Sólo el saldo titular sin justificación en Sobredotación se incorpora en el PAL con FUNCIÓN '.self::FUNCION_OTROS.'.'; }
+        if ($pendientes > 0) { $notas[] = 'Pendientes de distribución del docente: '.$pendientes.' h. Los saldos titulares y a plazo fijo se incorporan en el PAL con FUNCIÓN '.self::FUNCION_OTROS.'; del saldo titular se descuentan las horas justificadas en Sobredotación.'; }
         $problemas = [];
         if ($grupo) {
             $factor = $grupo['contrato'] > 0 ? $parte / $grupo['contrato'] : 0;
@@ -342,7 +391,14 @@ class DotacionPal2027
                 }
             } elseif ($grupo['columna'] === 'reserva') {
                 if (! $exceso && $capacidad['calidad'] === 'Titular') { $fila['_pal_reserva_titular'] = $parte; }
-                elseif (! $exceso) { $notas[] = 'Reserva '.$capacidad['calidad'].' excluida de las entradas numéricas del PAL: sólo se incorporan reservas titulares sin justificación en Sobredotación.'; }
+                elseif (! $exceso && $capacidad['calidad'] === 'Plazo Fijo') {
+                    $fila['R'] = $parte;
+                    $notas[] = 'Reserva a plazo fijo incorporada en FUNCIÓN '.self::FUNCION_OTROS.' y columna R.';
+                } elseif (! $exceso) {
+                    $notas[] = 'Reserva '.$capacidad['calidad'].' excluida: calidad contractual sin correspondencia en la incorporación de reservas del PAL.';
+                    $fila['_pal_exclusiones'][] = ['motivo' => 'Reserva con calidad contractual sin correspondencia', 'horas' => $parte,
+                        'detalle' => 'La reserva no corresponde a una capacidad titular o a plazo fijo del padrón.'];
+                }
                 if ($grupo['reserva_origen'] === null) { $notas[] = 'Reserva histórica sin origen contractual: calidad inferida del contrato disponible, primero titular.'; }
             } elseif ($grupo['columna'] === 'incompatible') {
                 $problemas[] = 'financiamiento sin equivalencia en el formato';
@@ -350,7 +406,13 @@ class DotacionPal2027
             $notas[] = 'Asignación SGA: '.$parte.' h cronológicas. '.implode('; ', array_unique($grupo['detalle'])).'.';
         }
         if ($fila['D'] === '') { $notas[] = 'Nivel pendiente de identificar en las categorías del formato PAL.'; }
-        if ($problemas !== []) { $notas[] = 'INCOMPATIBLE: '.implode('; ', $problemas).'. Estas horas no se cargan en las entradas numéricas; J/N/O no representan este tramo.'; }
+        if ($problemas !== []) {
+            $detalleProblema = implode('; ', $problemas);
+            $notas[] = 'INCOMPATIBLE: '.$detalleProblema.'. Estas horas no se cargan en las entradas numéricas; J/N/O no representan este tramo.';
+            $fila['_pal_exclusiones'][] = ['motivo' => $exceso ? 'Asignación excede capacidad contractual' : 'Asignación sin representación PAL',
+                'horas' => $parte, 'base' => $exceso ? 'Asignación excedente' : 'Contrato docente',
+                'detalle' => $detalleProblema.'. '.implode('; ', array_unique($grupo['detalle'])).'.'];
+        }
         $fila['S'] = implode(' ', $notas);
         return $fila;
     }

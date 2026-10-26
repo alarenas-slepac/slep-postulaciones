@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.25.643',
+    'current_version' => '2026.10.25.644',
     'entries' => [
+        [
+            'version' => '2026.10.25.644',
+            'title' => 'PAL: contrato completo a plazo fijo, aula equivalente y detalle de exclusiones',
+            'summary' => 'Incorpora saldos y reservas a plazo fijo y convierte el aula sin equivalencia directa conservando el contrato y las fórmulas originales.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Incluye saldo sin asignación y reservas de General a plazo fijo en FUNCIÓN Otros/R. Conserva por separado titular y contrata y descuenta Sobredotación justificada sólo del saldo y las reservas titulares, una vez.',
+                'Invierte las tablas efectivas 65/35 y 60/40 para representar exactamente el contrato de aula que no coincide directamente, con el menor número de bloques. Mantiene las fórmulas N/O/J, el aula real SGA en Observaciones y las filas 60/40 separadas.',
+                'Añade Excluidos PAL 2027 a ambas descargas: motivo, horas, calidad, detalle y año base. Incluye personas sin continuidad según la situación del padrón anterior, no renovaciones activas, BIR, Sobredotación e incompatibilidades restantes, sin duplicar contratos.',
+                'Distingue el padrón docente de los cupos sin persona y de las asignaciones excedentes. No modifica registros ni bases de datos y escribe el detalle del consolidado por establecimiento.',
+            ],
+            'published_at' => '2026-10-25',
+        ],
         [
             'version' => '2026.10.25.643',
             'title' => 'Reservas titulares elegibles en función Otros del PAL',

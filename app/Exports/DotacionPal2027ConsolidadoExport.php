@@ -31,6 +31,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
         $zip = new ZipArchive;
         $abierto = false;
         $eeHandle = $docHandle = null;
+        $exclusiones = null;
         try {
             if (! copy($this->template(), $path) || $zip->open($path) !== true) { throw new \RuntimeException('No se pudo abrir la plantilla PAL.'); }
             $abierto = true;
@@ -38,6 +39,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             $ee = $this->esquema($zip, $partes['Info Establecimiento'], 4, 34);
             $docs = $this->esquema($zip, $partes['Info Funcionario (DOCENTE)'], 3, 94);
             $styles = $this->xml($zip, 'xl/styles.xml');
+            $exclusiones = new DotacionPalExclusiones2027Export($styles);
             $eeRows = $temporales[] = $this->temporal();
             $docRows = $temporales[] = $this->temporal();
             $eeHandle = fopen($eeRows, 'wb'); $docHandle = fopen($docRows, 'wb');
@@ -47,6 +49,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             $eeNumero = 4; $docNumero = 3; $cantidad = 0; $wrapped = []; $sinEstilos = [];
             foreach ($reportes as $reporte) {
                 $cantidad++;
+                $exclusiones->agregar($reporte['excluidos'] ?? []);
                 foreach ($reporte['cursos'] as $entry) {
                     $this->fila($eeHandle, $ee, $eeNumero++, $entry, ['G'], $styles, $wrapped);
                 }
@@ -76,6 +79,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             foreach ($table->getElementsByTagNameNS(self::NS, 'autoFilter') as $filter) { $filter->setAttribute('ref', 'A1:S'.$docLast); }
             $this->reemplazar($zip, 'xl/tables/table1.xml', $table);
             $this->resumen($zip, $partes['Resumen'], $cantidad, $eeLast, $docLast);
+            $exclusiones->incorporar($zip);
             if (! $zip->close()) { throw new \RuntimeException('No se pudo finalizar el consolidado PAL.'); }
             $abierto = false;
             return ['establecimientos' => $cantidad, 'niveles' => $eeDatos, 'filas_docentes' => $docDatos];
@@ -83,6 +87,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             if (is_resource($eeHandle)) { fclose($eeHandle); }
             if (is_resource($docHandle)) { fclose($docHandle); }
             if ($abierto) { $zip->close(); }
+            $exclusiones?->cerrar();
             foreach ($temporales as $temporal) { if (is_file($temporal)) { unlink($temporal); } }
         }
     }

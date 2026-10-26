@@ -80,10 +80,10 @@ class DotacionPal2027ReservasTest extends IsolatedSecurityTestCase
         $report = $this->reporte($this->docente([$reserva, $funcion], ['horas_planta' => 20, 'horas_contrata' => 24]));
         $this->assertSame(0, $report['incompatibles']);
         $this->assertSame('Plazo Fijo', $report['docentes'][0]['H']);
-        $this->assertNull($report['docentes'][0]['R']);
-        $this->assertStringContainsString('Reserva Plazo Fijo excluida', $report['docentes'][0]['S']);
+        $this->assertSame(12.0, $report['docentes'][0]['R']);
+        $this->assertStringContainsString('Reserva a plazo fijo incorporada', $report['docentes'][0]['S']);
         $this->assertSame(['Titular', 'Plazo Fijo'], array_column(array_slice($report['docentes'], 1), 'H'));
-        $this->assertEquals(32, array_sum(array_column($report['docentes'], 'R')));
+        $this->assertEquals(44, array_sum(array_column($report['docentes'], 'R')));
     }
 
     public function test_justificacion_compartida_se_descuenta_una_vez_entre_saldo_y_reserva(): void
@@ -108,8 +108,8 @@ class DotacionPal2027ReservasTest extends IsolatedSecurityTestCase
         $otros = array_values(array_filter($report['docentes'], fn ($r) => $r['G'] === 'Otros (Talleristas / Apoyo / etc.)'));
         $this->assertSame(0, $report['incompatibles']);
         $this->assertSame(['Titular', 'Plazo Fijo'], array_column($otros, 'H'));
-        $this->assertSame([10.0, null], array_column($otros, 'R'));
-        $this->assertEquals(40, array_sum(array_column($report['docentes'], 'R')));
+        $this->assertSame([10.0, 4.0], array_column($otros, 'R'));
+        $this->assertEquals(44, array_sum(array_column($report['docentes'], 'R')));
     }
 
     public function test_justificacion_superior_al_saldo_y_reserva_no_resta_funciones_ni_situaciones(): void
@@ -129,12 +129,12 @@ class DotacionPal2027ReservasTest extends IsolatedSecurityTestCase
         $this->assertEquals(34, array_sum(array_column($rows, 'R')));
     }
 
-    public function test_reserva_historica_sin_origen_se_limita_a_la_capacidad_titular(): void
+    public function test_reserva_historica_sin_origen_se_reparte_por_capacidad_de_cada_calidad(): void
     {
         $report = $this->reporte($this->docente([$this->reserva(44, null)], ['horas_planta' => 20, 'horas_contrata' => 24]));
         $this->assertSame(0, $report['incompatibles']);
         $this->assertSame(['Titular', 'Plazo Fijo'], array_column($report['docentes'], 'H'));
-        $this->assertSame([20.0, null], array_column($report['docentes'], 'R'));
+        $this->assertSame([20.0, 24.0], array_column($report['docentes'], 'R'));
         $this->assertStringContainsString('Reserva histórica sin origen', $report['docentes'][0]['S']);
     }
 
@@ -142,7 +142,7 @@ class DotacionPal2027ReservasTest extends IsolatedSecurityTestCase
     {
         $report = $this->reporte($this->docente([$this->funcion(38), $this->reserva(6)], ['horas_planta' => 4, 'horas_contrata' => 40]));
         $this->assertSame(1, $report['incompatibles']);
-        $this->assertEquals(42, array_sum(array_column($report['docentes'], 'R')));
+        $this->assertEquals(44, array_sum(array_column($report['docentes'], 'R')));
         $this->assertStringContainsString('reserva excede las horas de su calidad', $report['docentes'][2]['S']);
         foreach (['PIE', 'SEP', 'Fondo sin equivalencia'] as $fondos) {
             $report = $this->reporte($this->docente([$this->reserva(44)->forceFill(['subvencion' => $fondos])]));
@@ -152,7 +152,7 @@ class DotacionPal2027ReservasTest extends IsolatedSecurityTestCase
         }
     }
 
-    public function test_fracciones_del_reparto_no_se_ocultan_al_excluir_la_reserva_contrata(): void
+    public function test_fracciones_reales_se_detallan_al_convertir_aula_e_incorporar_reserva_contrata(): void
     {
         $curso = (new EstablecimientoCurso)->setRelation('curso', (new Curso)->forceFill(['codigo' => '1B']));
         $aula = $this->funcion(35)->forceFill(['tipo_asignacion' => 'plan_estudio', 'horas_plan_pedagogicas' => 30,
@@ -161,14 +161,14 @@ class DotacionPal2027ReservasTest extends IsolatedSecurityTestCase
             $this->funcion(3)->forceFill(['id' => 3, 'tipo_asignacion' => 'plan_normativo']),
             $this->funcion(2)->forceFill(['id' => 4, 'tipo_asignacion' => 'pie_colaborativo', 'subvencion' => 'PIE'])],
             ['horas_planta' => 12, 'horas_contrata' => 32]));
-        $this->assertSame(2, $report['incompatibles']);
-        $this->assertStringContainsString('10.2857 h pedagógicas / 12 h', $report['docentes'][0]['S']);
-        $this->assertStringContainsString('19.7143 h pedagógicas / 23 h', $report['docentes'][1]['S']);
+        $this->assertSame(0, $report['incompatibles']);
+        $this->assertStringContainsString('10.2857 h pedagógicas reales', $report['docentes'][0]['S']);
+        $this->assertStringContainsString('19.7143 h pedagógicas reales', $report['docentes'][1]['S']);
         $this->assertSame('Plazo Fijo', $report['docentes'][2]['H']);
-        // La reserva excluida puede compartir fila con el plan normativo de 3 h.
-        $this->assertSame(3.0, $report['docentes'][2]['R']);
-        $this->assertStringContainsString('Reserva Plazo Fijo excluida', $report['docentes'][2]['S']);
-        $this->assertEquals(3, array_sum(array_column($report['docentes'], 'R')));
+        // Reserva 1,25 + plan normativo 3 + saldo 2,75, sin duplicar.
+        $this->assertSame(7.0, $report['docentes'][2]['R']);
+        $this->assertStringContainsString('Reserva a plazo fijo incorporada', $report['docentes'][2]['S']);
+        $this->assertEquals(7, array_sum(array_column($report['docentes'], 'R')));
         $this->assertEquals(2, array_sum(array_column($report['docentes'], 'P')));
     }
 

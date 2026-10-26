@@ -30,7 +30,8 @@ class DotacionPal2027DocenciaConsolidadaTest extends IsolatedSecurityTestCase
         $doc = $this->docente();
         $antes = json_encode($doc); $establecimientos = DB::table('establecimientos')->get()->toJson();
         $report = $this->reporte($doc);
-        $this->assertCount(1, $report['docentes']); $this->assertSame(0, $report['incompatibles']);
+        $this->assertCount(2, $report['docentes']); $this->assertSame(0, $report['incompatibles']);
+        $this->assertSame(1.0, $report['docentes'][1]['R']);
         $this->assertSame(1, $report['personas']);
         $fila = $report['docentes'][0];
         $this->assertSame('Plazo Fijo', $fila['H']); $this->assertSame('Docente aula', $fila['G']);
@@ -57,27 +58,29 @@ class DotacionPal2027DocenciaConsolidadaTest extends IsolatedSecurityTestCase
                 $this->assertEquals(5, $sheet->getCell('O3')->getCalculatedValue());
                 $this->assertStringStartsWith('=', $sheet->getCell('J3')->getValue());
                 $this->assertStringNotContainsString('INCOMPATIBLE:', (string) $sheet->getCell('S3')->getValue());
-                $this->assertNull($sheet->getCell('A4')->getValue());
+                $this->assertEquals(1, $sheet->getCell('J4')->getCalculatedValue());
+                $this->assertNull($sheet->getCell('A5')->getValue());
             } finally { $book->disconnectWorksheets(); }
         }
     }
 
-    public function test_si_el_total_tampoco_coincide_se_mantienen_las_incompatibilidades(): void
+    public function test_si_el_total_tampoco_coincide_se_convierten_los_tramos_sin_mezclar_niveles(): void
     {
         $report = $this->reporte($this->docente(['asignaciones' => [$this->asignacion('1B', 4, 4), $this->asignacion('1M', 8, 11)]]));
-        $this->assertSame(2, $report['incompatibles']); $this->assertCount(2, $report['docentes']);
+        $this->assertSame(0, $report['incompatibles']); $this->assertCount(3, $report['docentes']);
         foreach ($report['docentes'] as $fila) {
-            $this->assertNull($fila['K']); $this->assertNull($fila['L']); $this->assertNull($fila['M']);
-            $this->assertStringContainsString('INCOMPATIBLE:', $fila['S']);
+            $this->assertSame('65/35', $fila['M']);
+            $this->assertStringContainsString('Conversión PAL de aula a 65/35:', $fila['S']);
             $this->assertArrayNotHasKey('_pal_contrato_aula', $fila);
         }
+        $this->assertNull($report['docentes'][0]['L']); $this->assertNull($report['docentes'][1]['K']);
     }
 
     public function test_no_rescata_el_total_cruzando_titular_con_plazo_fijo(): void
     {
         $report = $this->reporte($this->docente(['horas_contrato_base' => 14, 'horas_contrato' => 14, 'horas_planta' => 4, 'horas_contrata' => 10]));
         $this->assertSame(['Titular', 'Plazo Fijo'], array_column($report['docentes'], 'H'));
-        $this->assertSame(2, $report['incompatibles']);
+        $this->assertSame(0, $report['incompatibles']);
     }
 
     public function test_6040_sigue_separada_aunque_su_contrato_conjunto_si_sea_representable(): void
@@ -85,7 +88,7 @@ class DotacionPal2027DocenciaConsolidadaTest extends IsolatedSecurityTestCase
         $report = $this->reporte($this->docente(['asignaciones' => [
             $this->asignacion('1B', 4, 4, '60/40'), $this->asignacion('1M', 8, 11, '60/40'),
         ]]));
-        $this->assertSame(2, $report['incompatibles']); $this->assertCount(2, $report['docentes']);
+        $this->assertSame(0, $report['incompatibles']); $this->assertCount(2, $report['docentes']);
         foreach ($report['docentes'] as $fila) { $this->assertStringContainsString('60/40 queda excluida', $fila['S']); }
     }
 
@@ -94,7 +97,7 @@ class DotacionPal2027DocenciaConsolidadaTest extends IsolatedSecurityTestCase
         $report = $this->reporte($this->docente(['asignaciones' => [
             $this->asignacion('EPJA_SIN_DETALLE', 4, 4), $this->asignacion('1M', 8, 10),
         ]]));
-        $this->assertSame(2, $report['incompatibles']);
+        $this->assertSame(1, $report['incompatibles']);
         $this->assertStringContainsString('falta desglose del nivel', $report['docentes'][0]['S']);
         $report = $this->reporte($this->docente(['horas_contrato_base' => 88, 'horas_contrato' => 88, 'horas_contrata' => 88,
             'asignaciones' => [$this->asignacion('1B', 38, 44), $this->asignacion('1M', 38, 44)]]));
