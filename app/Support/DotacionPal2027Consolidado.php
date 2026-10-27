@@ -8,12 +8,15 @@ use Illuminate\Validation\ValidationException;
 
 class DotacionPal2027Consolidado
 {
-    public function __construct(private readonly DotacionPal2027 $formato) {}
+    public function __construct(private readonly DotacionPal2027 $formato, private readonly DotacionPalPersonal2027 $personal) {}
 
     public function establecimientos(): Builder
     {
-        // Mismo universo del listado de Dotación; no hereda filtros ni paginación.
-        return Establecimiento::query()->where(fn ($q) => $q->whereNull('sala_cuna')->orWhere('sala_cuna', false))
+        // No hereda filtros. Añade jardines con personal histórico AAEE/JUNJI.
+        return Establecimiento::query()->where(function ($q): void {
+            $q->whereNull('sala_cuna')->orWhere('sala_cuna', false);
+            if ($this->personal->disponible()) { $q->orWhereIn('rbd', $this->personal->fuente()->select('rbd')); }
+        })
             ->orderBy('rbd')->orderBy('id');
     }
 
@@ -21,10 +24,16 @@ class DotacionPal2027Consolidado
     {
         foreach ($this->establecimientos()->lazy(10) as $ee) {
             try {
-                $reporte = $this->formato->construir($ee, $this->formato->datos($ee), $tablas);
+                // Los jardines sólo aportan personal VTF; no se les proyecta un
+                // plan escolar ni una nómina docente que no forman parte del proceso.
+                $reporte = $ee->sala_cuna ? ['cursos' => [], 'docentes' => []]
+                    : $this->formato->construir($ee, $this->formato->datos($ee), $tablas);
+                $reporte += $this->personal->construir($ee);
                 if ($reporte['cursos'] === []) {
                     $reporte['cursos'][] = ['A' => (string) $ee->nombre_establecimiento, 'B' => (string) $ee->rbd,
-                        'C' => 'Sin cursos registrados para 2027; revisar SGA', 'D' => 0, 'E' => 0, 'F' => null, 'H' => null];
+                        'C' => $ee->sala_cuna ? 'Jardín VTF · referencia de personal 08/2026'
+                            : 'Sin cursos registrados para 2027; revisar SGA',
+                        'D' => $ee->sala_cuna ? null : 0, 'E' => $ee->sala_cuna ? null : 0, 'F' => null, 'H' => null];
                 }
             } catch (\Throwable $error) {
                 report($error);

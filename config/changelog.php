@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.27.652',
+    'current_version' => '2026.10.27.653',
     'entries' => [
+        [
+            'version' => '2026.10.27.653',
+            'title' => 'Personal AAEE y JUNJI de agosto de 2026 en Excel PAL 2027',
+            'summary' => 'Completa las hojas AE y VTF del PAL con el padrón histórico de agosto de 2026, excluyendo reemplazos y suplencias.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Utiliza exclusivamente reemplazos_personal de 08/2026 para AAEE/JUNJI, aunque existan cargas posteriores. Identifica VTF por financiamiento o estatuto JUNJI y por jardín, sin duplicar sus líneas en AE.',
+                'Agrupa contratos compatibles por RUT normalizado, RBD, cargo, nivel y calidad; informa jornada total y componentes PIE/SEP. Conserva nombre y origen en Observaciones y deja sin inventar las horas lectivas no informadas.',
+                'Incluye en el consolidado jardines con personal elegible, sin proyectarles cursos escolares. Amplía los rangos y validaciones de AE, VTF y Resumen manteniendo las fórmulas y el procesamiento por tramos.',
+                'Añade PROFESIONAL a la validación de Cargo de VTF y lo vincula con Otros asistentes de la educación en Función, incluidos fonoaudiólogos y terapeutas ocupacionales del padrón.',
+                'Actualiza las indicaciones de descarga y documentación e incorpora pruebas aisladas de filtros, agrupación, clasificación, permisos existentes y exportaciones. No requiere migraciones ni cambios en recursos compilados.',
+            ],
+            'published_at' => '2026-10-27',
+        ],
         [
             'version' => '2026.10.27.652',
             'title' => 'Selección de horas parciales al crear cupos BIR',

@@ -23,12 +23,14 @@ dotación. No habilita datos de matrícula para el rol directivo.
   Esta selección se aplica por establecimiento. No se supone que Git sincronice
   bases de datos ni que el ambiente local tenga lo ingresado en producción.
 - Se completan **Info Establecimiento** e **Info Funcionario (DOCENTE)**.
-  Asistentes y VTF conservan encabezados, pero quedan sin registros. Los docentes
+  **Info Funcionario(AE)** e **Info Funcionario (VTF)** usan exclusivamente
+  `reemplazos_personal` de **08/2026**, conforme al criterio detallado abajo. Los docentes
   por contratar y directivos por asumir se incorporan con identidades sintéticas
   y una indicación explícita de su condición pendiente.
 - Universo: los mismos establecimientos del listado de Dotación, con `sala_cuna`
-  falso o nulo. Se procesan ordenados por RBD. Las salas cuna/VTF mantienen su
-  exclusión anterior. Un establecimiento sin cursos 2027 aparece en
+  falso o nulo, más los jardines con personal AAEE/JUNJI elegible de 08/2026.
+  Se procesan ordenados por RBD. Los jardines aportan personal VTF y una fila
+  identificativa sin cursos ni proyección escolar. Un establecimiento sin cursos 2027 aparece en
   **Info Establecimiento** con su RBD y la indicación de que faltan registros.
 - **Resumen** obtiene los RBD desde **Info Establecimiento**, a solicitud del
   usuario, para incluir también los establecimientos sin funcionarios. Se conserva
@@ -39,6 +41,53 @@ dotación. No habilita datos de matrícula para el rol directivo.
   visibles del listado y del detalle generan el consolidado.
 
 ## Mapeo
+
+### Asistentes y jardines VTF: referencia de agosto de 2026
+
+Se selecciona `anio=2026`, `mes=8`, estatuto **AAEE o JUNJI**, sin usar el alcance
+de padrón vigente: una carga posterior no reemplaza esta referencia histórica.
+Se excluye cualquier tipo contractual que contenga `REEMPLAZ` o `SUPLEN`, sin
+distinguir mayúsculas. No se cambia la fuente docente de 2027 ni su proyección.
+
+La fuente histórica también identifica JUNJI mediante **financiamiento**, con
+estatuto AAEE. Por eso cada línea con financiamiento JUNJI, estatuto JUNJI o de
+un establecimiento `sala_cuna` se dirige sólo a VTF; el resto AAEE va a AE.
+La asociación usa el RBD histórico, incluso si `establecimiento_id` es nulo.
+Los jardines con personal elegible se incluyen en el consolidado y en Resumen.
+No se fabrican establecimientos para RBD inexistentes en el catálogo.
+
+Se normaliza el RUT y se agrupan las líneas por persona, RBD, hoja, cargo,
+calidad contractual y nivel (este último sólo en AE). Se suman las jornadas de
+los financiamientos sin repetir una misma línea contractual importada con
+distinta representación del RUT. Calidades distintas y cargos distintos siguen
+en filas separadas; el conteo nativo del resumen usa RUT únicos por RBD.
+Se usa `jornada`; sólo si es nula se suman `jornada_basica` y `jornada_media`.
+
+| Hoja | Mapeo |
+| --- | --- |
+| AE A–C | RUT normalizado, establecimiento y RBD |
+| AE D | Nivel único del establecimiento, o nivel inequívoco del desglose Básica/Media. Se deja vacío si no se individualiza, especialmente con Parvularia y Básica combinadas |
+| AE E–H | Asistente de la Educación; escalafón; función Administrativo, Auxiliares, Técnicos o Profesionales; calidad Indefinido, Plazo Fijo u Otros |
+| AE I, K–L | Contrato total, horas de financiamiento PIE y SEP. PIE/SEP son componentes del contrato, no horas adicionales |
+| VTF D–G | Estamento y cargo según escalafón; función Directiva, Educadora de Párvulos, Técnico de Educación Parvularia u Otros asistentes; calidad contractual |
+| VTF H | Contrato total |
+| AE J / VTF I | Vacías: la fuente no informa horas lectivas; no se deducen de la jornada contractual |
+| AE M / VTF J | Nombre, origen 08/2026, cargo/tipo/financiamiento originales y datos pendientes de clasificación |
+
+`INDEFINID…` se representa como Indefinido; Plazo Fijo y Contrata como Plazo Fijo.
+Otros tipos conservan su descripción en Observaciones. En VTF, directoras y
+encargadas educadoras se clasifican en Función Directiva; educadoras en Educadora
+de Párvulos; técnicos en Técnico de Educación Parvularia; los demás en Otros
+asistentes. La validación de **VTF E** añade **PROFESIONAL** a sus opciones;
+profesionales, fonoaudiólogos y terapeutas ocupacionales usan ese cargo y
+**Otros asistentes de la educación** en F. Los cargos sin opción exacta quedan
+vacíos con su origen en Observaciones.
+No se inventan títulos ni fechas. Los encabezados y listas de la plantilla se
+conservan y sus rangos, junto con los del resumen, se amplían a todas las filas.
+El consolidado escribe las cuatro hojas por tramos, con un máximo explícito de
+100.000 filas por hoja de funcionarios. La descarga individual admite 10.000.
+
+### Establecimientos y docentes
 
 | Hoja / columnas | Fuente y criterio |
 | --- | --- |

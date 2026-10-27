@@ -31,6 +31,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
         $zip = new ZipArchive;
         $abierto = false;
         $eeHandle = $docHandle = null;
+        $personal = [];
         $exclusiones = null;
         try {
             if (! copy($this->template(), $path) || $zip->open($path) !== true) { throw new \RuntimeException('No se pudo abrir la plantilla PAL.'); }
@@ -39,6 +40,14 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             $ee = $this->esquema($zip, $partes['Info Establecimiento'], 4, 34);
             $docs = $this->esquema($zip, $partes['Info Funcionario (DOCENTE)'], 3, 94);
             $styles = $this->xml($zip, 'xl/styles.xml');
+            foreach (['asistentes' => ['Info Funcionario(AE)', 204, 'M', ['B','M']], 'vtf' => ['Info Funcionario (VTF)', 133, 'J', ['B','J']]] as $key => [$nombre, $fin, $columna, $textos]) {
+                $modelo = $this->esquema($zip, $partes[$nombre], 3, $fin);
+                $filas = $temporales[] = $this->temporal();
+                $handle = fopen($filas, 'wb');
+                if (! $handle) { throw new \RuntimeException('No se pudo preparar el personal AE/VTF del PAL.'); }
+                $personal[$key] = compact('nombre', 'modelo', 'filas', 'handle', 'fin', 'columna', 'textos') + ['numero' => 3, 'wrapped' => []];
+                foreach ($modelo['encabezados'] as $row) { $this->escribir($handle, $modelo['doc']->saveXML($row)); }
+            }
             $exclusiones = new DotacionPalExclusiones2027Export($styles);
             $eeRows = $temporales[] = $this->temporal();
             $docRows = $temporales[] = $this->temporal();
@@ -56,6 +65,15 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
                 foreach ($reporte['docentes'] as $entry) {
                     $this->fila($docHandle, $docs, $docNumero++, $entry, ['J','N','O'], $styles, $wrappedDocs);
                 }
+                foreach ($personal as $key => &$hoja) {
+                    foreach ($reporte[$key] ?? [] as $entry) {
+                        if ($hoja['numero'] > 100002) {
+                            throw ValidationException::withMessages(['pal' => 'El consolidado supera 100.000 filas de personal AE/VTF por hoja. No se generó un archivo incompleto.']);
+                        }
+                        $this->fila($hoja['handle'], $hoja['modelo'], $hoja['numero']++, $entry, [], $styles, $hoja['wrapped'], $hoja['textos']);
+                    }
+                }
+                unset($hoja);
                 if ($eeNumero > 10004 || $docNumero > 100003 || $cantidad > 10000) {
                     throw ValidationException::withMessages(['pal' => 'El consolidado supera el límite de 100.000 filas docentes, 10.000 niveles o 10.000 establecimientos. No se generó un archivo incompleto.']);
                 }
@@ -73,19 +91,35 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             if (! $zip->addFile($eeSheet, $partes['Info Establecimiento']) || ! $zip->addFile($docSheet, $partes['Info Funcionario (DOCENTE)'])) {
                 throw new \RuntimeException('No se pudieron incorporar las hojas PAL.');
             }
+            $personalLast = [];
+            foreach ($personal as &$hoja) {
+                while ($hoja['numero'] <= $hoja['fin']) {
+                    $this->fila($hoja['handle'], $hoja['modelo'], $hoja['numero']++, [], [], $styles, $hoja['wrapped'], $hoja['textos']);
+                }
+                fclose($hoja['handle']); $hoja['handle'] = null;
+                $last = $personalLast[$hoja['nombre']] = $hoja['numero'] - 1;
+                $sheet = $temporales[] = $this->temporal();
+                if ($hoja['nombre'] === 'Info Funcionario (VTF)') { $this->validacionProfesionalVtf($hoja['modelo']['doc']); }
+                $this->validaciones($hoja['modelo']['doc'], $last);
+                $this->componer($hoja['modelo'], $hoja['filas'], $sheet, $hoja['columna'], $last);
+                if (! $zip->addFile($sheet, $partes[$hoja['nombre']])) { throw new \RuntimeException('No se pudo incorporar el personal AE/VTF al PAL.'); }
+            }
+            unset($hoja);
             $this->reemplazar($zip, 'xl/styles.xml', $styles);
             $table = $this->xml($zip, 'xl/tables/table1.xml');
             $table->documentElement->setAttribute('ref', 'A1:S'.$docLast);
             foreach ($table->getElementsByTagNameNS(self::NS, 'autoFilter') as $filter) { $filter->setAttribute('ref', 'A1:S'.$docLast); }
             $this->reemplazar($zip, 'xl/tables/table1.xml', $table);
-            $this->resumen($zip, $partes['Resumen'], $cantidad, $eeLast, $docLast);
+            $this->resumen($zip, $partes['Resumen'], $cantidad, $eeLast, $docLast, $personalLast);
             $exclusiones->incorporar($zip);
             if (! $zip->close()) { throw new \RuntimeException('No se pudo finalizar el consolidado PAL.'); }
             $abierto = false;
             return ['establecimientos' => $cantidad, 'niveles' => $eeDatos, 'filas_docentes' => $docDatos];
         } finally {
+            unset($hoja);
             if (is_resource($eeHandle)) { fclose($eeHandle); }
             if (is_resource($docHandle)) { fclose($docHandle); }
+            foreach ($personal as $hoja) { if (is_resource($hoja['handle'])) { fclose($hoja['handle']); } }
             if ($abierto) { $zip->close(); }
             $exclusiones?->cerrar();
             foreach ($temporales as $temporal) { if (is_file($temporal)) { unlink($temporal); } }
@@ -124,11 +158,11 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
         return ['doc' => $doc, 'filas' => $rows, 'encabezados' => $headers, 'fin' => $fin];
     }
 
-    private function fila($handle, array $esquema, int $numero, array $entry, array $calculadas, ?DOMDocument $styles, array &$wrapped): void
+    private function fila($handle, array $esquema, int $numero, array $entry, array $calculadas, ?DOMDocument $styles, array &$wrapped, ?array $textos = null): void
     {
         $row = $esquema['filas'][min($numero, $esquema['fin'])]->cloneNode(true);
         $row->setAttribute('r', (string) $numero);
-        $this->rellenarFila($esquema['doc'], $row, $entry, $calculadas, $styles, $wrapped);
+        $this->rellenarFila($esquema['doc'], $row, $entry, $calculadas, $styles, $wrapped, $textos);
         $this->escribir($handle, $esquema['doc']->saveXML($row));
     }
 
@@ -149,7 +183,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
         } finally { if (is_resource($in)) { fclose($in); } if (is_resource($out)) { fclose($out); } }
     }
 
-    private function resumen(ZipArchive $zip, string $part, int $cantidad, int $eeLast, int $docLast): void
+    private function resumen(ZipArchive $zip, string $part, int $cantidad, int $eeLast, int $docLast, array $personalLast): void
     {
         $doc = $this->xml($zip, $part);
         $sheetData = $doc->getElementsByTagNameNS(self::NS, 'sheetData')->item(0);
@@ -194,6 +228,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
                 }
             }
         }
+        $this->extenderResumenPersonal($doc, $personalLast);
         $doc->getElementsByTagNameNS(self::NS, 'dimension')->item(0)->setAttribute('ref', 'A1:S'.$last);
         $this->reemplazar($zip, $part, $doc);
     }
