@@ -43,8 +43,9 @@ class DotacionContrataHabilitacionController extends Controller
             'cupos.*' => ['required', 'string', 'distinct', 'regex:/^\d+:(plan_estudio|parvularia|pie)$/D'],
             'huellas' => ['required', 'array', 'max:1000'],
             'huellas.*' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D'],
+            'horas' => ['required', 'array', 'min:1', 'max:1000'],
         ]);
-        $creados = $service->generar($establecimiento, (int) $data['anio'], $data['cupos'], $data['huellas'], $request->user()?->id);
+        $creados = $service->generar($establecimiento, (int) $data['anio'], $data['cupos'], $data['huellas'], $request->user()?->id, $data['horas']);
 
         return redirect()->route('admin.dotacion-establecimiento.bir.index', [$establecimiento, 'anio' => $data['anio']])
             ->with('success', $creados.' cupo(s) BIR creado(s). Los cupos ya existentes no se duplicaron. Sus horas cuentan en la dotación del año destino y quedan sin asignaciones.');

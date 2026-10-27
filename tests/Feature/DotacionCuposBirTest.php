@@ -147,6 +147,107 @@ class DotacionCuposBirTest extends IsolatedSecurityTestCase
         $this->assertDatabaseMissing('dotacion_docente_asignaciones', ['anio' => 2027]);
     }
 
+    #[DataProvider('titulos')]
+    public function test_permite_crear_14_de_34_horas_y_suma_solo_la_seleccion_al_bloque(string $titulo, bool $especial, string $bloque): void
+    {
+        DB::table('declaracion_sostenedores')->update(['nombre_titulo' => $titulo]);
+        DB::table('dotacion_docente_exclusiones')->update(['horas_traspaso_bir' => 34]);
+        $this->ee->forceFill(['especial' => $especial])->save();
+        $origen = DB::table('dotacion_docente_exclusiones')->get()->toJson();
+        $item = $this->service->resumen($this->ee, 2027)->sole();
+        $this->assertSame(34.0, $item['horas']);
+        $this->assertSame(1, $this->generar([$item['clave'] => 14]));
+        $this->assertSame(0, $this->generar([$item['clave'] => 14]));
+        $revision = $this->service->resumen($this->ee, 2027)->sole();
+        $this->assertNull($revision['motivo']);
+        $this->assertSame(14.0, (float) $revision['cupo']->horas);
+        $this->assertDatabaseHas('dotacion_contrata_habilitaciones', ['horas' => 14, 'bloque' => $bloque, 'titulo' => $titulo]);
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $this->assertSame(14.0, $data['resumen']['horas_contrato_docentes']);
+        $this->assertSame(14.0, $data['resumen']['horas_contrato_por_contratar_por_bloque'][$bloque]);
+        $this->assertSame(44.0, DotacionEstablecimientoCalculator::build($this->ee, 2026)['resumen']['horas_contrato_docentes']);
+        $this->assertSame($origen, DB::table('dotacion_docente_exclusiones')->get()->toJson());
+        $this->assertDatabaseCount('dotacion_contrata_habilitaciones', 1);
+        $this->assertDatabaseCount('dotacion_docente_asignaciones', 0);
+        $this->assertDatabaseCount('dotacion_docente_subsectores', 0);
+    }
+
+    public static function cantidadesInvalidas(): array
+    {
+        return [[19.38], [44], [0], [-1], ['abc'], ['14,5'], ['1.234'], [null], [['horas' => 14]], ['1e1']];
+    }
+
+    #[DataProvider('cantidadesInvalidas')]
+    public function test_servidor_rechaza_horas_invalidas_o_sobre_el_maximo_sin_crear_cupos(mixed $cantidad): void
+    {
+        $this->ingresar('admin');
+        $item = $this->service->resumen($this->ee, 2027)->sole();
+        $payload = ['anio' => 2027, 'cupos' => [$item['clave']], 'huellas' => [$item['clave'] => $item['huella']], 'horas' => [$item['clave'] => $cantidad]];
+        $url = route('admin.dotacion-establecimiento.bir.index', [$this->ee, 'anio' => 2027]);
+        $this->from($url)->post(route('admin.dotacion-establecimiento.bir.store', $this->ee), $payload)
+            ->assertRedirect($url)->assertSessionHasErrors('horas.'.$item['clave']);
+        $this->assertDatabaseCount('dotacion_contrata_habilitaciones', 0);
+        $this->assertDatabaseHas('dotacion_docente_exclusiones', ['id' => $this->situacion, 'horas_traspaso_bir' => 19.37]);
+        $this->get($url)->assertOk()->assertSee('Revise la selección.');
+    }
+
+    public function test_valida_solo_cupos_seleccionados_y_exige_su_cantidad(): void
+    {
+        $item = $this->service->resumen($this->ee, 2027)->sole();
+        try { $this->generar([]); $this->fail('Faltan las horas seleccionadas.'); }
+        catch (ValidationException $error) { $this->assertArrayHasKey('horas.'.$item['clave'], $error->errors()); }
+        $this->assertDatabaseCount('dotacion_contrata_habilitaciones', 0);
+        $this->assertSame(1, $this->generar([$item['clave'] => 14, '999:pie' => 'ignorar no seleccionado']));
+        $this->assertSame(14.0, (float) DB::table('dotacion_contrata_habilitaciones')->sole()->horas);
+    }
+
+    public function test_cupo_parcial_reenviado_no_se_amplia_y_cambio_de_maximo_se_revalida(): void
+    {
+        $item = $this->service->resumen($this->ee, 2027)->sole();
+        $this->generar([$item['clave'] => 14]);
+        try { $this->generar([$item['clave'] => 15]); $this->fail('Un reenvío no modifica el cupo existente.'); }
+        catch (ValidationException) { $this->assertSame(14.0, (float) DB::table('dotacion_contrata_habilitaciones')->sole()->horas); }
+        DB::table('dotacion_docente_exclusiones')->update(['horas_traspaso_bir' => 10]);
+        $this->assertNotNull($this->service->resumen($this->ee, 2027)->sole()['motivo']);
+        try {
+            $this->service->generar($this->ee, 2027, [$item['clave']], [$item['clave'] => $item['huella']], null, [$item['clave'] => 10]);
+            $this->fail('La revisión anterior ya no es válida.');
+        } catch (ValidationException) { $this->assertDatabaseHas('dotacion_contrata_habilitaciones', ['horas' => 14]); }
+    }
+
+    public function test_horas_parciales_por_bloque_no_consumen_el_maximo_completo_y_no_se_traspasan_entre_bloques(): void
+    {
+        DB::table('declaracion_sostenedores')->update(['nombre_titulo' => 'Educación Diferencial']);
+        DB::table('dotacion_docente_asignaciones')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2026, 'docente_rut' => '99000001-K',
+            'docente_rut_normalizado' => '99000001K', 'tipo_asignacion' => 'funcion_directiva', 'horas_contrato' => 5, 'estado' => 'activa',
+        ]);
+        $items = $this->service->resumen($this->ee, 2027)->keyBy('bloque');
+        $general = $items['plan_estudio']['clave']; $pie = $items['pie']['clave'];
+        try { $this->generar([$general => 5.01, $pie => 10]); $this->fail('No se trasladan horas del máximo PIE al general.'); }
+        catch (ValidationException) { $this->assertDatabaseCount('dotacion_contrata_habilitaciones', 0); }
+        $this->assertSame(2, $this->generar([$general => 4, $pie => 10.25]));
+        $this->assertSame(14.25, (float) DB::table('dotacion_contrata_habilitaciones')->sum('horas'));
+        $this->assertSame(0, $this->generar([$general => 4, $pie => 10.25]));
+        $this->assertSame(14.25, DotacionEstablecimientoCalculator::build($this->ee, 2027)['resumen']['horas_contrato_docentes']);
+    }
+
+    public function test_formulario_precarga_maximo_conserva_errores_y_muestra_cupo_parcial_creado(): void
+    {
+        $this->ingresar('admin');
+        DB::table('dotacion_docente_exclusiones')->update(['horas_traspaso_bir' => 34]);
+        $item = $this->service->resumen($this->ee, 2027)->sole();
+        $url = route('admin.dotacion-establecimiento.bir.index', [$this->ee, 'anio' => 2027]);
+        $this->get($url)->assertOk()->assertSee('name="horas['.$item['clave'].']"', false)->assertSee('max="34"', false)->assertSee('value="34"', false);
+        $payload = ['anio' => 2027, 'cupos' => [$item['clave']], 'huellas' => [$item['clave'] => $item['huella']], 'horas' => [$item['clave'] => 35]];
+        $this->from($url)->post(route('admin.dotacion-establecimiento.bir.store', $this->ee), $payload)->assertSessionHasErrors('horas.'.$item['clave']);
+        $this->get($url)->assertOk()->assertSee('value="35"', false)->assertSee('aria-invalid="true"', false)->assertSee('checked', false);
+        $payload['horas'][$item['clave']] = 14;
+        $this->post(route('admin.dotacion-establecimiento.bir.store', $this->ee), $payload)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->get($url)->assertOk()->assertSee('generado · 14 h')->assertDontSee('name="horas[', false);
+        $this->assertDatabaseHas('dotacion_contrata_habilitaciones', ['horas' => 14]);
+    }
+
     public static function situacionesNoElegibles(): array
     {
         return [
@@ -291,6 +392,7 @@ class DotacionCuposBirTest extends IsolatedSecurityTestCase
         $item = $this->service->resumen($this->ee, 2027)->sole();
         $this->post(route('admin.dotacion-establecimiento.bir.store', $this->ee), [
             'anio' => 2027, 'cupos' => [$item['clave']], 'huellas' => [$item['clave'] => $item['huella']],
+            'horas' => [$item['clave'] => $item['horas']],
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('dotacion_contrata_habilitaciones', 1);
         $this->assertSame(0, DB::transactionLevel());
@@ -310,7 +412,7 @@ class DotacionCuposBirTest extends IsolatedSecurityTestCase
         $this->get($url.'&q=basica')->assertOk()->assertSee('Generar cupo');
         $this->get($url.'&bloque=pie')->assertOk()->assertSee('No hay situaciones BIR');
         $item = $this->service->resumen($this->ee, 2027)->sole();
-        $payload = ['anio' => 2027, 'cupos' => [$item['clave']], 'huellas' => [$item['clave'] => $item['huella']]];
+        $payload = ['anio' => 2027, 'cupos' => [$item['clave']], 'huellas' => [$item['clave'] => $item['huella']], 'horas' => [$item['clave'] => $item['horas']]];
         $post = route('admin.dotacion-establecimiento.bir.store', $this->ee);
         $this->post($post, $payload)->assertRedirect($url)->assertSessionHasNoErrors()->assertSessionHas('success');
         $this->post($post, $payload)->assertRedirect($url)->assertSessionHasNoErrors();
@@ -344,10 +446,10 @@ class DotacionCuposBirTest extends IsolatedSecurityTestCase
         $this->service->generar($this->ee, 2027, ['1:pie'], [], null);
     }
 
-    private function generar(): int
+    private function generar(?array $horas = null): int
     {
         $items = $this->service->resumen($this->ee, 2027);
-        return $this->service->generar($this->ee, 2027, $items->pluck('clave')->all(), $items->pluck('huella', 'clave')->all(), null);
+        return $this->service->generar($this->ee, 2027, $items->pluck('clave')->all(), $items->pluck('huella', 'clave')->all(), null, $horas);
     }
 
     protected function ingresar(string $rol): void
