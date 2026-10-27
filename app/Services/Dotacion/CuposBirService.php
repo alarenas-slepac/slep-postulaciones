@@ -9,6 +9,7 @@ use App\Support\DotacionEstablecimientoCalculator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class CuposBirService
@@ -68,7 +69,7 @@ class CuposBirService
             // la situación. Un cambio de título/bloque no permite duplicar el cupo.
             $cuposPersona = $existentes->get($rut, collect());
             if ($cuposPersona->contains(fn ($cupo) => ! isset($horasPorBloque[$cupo->bloque])
-                || abs((float) $cupo->horas - $horasPorBloque[$cupo->bloque]) > 0.001
+                || (float) $cupo->horas <= 0 || (float) $cupo->horas > $horasPorBloque[$cupo->bloque] + 0.001
                 || $cupo->titulo !== ($docente['titulo'] ?? 'Sin título declarado'))) {
                 $motivo = 'Existen cupos BIR con otra distribución, horas o título. Revise los cupos generados antes de volver a crear.';
             }
@@ -90,14 +91,14 @@ class CuposBirService
         return $items;
     }
 
-    public function generar(Establecimiento $establecimiento, int $anio, array $seleccion, array $huellas, ?int $usuario): int
+    public function generar(Establecimiento $establecimiento, int $anio, array $seleccion, array $huellas, ?int $usuario, ?array $horasSeleccionadas = null): int
     {
         if (! self::disponible()) throw ValidationException::withMessages(['cupos' => 'Aplique la migración de origen BIR antes de crear estos cupos.']);
         if ($anio < 2027 || $anio > 2100 || ! $seleccion || count($seleccion) > 1000 || count(array_unique($seleccion)) !== count($seleccion)) {
             throw ValidationException::withMessages(['cupos' => 'Seleccione cupos válidos del año 2027 o posterior, sin repetirlos.']);
         }
 
-        return DB::transaction(function () use ($establecimiento, $anio, $seleccion, $huellas, $usuario): int {
+        return DB::transaction(function () use ($establecimiento, $anio, $seleccion, $huellas, $usuario, $horasSeleccionadas): int {
             // La asignación, retiro y creación de cupos comparten este bloqueo.
             Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
             DotacionDocenteExclusion::query()->where('establecimiento_id', $establecimiento->id)
@@ -109,15 +110,27 @@ class CuposBirService
                 if (! $item || $item['motivo'] || ! hash_equals($item['huella'], (string) ($huellas[$clave] ?? ''))) {
                     throw ValidationException::withMessages(['cupos' => 'La situación, el contrato o el título cambiaron o el cupo no está habilitado. Recargue la revisión BIR antes de generar.']);
                 }
+                // Los consumidores anteriores sin selección explícita conservan
+                // el máximo inicial o la cantidad del cupo ya generado.
+                $cantidad = $horasSeleccionadas === null
+                    ? ($item['cupo']?->horas ?? $item['horas'])
+                    : ($horasSeleccionadas[$clave] ?? null);
+                Validator::make(['horas' => [$clave => $cantidad]], [
+                    'horas.'.$clave => ['bail', 'required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:'.$item['horas']],
+                ], [
+                    'horas.*.required' => 'Indique las horas del cupo seleccionado.',
+                    'horas.*.max' => 'Las horas del cupo no pueden superar las '.DotacionEstablecimientoCalculator::formatHoras($item['horas']).' h disponibles en este bloque.',
+                ], ['horas.'.$clave => 'horas del cupo'])->validate();
+                $cantidad = round((float) $cantidad, 2);
                 if ($item['cupo']) {
-                    if (abs((float) $item['cupo']->horas - $item['horas']) > 0.001 || $item['cupo']->titulo !== $item['titulo']) {
-                        throw ValidationException::withMessages(['cupos' => 'Ya existe un cupo BIR con otros antecedentes. Revíselo en Docentes por contratar antes de volver a generar.']);
+                    if (abs((float) $item['cupo']->horas - $cantidad) > 0.001) {
+                        throw ValidationException::withMessages(['horas.'.$clave => 'El cupo BIR ya fue generado con otra cantidad de horas. Para cambiarla, retire primero el cupo sin asignaciones desde Docentes por contratar.']);
                     }
                     continue; // Reenviar una solicitud idéntica no duplica contrato.
                 }
                 $nuevos[] = [
                     'establecimiento_id' => $establecimiento->id, 'anio' => $anio, 'bloque' => $item['bloque'],
-                    'horas' => $item['horas'], 'titulo' => $item['titulo'], 'funcion' => $item['funcion'],
+                    'horas' => $cantidad, 'titulo' => $item['titulo'], 'funcion' => $item['funcion'],
                     'bir_situacion_id' => $item['situacion_id'], 'bir_docente_rut_normalizado' => $item['rut_normalizado'],
                     'created_by' => $usuario, 'created_at' => now(), 'updated_at' => now(),
                 ];

@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.27.651',
+    'current_version' => '2026.10.27.652',
     'entries' => [
+        [
+            'version' => '2026.10.27.652',
+            'title' => 'Selección de horas parciales al crear cupos BIR',
+            'summary' => 'Permite crear un cupo BIR con menos horas que las conservadas, sin superar el máximo de cada bloque.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade Horas a crear por cupo, precargadas con el máximo permitido, con límites visibles y mensajes junto al campo. Por ejemplo, de 34 horas conservadas se pueden elegir 14.',
+                'Revalida en servidor las cantidades seleccionadas, con hasta dos decimales, y el máximo vigente de cada bloque dentro de la transacción. Sólo las horas elegidas se incorporan al contrato y la nómina; conserva la situación BIR de origen.',
+                'Reconoce como válidos los cupos parciales ya generados y conserva la protección contra reenvíos y duplicados. Una nueva cantidad no sobrescribe un cupo existente; se mantiene el retiro previo de cupos sin asignaciones.',
+                'Incluye pruebas de cantidades parciales, límites, validación, contratos mixtos, reenvíos y conservación de antecedentes. No requiere migraciones ni cambios en recursos compilados.',
+            ],
+            'published_at' => '2026-10-27',
+        ],
         [
             'version' => '2026.10.27.651',
             'title' => 'Cupos por contratar visibles en la nómina docente y su bloque',
