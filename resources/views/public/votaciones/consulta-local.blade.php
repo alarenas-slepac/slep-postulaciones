@@ -14,7 +14,7 @@
         <p class="cv-lead">Consulta tu local de votación para la elección de caja de compensación y la consulta de mutualidad.</p>
         <div class="cv-steps" aria-label="Cómo consultar">
             <div><span class="cv-step-number">1</span><p><strong>Ingresa tu RUT</strong><small>Incluye el dígito verificador.</small></p></div>
-            <div><span class="cv-step-number">2</span><p><strong>Revisa tu asignación</strong><small>Local, grupo, día y hora de inicio.</small></p></div>
+            <div><span class="cv-step-number">2</span><p><strong>Revisa tu asignación</strong><small>Local, grupo y día de votación.</small></p></div>
             <div><span class="cv-step-number">3</span><p><strong>Acude al local indicado</strong><small>Puede ser distinto de donde trabajas.</small></p></div>
         </div>
     </section>
@@ -54,7 +54,7 @@
                 <div class="cv-result-top"><div><span class="cv-eyebrow">Funcionario/a</span><h3>{{ $votante->nombre }}</h3></div><span class="cv-badge"><i class="bi bi-check-circle" aria-hidden="true"></i> Registro en el padrón</span></div>
                 <div class="cv-result-grid">
                     <div class="cv-destination"><span class="cv-eyebrow">Debes dirigirte a</span><div class="cv-establishment-heading">@include('public.votaciones.partials.establecimiento-logo', ['logo' => $votante->local->establecimientoDestino?->admisionPerfil?->logoUrl(), 'nombre' => $votante->local->lugar_votacion])<div><h4>{{ $votante->local->lugar_votacion }}</h4><p class="mb-0">RBD del local: <strong>{{ $votante->local->rbd_local }}</strong></p></div></div><span class="cv-group mt-2">Grupo: {{ $votante->grupo ?? 'Por confirmar' }}</span></div>
-                    <dl class="cv-schedule mb-0"><div><dt><i class="bi bi-calendar3" aria-hidden="true"></i> Día de votación</dt><dd>{{ $votante->local->dia->translatedFormat('l d') }} de {{ $votante->local->dia->translatedFormat('F Y') }}</dd></div><div><dt><i class="bi bi-clock" aria-hidden="true"></i> Hora de inicio</dt><dd>{{ substr($votante->local->hora_inicio, 0, 5) }} <small>hrs.</small></dd></div></dl>
+                    <dl class="cv-schedule d-block mb-0"><div><dt><i class="bi bi-calendar3" aria-hidden="true"></i> Día de votación</dt><dd>{{ $votante->local->dia->translatedFormat('l d') }} de {{ $votante->local->dia->translatedFormat('F Y') }}</dd></div></dl>
                 </div>
                 <section class="cv-location" aria-labelledby="ubicacion-titulo-{{ $loop->index }}">
                     <div class="cv-location-header">

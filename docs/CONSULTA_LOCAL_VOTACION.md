@@ -1,6 +1,6 @@
 # Consulta pública de local de votación
 
-La dirección `/consulta-local-votacion` permite buscar por RUT, sin iniciar sesión, las asignaciones para la elección de caja de compensación y la consulta de mutualidad. Muestra nombre, establecimiento donde trabaja la persona, calidad jurídica, grupo, local de destino, RBD del local, día y hora de inicio. No registra votos ni importa personas al padrón de personal del SGA.
+La dirección `/consulta-local-votacion` permite buscar por RUT, sin iniciar sesión, las asignaciones para la elección de caja de compensación y la consulta de mutualidad. Muestra nombre, establecimiento donde trabaja la persona, calidad jurídica, grupo, local de destino, RBD del local y día de votación. La hora de inicio se conserva para la administración del padrón y no se muestra en la consulta pública. No registra votos ni importa personas al padrón de personal del SGA.
 
 ## Preparar la jornada
 
@@ -80,7 +80,7 @@ El resultado busca el **RBD_LUGAR_DE_VOTACION** en `establecimientos.rbd`. La re
 
 El mapa usa Leaflet y OpenStreetMap, como Centro de Operaciones. Muestra únicamente el punto del local y ofrece **Cómo llegar** para abrir las coordenadas en Google Maps. No solicita la geolocalización del funcionario. Los datos del mapa no incluyen RUT, nombre de la persona, contrato ni información de otros votantes. Las teselas usan `referrerPolicy: origin`, por lo que sólo envían el origen del sitio, conservando el `no-referrer` del resto de la consulta. Se mantiene visible la atribución de OpenStreetMap.
 
-Si no hay coincidencia de RBD, la consulta conserva el local y horario del padrón e indica **Ubicación en mapa por confirmar**. Si falta la dirección, muestra **Dirección por confirmar**. Las coordenadas fuera de rango, incompletas y el par `0,0` no generan un marcador. Ante errores del proveedor del mapa, sigue disponible la dirección y el enlace externo cuando hay coordenadas válidas.
+Si no hay coincidencia de RBD, la consulta conserva el local y el día del padrón e indica **Ubicación en mapa por confirmar**. Si falta la dirección, muestra **Dirección por confirmar**. Las coordenadas fuera de rango, incompletas y el par `0,0` no generan un marcador. Ante errores del proveedor del mapa, sigue disponible la dirección y el enlace externo cuando hay coordenadas válidas.
 
 Para corregir coordenadas o comuna, actualiza el establecimiento en el catálogo existente. Para completar la dirección, usa su perfil de Admisión Escolar. Los cambios se reflejan en la siguiente consulta sin volver a importar el Excel. Esta ampliación no requiere migraciones, paquetes ni variables `.env` adicionales; desplegar también el nuevo JavaScript y los recursos compilados de `public/build`.
 
