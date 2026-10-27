@@ -30,6 +30,9 @@
                 <div class="dotacion-eyebrow mb-1">Planificación de contratación</div>
                 <h2 class="h5 fw-bold mb-1" id="habilitaciones-contrata-titulo">Docentes por contratar</h2>
                 <p class="text-muted small mb-0">Cree docentes por contratar en cualquiera de los tres bloques, con o sin sobredotación. Sus horas se suman al contrato del bloque y al total del establecimiento para {{ $anio }}, desde su creación. Cada cupo admite hasta 44 horas. También puede reemplazar un contrato a contrata, conservando su título y horas.</p>
+                @if(($canManageContrataHabilitaciones ?? false) && $anio >= 2027)
+                    <a class="btn btn-outline-primary rounded-pill mt-3" href="{{ route('admin.dotacion-establecimiento.bir.index', [$establecimiento, 'anio' => $anio]) }}"><i class="bi bi-person-plus" aria-hidden="true"></i> Crear cupos desde Proceso BIR {{ $anio - 1 }}</a>
+                @endif
             </div>
             <div class="card-body">
                 @if (session('contrata_success'))
@@ -74,6 +77,7 @@
                                                     <span class="small"><strong>Docente por contratar #{{ $habilitacion->id }}</strong><br>{{ $fmt($horasAsignadasVirtual) }} de {{ $fmt($habilitacion->horas) }} h asignadas
                                                         @if (!empty($habilitacion->titulo))<br><span class="text-muted">{{ $habilitacion->titulo }}</span>@endif
                                                         @if (!empty($habilitacion->no_renovacion_id))<br><span class="badge rounded-pill text-bg-light border">Reemplazo de contrata</span>@endif
+                                                        @if (!empty($habilitacion->bir_situacion_id))<br><span class="badge rounded-pill text-bg-light border">Origen Proceso BIR</span>@endif
                                                     </span>
                                                     @if ($canManageContrataHabilitaciones ?? false)
                                                         @if ($tieneAsignacionesVirtual)

@@ -6,13 +6,50 @@ use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Services\Dotacion\NoRenovacionService;
+use App\Services\Dotacion\CuposBirService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+use Illuminate\View\View;
 
 class DotacionContrataHabilitacionController extends Controller
 {
+    public function bir(Request $request, Establecimiento $establecimiento, CuposBirService $service): View
+    {
+        $this->authorizeRequest($request, $establecimiento);
+        $data = $request->validate([
+            'anio' => ['required', 'integer', 'between:2027,2100'],
+            'bloque' => ['nullable', Rule::in(ContratacionHabilitacionService::BLOQUES)],
+            'q' => ['nullable', 'string', 'max:150'],
+        ]);
+        $items = $service->resumen($establecimiento, (int) $data['anio']);
+        $visibles = $items->filter(fn ($item) => (empty($data['bloque']) || $item['bloque'] === $data['bloque'])
+            && (empty($data['q']) || Str::contains(Str::lower(Str::ascii($item['titulo'])), Str::lower(Str::ascii($data['q'])))));
+
+        return view('admin.dotacion-establecimiento.cupos-bir', [
+            'establecimiento' => $establecimiento, 'anio' => (int) $data['anio'], 'filtros' => $data,
+            'items' => $visibles, 'disponible' => CuposBirService::disponible(),
+        ]);
+    }
+
+    public function generarBir(Request $request, Establecimiento $establecimiento, CuposBirService $service): RedirectResponse
+    {
+        $this->authorizeRequest($request, $establecimiento);
+        $data = $request->validate([
+            'anio' => ['required', 'integer', 'between:2027,2100'],
+            'cupos' => ['required', 'array', 'min:1', 'max:1000'],
+            'cupos.*' => ['required', 'string', 'distinct', 'regex:/^\d+:(plan_estudio|parvularia|pie)$/D'],
+            'huellas' => ['required', 'array', 'max:1000'],
+            'huellas.*' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D'],
+        ]);
+        $creados = $service->generar($establecimiento, (int) $data['anio'], $data['cupos'], $data['huellas'], $request->user()?->id);
+
+        return redirect()->route('admin.dotacion-establecimiento.bir.index', [$establecimiento, 'anio' => $data['anio']])
+            ->with('success', $creados.' cupo(s) BIR creado(s). Los cupos ya existentes no se duplicaron. Sus horas cuentan en la dotación del año destino y quedan sin asignaciones.');
+    }
+
     public function store(Request $request, Establecimiento $establecimiento, ContratacionHabilitacionService $service): RedirectResponse
     {
         $this->authorizeRequest($request, $establecimiento);

@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.27.648',
+    'current_version' => '2026.10.27.649',
     'entries' => [
+        [
+            'version' => '2026.10.27.649',
+            'title' => 'Docentes por contratar desde horas conservadas de Proceso BIR',
+            'summary' => 'Permite revisar y generar cupos por bloque y título para docentes que no continúan y conservan horas BIR del año anterior.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade Crear cupos desde Proceso BIR en Docentes por contratar, con filtros por bloque y título, selección de cupos y revisión de las horas conservadas para el año destino desde 2027.',
+                'Copia el título y la función del origen y aplica la distribución contractual vigente entre Plan general, Educación Parvularia y PIE especializado. Mantiene el contrato y las asignaciones del año anterior; los nuevos cupos quedan sin asignaciones ni asociaciones.',
+                'Suma cada cupo al contrato del bloque y del establecimiento en el año de creación, con o sin sobredotación. Excluye docentes que continúan, situaciones sin horas conservadas y personas presentes en la nómina del destino.',
+                'Revalida los antecedentes al guardar y protege contra reenvíos, cambios de título o distribución y recreación de situaciones mediante transacción, bloqueos e índices únicos por origen y persona/año/bloque.',
+                'Requiere la migración aditiva de origen BIR en cupos. Conserva los registros históricos y presenta preparación pendiente antes de migrar. Incluye pruebas aisladas de conteo, distribución, permisos y fallos de escritura.',
+            ],
+            'published_at' => '2026-10-27',
+        ],
         [
             'version' => '2026.10.27.648',
             'title' => 'Participación sobre el padrón y resultados de votación animados',
