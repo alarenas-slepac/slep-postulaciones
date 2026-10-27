@@ -53,6 +53,13 @@ class ContratacionHabilitacionService
             $horas = (float) $cupo->horas;
             $asignadas = round((float) collect($detalle['items'] ?? [])->sum('horas_contrato'), 2);
             $parvularia = $cupo->bloque === 'parvularia';
+            $diferencia = round($horas - $asignadas, 2);
+            [$estadoKey, $estadoLabel, $estadoClase, $estadoDetalle] = match (true) {
+                $diferencia < -0.01 => ['sobrecarga', 'Sobrecarga', 'text-bg-danger', 'Las horas asignadas superan las horas del cupo.'],
+                $diferencia > 0.01 && $asignadas <= 0.01 => ['pendiente_asignacion', 'Pendiente asignación', 'text-bg-secondary', 'El cupo suma contrato al bloque y aún no registra asignaciones.'],
+                $diferencia > 0.01 => ['faltan_horas', 'Faltan horas', 'text-bg-info', 'El cupo mantiene horas disponibles para asignar.'],
+                default => ['cuadra', 'Cuadra', 'text-bg-success', 'Las horas del cupo y sus asignaciones cuadran.'],
+            };
 
             return [
                 'rut' => $rut,
@@ -64,17 +71,28 @@ class ContratacionHabilitacionService
                 'estamento_cobertura' => 'docente',
                 'horas_contrato' => $horas,
                 'horas_contrato_base' => $horas,
+                'horas_excluidas' => 0.0,
                 'horas_planta' => 0.0,
                 'horas_contrata' => $horas,
                 'horas_asignadas_total' => $asignadas,
                 'horas_aula' => (float) ($detalle['aula'] ?? 0),
+                'horas_aula_65_35' => (float) ($detalle['aula_65_35'] ?? 0),
+                'horas_aula_60_40' => (float) ($detalle['aula_60_40'] ?? 0),
                 'horas_contrato_65_35' => (float) ($detalle['contrato_65_35'] ?? 0),
                 'horas_contrato_60_40' => (float) ($detalle['contrato_60_40'] ?? 0),
                 'horas_contrato_especial' => (float) ($detalle['contrato_especial'] ?? 0),
                 'horas_funciones_total' => (float) ($detalle['funciones_total'] ?? 0),
                 'horas_reservadas_no_normativas' => (float) ($detalle['reservadas_no_normativas'] ?? 0),
-                'diferencia' => round($horas - $asignadas, 2),
+                'horas_directivas' => (float) ($detalle['directivas'] ?? 0),
+                'horas_tecnico_pedagogicas' => (float) ($detalle['tecnico_pedagogicas'] ?? 0),
+                'horas_pie' => (float) ($detalle['pie'] ?? 0),
+                'horas_planes' => (float) ($detalle['planes'] ?? 0),
+                'horas_otras_funciones' => (float) ($detalle['otras'] ?? 0),
+                'diferencia' => $diferencia,
+                'estado_cuadratura' => ['key' => $estadoKey, 'label' => $estadoLabel, 'class' => $estadoClase, 'detalle' => $estadoDetalle],
                 'asignaciones' => $detalle['items'] ?? collect(),
+                'financiamiento' => collect($detalle['subvenciones'] ?? [])->pluck('subvencion')->join(' / ') ?: 'Por definir',
+                'niveles_declarados' => 'Cupo planificado',
                 'tipo_contrato' => 'Por contratar',
                 'fecha_antiguedad' => null,
                 'tramo' => null,
@@ -82,6 +100,7 @@ class ContratacionHabilitacionService
                 'fuente_contrato' => 'dotacion_contrata_habilitaciones',
                 'cupo_contrata_id' => (int) $cupo->id,
                 'cupo_bloque' => (string) $cupo->bloque,
+                'mes' => null,
                 'anio' => (int) $cupo->anio,
             ];
         });

@@ -11,6 +11,8 @@ En Dotación establecimiento, seleccione **2027** y abra **Docentes por contrata
 
 La creación conserva íntegros el padrón, la situación BIR y las asignaciones del año anterior. Los cupos se incorporan como identidades `VACANTE-<id>` al contrato del año destino y bloque, incluso con sobredotación. No se trasladan asignaciones ni asociaciones a asignaturas: se configuran posteriormente mediante las acciones habituales del módulo.
 
+En la pestaña **Docentes**, la nómina incluye los cupos por contratar del establecimiento y año junto con las personas vigentes. Muestra su título, bloque contractual, horas, asignaciones, reservas y saldo. El filtro por bloque respeta el bloque explícito del cupo, aunque conserve el título de otro ámbito. Los totales de la nómina incluyen cada cupo una sola vez; no se agrega nuevamente su contrato a los indicadores que ya lo consideran. Las identidades por contratar no ofrecen formularios de situaciones docentes ni justificaciones personales. Esta presentación se aplica también a cupos genéricos y de no renovación.
+
 ## Cambios y duplicados
 
 El formulario envía identificadores y huellas de revisión; las horas, títulos, bloques y condiciones se obtienen nuevamente del servidor al guardar. Una revisión obsoleta se rechaza completa.
