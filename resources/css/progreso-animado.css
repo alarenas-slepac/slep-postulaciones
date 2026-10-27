@@ -1,0 +1,12 @@
+.slep-meter { min-width: 0; margin-bottom: 1.25rem; }
+.slep-meter__heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: .65rem; }
+.slep-meter__label { min-width: 0; color: #334155; font-weight: 700; overflow-wrap: anywhere; }
+.slep-meter__value { flex-shrink: 0; color: #0b3d91; text-align: right; font-variant-numeric: tabular-nums; }
+.slep-meter__percent { display: block; margin-top: .2rem; color: #64748b; font-size: .8rem; font-weight: 400; }
+.slep-meter__track { height: .55rem; overflow: hidden; border-radius: 1rem; background: #e8eef5; }
+.slep-meter__fill { position: relative; display: block; height: 100%; min-width: 0; overflow: hidden; border-radius: inherit; background: linear-gradient(90deg, #0b3d91, #0d6efd); }
+.slep-meter__fill::after { content: ''; position: absolute; right: 2px; top: 50%; width: 4px; height: 4px; border-radius: 50%; background: #fff; box-shadow: 0 0 5px rgb(255 255 255 / 65%); transform: translateY(-50%); }
+.slep-meter__detail { margin: .65rem 0 0; color: #64748b; font-size: .85rem; line-height: 1.6; }
+.slep-counter { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .slep-meter__fill { animation: none; transition: none; } }
+@media print { .slep-meter__track { print-color-adjust: exact; } }

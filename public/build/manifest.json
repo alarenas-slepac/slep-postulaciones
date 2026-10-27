@@ -2257,6 +2257,15 @@
       "pie-comparison.css"
     ]
   },
+  "resources/css/progreso-animado.css": {
+    "file": "assets/progreso-animado-D_Z8vlfv.css",
+    "src": "resources/css/progreso-animado.css",
+    "isEntry": true,
+    "name": "progreso-animado",
+    "names": [
+      "progreso-animado.css"
+    ]
+  },
   "resources/css/votaciones-admin.css": {
     "file": "assets/votaciones-admin-Bufya2o9.css",
     "src": "resources/css/votaciones-admin.css",
@@ -2276,7 +2285,7 @@
     ]
   },
   "resources/css/votaciones-resultados.css": {
-    "file": "assets/votaciones-resultados-DnssLD68.css",
+    "file": "assets/votaciones-resultados-BiE3OSQ0.css",
     "src": "resources/css/votaciones-resultados.css",
     "isEntry": true,
     "name": "votaciones-resultados",
@@ -2352,6 +2361,12 @@
     "file": "assets/pie-comparison-CQRO3NbM.js",
     "name": "pie-comparison",
     "src": "resources/js/pie-comparison.js",
+    "isEntry": true
+  },
+  "resources/js/progreso-animado.js": {
+    "file": "assets/progreso-animado-DMoDUQvq.js",
+    "name": "progreso-animado",
+    "src": "resources/js/progreso-animado.js",
     "isEntry": true
   },
   "resources/js/votaciones-admin-rutas.js": {

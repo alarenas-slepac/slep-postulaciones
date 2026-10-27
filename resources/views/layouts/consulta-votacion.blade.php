@@ -28,5 +28,6 @@
     <a href="{{ route('public.resultados-votacion.index', request()->filled('jornada') ? ['jornada' => request()->query('jornada')] : []) }}">Resultados de votación</a>
     <span>Elección de caja de compensación y consulta de mutualidad</span>
 </footer>
+@stack('scripts')
 </body>
 </html>

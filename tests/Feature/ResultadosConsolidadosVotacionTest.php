@@ -237,6 +237,136 @@ class ResultadosConsolidadosVotacionTest extends IsolatedSecurityTestCase
         $this->assertNull($dia->refresh()->publicado_at);
     }
 
+    public function test_participacion_usa_mayor_total_incluidos_nulos_y_blancos_y_padron_unico_de_la_jornada(): void
+    {
+        $this->padronParticipacion(100);
+        DB::table('votacion_padron_consulta')->insert([
+            ['jornada_votacion_id' => $this->jornada->id, 'rut' => '99000001K', 'nombre' => 'DUPLICADO_PRIVADO'],
+            ['jornada_votacion_id' => 999, 'rut' => '99000999K', 'nombre' => 'OTRA_JORNADA_PRIVADA'],
+        ]);
+        $this->guardar(); $consolidado = $this->consolidar(); $this->publicar($consolidado);
+        $respuesta = $this->get($this->rutaPublica())->assertOk()->assertSee('Avance de participación')
+            ->assertSee('21,0 %')->assertSee('21 de 100')
+            ->assertDontSee('99000001K')->assertDontSee('PADRON_PRIVADO')->assertDontSee('DUPLICADO_PRIVADO')->assertDontSee('OTRA_JORNADA_PRIVADA');
+        $this->assertSame(['votantes' => 21, 'padron' => 100, 'porcentaje' => 21.0], $respuesta->viewData('participacion'));
+        $this->assertStringContainsString('no-store', $respuesta->headers->get('Cache-Control'));
+        $dom = new \DOMDocument; @$dom->loadHTML('<?xml encoding="UTF-8">'.$respuesta->getContent());
+        $xpath = new \DOMXPath($dom);
+        $barra = $xpath->query('//*[@aria-labelledby="participacion-padron" and @role="progressbar"]')->item(0);
+        $this->assertSame('21', $barra->getAttribute('aria-valuenow'));
+        $this->assertStringContainsString('21 de 100', $barra->getAttribute('aria-valuetext'));
+        $this->assertGreaterThan(10, $xpath->query('//*[@data-slep-count]')->length);
+        $this->assertGreaterThan(3, $xpath->query('//*[@data-slep-fill]')->length);
+    }
+
+    public function test_participacion_diaria_y_acumulada_conservan_la_copia_publicada_sin_borradores(): void
+    {
+        $this->padronParticipacion(100);
+        $primero = $this->guardar(); $this->guardar('2026-10-26');
+        $consolidado = $this->consolidar(); $this->publicar($consolidado);
+        $copia = $consolidado->fresh()->getAttributes();
+        $this->guardar('2026-10-27'); $this->corregir($primero, 100);
+        $publico = $this->get($this->rutaPublica())->assertOk();
+        $this->assertSame(['votantes' => 42, 'padron' => 100, 'porcentaje' => 42.0], $publico->viewData('participacion'));
+        $dia = $this->get($this->rutaPublica(['fecha' => '2026-10-23']))->assertOk();
+        $this->assertSame(21, $dia->viewData('participacion')['votantes']);
+        $this->assertSame(21.0, $dia->viewData('participacion')['porcentaje']);
+        $admin = $this->actingAs($this->admin)->get($this->rutaAdmin())->assertOk();
+        $this->assertSame(144, $admin->viewData('participacion')['votantes']);
+        $this->assertSame($copia, $consolidado->fresh()->getAttributes());
+    }
+
+    public function test_acumulado_toma_la_mayor_papeleta_acumulada_y_no_suma_maximos_diarios(): void
+    {
+        $this->padronParticipacion(100); $this->guardar();
+        $datos = $this->datos('2026-10-26');
+        foreach ($datos['conteos'] as &$papeleta) $papeleta = array_fill_keys(array_keys($papeleta), 0);
+        unset($papeleta);
+        $datos['conteos']['mutualidad']['achs'] = 30;
+        app(ResultadoDiarioService::class)->guardar($this->jornada, $datos, $this->admin);
+        $this->publicar($this->consolidar());
+        $this->assertSame(48, $this->get($this->rutaPublica())->assertOk()->viewData('participacion')['votantes']);
+        $this->assertSame(30, $this->get($this->rutaPublica(['fecha' => '2026-10-26']))->assertOk()->viewData('participacion')['votantes']);
+    }
+
+    public function test_administracion_distingue_participacion_del_dia_guardado_y_del_consolidado(): void
+    {
+        $this->padronParticipacion(100); $this->guardar(); $this->guardar('2026-10-26');
+        $respuesta = $this->actingAs($this->admin)->get($this->rutaAdmin())->assertOk();
+        $this->assertSame(21, $respuesta->viewData('participacionDia')['votantes']);
+        $this->assertSame(42, $respuesta->viewData('participacion')['votantes']);
+        $dom = new \DOMDocument; @$dom->loadHTML('<?xml encoding="UTF-8">'.$respuesta->getContent());
+        $xpath = new \DOMXPath($dom);
+        $this->assertSame(1, $xpath->query('//*[@id="participacion-dia-padron"]')->length);
+        $this->assertSame(1, $xpath->query('//*[@id="participacion-padron"]')->length);
+    }
+
+    public function test_sin_padron_conserva_los_votantes_y_no_inventa_un_porcentaje(): void
+    {
+        $this->guardar(); $this->publicar($this->consolidar());
+        $respuesta = $this->get($this->rutaPublica())->assertOk()->assertSee('No hay padrón cargado');
+        $this->assertSame(['votantes' => 21, 'padron' => 0, 'porcentaje' => null], $respuesta->viewData('participacion'));
+        $this->assertStringNotContainsString('role="progressbar" aria-labelledby="participacion-padron"', $respuesta->getContent());
+    }
+
+    public function test_cero_votantes_con_padron_conocido_muestra_cero_por_ciento(): void
+    {
+        $this->padronParticipacion(100); $datos = $this->datos();
+        foreach ($datos['conteos'] as &$papeleta) $papeleta = array_fill_keys(array_keys($papeleta), 0);
+        unset($papeleta);
+        app(ResultadoDiarioService::class)->guardar($this->jornada, $datos, $this->admin);
+        $this->publicar($this->consolidar());
+        $respuesta = $this->get($this->rutaPublica())->assertOk();
+        $this->assertSame(['votantes' => 0, 'padron' => 100, 'porcentaje' => 0.0], $respuesta->viewData('participacion'));
+        $this->assertStringContainsString('data-slep-fill="0" style="width: 0%"', $respuesta->getContent());
+    }
+
+    public function test_mas_votantes_que_padron_conserva_porcentaje_real_y_limita_la_barra(): void
+    {
+        $this->padronParticipacion(10); $this->guardar(); $this->publicar($this->consolidar());
+        $respuesta = $this->get($this->rutaPublica())->assertOk()->assertSee('210,0 %')->assertSee('El total de votantes supera el padrón vigente');
+        $this->assertSame(210.0, $respuesta->viewData('participacion')['porcentaje']);
+        $this->assertStringContainsString('data-slep-fill="100" style="width: 100%"', $respuesta->getContent());
+    }
+
+    public function test_participacion_se_adapta_a_una_jornada_de_solo_mutualidad(): void
+    {
+        $this->padronParticipacion(100);
+        $this->jornada->procesos()->sync(DB::table('procesos_votacion')->where('codigo', 'CONSULTA_MUTUALIDADES')->pluck('id'));
+        $datos = $this->datos(); $datos['conteos'] = ['mutualidad' => $datos['conteos']['mutualidad']];
+        app(ResultadoDiarioService::class)->guardar($this->jornada, $datos, $this->admin);
+        $this->publicar($this->consolidar());
+        $respuesta = $this->get($this->rutaPublica())->assertOk();
+        $this->assertSame(18, $respuesta->viewData('participacion')['votantes']);
+        $this->assertSame(18.0, $respuesta->viewData('participacion')['porcentaje']);
+    }
+
+    public function test_participacion_legacy_solo_cuenta_los_dias_publicados_y_el_padron_vigente(): void
+    {
+        $this->padronParticipacion(100);
+        foreach (['2026-10-23', '2026-10-26'] as $fecha) {
+            $dia = $this->guardar($fecha);
+            app(ResultadoDiarioService::class)->publicar($this->jornada, $dia, true, 1, $this->admin);
+        }
+        $this->guardar('2026-10-27');
+        $this->assertSame(42, $this->get($this->rutaPublica())->assertOk()->viewData('participacion')['votantes']);
+        $this->assertSame(21, $this->get($this->rutaPublica(['fecha' => '2026-10-23']))->assertOk()->viewData('participacion')['votantes']);
+        DB::table('votacion_padron_consulta')->insert(['jornada_votacion_id' => $this->jornada->id, 'rut' => '99001000K', 'nombre' => 'PADRON_PRIVADO']);
+        $this->assertSame(101, $this->get($this->rutaPublica())->assertOk()->viewData('participacion')['padron']);
+    }
+
+    private function padronParticipacion(int $cantidad): void
+    {
+        Schema::create('votacion_padron_consulta', function (Blueprint $t): void {
+            $t->id(); $t->unsignedBigInteger('jornada_votacion_id'); $t->string('rut'); $t->string('nombre');
+        });
+        foreach (range(1, $cantidad) as $numero) {
+            DB::table('votacion_padron_consulta')->insert([
+                'jornada_votacion_id' => $this->jornada->id, 'rut' => (string) (99000000 + $numero).'K', 'nombre' => 'PADRON_PRIVADO',
+            ]);
+        }
+    }
+
     protected function datos(string $fecha = '2026-10-23'): array
     {
         return ['fecha' => $fecha, 'version' => 0, 'observacion_interna' => 'OBSERVACION_INTERNA', 'conteos' => [
