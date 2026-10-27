@@ -87,9 +87,10 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
         $zip = $this->zip(Storage::disk('local')->path('pal.xlsx'));
         $original = $this->zip(app(DotacionPal2027Export::class)->template());
         try {
-            foreach (['xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet5.xml', 'xl/worksheets/sheet6.xml', 'xl/worksheets/sheet7.xml', 'xl/worksheets/sheet8.xml', 'xl/worksheets/sheet9.xml'] as $part) {
+            foreach (['xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet5.xml', 'xl/worksheets/sheet7.xml', 'xl/worksheets/sheet8.xml', 'xl/worksheets/sheet9.xml'] as $part) {
                 $this->assertSame($original->getFromName($part), $zip->getFromName($part), $part);
             }
+            $this->assertStringContainsString('DIRECTOR/A,PROFESIONAL', $zip->getFromName('xl/worksheets/sheet6.xml'));
             foreach (['xl/worksheets/sheet3.xml', 'xl/worksheets/sheet4.xml'] as $part) {
                 $this->assertSame($this->formulas($original->getFromName($part)), $this->formulas($zip->getFromName($part)));
             }

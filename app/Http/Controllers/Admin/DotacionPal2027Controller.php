@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Support\DotacionPal2027;
 use App\Support\DotacionPal2027Consolidado;
+use App\Support\DotacionPalPersonal2027;
 use Illuminate\Http\Request;
 
 class DotacionPal2027Controller extends Controller
@@ -26,12 +27,13 @@ class DotacionPal2027Controller extends Controller
             ->header('Cache-Control', 'private, no-store, max-age=0');
     }
 
-    public function __invoke(Request $request, Establecimiento $establecimiento, DotacionPal2027 $datos, DotacionPal2027Export $export)
+    public function __invoke(Request $request, Establecimiento $establecimiento, DotacionPal2027 $datos, DotacionPal2027Export $export, DotacionPalPersonal2027 $personal)
     {
         abort_unless(DotacionPal2027::canView($request->user()?->activeRoleName()), 403);
         abort_if((bool) $establecimiento->sala_cuna, 404);
         $validated = $request->validate(['descargar' => ['sometimes', 'boolean'], 'anio' => ['sometimes', 'integer', 'in:2027']]);
         $reporte = $datos->construir($establecimiento, $datos->datos($establecimiento), $export->tablas());
+        $reporte += $personal->construir($establecimiento);
         if ($validated['descargar'] ?? false) { return $export->download($reporte, (string) $establecimiento->rbd); }
         return response()->view('admin.dotacion-establecimiento.pal-2027', compact('establecimiento', 'reporte'))
             ->header('Cache-Control', 'private, no-store, max-age=0');

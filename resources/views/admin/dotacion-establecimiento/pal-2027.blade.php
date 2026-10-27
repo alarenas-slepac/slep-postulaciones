@@ -45,6 +45,9 @@
                     <li>«Resumen» obtiene sus RBD desde «Info Establecimiento» e incluye también los que aún no tienen docentes cargados. Conserva los cálculos de personas y horas por RBD.</li>
                 @endif
                 <li>Completa «Info Establecimiento» e «Info Funcionario (DOCENTE)» con los datos del proceso 2027.</li>
+                <li>Completa «Info Funcionario(AE)» e «Info Funcionario (VTF)» exclusivamente con funcionarios AAEE/JUNJI del padrón de agosto de 2026. Excluye reemplazos y suplencias. El personal con financiamiento JUNJI y el de jardines VTF se informa en VTF, sin repetirlo en AE.</li>
+                <li>Agrupa las líneas de una misma persona por RBD, cargo, nivel y calidad contractual. Informa contrato total y financiamiento PIE/SEP cuando corresponde. El nombre y el origen 08/2026 aparecen en Observaciones; las horas lectivas sin registro permanecen vacías.</li>
+                <li>En VTF, la columna Cargo admite «PROFESIONAL». Para esos casos, Función corresponde a «Otros asistentes de la educación».</li>
                 <li>«Info Establecimiento» muestra las horas requeridas por el plan. Detalla los cursos de cada combinación y cuenta su plan compartido una sola vez; los planes distintos se presentan en filas separadas.</li>
                 <li>Columna H de establecimientos: contrato necesario para el plan de estudios, sin agregar PIE ni funciones.</li>
                 <li>Separa titular y plazo fijo. Las reservas conservan su calidad contractual y el resto se distribuye primero en titular y luego contrata; se identifica cada función y proporción.</li>
@@ -53,11 +56,11 @@
                 <li>Los saldos titulares y a plazo fijo sin asignar se clasifican en FUNCIÓN «Otros (Talleristas / Apoyo / etc.)», columna R. Del saldo titular se descuentan las horas justificadas en Sobredotación 2027.</li>
                 <li>Las reservas de General «Horas para otras funciones», titulares y a plazo fijo, se incorporan en FUNCIÓN «Otros», columna R. La justificación titular en Sobredotación se descuenta una sola vez entre saldo y reservas titulares.</li>
                 <li>Las horas excluidas por situaciones 2027 se incorporan en FUNCIÓN «Otros», respetando titular y contrata. Observaciones detalla el motivo, el contrato y las horas incorporadas o excluidas. Los docentes con situación BIR 2027 se excluyen del PAL.</li>
-                <li>Incluye docentes por contratar con RUT sintético VACANTE-&lt;id&gt; y Docentes Directivos por asumir con VACANTE-ADP-&lt;establecimiento&gt;-&lt;regla&gt;. Observaciones identifica su condición pendiente. «Resumen» cuenta estas identidades además de las personas del padrón. Asistentes y VTF quedan vacías.</li>
+                <li>Incluye docentes por contratar con RUT sintético VACANTE-&lt;id&gt; y Docentes Directivos por asumir con VACANTE-ADP-&lt;establecimiento&gt;-&lt;regla&gt;. Observaciones identifica su condición pendiente. «Resumen» cuenta estas identidades además de las personas del padrón.</li>
                 <li>«Excluidos PAL 2027» detalla personas y horas excluidas, motivo, calidad contractual y año base. Incluye quienes no continúan en 2027 según la situación del padrón anterior, no renovaciones, BIR y Sobredotación justificada. Sólo las incompatibilidades restantes de cupos o plazas se mantienen allí, con una base distinta del padrón.</li>
                 <li>La hoja «Resumen» conserva sus fórmulas y necesita Excel compatible con FILTER, UNIQUE, VSTACK y LET. Revise el recálculo al abrir.</li>
             </ul>
-            <p class="small pal-muted mt-3 mb-0">@unless($esConsolidado) Año del padrón utilizado por el SGA: {{ $reporte['anio_padron'] ?: 'Sin datos' }}. @endunless Los cursos y asignaciones corresponden exclusivamente a 2027. Asistentes y VTF conservan el alcance anterior: las salas cuna no participan en este proceso. Descargar no modifica registros.</p>
+            <p class="small pal-muted mt-3 mb-0">@unless($esConsolidado) Año del padrón docente utilizado por el SGA: {{ $reporte['anio_padron'] ?: 'Sin datos' }}. @endunless Los cursos y asignaciones corresponden exclusivamente a 2027. AE y VTF usan sólo agosto de 2026, aunque existan meses posteriores. El consolidado incluye jardines con personal de ese período, sin proyectarles cursos escolares. Descargar no modifica registros.</p>
         </div>
     </section>
     @if ($esConsolidado)

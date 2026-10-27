@@ -73,7 +73,8 @@ class DotacionPal2027Export
 
     public function guardar(array $reporte, string $path): void
     {
-        if (count($reporte['docentes']) > 10000 || count($reporte['cursos']) > 1000) {
+        if (count($reporte['docentes']) > 10000 || count($reporte['cursos']) > 1000
+            || count($reporte['asistentes'] ?? []) > 10000 || count($reporte['vtf'] ?? []) > 10000) {
             throw ValidationException::withMessages(['pal' => 'La cantidad de filas supera el límite de esta descarga por establecimiento.']);
         }
         if (! copy($this->template(), $path)) { throw new \RuntimeException('No se pudo leer la plantilla PAL.'); }
@@ -93,6 +94,23 @@ class DotacionPal2027Export
             $ee = $this->xml($zip, $partes['Info Establecimiento']);
             $this->rellenar($ee, $reporte['cursos'], 4, 34, ['G'], $styles);
             $zip->addFromString($partes['Info Establecimiento'], $ee->saveXML());
+            $personalLast = [];
+            foreach (['asistentes' => ['Info Funcionario(AE)', 204, ['B','M']], 'vtf' => ['Info Funcionario (VTF)', 133, ['B','J']]] as $key => [$hoja, $fin, $textos]) {
+                if (empty($reporte[$key])) {
+                    if ($key === 'vtf') {
+                        $personal = $this->xml($zip, $partes[$hoja]);
+                        $this->validacionProfesionalVtf($personal);
+                        $zip->addFromString($partes[$hoja], $personal->saveXML());
+                    }
+                    continue;
+                }
+                $personal = $this->xml($zip, $partes[$hoja]);
+                $personalLast[$hoja] = max($fin, count($reporte[$key]) + 2);
+                $this->rellenar($personal, $reporte[$key], 3, $fin, [], $styles, $textos);
+                if ($key === 'vtf') { $this->validacionProfesionalVtf($personal); }
+                $this->validaciones($personal, $personalLast[$hoja]);
+                $zip->addFromString($partes[$hoja], $personal->saveXML());
+            }
             $zip->addFromString('xl/styles.xml', $styles->saveXML());
             if ($last > 94) {
                 $table = $this->xml($zip, 'xl/tables/table1.xml');
@@ -100,12 +118,14 @@ class DotacionPal2027Export
                 foreach ($table->getElementsByTagNameNS(self::NS, 'autoFilter') as $filter) { $filter->setAttribute('ref', 'A1:S'.$last); }
                 $zip->addFromString('xl/tables/table1.xml', $table->saveXML());
             }
-            if ($last > 176) {
+            if ($last > 176 || $personalLast !== []) {
                 $summary = $this->xml($zip, $partes['Resumen']);
+                $docEnd = max(176, $last);
                 foreach ($summary->getElementsByTagNameNS(self::NS, 'f') as $formula) {
                     $formula->nodeValue = str_replace(["'Info Funcionario (DOCENTE)'!$".'A$3:$A$176', "'Info Funcionario (DOCENTE)'!$".'C$3:$C$176', "'Info Funcionario (DOCENTE)'!$".'G$3:$G$176'],
-                        ["'Info Funcionario (DOCENTE)'!$".'A$3:$A$'.$last, "'Info Funcionario (DOCENTE)'!$".'C$3:$C$'.$last, "'Info Funcionario (DOCENTE)'!$".'G$3:$G$'.$last], $formula->textContent);
+                        ["'Info Funcionario (DOCENTE)'!$".'A$3:$A$'.$docEnd, "'Info Funcionario (DOCENTE)'!$".'C$3:$C$'.$docEnd, "'Info Funcionario (DOCENTE)'!$".'G$3:$G$'.$docEnd], $formula->textContent);
                 }
+                $this->extenderResumenPersonal($summary, $personalLast);
                 $zip->addFromString($partes['Resumen'], $summary->saveXML());
             }
             $exclusiones->incorporar($zip);
@@ -135,7 +155,7 @@ class DotacionPal2027Export
         return $doc;
     }
 
-    private function rellenar(DOMDocument $doc, array $datos, int $inicio, int $originalFin, array $calculadas, ?DOMDocument $styles = null): void
+    private function rellenar(DOMDocument $doc, array $datos, int $inicio, int $originalFin, array $calculadas, ?DOMDocument $styles = null, ?array $textos = null): void
     {
         $xpath = new DOMXPath($doc); $xpath->registerNamespace('m', self::NS);
         $sheetData = $xpath->query('//m:sheetData')->item(0);
@@ -161,13 +181,16 @@ class DotacionPal2027Export
                 }
             }
             $entries = $datos[$numero - $inicio] ?? [];
-            $this->rellenarFila($doc, $row, $entries, $calculadas, $styles, $wrapped);
+            $this->rellenarFila($doc, $row, $entries, $calculadas, $styles, $wrapped, $textos);
         }
         $dimension = $xpath->query('//m:dimension')->item(0);
-        if ($fin > $originalFin) { $dimension->setAttribute('ref', 'A1:'.($inicio === 3 ? 'S' : 'H').max($fin, (int) preg_replace('/.*[A-Z]/', '', $dimension->getAttribute('ref')))); }
+        if ($fin > $originalFin) {
+            preg_match('/([A-Z]+)(\d+)$/', $dimension->getAttribute('ref'), $limite);
+            $dimension->setAttribute('ref', 'A1:'.$limite[1].max($fin, (int) $limite[2]));
+        }
     }
 
-    protected function rellenarFila(DOMDocument $doc, DOMElement $row, array $entries, array $calculadas, ?DOMDocument $styles, array &$wrapped): void
+    protected function rellenarFila(DOMDocument $doc, DOMElement $row, array $entries, array $calculadas, ?DOMDocument $styles, array &$wrapped, ?array $textos = null): void
     {
             $numero = (int) $row->getAttribute('r');
             foreach ($row->childNodes as $cell) {
@@ -197,8 +220,11 @@ class DotacionPal2027Export
                     $is->appendChild($text); $cell->appendChild($is);
                     $esDocente = in_array('J', $calculadas, true);
                     $identidadSintetica = $column === 'A' && str_starts_with((string) $value, 'VACANTE-');
-                    if ($column === 'S' || ($styles && ($esDocente ? $identidadSintetica : in_array($column, ['A','C'], true)))) {
-                        $porLinea = $column === 'A' ? 13 : ($column === 'C' ? 25 : 50);
+                    $envolver = $textos !== null ? in_array($column, $textos, true)
+                        : ($column === 'S' || ($esDocente ? $identidadSintetica : in_array($column, ['A','C'], true)));
+                    if ($styles && $envolver) {
+                        $porLinea = $textos !== null ? ($column === 'B' ? 18 : 26)
+                            : ($column === 'A' ? 13 : ($column === 'C' ? 25 : 50));
                         $height = min(409, max((float) $row->getAttribute('ht'), ceil(mb_strlen($clean) / $porLinea) * 14 + 6));
                         $row->setAttribute('ht', (string) $height); $row->setAttribute('customHeight', '1');
                         if ($styles) {
@@ -223,7 +249,38 @@ class DotacionPal2027Export
     {
         foreach ($doc->getElementsByTagNameNS(self::NS, 'dataValidation') as $rule) {
             $range = $rule->getAttribute('sqref');
-            if (preg_match('/^([DEGHM])3:\1\d+$/', $range, $m)) { $rule->setAttribute('sqref', $m[1].'3:'.$m[1].$last); }
+            if (preg_match('/^([A-Z]+)3:\1\d+$/', $range, $m)) { $rule->setAttribute('sqref', $m[1].'3:'.$m[1].$last); }
+        }
+    }
+
+    protected function validacionProfesionalVtf(DOMDocument $doc): void
+    {
+        // La nueva opción debe caber junto a la flecha del selector de Excel.
+        foreach ($doc->getElementsByTagNameNS(self::NS, 'col') as $col) {
+            if ($col->getAttribute('min') === '5' && $col->getAttribute('max') === '5') {
+                $col->setAttribute('width', (string) max(16.5, (float) $col->getAttribute('width')));
+                $col->setAttribute('customWidth', '1');
+            }
+        }
+        foreach ($doc->getElementsByTagNameNS(self::NS, 'dataValidation') as $rule) {
+            if (! preg_match('/^E3:E\d+$/', $rule->getAttribute('sqref'))) { continue; }
+            $formula = $rule->getElementsByTagNameNS(self::NS, 'formula1')->item(0);
+            $opciones = array_values(array_filter(array_map('trim', explode(',', trim($formula->textContent, '"')))));
+            if (! in_array('PROFESIONAL', $opciones, true)) { $opciones[] = 'PROFESIONAL'; }
+            $formula->nodeValue = '"'.implode(',', $opciones).'"';
+        }
+    }
+
+    /** Conserva las funciones/criterios nativos y amplía sus rangos finitos por hoja. */
+    protected function extenderResumenPersonal(DOMDocument $doc, array $ultimas): void
+    {
+        foreach ($doc->getElementsByTagNameNS(self::NS, 'f') as $formula) {
+            $text = $formula->textContent;
+            foreach ($ultimas as $hoja => $last) {
+                $text = preg_replace_callback("/'".preg_quote($hoja, '/')."'!\\$([A-Z]+)\\$3:\\$\\1\\$100(?!\\d)/",
+                    fn ($m) => "'".$hoja."'!$".$m[1].'$3:$'.$m[1].'$'.max(100, $last), $text);
+            }
+            $formula->nodeValue = $text;
         }
     }
 }
