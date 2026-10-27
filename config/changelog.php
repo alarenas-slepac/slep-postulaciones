@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.27.650',
+    'current_version' => '2026.10.27.651',
     'entries' => [
+        [
+            'version' => '2026.10.27.651',
+            'title' => 'Cupos por contratar visibles en la nómina docente y su bloque',
+            'summary' => 'Incorpora a la pestaña Docentes los cupos del año y establecimiento con contrato, asignaciones y saldo, sin duplicar sus horas.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade los docentes por contratar a la nómina visible y sus totales desde la creación del cupo, incluidos los cupos de no renovación y Proceso BIR. Conserva separadas las personas vigentes y las identidades VACANTE en el padrón y las proyecciones.',
+                'Muestra título, bloque definido, contrato, aula, funciones, reservas, saldo y estado de cuadratura. El filtro por bloque utiliza el bloque del cupo aunque el título heredado corresponda a otra especialidad.',
+                'Identifica el origen contractual y año del cupo, conserva los enlaces de asignación e impide mostrar formularios de situaciones docentes o justificación personal para identidades por contratar.',
+                'Verifica la suma contractual por bloque y año sin duplicados, la actualización tras asignaciones y retiro y la consulta por los roles de gestión. No requiere migraciones ni recompilación de recursos.',
+            ],
+            'published_at' => '2026-10-27',
+        ],
         [
             'version' => '2026.10.27.650',
             'title' => 'Consulta por RUT del local de votación sin hora de inicio',

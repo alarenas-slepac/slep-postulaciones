@@ -1,6 +1,11 @@
 @php
     $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
     $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
+    $cuposNomina = collect($docentesVirtualesPorCupo ?? data_get($asignacion ?? [], 'docentes', []))
+        ->filter(fn (array $docente) => isset($docente['cupo_contrata_id']))->unique('cupo_contrata_id');
+    $docentes = $docentes->concat($cuposNomina)->unique(fn (array $docente) =>
+        \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut_normalizado'] ?? $docente['rut']))->values();
+    $totalCuposNomina = $docentes->filter(fn (array $docente) => isset($docente['cupo_contrata_id']))->count();
     $totalContratoBase = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0));
     $totalExcluidas = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_excluidas'] ?? 0));
     $totalContrato = (float) $docentes->sum(fn ($docente) => (float) ($docente['horas_contrato'] ?? 0));
@@ -57,14 +62,14 @@
             <span class="dotacion-icon" style="width:40px;height:40px;background:#0d6efd;"><i class="bi bi-person-workspace"></i></span>
             <div>
                 <div class="dotacion-eyebrow">Base docente contractual</div>
-                <h2 class="h5 fw-bold mb-1">Docentes vigentes del establecimiento</h2>
-                <div class="text-muted small">La nómina considera los registros vigentes del último mes. Las situaciones docentes distribuyen el contrato original entre horas necesarias y no necesarias; sólo las necesarias suman al bloque contractual correspondiente. Proceso BIR conserva siempre el contrato completo durante el año seleccionado.</div>
+                <h2 class="h5 fw-bold mb-1">Nómina de docentes y cupos por contratar</h2>
+                <div class="text-muted small">La nómina considera los docentes vigentes del último mes y los cupos creados para el año consultado. Cada cupo suma sus horas de contrato al bloque definido desde su creación, aunque aún no tenga asignaciones. Las situaciones docentes distribuyen el contrato original entre horas necesarias y no necesarias; sólo las necesarias suman al bloque contractual correspondiente. Proceso BIR conserva siempre el contrato completo durante el año seleccionado.</div>
             </div>
         </div>
     </div>
     <div class="card-body">
         <div class="row g-3">
-            <div class="col-xl-2 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Docentes</div><div class="h4 fw-bold mb-0">{{ $docentes->count() }}</div><div class="small text-muted">Vigentes</div></div></div>
+            <div class="col-xl-2 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Registros de la nómina</div><div class="h4 fw-bold mb-0">{{ $docentes->count() }}</div><div class="small text-muted">{{ $docentes->count() - $totalCuposNomina }} {{ $docentes->count() - $totalCuposNomina === 1 ? 'docente' : 'docentes' }} · {{ $totalCuposNomina }} {{ $totalCuposNomina === 1 ? 'cupo' : 'cupos' }}</div></div></div>
             <div class="col-xl-2 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Contrato original</div><div class="h4 fw-bold mb-0">{{ $fmt($totalContratoBase) }}</div><div class="small text-muted">Horas registradas</div></div></div>
             <div class="col-xl-2 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Horas no consideradas</div><div class="h4 fw-bold text-warning mb-0">{{ $fmt($totalExcluidas) }}</div><div class="small text-muted">Situaciones docentes</div></div></div>
             <div class="col-xl-2 col-md-4 col-sm-6"><div class="p-3 rounded-4 bg-light h-100"><div class="small text-muted">Contrato considerado</div><div class="h4 fw-bold text-success mb-0">{{ $fmt($totalContrato) }}</div><div class="small text-muted">Base para el cálculo</div></div></div>
@@ -191,6 +196,7 @@
             <tbody>
                 @forelse ($docentes as $docente)
                     @php
+                        $esCupo = isset($docente['cupo_contrata_id']);
                         $collapseId = 'docente-detalle-'.$loop->iteration;
                         $redondeoParvularia = (float) ($docente['redondeo_parvularia'] ?? 0);
                         $redondeoTitular = min($redondeoParvularia, (float) ($docente['horas_titulares_disponibles'] ?? 0));
@@ -228,6 +234,7 @@
                         $bloquesRevision = [];
                         if ((float) ($docente['horas_contrato'] ?? 0) - $contratoPieRevision > 0.01) $bloquesRevision[] = $perfilRevision['es_educacion_parvulos'] ? 'parvularia' : 'plan_estudio';
                         if ($contratoPieRevision > 0.01) $bloquesRevision[] = 'pie';
+                        if ($esCupo) $bloquesRevision = [$docente['cupo_bloque']];
                         $estadosRevision = [];
                         if ($diferencia > 0.01) $estadosRevision[] = 'saldo';
                         if ($diferencia < -0.01) $estadosRevision[] = 'sobrecarga';
@@ -239,7 +246,7 @@
                         <td><button class="btn btn-sm btn-outline-primary rounded-pill text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $formConErrores ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down" aria-hidden="true"></i> Ver detalle<span class="visually-hidden"> de {{ $docente['nombre'] }}</span></button></td>
                         <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="text-muted small">{{ $docente['rut'] }} · {{ $docente['niveles_declarados'] }}</div></td>
                         @if ($proceso2027Docentes['aplica'] ?? false)
-                            <td><span class="badge rounded-pill text-bg-primary">{{ $docente['prioridad_2027_label'] ?? 'Sin prioridad' }}</span><div class="small text-muted mt-1">{{ $docente['tramo'] ?: 'Sin tramo' }} · {{ $docente['fecha_antiguedad'] ?: 'Sin antigüedad' }}</div><div class="small text-success">Disp.: {{ $fmt(max(0, (float) ($docente['horas_titulares_disponibles'] ?? 0) - $redondeoTitular)) }} titular + {{ $fmt(max(0, (float) ($docente['horas_contrata_disponibles'] ?? 0) - $redondeoContrata)) }} contrata</div>@if ($redondeoParvularia > 0.01)<div class="small text-muted">Neteo Parvularia: {{ $fmt($redondeoParvularia) }} h</div>@endif</td>
+                            <td>@if($esCupo)<span class="badge rounded-pill text-bg-light border">Cupo por contratar</span><div class="small text-muted mt-1">Disponible: {{ $fmt(max(0, (float) $diferencia)) }} h</div>@else<span class="badge rounded-pill text-bg-primary">{{ $docente['prioridad_2027_label'] ?? 'Sin prioridad' }}</span><div class="small text-muted mt-1">{{ $docente['tramo'] ?: 'Sin tramo' }} · {{ $docente['fecha_antiguedad'] ?: 'Sin antigüedad' }}</div><div class="small text-success">Disp.: {{ $fmt(max(0, (float) ($docente['horas_titulares_disponibles'] ?? 0) - $redondeoTitular)) }} titular + {{ $fmt(max(0, (float) ($docente['horas_contrata_disponibles'] ?? 0) - $redondeoContrata)) }} contrata</div>@if ($redondeoParvularia > 0.01)<div class="small text-muted">Neteo Parvularia: {{ $fmt($redondeoParvularia) }} h</div>@endif @endif</td>
                         @endif
                         <td><div class="fw-semibold">{{ $docente['funcion'] }}</div><div class="text-muted small">{{ $docente['titulo'] }}</div></td>
                         <td class="text-end">
@@ -256,7 +263,7 @@
                                         <span class="badge text-bg-primary">Planta {{ $fmt($horasPlanta) }} h</span>
                                     @endif
                                     @if ($horasContrata > 0.01)
-                                        <span class="badge text-bg-info">Contrata {{ $fmt($horasContrata) }} h</span>
+                                        <span class="badge text-bg-info">{{ $esCupo ? 'Por contratar' : 'Contrata' }} {{ $fmt($horasContrata) }} h</span>
                                     @endif
                                 </div>
                             @endif
@@ -288,7 +295,7 @@
                                 @if (isset($establecimiento, $anio))
                                 <div class="d-flex flex-wrap gap-2 mb-3">
                                     <a class="btn btn-sm btn-outline-primary rounded-pill" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion', 'asig_buscar' => $docente['rut']]) }}">Revisar asignaciones</a>
-                                    @if (($canViewSobredotacion ?? false) && $diferencia > 0.01)
+                                    @if (!$esCupo && ($canViewSobredotacion ?? false) && $diferencia > 0.01)
                                         <a class="btn btn-sm btn-outline-secondary rounded-pill" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion', 'revision_sobredotacion_q' => $docente['rut'], 'revision_sobredotacion_state' => 'saldo']) }}">Revisar y justificar saldo</a>
                                     @endif
                                 </div>
@@ -319,16 +326,16 @@
                                                             <span class="badge text-bg-primary">Planta: {{ $fmt($horasPlanta) }} h</span>
                                                         @endif
                                                         @if ($horasContrata > 0.01)
-                                                            <span class="badge text-bg-info">Contrata: {{ $fmt($horasContrata) }} h</span>
+                                                            <span class="badge text-bg-info">{{ $esCupo ? 'Por contratar' : 'Contrata' }}: {{ $fmt($horasContrata) }} h</span>
                                                         @endif
                                                     </div>
                                                 @endif
                                                 <div class="small text-muted">Tipo contrato</div><div class="mb-2">{{ $docente['tipo_contrato'] }}</div>
                                                 <div class="small text-muted">Financiamiento</div><div class="mb-2">{{ $docente['financiamiento'] }}</div>
                                                 <div class="small text-muted">Fuente contractual</div>
-                                                <div>{{ ($docente['fuente_contrato'] ?? null) === 'declaracion_sostenedor' ? 'Declaración sostenedor' : 'Reemplazos personal' }}</div>
+                                                <div>{{ $esCupo ? 'Cupo por contratar · '.\App\Services\Dotacion\NoRenovacionService::BLOQUES[$docente['cupo_bloque']] : (($docente['fuente_contrato'] ?? null) === 'declaracion_sostenedor' ? 'Declaración sostenedor' : 'Reemplazos personal') }}</div>
                                                 <div class="small text-muted mt-2">Período considerado</div>
-                                                <div>{{ str_pad((string) $docente['mes'], 2, '0', STR_PAD_LEFT) }}/{{ $docente['anio'] }}@if (($docente['registros_contrato'] ?? 1) > 1) · {{ $docente['registros_contrato'] }} líneas vigentes @endif</div>
+                                                <div>@if($esCupo) Dotación {{ $docente['anio'] }} @else {{ str_pad((string) $docente['mes'], 2, '0', STR_PAD_LEFT) }}/{{ $docente['anio'] }}@if (($docente['registros_contrato'] ?? 1) > 1) · {{ $docente['registros_contrato'] }} líneas vigentes @endif @endif</div>
                                             </div>
                                         </div>
                                     </div>
@@ -394,8 +401,10 @@
                                         </div>
                                     </div>
                                 </div>
-                                @include('admin.dotacion-establecimiento.partials._situaciones_docentes_consulta')
-                                @if (($activeRole ?? null) !== 'funcionario_directivo_estab' && ($canManageDocenteExclusiones ?? false) && Route::has('admin.dotacion-establecimiento.docentes.exclusiones.store'))
+                                @if(!$esCupo)
+                                    @include('admin.dotacion-establecimiento.partials._situaciones_docentes_consulta')
+                                @endif
+                                @if (!$esCupo && ($activeRole ?? null) !== 'funcionario_directivo_estab' && ($canManageDocenteExclusiones ?? false) && Route::has('admin.dotacion-establecimiento.docentes.exclusiones.store'))
                                     <div class="card border-warning-subtle shadow-sm mt-3">
                                         <div class="card-body">
                                             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">

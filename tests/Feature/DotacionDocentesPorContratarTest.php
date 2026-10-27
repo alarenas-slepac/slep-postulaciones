@@ -15,6 +15,7 @@ use App\Support\DotacionSobredotacionCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
@@ -150,6 +151,82 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         $this->assertSame(60.0, $resumen['diferencia_contrato_calculado']);
         $this->expectException(ValidationException::class);
         $service->revocar($this->ee, 2027, $id);
+    }
+
+    #[DataProvider('bloquesYAnos')]
+    public function test_nomina_incluye_cupos_contrato_y_bloque_sin_duplicarlos_ni_ofrecer_situaciones(int $anio, string $bloque): void
+    {
+        $service = app(ContratacionHabilitacionService::class);
+        $service->habilitar($this->ee, $anio, $bloque, 2, 10.5, null);
+        $ids = DB::table('dotacion_contrata_habilitaciones')->pluck('id');
+        // Un título heredado de otro bloque no cambia el bloque del cupo.
+        DB::table('dotacion_contrata_habilitaciones')->update(['titulo' => 'Educación Diferencial']);
+        $data = DotacionEstablecimientoCalculator::build($this->ee, $anio);
+        $proceso = $anio >= 2027 ? DotacionProceso2027Calculator::resumen($this->ee, $anio, $data) : ['aplica' => false];
+        $html = view('admin.dotacion-establecimiento.partials._docentes', [
+            ...$data, 'establecimiento' => $this->ee, 'anio' => $anio, 'proceso2027' => $proceso,
+            'activeRole' => 'admin', 'canViewSobredotacion' => true,
+            'canManageDocenteExclusiones' => true, 'docenteExclusionesTableReady' => true,
+        ])->render();
+        $xpath = $this->nominaXpath($html);
+        $this->assertSame(3, $xpath->query('//tr[@data-revision-row]')->length);
+        $this->assertStringContainsString('1 docente · 2 cupos', $html);
+        foreach ($ids as $id) {
+            $row = $xpath->query('//tr[@data-revision-row="'.sha1('VACANTE-'.$id).'"]')->item(0);
+            $this->assertNotNull($row);
+            $this->assertSame($bloque, $row->getAttribute('data-revision-block'));
+            $this->assertStringContainsString('Educación Diferencial', $row->textContent);
+            $this->assertStringContainsString('10,50', $row->textContent);
+            $this->assertStringContainsString('Pendiente asignación', $row->textContent);
+            $detalle = $xpath->query('//tr[@data-revision-related="'.sha1('VACANTE-'.$id).'"]')->item(0);
+            $this->assertSame(0, $xpath->query('.//form', $detalle)->length);
+            $this->assertSame(0, $xpath->query('.//a[contains(@href,"tab=sobredotacion")]', $detalle)->length);
+            $this->assertStringContainsString('Cupo por contratar', $detalle->textContent);
+            $this->assertStringNotContainsString('Reemplazos personal', $detalle->textContent);
+        }
+        $this->assertCount(1, $data['docentes']); // La vista no modifica padrón/proyecciones.
+        $this->assertSame(65.0, $data['resumen']['horas_contrato_docentes']);
+        $duplicado = view('admin.dotacion-establecimiento.partials._docentes', [
+            ...$data, 'docentes' => $data['asignacion']['docentes'],
+            'docentesVirtualesPorCupo' => $data['asignacion']['docentes']->whereNotNull('cupo_contrata_id'),
+            'anio' => $anio,
+        ])->render();
+        $this->assertSame(3, $this->nominaXpath($duplicado)->query('//tr[@data-revision-row]')->length);
+        $this->assertTrue($service->revocar($this->ee, $anio, $ids->first()));
+        $final = DotacionEstablecimientoCalculator::build($this->ee, $anio);
+        $sinCupo = view('admin.dotacion-establecimiento.partials._docentes', [...$final, 'anio' => $anio])->render();
+        $this->assertSame(2, $this->nominaXpath($sinCupo)->query('//tr[@data-revision-row]')->length);
+        $this->assertStringNotContainsString('VACANTE-'.$ids->first().' ·', $sinCupo);
+        $this->assertSame(54.5, $final['resumen']['horas_contrato_docentes']);
+    }
+
+    public function test_nomina_del_cupo_muestra_asignaciones_reservas_y_saldo_actualizados(): void
+    {
+        $service = app(ContratacionHabilitacionService::class);
+        $service->habilitar($this->ee, 2027, 'plan_estudio', 1, 12, null);
+        $id = DB::table('dotacion_contrata_habilitaciones')->value('id');
+        foreach (['plan_estudio' => 2, 'reserva_no_normativa' => 2] as $tipo => $horas) {
+            DotacionDocenteAsignacion::create([
+                'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'docente_rut' => 'VACANTE-'.$id,
+                'docente_rut_normalizado' => 'VACANTE_'.$id, 'tipo_asignacion' => $tipo,
+                'horas_contrato' => $horas, 'horas_plan_pedagogicas' => $tipo === 'plan_estudio' ? 2 : null,
+                'proporcion_aplicada' => '65/35', 'estado' => 'activa',
+            ]);
+        }
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $virtual = $service->docentesVirtuales($this->ee, 2027)->sole();
+        $this->assertSame(2.0, $virtual['horas_aula_65_35']);
+        $this->assertSame(8.0, $virtual['diferencia']);
+        $this->assertSame('faltan_horas', $virtual['estado_cuadratura']['key']);
+        $html = view('admin.dotacion-establecimiento.partials._docentes', [...$data, 'anio' => 2027])->render();
+        $xpath = $this->nominaXpath($html);
+        $row = $xpath->query('//tr[@data-revision-row="'.sha1('VACANTE-'.$id).'"]')->item(0);
+        $this->assertSame('2', trim($xpath->query('.//*[@data-docente-value="asignadas"]', $row)->item(0)->textContent));
+        $this->assertSame('2', trim($xpath->query('.//*[@data-docente-value="reservadas"]', $row)->item(0)->textContent));
+        $this->assertStringContainsString('8', $row->textContent);
+        $this->assertSame(56.0, $data['resumen']['horas_contrato_docentes']);
+        $this->assertSame(4.0, $data['resumen']['horas_contrato_calculado']);
+        $this->assertSame(52.0, $data['resumen']['diferencia_contrato_calculado']);
     }
 
     public function test_reemplazo_y_anulacion_conservan_el_total_sin_duplicar_el_contrato_retirado(): void
@@ -350,6 +427,22 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         $this->post($url, $params)->assertRedirect()->assertSessionHas('contrata_success');
         $this->assertSame(88.0, (float) DB::table('dotacion_contrata_habilitaciones')->sum('horas'));
         $this->assertSame(132.0, (float) DotacionEstablecimientoCalculator::build($this->ee, 2027)['resumen']['horas_contrato_docentes']);
+        $this->withoutVite();
+        Storage::disk('local')->put('nomina-views/layouts/app.blade.php', '<html><body>@yield(\'content\')</body></html>');
+        $this->app['view']->getFinder()->prependLocation(Storage::disk('local')->path('nomina-views'));
+        $this->get(route('admin.dotacion-establecimiento.show', [$this->ee, 'anio' => 2027, 'tab' => 'docentes']))
+            ->assertOk()->assertSee('Nómina de docentes y cupos por contratar')->assertSee('1 docente · 2 cupos')
+            ->assertSee('Docente por contratar #1')->assertSee('Docente por contratar #2')->assertSee('132');
+    }
+
+    private function nominaXpath(string $html): \DOMXPath
+    {
+        $dom = new \DOMDocument;
+        $anterior = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($anterior);
+        return new \DOMXPath($dom);
     }
 
     private function resetCalculators(): void
