@@ -62,6 +62,20 @@ Ubicar sobre el contenido un encabezado con etiqueta de contexto opcional, icono
 
 Usar tarjetas de superficie blanca, cabecera clara y cuerpo con espacio consistente. Los indicadores de resumen deben mostrar etiqueta, cifra y explicación breve. Las pestañas o pasos muestran estado activo con texto, borde y fondo; el paso actual, completado, observado, rechazado y pendiente conservan los mismos significados en todo el sistema. La navegación de pasos no sustituye las etiquetas de las secciones.
 
+### Barras de progreso y cifras animadas
+
+Usar el patrón compartido `partials.progreso-animado`, con sus recursos `resources/css/progreso-animado.css` y `resources/js/progreso-animado.js`. La etiqueta va a la izquierda y la cantidad y porcentaje a la derecha, con números tabulares. La pista es clara, delgada y redondeada; el relleno usa azul institucional `#0b3d91` a `#0d6efd`, con un pequeño punto claro al extremo. Conservar las superficies blancas y los textos del sistema; no copiar el fondo oscuro ni los colores rosados de referencias externas.
+
+- El servidor entrega el valor final, el total, el porcentaje con un decimal y la barra completa. Siempre indicar qué representa el denominador y conservar los datos legibles sin JavaScript.
+- Al entrar al menos un 20 % del bloque en pantalla, animar el relleno y contar las cifras y porcentajes desde cero durante un segundo, con desaceleración suave. Ejecutar una sola vez por bloque; volver a desplazar la página no reinicia el conteo.
+- Las barras se observan con `IntersectionObserver` y los contadores usan `requestAnimationFrame`; no usar temporizadores o escuchas permanentes de scroll. Para animar un conjunto de cifras, agrupar elementos `data-slep-count` dentro de `data-slep-reveal` sin anidar grupos.
+- Con `prefers-reduced-motion: reduce`, sin soporte de observación o al imprimir, mostrar inmediatamente los valores finales. Si la preferencia cambia durante la animación, finalizarla. No parpadear, mover paneles ni introducir cambios de tamaño.
+- Mantener etiquetas únicas y `role="progressbar"` con valores ARIA finales. Los números visuales animados llevan `aria-hidden="true"` y una alternativa estática accesible; no anunciar cada fotograma con `aria-live`.
+- Con total desconocido o cero no inventar un porcentaje: mostrar «—» y explicar el dato faltante. Si el resultado supera el total, la pista se limita al 100 %, se conserva la cifra real y se explica la inconsistencia. En resultados por opción sin votos válidos, mostrar 0 %.
+- Las cantidades, porcentajes y barras deben verificarse en escritorio, móvil, movimiento reducido, ausencia de JavaScript y con valores cero, completos y superiores al total.
+
+Ejemplo de inclusión: `@include('partials.progreso-animado', ['id' => 'participacion-padron', 'etiqueta' => 'Votantes del padrón', 'valor' => 320, 'maximo' => 1000, 'detalle' => '320 de 1.000 personas.'])`. El parcial carga sus recursos una sola vez mediante las pilas `styles` y `scripts` del layout.
+
 ### Formularios
 
 Agrupar campos por tarea en secciones con título e icono. Asociar `label` e `id`; marcar los obligatorios con texto o asterisco visible y conservar validación del servidor. Usar `.form-control`, `.form-select`, `.form-check` y mensajes de ayuda/errores de Bootstrap como base; bordes suaves, radio cercano a `0.75rem` y foco azul visible. Mostrar los campos de solo lectura con fondo tenue. Colocar **Cancelar/Volver** como acción secundaria y **Guardar/Enviar** como acción principal al final. Deshabilitar una acción solo cuando exista una razón comprensible para el usuario.

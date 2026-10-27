@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.26.647',
+    'current_version' => '2026.10.27.648',
     'entries' => [
+        [
+            'version' => '2026.10.27.648',
+            'title' => 'Participación sobre el padrón y resultados de votación animados',
+            'summary' => 'Añade votantes y porcentaje respecto del padrón total y anima barras, cantidades y porcentajes al entrar en pantalla.',
+            'roles' => ['admin', 'Público'],
+            'items' => [
+                'Calcula votantes como el mayor total de las papeletas del día, acumulado o consolidado mostrado, incluyendo nulos y blancos. Cuenta el padrón vigente por RUT único de la jornada, sin exponer identidades ni mezclar borradores con la copia pública.',
+                'Muestra el avance de participación en resultados públicos y en la revisión administrativa. Informa padrón ausente y conteos superiores al padrón sin alterar los escrutinios históricos.',
+                'Comparte un componente de progreso con barras azules institucionales y contadores que se animan una sola vez al entrar en pantalla. Conserva cifras accesibles finales, datos sin JavaScript, movimiento reducido e impresión.',
+                'Documenta el patrón reutilizable en el Design System e incorpora pruebas aisladas de cálculos, publicaciones, privacidad y animación. Incluye los recursos compilados y no requiere migraciones ni nuevas variables de entorno.',
+            ],
+            'published_at' => '2026-10-27',
+        ],
         [
             'version' => '2026.10.26.647',
             'title' => 'Asignaciones de aula completadas con saldo titular y contrata del mismo docente',

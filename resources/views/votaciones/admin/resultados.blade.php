@@ -33,6 +33,9 @@
     @else
         <section class="mb-4" aria-labelledby="escrutinio-titulo">
             <div class="vr-section-heading mb-3"><div><span class="cv-eyebrow">{{ $jornada->nombre }}</span><h2 id="escrutinio-titulo">Escrutinio del {{ \Carbon\Carbon::parse($fecha)->format('d-m-Y') }}</h2><p class="text-secondary mb-0">Totales de todos los locales del día. Registra cero cuando una opción no tenga votos.</p></div><span class="cv-badge {{ $resultado ? '' : 'cv-badge-muted' }}">{{ $resultado ? 'Día guardado' : 'Sin registrar' }}</span></div>
+            @if($resultado)
+                @include('votaciones.partials.participacion', ['participacion' => $participacionDia, 'tituloParticipacion' => 'Participación del día guardado', 'prefijoParticipacion' => 'participacion-dia'])
+            @endif
             <form method="POST" action="{{ route('votaciones.admin.resultados.guardar', $jornada) }}" data-vr-form>
                 @csrf
                 <input type="hidden" name="fecha" value="{{ $fecha }}">
@@ -71,6 +74,7 @@
                 <div class="vr-section-heading"><div><span class="cv-eyebrow">Revisión general</span><h2 id="consolidado-titulo">2. Consolida todos los días registrados</h2><p class="text-secondary mb-0">Las siguientes sumas incluyen todos los días de la tabla anterior. Revisa cada opción antes de preparar la publicación.</p></div><span class="cv-badge {{ $consolidadoVigente ? '' : 'cv-badge-muted' }}">{{ $consolidadoVigente ? 'Consolidado preparado · v'.$consolidado->version : 'Pendiente de consolidar' }}</span></div>
                 <form class="mt-3" method="POST" action="{{ route('votaciones.admin.resultados.consolidar', $jornada) }}">@csrf<input type="hidden" name="huella" value="{{ $huella }}"><input type="hidden" name="fecha" value="{{ $fecha }}"><button type="submit" class="btn {{ $consolidadoVigente ? 'cv-secondary' : 'cv-primary' }}" data-vr-publish><i class="bi bi-calculator" aria-hidden="true"></i> Consolidar todos los días</button></form>
             </div>
+            @include('votaciones.partials.participacion', ['tituloParticipacion' => 'Participación de todos los días registrados'])
             @include('votaciones.partials.resumen-papeletas', ['resumen' => $resumen, 'prefijo' => 'consolidado'])
         </section>
         <section class="cv-panel mt-4" aria-labelledby="publicacion-titulo" id="publicacion-consolidado">

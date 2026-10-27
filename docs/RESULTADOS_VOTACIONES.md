@@ -12,6 +12,16 @@ En **Votaciones → Resultados diarios**, la pantalla **Resultados y consolidaci
 
 Cada papeleta registra además **nulos y blancos**. Votos válidos = suma de sus opciones. Total de papeletas = válidos + nulos + blancos. Los porcentajes se calculan sobre los válidos de cada papeleta; con cero válidos se muestra 0 %. No se suman las tres papeletas para calcular personas ni se presupone que deban tener igual total. No se aplican umbrales legales ni se proclaman ganadores.
 
+### Participación y animaciones
+
+En la vista pública y la revisión administrativa del consolidado se muestra el avance respecto del padrón total de la jornada: **cantidad de votantes, personas del padrón y porcentaje**. Administración también muestra la participación del día seleccionado cuando ya está guardado; los cambios sin guardar del formulario no alteran ese indicador. Por definición de este informe, votantes es el **mayor total de papeletas**, incluyendo nulos y blancos, del período mostrado. Para un día se comparan sus papeletas; para el acumulado o consolidado se suman primero los días por papeleta y se elige el mayor total acumulado. No se suman papeletas distintas ni máximos diarios.
+
+El padrón corresponde a la **carga vigente de esa jornada**, contando cada RUT normalizado una sola vez aunque tenga varias asignaciones a establecimientos. Se consulta únicamente el agregado y no se envían RUT ni nombres a la página. Los resultados públicos siguen usando sólo los días y conteos de la versión publicada; las cargas o correcciones pendientes de resultados no alteran el numerador público. Si se actualiza el padrón, cambia el denominador vigente mostrado.
+
+Con padrón ausente o vacío se conservan los votantes y se muestra «—» en el porcentaje. Si los votantes superan al padrón, se informa la inconsistencia, se conserva el porcentaje real y se limita el relleno al 100 %. No se modifica ni rechaza un escrutinio histórico por este indicador.
+
+Las barras, votos, totales y porcentajes se animan una sola vez al entrar en pantalla, con el patrón documentado en `docs/DESIGN_SYSTEM.md`. La duración es un segundo y no se altera la base de cálculo de las opciones: sus porcentajes siguen usando votos válidos. Sin JavaScript, con movimiento reducido o al imprimir, los resultados finales permanecen legibles. Se reutilizan los tonos azules institucionales y los paneles claros existentes.
+
 El catálogo está en `config/votaciones.php`, sección `papeletas`. Las claves son persistentes: no renombrarlas o reutilizarlas para opciones distintas si existen resultados históricos. Una jornada con sólo un proceso presenta únicamente las papeletas correspondientes. No es necesario volver a importar el Excel.
 
 Los días ya guardados conservan sus papeletas aunque posteriormente se cambien los procesos de la jornada. Las nuevas fechas utilizan los procesos vigentes; los acumulados leen las papeletas efectivamente registradas, sin descartar las anteriores.
@@ -58,6 +68,6 @@ cd /home/slepac/apps/slep_postulaciones
 /opt/cpanel/ea-php83/root/usr/bin/php artisan route:list --path=resultados
 ```
 
-Se reutilizan los recursos CSS y JavaScript ya compilados del parche anterior; esta ampliación cambia vistas y código PHP. No se requieren dependencias nuevas ni colas. Para logos, mantener el disco de medios de Admisión y su acceso público ya utilizados por el sistema. Un rollback eliminaría los escrutinios: no forma parte de la actualización habitual.
+La ampliación de participación y animaciones no requiere migraciones adicionales a las ya indicadas, dependencias nuevas ni colas. Compilar con `npm run build` y desplegar también el manifiesto y los recursos de `public/build`, incluidos `progreso-animado` y el CSS de resultados. Para logos, mantener el disco de medios de Admisión y su acceso público ya utilizados por el sistema. Un rollback eliminaría los escrutinios: no forma parte de la actualización habitual.
 
 Antes de cargar datos reales, comprobar en un entorno de pruebas: guardar al menos tres fechas sin publicación pública, consolidar las tres, revisar sumas y publicar en una acción; añadir/corregir un día y comprobar que la versión pública permanece igual; volver a consolidar y publicar; consultar una fecha y retirar el consolidado. Las pruebas automatizadas usan exclusivamente SQLite en memoria, datos ficticios y almacenamiento temporal; no envían mensajes.
