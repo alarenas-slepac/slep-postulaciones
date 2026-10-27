@@ -73,7 +73,8 @@ class ConsultaLocalVotacionTest extends IsolatedSecurityTestCase
         $this->cargar($analysis);
         $this->publicar();
         $response = $this->post(route('public.consulta-votacion.consultar'), ['rut' => RutChile::format($this->rut()), 'jornada' => $this->jornada->slug]);
-        $response->assertOk()->assertSee('Funcionaria de prueba')->assertSee('Local de prueba')->assertSee('28')->assertSee('09:00')->assertSee('Grupo: 1')->assertSee('RBD del local:')->assertDontSee('Otra persona de prueba');
+        $response->assertOk()->assertSee('Funcionaria de prueba')->assertSee('Local de prueba')->assertSee('miércoles 28')->assertSee('octubre 2026')->assertSee('Grupo: 1')->assertSee('RBD del local:')->assertDontSee('Otra persona de prueba')
+            ->assertDontSee('09:00')->assertDontSee('Hora de inicio')->assertDontSee('hora de inicio');
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         $response->assertHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')->assertHeader('Referrer-Policy', 'no-referrer');
         $response->assertSessionMissing('_old_input');
@@ -112,9 +113,11 @@ class ConsultaLocalVotacionTest extends IsolatedSecurityTestCase
 
     public function test_conserva_multiples_establecimientos_para_un_mismo_rut(): void
     {
-        $analysis = $this->analizar(voters: [$this->votante(), $this->votante(['RBD' => 9002, 'ESTABLECIMIENTO' => 'Segundo establecimiento'])], locals: [$this->local(), $this->local(['RBD' => 9002, 'ESTABLECIMIENTO' => 'Segundo establecimiento', 'HORARIO' => '11:30'])]);
+        $analysis = $this->analizar(voters: [$this->votante(), $this->votante(['RBD' => 9002, 'ESTABLECIMIENTO' => 'Segundo establecimiento'])], locals: [$this->local(), $this->local(['RBD' => 9002, 'ESTABLECIMIENTO' => 'Segundo establecimiento', 'HORARIO' => '11:30', 'DIA' => '2026-10-29'])]);
         $this->cargar($analysis); $this->publicar();
-        $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])->assertOk()->assertSee('Segundo establecimiento')->assertSee('09:00')->assertSee('11:30');
+        $this->post(route('public.consulta-votacion.consultar'), ['rut' => $this->rut(), 'jornada' => $this->jornada->slug])->assertOk()->assertSee('Origen de prueba')->assertSee('Segundo establecimiento')->assertSee('miércoles 28')->assertSee('jueves 29')
+            ->assertDontSee('09:00')->assertDontSee('11:30')->assertDontSee('Hora de inicio');
+        $this->assertSame(['09:00:00', '11:30:00'], $this->jornada->localesConsulta()->orderBy('rbd_origen')->pluck('hora_inicio')->all());
     }
 
     public function test_mismo_local_puede_tener_horarios_distintos_segun_rbd_de_origen(): void
@@ -228,6 +231,7 @@ class ConsultaLocalVotacionTest extends IsolatedSecurityTestCase
         $this->actingAs($admin)->get(route('votaciones.admin.padrones.index'))->assertOk()->assertSee('Padrón y locales de votación');
         $file = new UploadedFile($this->libro(), 'padron.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
         $this->post(route('votaciones.admin.padrones.importar', $this->jornada), ['archivo' => $file])->assertRedirect()->assertSessionHas('success');
+        $this->get(route('votaciones.admin.padrones.index', ['jornada' => $this->jornada->slug]))->assertOk()->assertSee('09:00 hrs.');
         $this->patch(route('votaciones.admin.padrones.publicacion', $this->jornada), ['publicar' => 1])->assertRedirect()->assertSessionHas('success');
         $this->assertTrue($this->jornada->refresh()->consulta_publica);
         $this->patch(route('votaciones.admin.padrones.publicacion', $this->jornada), ['publicar' => 0])->assertRedirect();

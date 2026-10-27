@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.27.649',
+    'current_version' => '2026.10.27.650',
     'entries' => [
+        [
+            'version' => '2026.10.27.650',
+            'title' => 'Consulta por RUT del local de votación sin hora de inicio',
+            'summary' => 'Oculta la hora en la consulta pública y conserva el día, grupo y local de votación.',
+            'roles' => ['Público'],
+            'items' => [
+                'Retira la hora de inicio de todas las tarjetas de asignaciones y actualiza la ayuda del formulario. El día ocupa el espacio disponible con los componentes del Design System.',
+                'Conserva los horarios cargados, las plantillas y su consulta administrativa. No requiere migraciones ni cambios en los recursos compilados.',
+                'Actualiza las pruebas de consulta por RUT y múltiples asignaciones para comprobar fechas visibles, horas ausentes y conservación del horario administrativo.',
+            ],
+            'published_at' => '2026-10-27',
+        ],
         [
             'version' => '2026.10.27.649',
             'title' => 'Docentes por contratar desde horas conservadas de Proceso BIR',
