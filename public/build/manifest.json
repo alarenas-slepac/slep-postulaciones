@@ -2372,6 +2372,19 @@
     "src": "resources/js/pie-comparison.js",
     "isEntry": true
   },
+  "resources/js/postulante-ficha.js": {
+    "file": "assets/postulante-ficha-DdVBeGOP.js",
+    "name": "postulante-ficha",
+    "src": "resources/js/postulante-ficha.js",
+    "isEntry": true,
+    "imports": [
+      "resources/js/slep-listados.js",
+      "__commonjsHelpers-92s3wAHG.js"
+    ],
+    "css": [
+      "assets/postulante-ficha-epTGVVwF.css"
+    ]
+  },
   "resources/js/progreso-animado.js": {
     "file": "assets/progreso-animado-DMoDUQvq.js",
     "name": "progreso-animado",
@@ -2379,7 +2392,7 @@
     "isEntry": true
   },
   "resources/js/slep-listados.js": {
-    "file": "assets/slep-listados-BZPcG9hS.js",
+    "file": "assets/slep-listados-GYjQ2UVH.js",
     "name": "slep-listados",
     "src": "resources/js/slep-listados.js",
     "isEntry": true,
