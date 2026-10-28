@@ -14,6 +14,7 @@ export default defineConfig({
             input: [
                 'resources/scss/app.scss',
                 'resources/js/app.js',
+                'resources/js/slep-listados.js',
                 'resources/css/centro-operaciones.css',
                 'resources/js/centro-operaciones.js',
                 'resources/css/votaciones-publicas.css',

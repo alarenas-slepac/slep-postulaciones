@@ -1,7 +1,14 @@
 {
-  "_leaflet-Bu0uVQ8k.js": {
-    "file": "assets/leaflet-Bu0uVQ8k.js",
+  "__commonjsHelpers-92s3wAHG.js": {
+    "file": "assets/_commonjsHelpers-92s3wAHG.js",
+    "name": "_commonjsHelpers"
+  },
+  "_leaflet-0AKwKANS.js": {
+    "file": "assets/leaflet-0AKwKANS.js",
     "name": "leaflet",
+    "imports": [
+      "__commonjsHelpers-92s3wAHG.js"
+    ],
     "css": [
       "assets/leaflet-CLLlcC51.css"
     ],
@@ -2325,24 +2332,26 @@
     "isEntry": true
   },
   "resources/js/centro-operaciones.js": {
-    "file": "assets/centro-operaciones-DecAUpDk.js",
+    "file": "assets/centro-operaciones-UaT7tm_2.js",
     "name": "centro-operaciones",
     "src": "resources/js/centro-operaciones.js",
     "isEntry": true,
     "imports": [
-      "_leaflet-Bu0uVQ8k.js"
+      "_leaflet-0AKwKANS.js",
+      "__commonjsHelpers-92s3wAHG.js"
     ],
     "css": [
       "assets/centro-operaciones-BKK0pH8C.css"
     ]
   },
   "resources/js/consulta-votacion-mapa.js": {
-    "file": "assets/consulta-votacion-mapa-Aq-M-BoV.js",
+    "file": "assets/consulta-votacion-mapa-Cq84QywX.js",
     "name": "consulta-votacion-mapa",
     "src": "resources/js/consulta-votacion-mapa.js",
     "isEntry": true,
     "imports": [
-      "_leaflet-Bu0uVQ8k.js"
+      "_leaflet-0AKwKANS.js",
+      "__commonjsHelpers-92s3wAHG.js"
     ]
   },
   "resources/js/dotacion-asignacion.js": {
@@ -2369,13 +2378,30 @@
     "src": "resources/js/progreso-animado.js",
     "isEntry": true
   },
+  "resources/js/slep-listados.js": {
+    "file": "assets/slep-listados-BZPcG9hS.js",
+    "name": "slep-listados",
+    "src": "resources/js/slep-listados.js",
+    "isEntry": true,
+    "imports": [
+      "__commonjsHelpers-92s3wAHG.js"
+    ],
+    "css": [
+      "assets/slep-listados-wCeML6_C.css"
+    ],
+    "assets": [
+      "assets/bootstrap-icons-mSm7cUeB.woff2",
+      "assets/bootstrap-icons-BeopsB42.woff"
+    ]
+  },
   "resources/js/votaciones-admin-rutas.js": {
-    "file": "assets/votaciones-admin-rutas-CUaCZcHF.js",
+    "file": "assets/votaciones-admin-rutas-BICAXnyO.js",
     "name": "votaciones-admin-rutas",
     "src": "resources/js/votaciones-admin-rutas.js",
     "isEntry": true,
     "imports": [
-      "_leaflet-Bu0uVQ8k.js"
+      "_leaflet-0AKwKANS.js",
+      "__commonjsHelpers-92s3wAHG.js"
     ],
     "css": [
       "assets/votaciones-admin-rutas-EiWOEaVb.css"
@@ -2388,12 +2414,13 @@
     "isEntry": true
   },
   "resources/js/votaciones-publicas.js": {
-    "file": "assets/votaciones-publicas-DLPHkm8u.js",
+    "file": "assets/votaciones-publicas-D6IDZ9_k.js",
     "name": "votaciones-publicas",
     "src": "resources/js/votaciones-publicas.js",
     "isEntry": true,
     "imports": [
-      "_leaflet-Bu0uVQ8k.js"
+      "_leaflet-0AKwKANS.js",
+      "__commonjsHelpers-92s3wAHG.js"
     ]
   },
   "resources/js/votaciones-resultados.js": {
