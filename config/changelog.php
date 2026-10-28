@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.28.654',
+    'current_version' => '2026.10.28.655',
     'entries' => [
+        [
+            'version' => '2026.10.28.655',
+            'title' => 'Ficha de personas con diseño institucional y estado laboral visible',
+            'summary' => 'Adapta la Ficha del usuario del buscador al Design System, con secciones claras, antecedentes laborales y formularios accesibles.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_estab'],
+            'items' => [
+                'Organiza identidad, datos personales, restricciones, documentos, estado laboral e historial de solicitudes en paneles adaptables a móvil, con accesos por sección y acciones de perfil PDF.',
+                'Reutiliza las tarjetas laborales del buscador y conserva todos los vínculos activos, trabajo externo, reemplazos vigentes y trazabilidad del último vínculo. Mantiene los permisos actuales de consulta y edición.',
+                'Adapta las ventanas de registro y finalización, los establecimientos con búsqueda, las filas dinámicas, el interruptor de trabajo externo y el calendario en español. Conserva los valores ante errores y reabre la ventana correspondiente.',
+                'Documenta los componentes incorporados y añade pruebas aisladas de permisos, datos históricos, recuperación de errores, restricciones y escape de textos. No requiere migraciones.',
+            ],
+            'published_at' => '2026-10-28',
+        ],
         [
             'version' => '2026.10.28.654',
             'title' => 'Estado laboral visible y diseño institucional en el buscador de personas',

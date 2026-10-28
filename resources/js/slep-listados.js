@@ -7,15 +7,14 @@ import '../css/slep-listados.css';
 
 select2(window, jquery);
 
-function initialize(root) {
-    if (root.dataset.slepInitialized) return;
-    root.dataset.slepInitialized = 'true';
-    root.querySelectorAll('[data-slep-select]').forEach(select => {
+export function enhanceSelects(scope, root = scope.closest('[data-slep-listing]') || scope) {
+    scope.querySelectorAll('[data-slep-select]').forEach(select => {
+        if (jquery(select).data('select2')) return;
         const mode = select.dataset.slepSelect;
         const label = root.querySelector(`label[for="${select.id}"]`);
         const widget = jquery(select);
         widget.select2({
-            theme: 'bootstrap-5', width: '100%', dropdownParent: jquery(root), dropdownCssClass: 'slep-select-dropdown',
+            theme: 'bootstrap-5', width: '100%', dropdownParent: jquery(select.closest('.modal') || root), dropdownCssClass: 'slep-select-dropdown',
             minimumResultsForSearch: mode === 'compact' ? Infinity : 0,
             tags: mode === 'tags',
             createTag: params => {
@@ -46,6 +45,20 @@ function initialize(root) {
         removeTitle();
     });
 
+}
+
+export function destroySelects(scope) {
+    scope.querySelectorAll('[data-slep-select]').forEach(select => {
+        if (jquery(select).data('select2')) jquery(select).off('.slepListing').select2('destroy');
+    });
+}
+
+export { jquery as selectQuery };
+
+function initialize(root) {
+    if (root.dataset.slepInitialized) return;
+    root.dataset.slepInitialized = 'true';
+    enhanceSelects(root);
     const area = root.querySelector('[data-slep-area]');
     const syncArea = () => {
         const selected = area?.selectedOptions[0];

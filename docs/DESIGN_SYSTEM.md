@@ -179,6 +179,48 @@ vacíos, errores y coincidencia de varios estados en una misma persona.
 
 Mostrar los datos en bloques de etiqueta/valor sobre superficie suave, con textos largos que puedan partirse. Separar los documentos por nombre, metadatos y acciones de ver/descargar. Para procesos con varias aprobaciones, usar tarjetas de etapas y un historial cronológico como en `show.blade.php`; cada etapa debe presentar estado y responsable o siguiente acción de forma legible.
 
+#### Fichas de personas y formularios de vinculación
+
+La ficha del buscador usa `resources/js/postulante-ficha.js` y
+`resources/css/postulante-ficha.css`, sobre los componentes de `slep-listados`.
+Conservar un único título principal, identidad y acciones de volver, ver y descargar.
+La navegación por anclas permite llegar a datos, estado laboral, restricciones y
+solicitudes sin ocultar contenido. Los datos usan listas semánticas `dl/dt/dd`,
+dos columnas en escritorio y una en móvil. Mostrar los valores desconocidos
+explícitamente; el historial y las restricciones tienen bloques propios.
+
+- Reutilizar `partials.ui.estado-laboral` en la ficha: `mostrarAuditoria` añade
+  fecha y responsable con relaciones ya cargadas; `gestionarContratos` habilita
+  acciones sólo si el controlador las autoriza. Los permisos de documentos,
+  vinculación, trabajo externo y solicitudes conservan sus reglas independientes.
+- Las ventanas usan Bootstrap Modal con cabecera clara, borde institucional,
+  radio de `1.375rem`, cierre con nombre accesible y botones de 44 px. Mantener
+  Escape, retención y retorno del foco. Reabrir la ventana correspondiente tras
+  errores del servidor y conservar sus valores. La finalización explica su efecto
+  y pide motivo; el registro anterior permanece en el historial.
+- Las filas dinámicas se agrupan en `fieldset/legend`, numeradas y con etiquetas
+  e identificadores únicos. Explicar el mínimo y máximo de filas, deshabilitar
+  acciones en esos extremos y anunciar la cantidad con `aria-live="polite"`.
+  Al retirar una fila, destruir su Select2; al agregarla, usar `enhanceSelects`.
+  El desplegable se inserta dentro del modal para conservar el foco y la búsqueda.
+- El interruptor conserva un checkbox real con `role="switch"` y etiqueta
+  pulsable. Su presentación propia usa azul al activar, pista gris al desactivar
+  y foco visible; debe funcionar con la barra espaciadora.
+- Para fechas con presentación institucional, empaquetar Flatpickr localmente,
+  en español y con `disableMobile: true`, calendario dentro del modal y clase
+  `.slep-date-calendar`. Mostrar `DD-MM-AAAA` y enviar `AAAA-MM-DD` desde el
+  campo original. La alternativa sin JavaScript muestra el formato ISO requerido.
+  Conservar etiquetas, ayuda y errores vinculados al control visible, teclado,
+  selección y acción «Limpiar fecha». Evitar el selector nativo de fechas.
+  Cuando el tipo contractual sea Indefinido, limpiar y deshabilitar la fecha.
+- Los errores se presentan junto al control y en un resumen; el primer campo
+  inválido recibe el foco. Mostrar «Guardando…» durante el envío y restaurar la
+  acción al volver con el navegador. La validación del servidor es obligatoria.
+
+Verificar también varias vinculaciones simultáneas, historial vencido o
+desactivado, restricciones judiciales/manuales, roles de sólo consulta, filas
+agregadas y retiradas repetidamente, calendario y formularios en móvil.
+
 ### Correos de notificación
 
 Usar `resources/views/emails/layouts/institutional.blade.php` como base para correos transaccionales. El asunto, preencabezado y título deben identificar la etapa; el cuerpo presenta el motivo, un resumen breve con datos necesarios para actuar y una llamada a la acción hacia la vista autorizada. Reutilizar la identidad azul, superficies claras, tipografía legible y espaciado del layout institucional. Evitar tablas densas, colores como única señal de estado y datos personales que no sean necesarios para la gestión. Los destinatarios adicionales configurables se validan, se deduplican y se suman a los usuarios del rol responsable; documentar el evento y registrar el resultado del envío cuando exista auditoría de notificaciones.
