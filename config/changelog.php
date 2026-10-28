@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.27.653',
+    'current_version' => '2026.10.28.654',
     'entries' => [
+        [
+            'version' => '2026.10.28.654',
+            'title' => 'Estado laboral visible y diseño institucional en el buscador de personas',
+            'summary' => 'Muestra la vinculación laboral activa en una tarjeta amarilla dentro de cada registro y adapta el buscador al Design System.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_estab'],
+            'items' => [
+                'Añade una columna de estado laboral con tarjetas visibles de vinculación activa, trabajo externo y reemplazo vigente. La tarjeta amarilla detalla todos los establecimientos, tipo de contrato, horas y fecha de término sin depender de tooltips.',
+                'Adapta cabecera, filtros, mensajes, documentación, acciones, tabla, estado vacío y paginación. En móvil cada fila se presenta como una ficha conservando sus datos y antecedentes laborales.',
+                'Incluye selectores institucionales con búsqueda y mención de texto libre, campos de experiencia sin flechas nativas y validación visible. Empaqueta los recursos localmente y conserva las reglas de consulta, permisos y orden alfabético.',
+                'Documenta los nuevos componentes reutilizables, colores, comportamiento accesible y adaptación móvil en el Design System. Añade pruebas con datos sintéticos para vínculos vigentes y vencidos, estados simultáneos, filtros y paginación.',
+            ],
+            'published_at' => '2026-10-28',
+        ],
         [
             'version' => '2026.10.27.653',
             'title' => 'Personal AAEE y JUNJI de agosto de 2026 en Excel PAL 2027',

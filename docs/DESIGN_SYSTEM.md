@@ -88,6 +88,31 @@ Usar el `select` nativo para listas cortas y fáciles de recorrer. Para catálog
 
 Conservar el `<select>` real, su `name`, `id`, grupos, opción vacía, valor seleccionado y validación del servidor. Asociar su `label` y mostrar el error junto al control visible. Si los recursos de Select2 no cargan, el selector nativo debe seguir siendo utilizable. Al cambiar una sección condicional o limpiar un valor por código, actualizar también el control enriquecido. Comprobar teclado, móvil y que el desplegable no quede recortado por una tarjeta o modal.
 
+#### Selectores con presentación institucional en listados
+
+Cuando se requiere reemplazar toda la apariencia nativa de una pantalla, usar
+`resources/js/slep-listados.js` con el contenedor `data-slep-listing`. El paquete
+incluye localmente Select2, su tema Bootstrap 5, Bootstrap Icons y `resources/css/slep-listados.css`;
+no depende de CDN ni modifica el jQuery de otros módulos. Mantener el control
+HTML como fuente de los valores y como alternativa si no se ejecuta JavaScript.
+
+- `data-slep-select="search"`: catálogo con búsqueda, grupos y selección única.
+- `data-slep-select="compact"`: lista corta con desplegable institucional, sin
+  buscador, por ejemplo la cantidad de resultados por página.
+- `data-slep-select="tags"`: selección o texto libre, por ejemplo una mención.
+  Mantener el límite validado por el servidor; este patrón admite hasta 255 caracteres.
+- Usar etiquetas visibles y propagar `aria-labelledby`, ayudas, errores y estado
+  inválido al combobox. Al abrir, llevar el foco al buscador. Conservar Escape,
+  flechas y Enter. Los textos de opciones siempre se escapan.
+- Los filtros condicionales se ocultan y deshabilitan juntos, limpiando sólo los
+  valores que dejan de aplicar y actualizando Select2 al cambiar el área.
+- Para números enteros sencillos, el campo institucional puede usar `type="text"`
+  e `inputmode="numeric"`, sin flechas del navegador. Mostrar unidad, rango y error
+  junto al campo. Conservar validación de servidor y ofrecer mensajes propios,
+  sin ventanas emergentes de validación nativa.
+- Mostrar el texto completo mediante ajuste de líneas. No depender de `title`
+  ni de un tooltip del navegador para información necesaria.
+
 ### Botones y enlaces de acción
 
 Primario azul sólido; secundario blanco con borde gris; éxito verde; advertencia ámbar; peligro rojo, preferentemente con fondo blanco salvo confirmación explícita. Botones con texto directo, icono opcional, peso fuerte y esquinas redondeadas. Los enlaces que actúan como botones deben seguir la misma apariencia. Mantener un área de interacción cómoda, especialmente en móvil, y estados hover, foco, carga y deshabilitado reconocibles.
@@ -101,6 +126,54 @@ Si una fila permite cambiar un estado, mostrar primero el **estado actual** con 
 ### Estados, mensajes y confirmaciones
 
 Usar chips redondeados con texto explícito para estados; reutilizar el significado cromático de la tabla de tokens. Los avisos informativos y de validación muestran icono, mensaje breve y, si hace falta, el siguiente paso. Confirmar acciones irreversibles con el patrón existente de la aplicación y explicar su efecto. Mostrar el estado real del proceso; no inferirlo solo de un color decorativo.
+
+### Tarjetas de estado dentro de una fila
+
+Usar `partials.ui.estado-laboral` y las clases compartidas `.slep-record-state`
+para mostrar antecedentes laborales en una columna propia del registro. Las
+tarjetas llevan radio de `.875rem`, borde fino con acento lateral, título con
+icono y detalles legibles a la vista, sin depender de hover o de colorear toda
+la fila. El parcial recibe contratos y reemplazos ya consultados; no hace
+consultas ni decide nuevas reglas de vigencia.
+
+| Variante | Uso en el buscador | Colores |
+| --- | --- | --- |
+| `--warning` | Vinculación laboral activa registrada: establecimiento, RBD, tipo, horas y término de cada contrato | Texto `#8a4b00`, fondo amarillo `#fff8e1`, borde `#f3d99c`, acento `#c58c16` |
+| `--success` | Trabajo externo informado y su observación | Texto `#0f5132`, fondo `#ecfdf3`, borde `#b8e2c8` |
+| `--info` | Reemplazo vigente: establecimiento, solicitud y término | Texto `#0d47a1`, fondo `#eef6ff`, borde `#c9dcf5` |
+| `--neutral` | Sin vinculación laboral activa registrada | Texto `#475569`, fondo `#f8fafc`, borde `#dbe4f0` |
+
+Una persona puede tener varias tarjetas simultáneas. Mostrar siempre primero
+la vinculación activa amarilla y conservar todos sus establecimientos; un aviso
+de trabajo externo no la oculta. La ausencia de vínculo registrado no acredita
+disponibilidad. Las fechas o campos desconocidos deben indicarse como tales,
+sin inventar un tipo contractual ni un estado laboral.
+
+Los chips `.slep-status-pill` usan las mismas variantes; `--danger` se reserva
+para faltantes o errores con texto `#b42318`, fondo `#fff1f2` y borde `#fecdd3`.
+Para documentos, distinguir carga de aprobación administrativa.
+
+### Listado adaptable y paginación institucional
+
+El contenedor `.slep-listing` comparte cabecera, paneles, botones, leyenda,
+filtros y estados vacíos inspirados en Cometidos, con un único `h1` y acciones
+de al menos `2.75rem`. En escritorio, agrupar los datos por tarea y mantener
+el desplazamiento horizontal dentro de la tabla. Por debajo de 768 px, las
+filas se apilan como fichas con etiquetas `data-label`; conservar roles de
+tabla, encabezados accesibles y toda la información, incluidas las tarjetas
+laborales. Nombres y observaciones extensas deben partirse sin desbordar.
+
+Usar `partials.ui.paginacion` con `paginador` y una `etiqueta` accesible. Mostrar
+intervalo y total reales, enlaces anterior/siguiente, primera/última página y
+una ventana de hasta cinco páginas alrededor de la actual. Los saltos usan
+puntos suspensivos, los extremos deshabilitados son texto no interactivo y la
+página actual lleva `aria-current="page"`. Mantener los filtros en las URL del
+paginador. No mezclar la paginación Tailwind predeterminada con Bootstrap.
+
+Los filtros muestran «Buscando…» y `aria-busy` al enviar; al volver con el
+navegador se restauran. Los errores van junto a los controles y en un resumen
+enfocable. Comprobar escritorio, móvil, teclado, ausencia de JavaScript, estados
+vacíos, errores y coincidencia de varios estados en una misma persona.
 
 ### Detalles, documentos e historial
 
