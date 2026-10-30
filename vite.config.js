@@ -16,6 +16,7 @@ export default defineConfig({
                 'resources/js/app.js',
                 'resources/js/slep-listados.js',
                 'resources/js/postulante-ficha.js',
+                'resources/js/postulante-perfil.js',
                 'resources/css/centro-operaciones.css',
                 'resources/js/centro-operaciones.js',
                 'resources/css/votaciones-publicas.css',

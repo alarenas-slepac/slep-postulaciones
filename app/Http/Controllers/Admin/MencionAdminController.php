@@ -85,7 +85,7 @@ class MencionAdminController extends Controller
             });
         }
 
-        $items = $query->orderBy('subsector_id')->orderBy('nombre')->limit(300)->get();
+        $items = $query->orderBy('subsector_id')->orderBy('nombre')->get();
 
         $grouped = [];
         foreach ($items as $m) {
