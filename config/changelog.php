@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.29.656',
+    'current_version' => '2026.10.29.657',
     'entries' => [
+        [
+            'version' => '2026.10.29.657',
+            'title' => 'Detalle de exclusiones y referencias normativas en el aviso de participación',
+            'summary' => 'Amplía el aviso del padrón con las causales de exclusión de CCAF y las referencias oficiales de SUSESO.',
+            'roles' => ['admin', 'Público'],
+            'items' => [
+                'Aclara que el indicador referencial no certifica el padrón habilitado ni el quórum legal y detalla licencias, feriado, permisos administrativos, cometidos fuera de la región, postnatal parental, permisos sin goce y días compensatorios.',
+                'Distingue la consulta no vinculante sobre mutualidades de las reglas de CCAF e incorpora enlaces oficiales al Compendio SUSESO, al Dictamen 45.774-2015 y a la normativa para entidades públicas.',
+                'Mantiene el recuadro informativo del Design System, los cálculos de participación, los permisos y los datos registrados. No requiere migraciones ni recompilación de recursos.',
+            ],
+            'published_at' => '2026-10-29',
+        ],
         [
             'version' => '2026.10.29.656',
             'title' => 'Aviso informativo sobre padrón y participación en votaciones',
