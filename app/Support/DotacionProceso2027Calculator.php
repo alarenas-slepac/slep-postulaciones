@@ -219,7 +219,10 @@ class DotacionProceso2027Calculator
             $bloques['bloque_2']['requeridas'] += max(0.0, (float) $resumenContractual['contrato_educacion_parvularia_mas_trabajo_colaborativo_pie']);
         }
 
-        $rutsJustificados = array_fill_keys(DotacionSobredotacionJustificacion::rutsJustificados((int) $establecimiento->id, $anio), true);
+        $registrosJustificaciones = DotacionSobredotacionJustificacion::registrosPara((int) $establecimiento->id, $anio);
+        $rutsJustificados = array_fill_keys(DotacionSobredotacionJustificacion::rutsJustificados(
+            (int) $establecimiento->id, $anio, $registrosJustificaciones
+        ), true);
         $docentes = self::docentesPriorizados(collect(data_get($data, 'asignacion.docentes', $data['docentes'] ?? [])))
             ->map(function (array $docente) use ($rutsJustificados): array {
                 $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? ''));
@@ -452,7 +455,8 @@ class DotacionProceso2027Calculator
                 $docentes->reject(fn (array $docente) => isset($docente['cupo_contrata_id'])),
                 $resumenContractual,
                 $necesidades->get('funciones', [])
-            )
+            ),
+            $registrosJustificaciones
         );
 
         return [

@@ -3,21 +3,20 @@
 namespace App\Support;
 
 use App\Models\DotacionSobredotacionJustificacion;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 /** Avance sobre los mismos saldos individuales que admite el registro de justificaciones. */
 class DotacionJustificacionesAvanceCalculator
 {
-    public static function resumen(int $establecimientoId, int $anio, array $sobredotacion): array
+    public static function resumen(int $establecimientoId, int $anio, array $sobredotacion, ?Collection $registros = null): array
     {
         $disponible = Schema::hasTable('dotacion_sobredotacion_justificaciones');
-        $registros = $disponible
-            ? DotacionSobredotacionJustificacion::query()
-                ->where('establecimiento_id', $establecimientoId)->where('anio', $anio)->get()
-                ->keyBy(fn ($registro) => DotacionSobredotacionJustificacion::clave(
-                    $registro->bloque, $registro->docente_rut_normalizado, $registro->tipo_horas
-                ))
-            : collect();
+        $registros = ($registros ?? DotacionSobredotacionJustificacion::registrosPara($establecimientoId, $anio))
+            ->where('establecimiento_id', $establecimientoId)->where('anio', $anio)
+            ->keyBy(fn ($registro) => DotacionSobredotacionJustificacion::clave(
+                $registro->bloque, $registro->docente_rut_normalizado, $registro->tipo_horas
+            ));
         $total = 0.0;
         $justificadas = 0.0;
 

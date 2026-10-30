@@ -736,9 +736,19 @@ class DotacionAsignacionController extends Controller
                 }
                 $grupoProporcion = DotacionAsignacionCalculator::proportionGroup($proporcion);
                 if ($grupoProporcion !== 'especial') {
+                    if ($current === null && $grupoProporcion === '65_35' && (float) ($docente['horas_contrato'] ?? 0) === 18.0) {
+                        $necesidadVigente = DotacionAsignacionCalculator::planNeedForKey(
+                            $establecimiento, (int) $data['anio'], (string) ($data['necesidad_key'] ?? '')
+                        );
+                        if ($necesidadVigente) {
+                            // El formulario no puede convertir otra asignatura en Religión.
+                            $asignaturaNombre = $necesidadVigente['asignatura_nombre'] ?? $necesidadVigente['titulo'];
+                        }
+                    }
                     $horasContrato = $this->contratoMarginalAulaDocente(
                         $establecimiento, (int) $data['anio'], (string) $docente['rut_normalizado'],
-                        $grupoProporcion, $horasPlan, $current
+                        $grupoProporcion, $horasPlan, $current, $docente,
+                        ['tipo_asignacion' => $tipo, 'asignatura_nombre' => $asignaturaNombre]
                     );
                     $fuente = 'Conversión CPEIP del aula consolidada por docente · '.$proporcion;
                 }
@@ -988,9 +998,11 @@ class DotacionAsignacionController extends Controller
         string $rut,
         string $grupoProporcion,
         float $horasAula,
-        ?DotacionDocenteAsignacion $current = null
+        ?DotacionDocenteAsignacion $current = null,
+        ?array $docente = null,
+        array $fila = []
     ): float {
-        $aulaExistente = Schema::hasTable('dotacion_docente_asignaciones')
+        $previas = Schema::hasTable('dotacion_docente_asignaciones')
             ? DotacionDocenteAsignacion::query()
                 ->where('establecimiento_id', $establecimiento->id)
                 ->where('anio', $anio)
@@ -1003,16 +1015,17 @@ class DotacionAsignacionController extends Controller
                     DotacionAsignacionCalculator::coverageEstamento($row) === 'docente'
                     && DotacionAsignacionCalculator::proportionGroup($row->proporcion_aplicada) === $grupoProporcion
                 )
-                ->sum(fn (DotacionDocenteAsignacion $row) => (float) $row->horas_plan_pedagogicas)
-            : 0.0;
-        $proporcion = $grupoProporcion === '60_40'
-            ? DocenteHorasNoLectivasCalculator::PROPORCION_PRIORITARIOS
-            : DocenteHorasNoLectivasCalculator::PROPORCION_GENERAL;
-        $convertir = fn (float $aula): float => (float) (
-            DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula($proporcion, $aula)['horas_contrato'] ?? 0
-        );
+            : collect();
+        $fila += [
+            'id' => $current?->id ?? ((int) $previas->max('id') + 1),
+            'establecimiento_id' => $establecimiento->id, 'anio' => $anio,
+            'docente_rut_normalizado' => $rut, 'estado' => 'activa',
+            'estamento_cobertura' => 'docente', 'tipo_asignacion' => 'plan_estudio',
+            'proporcion_aplicada' => $grupoProporcion, 'horas_plan_pedagogicas' => $horasAula,
+        ];
 
-        return round($convertir($aulaExistente + $horasAula) - $convertir($aulaExistente), 2);
+        return round((float) DotacionContratoPlanCalculator::consolidar($previas->concat([$fila]), $docente)->sum('horas_contrato')
+            - (float) DotacionContratoPlanCalculator::consolidar($previas, $docente)->sum('horas_contrato'), 2);
     }
 
     private function contratoMarginalAulaEspecial(
@@ -1088,23 +1101,10 @@ class DotacionAsignacionController extends Controller
                 DotacionAsignacionCalculator::coverageEstamento($row) === 'docente'
                 && DotacionAsignacionCalculator::proportionGroup($row->proporcion_aplicada) !== 'especial'
             );
-        foreach (['65_35', '60_40'] as $proporcion) {
-            $aula = 0.0;
-            $contrato = 0.0;
-            foreach ($asignaciones as $asignacion) {
-                if (DotacionAsignacionCalculator::proportionGroup($asignacion->proporcion_aplicada) !== $proporcion) {
-                    continue;
-                }
-                $aula += (float) $asignacion->horas_plan_pedagogicas;
-                $nuevoContrato = (float) (DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula(
-                    $proporcion, $aula
-                )['horas_contrato'] ?? 0);
-                $marginal = round($nuevoContrato - $contrato, 2);
-                if (abs((float) $asignacion->horas_contrato - $marginal) > 0.001) {
-                    DB::table('dotacion_docente_asignaciones')->where('id', $asignacion->id)
-                        ->update(['horas_contrato' => $marginal]);
-                }
-                $contrato = $nuevoContrato;
+        foreach (DotacionContratoPlanCalculator::consolidar($asignaciones) as $asignacion) {
+            if ($asignacion->isDirty('horas_contrato')) {
+                DB::table('dotacion_docente_asignaciones')->where('id', $asignacion->id)
+                    ->update(['horas_contrato' => $asignacion->horas_contrato]);
             }
         }
     }

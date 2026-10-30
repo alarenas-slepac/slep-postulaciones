@@ -84,10 +84,13 @@ class DotacionAsignaturaResumenCalculator
                         'horas_aula' => 0.0,
                         'horas_contrato_especial' => 0.0,
                         'horas_contrato_asistente' => 0.0,
+                        'persona' => is_array($docente) ? $docente : null,
+                        'asignaciones' => collect(),
                     ];
                 }
 
                 $grupo['buckets_asignacion'][$bucketKey]['horas_aula'] += $horasAula;
+                $grupo['buckets_asignacion'][$bucketKey]['asignaciones']->push($asignacion);
                 if ($esAsistente) {
                     $grupo['buckets_asignacion'][$bucketKey]['horas_contrato_asistente'] += $horasContratoRegistradas;
                 } elseif ($proporcionAsignacion === 'especial') {
@@ -135,6 +138,10 @@ class DotacionAsignaturaResumenCalculator
                         : ($proporcion === 'especial'
                             ? round((float) $bucket['horas_contrato_especial'], 2)
                             : self::contratoDesdeAula($proporcion, $horasAula));
+                    if (! $esAsistente && $proporcion === '65_35'
+                        && DotacionReligionContratoCalculator::aplica($bucket['asignaciones'], $bucket['persona'])) {
+                        $horasContrato = 18.0;
+                    }
 
                     $grupo['horas_aula_asignadas'] += $horasAula;
                     if ($esAsistente) {
