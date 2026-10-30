@@ -732,6 +732,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')
             ->name('dotacion-establecimiento.asignaciones.fantasmas.destroy');
+        Route::delete('dotacion-establecimiento/{establecimiento}/asignaciones/docente', [DotacionAsignacionController::class, 'destroyDocenteAssignments'])
+            ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
+            ->whereNumber('establecimiento')
+            ->name('dotacion-establecimiento.asignaciones.docente.destroy');
         Route::delete('dotacion-establecimiento/{establecimiento}/asignaciones/{asignacion}', [DotacionAsignacionController::class, 'destroy'])
             ->middleware('ensure.role:admin|funcionario_directivo_estab|coordinador_uatp|coordinador_gdp|supervisor_plani')
             ->whereNumber('establecimiento')

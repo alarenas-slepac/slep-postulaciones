@@ -37,6 +37,7 @@
     $countSinInfo = $docentes->filter(fn ($docente) => in_array(($docente['estado_cuadratura']['key'] ?? null), ['sin_declaracion', 'sin_horas_contrato'], true))->count();
     $vacanciasPorNoContinuidad = $vacanciasPorNoContinuidad ?? null;
     $horasVacantesPorNoContinuidad = (float) data_get($vacanciasPorNoContinuidad, 'horas_vacantes_por_cubrir', 0);
+    $necesidadesAsignadas = collect(data_get($asignacion ?? [], 'necesidades', []))->flatMap(fn ($items) => collect($items))->keyBy('key');
 @endphp
 
 @include('admin.dotacion-establecimiento.partials._resumen_contractual_bloques')
@@ -178,7 +179,7 @@
         <span class="badge rounded-pill text-bg-light border">{{ $docentes->count() }} registro(s)</span>
     </div>
     <div class="table-responsive">
-        <table class="table align-middle mb-0">
+        <table class="table dotacion-docentes-table align-middle mb-0">
             <thead class="table-light">
                 <tr>
                     <th>Detalle</th>
@@ -214,6 +215,10 @@
                         $exclusionDocente = $docente['exclusion_docente'] ?? null;
                         $formConErrores = $errors->any() && (int) old('anio') === (int) ($anio ?? $docente['anio'])
                             && old('docente_rut') === ($docente['rut'] ?? null) && old('motivo') !== null;
+                        $errorAsignacionesDocente = $errors->any() && (string) old('detalle_asignaciones') === '1'
+                            && (int) old('anio') === (int) ($anio ?? $docente['anio'])
+                            && old('docente_rut') === ($docente['rut'] ?? null);
+                        $detalleAbierto = $formConErrores || $errorAsignacionesDocente;
                         $motivoSeleccionado = $formConErrores ? old('motivo') : ($exclusionDocente['motivo'] ?? '');
                         $fueroMaternalSeleccionado = $formConErrores ? old('posee_fuero_maternal', false) : ($exclusionDocente['posee_fuero_maternal'] ?? false);
                         $horasSeleccionadas = $formConErrores ? old('horas') : ($exclusionDocente['horas'] ?? 0);
@@ -242,14 +247,14 @@
                         if ($reservadasDocente > 0.01) $estadosRevision[] = 'reserva';
                         $revisionKey = sha1((string) $docente['rut']);
                     @endphp
-                    <tr data-revision-row="{{ $revisionKey }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['titulo'] }} {{ $docente['funcion'] }}" data-revision-block="{{ implode(' ', $bloquesRevision) }}" data-revision-state="{{ implode(' ', $estadosRevision) }}" data-revision-error="{{ $formConErrores ? '1' : '0' }}">
-                        <td><button class="btn btn-sm btn-outline-primary rounded-pill text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $formConErrores ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down" aria-hidden="true"></i> Ver detalle<span class="visually-hidden"> de {{ $docente['nombre'] }}</span></button></td>
-                        <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="text-muted small">{{ $docente['rut'] }} · {{ $docente['niveles_declarados'] }}</div></td>
+                    <tr data-revision-row="{{ $revisionKey }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['titulo'] }} {{ $docente['funcion'] }}" data-revision-block="{{ implode(' ', $bloquesRevision) }}" data-revision-state="{{ implode(' ', $estadosRevision) }}" data-revision-error="{{ $detalleAbierto ? '1' : '0' }}">
+                        <td data-label="Detalle"><button class="btn btn-sm btn-outline-primary rounded-pill text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $detalleAbierto ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}"><i class="bi bi-chevron-down" aria-hidden="true"></i> Ver detalle<span class="visually-hidden"> de {{ $docente['nombre'] }}</span></button></td>
+                        <td data-label="Docente"><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="text-muted small">{{ $docente['rut'] }} · {{ $docente['niveles_declarados'] }}</div></td>
                         @if ($proceso2027Docentes['aplica'] ?? false)
-                            <td>@if($esCupo)<span class="badge rounded-pill text-bg-light border">Cupo por contratar</span><div class="small text-muted mt-1">Disponible: {{ $fmt(max(0, (float) $diferencia)) }} h</div>@else<span class="badge rounded-pill text-bg-primary">{{ $docente['prioridad_2027_label'] ?? 'Sin prioridad' }}</span><div class="small text-muted mt-1">{{ $docente['tramo'] ?: 'Sin tramo' }} · {{ $docente['fecha_antiguedad'] ?: 'Sin antigüedad' }}</div><div class="small text-success">Disp.: {{ $fmt(max(0, (float) ($docente['horas_titulares_disponibles'] ?? 0) - $redondeoTitular)) }} titular + {{ $fmt(max(0, (float) ($docente['horas_contrata_disponibles'] ?? 0) - $redondeoContrata)) }} contrata</div>@if ($redondeoParvularia > 0.01)<div class="small text-muted">Neteo Parvularia: {{ $fmt($redondeoParvularia) }} h</div>@endif @endif</td>
+                            <td data-label="Prelación 2027">@if($esCupo)<span class="badge rounded-pill text-bg-light border">Cupo por contratar</span><div class="small text-muted mt-1">Disponible: {{ $fmt(max(0, (float) $diferencia)) }} h</div>@else<span class="badge rounded-pill text-bg-primary">{{ $docente['prioridad_2027_label'] ?? 'Sin prioridad' }}</span><div class="small text-muted mt-1">{{ $docente['tramo'] ?: 'Sin tramo' }} · {{ $docente['fecha_antiguedad'] ?: 'Sin antigüedad' }}</div><div class="small text-success">Disp.: {{ $fmt(max(0, (float) ($docente['horas_titulares_disponibles'] ?? 0) - $redondeoTitular)) }} titular + {{ $fmt(max(0, (float) ($docente['horas_contrata_disponibles'] ?? 0) - $redondeoContrata)) }} contrata</div>@if ($redondeoParvularia > 0.01)<div class="small text-muted">Neteo Parvularia: {{ $fmt($redondeoParvularia) }} h</div>@endif @endif</td>
                         @endif
-                        <td><div class="fw-semibold">{{ $docente['funcion'] }}</div><div class="text-muted small">{{ $docente['titulo'] }}</div></td>
-                        <td class="text-end">
+                        <td data-label="Título / función"><div class="fw-semibold">{{ $docente['funcion'] }}</div><div class="text-muted small">{{ $docente['titulo'] }}</div></td>
+                        <td class="text-end" data-label="Contrato considerado">
                             <div class="fw-bold">{{ $fmt($docente['horas_contrato']) }}</div>
                             @if ($exclusionDocente)
                                 <div class="small text-warning text-nowrap">Original {{ $fmt($horasContratoBaseDocente) }} h · excluye {{ $fmt($exclusionDocente['horas']) }} h</div>
@@ -268,11 +273,11 @@
                                 </div>
                             @endif
                         </td>
-                        <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_aula']) }}</td>
-                        <td class="text-end fw-bold text-success" data-docente-value="asignadas">{{ $fmt($horasAsignadasVisibles - $reservadasDocente) }}@if ($redondeoParvularia > 0.01)<div class="small text-muted fw-normal">Incluye +{{ $fmt($redondeoParvularia) }} h de redondeo NT</div>@endif</td>
-                        <td class="text-end" data-docente-value="reservadas">{{ $fmt($reservadasDocente) }}</td>
-                        <td class="text-end">@if ($diferencia === null)—@elseif ($diferencia < -0.01)<span class="text-danger fw-semibold">-{{ $fmt(abs($diferencia)) }}</span>@elseif ($diferencia > 0.01)<span class="text-warning fw-semibold">{{ $fmt($diferencia) }}</span>@else<span class="text-success fw-semibold">0</span>@endif</td>
-                        <td>
+                        <td class="text-end text-primary fw-semibold" data-label="Aula asignada">{{ $fmt($docente['horas_aula']) }}</td>
+                        <td class="text-end fw-bold text-success" data-docente-value="asignadas" data-label="Contrato asignado">{{ $fmt($horasAsignadasVisibles - $reservadasDocente) }}@if ($redondeoParvularia > 0.01)<div class="small text-muted fw-normal">Incluye +{{ $fmt($redondeoParvularia) }} h de redondeo NT</div>@endif</td>
+                        <td class="text-end" data-docente-value="reservadas" data-label="Reservado">{{ $fmt($reservadasDocente) }}</td>
+                        <td class="text-end" data-label="Saldo contrato">@if ($diferencia === null)—@elseif ($diferencia < -0.01)<span class="text-danger fw-semibold">-{{ $fmt(abs($diferencia)) }}</span>@elseif ($diferencia > 0.01)<span class="text-warning fw-semibold">{{ $fmt($diferencia) }}</span>@else<span class="text-success fw-semibold">0</span>@endif</td>
+                        <td data-label="Estado">
                             <span class="badge rounded-pill {{ $estado['class'] ?? 'text-bg-secondary' }}">{{ $estado['label'] ?? 'Sin estado' }}</span>
                             @if ($exclusionDocente)
                                 @if (($exclusionDocente['motivo'] ?? '') === 'proceso_bir')
@@ -289,7 +294,7 @@
                             @endif
                         </td>
                     </tr>
-                    <tr class="collapse{{ $formConErrores ? ' show' : '' }}" id="{{ $collapseId }}" data-revision-related="{{ $revisionKey }}">
+                    <tr class="collapse{{ $detalleAbierto ? ' show' : '' }}" id="{{ $collapseId }}" data-revision-related="{{ $revisionKey }}">
                         <td colspan="{{ $tableColspan }}" class="bg-light">
                             <div class="p-3">
                                 @if (isset($establecimiento, $anio))
@@ -401,6 +406,7 @@
                                         </div>
                                     </div>
                                 </div>
+                                @include('admin.dotacion-establecimiento.partials._docente_asignaciones')
                                 @if(!$esCupo)
                                     @include('admin.dotacion-establecimiento.partials._situaciones_docentes_consulta')
                                 @endif
