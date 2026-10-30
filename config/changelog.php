@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.28.655',
+    'current_version' => '2026.10.29.656',
     'entries' => [
+        [
+            'version' => '2026.10.29.656',
+            'title' => 'Aviso informativo sobre padrón y participación en votaciones',
+            'summary' => 'Explica el carácter referencial del avance y distingue la verificación del padrón de CCAF de la consulta sobre mutualidades.',
+            'roles' => ['admin', 'Público'],
+            'items' => [
+                'Reemplaza la ayuda bajo la barra de participación por el texto informativo sobre CCAF, SUSESO y el carácter consultivo de la consulta sobre mutualidades.',
+                'Presenta el aviso en un recuadro azul claro con icono, título accesible, texto de tamaño base y párrafos separados, siguiendo el Design System y la referencia de Cometidos.',
+                'Aplica el mismo aviso en los resultados públicos y administrativos, tanto diarios como acumulados. Conserva los cálculos de participación y los datos registrados.',
+            ],
+            'published_at' => '2026-10-29',
+        ],
         [
             'version' => '2026.10.28.655',
             'title' => 'Ficha de personas con diseño institucional y estado laboral visible',
