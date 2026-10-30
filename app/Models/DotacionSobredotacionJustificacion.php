@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class DotacionSobredotacionJustificacion extends Model
@@ -30,17 +31,22 @@ class DotacionSobredotacionJustificacion extends Model
         return abs((float) $this->horas_detectadas - $horas) < 0.01;
     }
 
-    /** Una justificación registrada retira al docente de otras funciones de ese año y establecimiento. */
-    public static function rutsJustificados(int $establecimientoId, int $anio): array
+    public static function registrosPara(int $establecimientoId, int $anio): Collection
     {
         if (! Schema::hasTable('dotacion_sobredotacion_justificaciones')) {
-            return [];
+            return collect();
         }
 
-        return self::query()->where('establecimiento_id', $establecimientoId)->where('anio', $anio)
+        return self::query()->where('establecimiento_id', $establecimientoId)->where('anio', $anio)->get();
+    }
+
+    /** Una justificación registrada retira al docente de otras funciones de ese año y establecimiento. */
+    public static function rutsJustificados(int $establecimientoId, int $anio, ?Collection $registros = null): array
+    {
+        return ($registros ?? self::registrosPara($establecimientoId, $anio))
+            ->where('establecimiento_id', $establecimientoId)->where('anio', $anio)
             ->whereIn('bloque', ['plan_estudio', 'parvularia', 'pie'])
             ->whereIn('tipo_horas', ['titular', 'contrata'])->where('horas_detectadas', '>', 0)
-            ->get(['docente_rut_normalizado', 'justificacion'])
             ->filter(fn (self $registro) => trim((string) $registro->justificacion) !== '')
             ->map(fn (self $registro) => \App\Support\DotacionEstablecimientoCalculator::normalizeRut($registro->docente_rut_normalizado))
             ->filter()->unique()->values()->all();

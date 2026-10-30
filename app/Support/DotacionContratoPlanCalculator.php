@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 /** Convierte el aula acumulada por docente sin reescribir registros históricos. */
 class DotacionContratoPlanCalculator
 {
-    public static function consolidar(Collection $asignaciones): Collection
+    public static function consolidar(Collection $asignaciones, ?array $docente = null): Collection
     {
         $asignaciones = DotacionContratoParvulariaCalculator::consolidar($asignaciones);
         if (! Schema::hasTable('docente_horas_proporciones')) {
@@ -17,6 +17,9 @@ class DotacionContratoPlanCalculator
 
         $acumuladas = [];
         $contratos = [];
+        $religion = $asignaciones->filter(fn ($fila) => self::proporcion($fila) !== null)
+            ->groupBy(fn ($fila) => self::grupo($fila))
+            ->map(fn (Collection $filas) => DotacionReligionContratoCalculator::aplica($filas, $docente));
         // El orden coincide con el recálculo al guardar. Se conserva el orden
         // original de presentación y cada fila aporta sólo el incremento real.
         foreach ($asignaciones->sortBy(fn ($row) => (int) data_get($row, 'id', 0)) as $indice => $row) {
@@ -28,15 +31,15 @@ class DotacionContratoPlanCalculator
             if ($proporcion === null || $rut === '' || $aula === null || (float) $aula <= 0) {
                 continue;
             }
-            $grupo = implode('|', [
-                data_get($row, 'establecimiento_id', ''), data_get($row, 'anio', ''), $rut,
-                DotacionAsignacionCalculator::proportionGroup(data_get($row, 'proporcion_aplicada')),
-            ]);
+            $grupo = self::grupo($row);
             $previas = $acumuladas[$grupo] ?? ['aula' => 0.0, 'contrato' => 0.0];
             $totalAula = round($previas['aula'] + (float) $aula, 2);
             $contrato = (float) DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula(
                 $proporcion, $totalAula
             )['horas_contrato'];
+            if ($religion->get($grupo, false)) {
+                $contrato = min(18.0, $contrato);
+            }
             $contratos[$indice] = round($contrato - $previas['contrato'], 2);
             $acumuladas[$grupo] = ['aula' => $totalAula, 'contrato' => $contrato];
         }
@@ -56,6 +59,17 @@ class DotacionContratoPlanCalculator
 
             return $row;
         });
+    }
+
+    private static function grupo(object|array $fila): string
+    {
+        return implode('|', [
+            data_get($fila, 'establecimiento_id', ''), data_get($fila, 'anio', ''),
+            DotacionEstablecimientoCalculator::normalizeRut((string) (
+                data_get($fila, 'docente_rut_normalizado') ?: data_get($fila, 'docente_rut', '')
+            )),
+            DotacionAsignacionCalculator::proportionGroup(data_get($fila, 'proporcion_aplicada')),
+        ]);
     }
 
     /** Contrato que se libera al retirar una asignación del total del docente. */

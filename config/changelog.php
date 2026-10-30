@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.30.661',
+    'current_version' => '2026.10.30.662',
     'entries' => [
+        [
+            'version' => '2026.10.30.662',
+            'title' => 'Contrato de 18 horas para el tramo de 16 horas aula de Religión',
+            'summary' => 'Respeta la jornada de 18 horas al asignar el tramo de 16 horas aula de Religión con proporción 65/35.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Usa 18 horas de contrato en el tramo repetido de 16 horas aula sólo si todas las asignaciones del grupo docente 65/35 corresponden a Religión y su jornada vigente, consolidada desde el padrón, es de 18 horas.',
+                'Conserva la conversión general para otras asignaturas, proporciones y jornadas. La tabla vigente debe confirmar que 18 horas de contrato cubren 16 horas aula; no altera la tabla general ni los cupos sin docente.',
+                'Comparte el cálculo entre guardado, edición, eliminación, detalle docente, resumen por asignatura, conciliación y proyección. Reconoce asignaciones distribuidas entre varios cursos y actualiza la carga al cambiar de docente o de jornada.',
+                'Incluye pruebas aisladas de asignación única y por varios cursos, reasignación, eliminación, fracciones y controles de jornada y asignatura. Las consultas conservan los registros históricos y no requieren migraciones.',
+                'Reutiliza una sola lectura de justificaciones para los saldos de la Etapa 7 y la elegibilidad docente, manteniendo el aislamiento por establecimiento y año.',
+            ],
+            'published_at' => '2026-10-30',
+        ],
         [
             'version' => '2026.10.30.661',
             'title' => 'Etapa 7 de justificación de horas en Dotación Establecimiento',

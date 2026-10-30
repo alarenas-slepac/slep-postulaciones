@@ -96,6 +96,8 @@ class DotacionConciliacionGeneral
             $todas = $todoPlan->filter(fn ($row) => DotacionAsignacionCalculator::proportionGroup(data_get($row, 'proporcion_aplicada')) === $grupo);
             if ($grupo === 'especial') {
                 $total += (float) $filas->sum('horas_contrato');
+            } elseif ($grupo === '65_35' && DotacionReligionContratoCalculator::aplica($filas, $docente)) {
+                $total += 18.0;
             } elseif (array_key_exists($campo, $docente) && $filas->count() === $todas->count()) {
                 // Reutiliza exactamente la conversión consolidada del detalle docente.
                 $total += (float) $docente[$campo];

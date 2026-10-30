@@ -164,7 +164,7 @@ class DotacionProyeccionCalculator
 
             $horas = round(max(0.0, (float) ($docente['horas_contrato'] ?? 0)), 2);
             $asignacionesDocente = collect($asignacionesPorRut->get($rut, $docente['asignaciones'] ?? []));
-            $referencia = self::detalleAsignaciones($asignacionesDocente, $contextos, $rut);
+            $referencia = self::detalleAsignaciones($asignacionesDocente, $contextos, $rut, $docente);
             $contrato = self::contratos(collect([$docente]), $asignacionesDocente, $especial);
             $porCategoria = array_intersect_key($contrato, $adicionales);
             $porIncorporarCategoria = $porCategoria;
@@ -183,7 +183,7 @@ class DotacionProyeccionCalculator
                     ? 'pie' : ($contrato['parvularia'] > 0 ? 'parvularia' : 'aula');
             };
             $asignadasPorCategoria = $asignacionesDocente->groupBy($categoriaAsignacion)
-                ->map(fn (Collection $filas) => self::detalleAsignaciones($filas, $contextos, $rut)['total_contrato']);
+                ->map(fn (Collection $filas) => self::detalleAsignaciones($filas, $contextos, $rut, $docente)['total_contrato']);
             // La asignación identifica la necesidad, pero su cantidad no limita
             // las horas necesarias definidas en Situación docente.
             foreach ($necesidades as $index => $necesidad) {
@@ -231,7 +231,7 @@ class DotacionProyeccionCalculator
     }
 
     /** Detalle informativo del año base; no limita ni modifica las horas conservadas. */
-    private static function detalleAsignaciones(Collection $asignaciones, array $contextos, string $rut): array
+    private static function detalleAsignaciones(Collection $asignaciones, array $contextos, string $rut, ?array $docente = null): array
     {
         $items = $asignaciones
             ->filter(fn ($row) => self::rut($row) === $rut
@@ -266,12 +266,20 @@ class DotacionProyeccionCalculator
             }
 
             return DotacionAsignacionCalculator::proportionGroup($item['proporcion']);
-        })->map(function (Collection $filas, string $grupo): array {
+        })->map(function (Collection $filas, string $grupo) use ($asignaciones, $rut, $docente): array {
             $pedagogicas = round((float) $filas->sum('horas_pedagogicas'), 2);
             $convertido = in_array($grupo, ['65_35', '60_40'], true);
             $contrato = $convertido
                 ? DocenteHorasNoLectivasCalculator::contratoRequeridoDesdeHorasAula($grupo, $pedagogicas)['horas_contrato']
                 : $filas->sum('horas_contrato');
+            if ($grupo === '65_35' && DotacionReligionContratoCalculator::aplica($asignaciones->filter(fn ($fila) =>
+                self::rut($fila) === $rut && data_get($fila, 'tipo_asignacion') === 'plan_estudio'
+                && DotacionAsignacionCalculator::proportionGroup(data_get($fila, 'proporcion_aplicada')) === $grupo
+                && (data_get($fila, 'estado') ?? 'activa') === 'activa'
+                && DotacionAsignacionCalculator::coverageEstamento($fila) === 'docente'
+            ), $docente)) {
+                $contrato = 18.0;
+            }
 
             return [
                 'label' => match ($grupo) {
