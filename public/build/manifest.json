@@ -2360,6 +2360,15 @@
     "src": "resources/js/dotacion-asignacion.js",
     "isEntry": true
   },
+  "resources/js/dotacion-docente-asignaciones.js": {
+    "file": "assets/dotacion-docente-asignaciones-DjNpUxAW.js",
+    "name": "dotacion-docente-asignaciones",
+    "src": "resources/js/dotacion-docente-asignaciones.js",
+    "isEntry": true,
+    "css": [
+      "assets/dotacion-docente-asignaciones-WnRkXQQJ.css"
+    ]
+  },
   "resources/js/funcionario-consulta.js": {
     "file": "assets/funcionario-consulta-DXrrOlQA.js",
     "name": "funcionario-consulta",

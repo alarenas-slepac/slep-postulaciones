@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.30.658',
+    'current_version' => '2026.10.30.659',
     'entries' => [
+        [
+            'version' => '2026.10.30.659',
+            'title' => 'Detalle y eliminación de asignaciones de horas por docente',
+            'summary' => 'Incorpora el detalle de horas asignadas sobre Situaciones docentes, con eliminación individual o de varias asignaciones del mismo docente.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Muestra asignatura o función, curso y bloque, subvención, proporción, horas aula y horas de contrato dentro del detalle del docente.',
+                'Permite seleccionar asignaciones y confirmar su eliminación individual o grupal. Recalcula las horas y el saldo; conserva las situaciones docentes y el historial de no renovación.',
+                'Valida el docente, año, establecimiento, estado, permisos y restricciones de acompañamiento. La operación grupal se revierte completa si una asignación no se puede eliminar. Respeta las suspensiones de escritura y mantiene el contexto al volver.',
+                'Incluye presentación adaptable a móvil, confirmación accesible, recursos compilados y pruebas aisladas. No requiere migraciones.',
+            ],
+            'published_at' => '2026-10-30',
+        ],
         [
             'version' => '2026.10.30.658',
             'title' => 'Catálogo completo y buscador integrado de menciones en Mi Perfil',

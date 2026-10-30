@@ -1,0 +1,43 @@
+.dotacion-docente-horas { border: 1px solid var(--slep-border, #dbe4f0); border-radius: 1rem; background: #fff; color: var(--slep-text, #0f172a); overflow: hidden; }
+.dotacion-docente-horas__header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem; border-bottom: 1px solid #dbe4f0; background: #f8fbff; }
+.dotacion-docente-horas__header h3 { font-size: 1.15rem; font-weight: 700; margin: 0 0 .5rem; }
+.dotacion-docente-horas__body { padding: 1.25rem; }
+.dotacion-docente-horas__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+.dotacion-docente-horas .btn, .dotacion-docente-horas__modal .btn { min-height: 2.75rem; border-radius: .75rem; font-weight: 700; }
+.dotacion-docente-horas .form-check-input { width: 1.15rem; height: 1.15rem; cursor: pointer; }
+.dotacion-docente-horas .form-check-input:focus-visible { outline: 2px solid #0d6efd; outline-offset: 3px; }
+.dotacion-docente-horas__table-wrap { overflow-x: auto; }
+.dotacion-docente-horas__table { min-width: 780px; font-size: .9rem; }
+.dotacion-docente-horas__table > thead > tr > th { background: #f8fafc; color: #334155; font-size: .8rem; padding: .75rem; }
+.dotacion-docente-horas__table > tbody > tr > td { padding: .875rem .75rem; vertical-align: top; overflow-wrap: anywhere; }
+.dotacion-docente-horas__table td:first-child { min-width: 3rem; }
+.dotacion-docente-horas__table td[data-label="Acción"] { min-width: 8rem; }
+.dotacion-docente-horas__table .btn { display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap; }
+.dotacion-docente-horas__modal { border: 1px solid #dbe4f0; border-radius: 1.375rem; }
+.dotacion-docente-horas__modal .modal-header { background: #f8fbff; border-radius: 1.375rem 1.375rem 0 0; }
+.dotacion-docente-horas__modal [data-horas-confirm-list] { overflow-wrap: anywhere; }
+@media (max-width: 767.98px) {
+    .dotacion-docentes-table { display: block; width: 100%; }
+    .dotacion-docentes-table > thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .dotacion-docentes-table > tbody { display: block; width: 100%; }
+    .dotacion-docentes-table > tbody > tr[data-revision-row] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; padding: 1rem; border-bottom: 1px solid #dbe4f0; }
+    .dotacion-docentes-table > tbody > tr[data-revision-row] > td { padding: 0; border: 0; min-width: 0; text-align: left !important; overflow-wrap: anywhere; }
+    .dotacion-docentes-table > tbody > tr[data-revision-row] > td:nth-child(-n+3),
+    .dotacion-docentes-table > tbody > tr[data-revision-row] > td:last-child { grid-column: 1 / -1; }
+    .dotacion-docentes-table > tbody > tr[data-revision-row] > td[data-label]::before { content: attr(data-label); display: block; font-size: .75rem; font-weight: 700; color: #64748b; margin-bottom: .25rem; }
+    .dotacion-docentes-table > tbody > tr[data-revision-related] { display: block; }
+    .dotacion-docentes-table > tbody > tr[data-revision-related]:not(.show) { display: none; }
+    .dotacion-docentes-table > tbody > tr[data-revision-related] > td { display: block; width: 100%; padding: 0; }
+    .dotacion-docentes-table > tbody > tr[data-revision-related] > td > .p-3 { padding: .75rem !important; }
+    .dotacion-docentes-table .text-nowrap { white-space: normal !important; }
+    .dotacion-docentes-table .badge { white-space: normal; max-width: 100%; }
+    .dotacion-docente-horas__body, .dotacion-docente-horas__header { padding: 1rem; }
+    .dotacion-docente-horas__table-wrap { overflow: visible; }
+    .dotacion-docente-horas__table { display: block; min-width: 0; }
+    .dotacion-docente-horas__table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .dotacion-docente-horas__table tbody { display: grid; gap: 1rem; }
+    .dotacion-docente-horas__table tbody tr { display: block; border: 1px solid #dbe4f0; border-radius: .75rem; overflow: hidden; }
+    .dotacion-docente-horas__table > tbody > tr > td { display: block; padding: .65rem .75rem; border: 0; text-align: left !important; }
+    .dotacion-docente-horas__table td[data-label]::before { content: attr(data-label); display: block; font-size: .75rem; font-weight: 700; color: #64748b; margin-bottom: .25rem; }
+    .dotacion-docente-horas__actions > form, .dotacion-docente-horas__actions .btn { width: 100%; }
+}

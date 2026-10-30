@@ -326,17 +326,62 @@ class DotacionAsignacionController extends Controller
         abort_unless((int) $asignacion->establecimiento_id === (int) $establecimiento->id, 404);
         DB::transaction(function () use ($establecimiento, $asignacion): void {
             Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
-            $asignacion->refresh();
-            if ($asignacion->estado === 'no_renovada') {
-                throw ValidationException::withMessages(['asignacion' => 'Esta asignación pertenece al historial de no renovación y no se puede eliminar desde Asignación de horas.']);
-            }
-            $this->validateAcompanamientoParvularia($establecimiento, null, $asignacion);
-            $asignacion->delete();
-            $this->recalcularContratoAulaParvularia($establecimiento, (int) $asignacion->anio, (string) $asignacion->docente_rut_normalizado);
-            $this->recalcularContratoAulaDocente($establecimiento, (int) $asignacion->anio, (string) $asignacion->docente_rut_normalizado);
+            $this->deleteAssignmentAndRecalculate($establecimiento, $asignacion);
         });
 
         return back()->with('success', 'Asignación de horas eliminada correctamente.');
+    }
+
+    public function destroyDocenteAssignments(Request $request, Establecimiento $establecimiento): RedirectResponse
+    {
+        $this->authorizeScope($request, $establecimiento);
+        $data = $request->validate([
+            'anio' => ['required', 'integer', 'between:2020,2100'],
+            'docente_rut' => ['required', 'string', 'max:40'],
+            'asignaciones' => ['required', 'array', 'min:1', 'max:1000'],
+            'asignaciones.*' => ['required', 'integer', 'min:1', 'distinct'],
+        ]);
+        $anio = (int) $data['anio'];
+        $rut = DotacionEstablecimientoCalculator::normalizeRut($data['docente_rut']);
+        if ($rut === '') {
+            throw ValidationException::withMessages(['docente_rut' => 'No fue posible identificar al docente. Actualice el detalle.']);
+        }
+        $ids = collect($data['asignaciones'])->map(fn ($id) => (int) $id);
+        $cantidad = DB::transaction(function () use ($establecimiento, $anio, $rut, $ids): int {
+            Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            $rows = DotacionDocenteAsignacion::query()
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)
+                ->where('estado', 'activa')
+                ->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            if ($rows->count() !== $ids->count()
+                || $rows->contains(fn ($row) => DotacionAsignacionCalculator::coverageEstamento($row) !== 'docente'
+                    || DotacionEstablecimientoCalculator::normalizeRut($row->docente_rut_normalizado ?: $row->docente_rut) !== $rut)) {
+                throw ValidationException::withMessages([
+                    'asignaciones' => 'Las asignaciones cambiaron o alguna no corresponde a este docente, establecimiento y año. Actualice el detalle y seleccione nuevamente.',
+                ]);
+            }
+            // El acompañamiento se retira antes del plan del que depende. Cada baja
+            // reutiliza las restricciones y el recálculo de la eliminación individual.
+            foreach ($rows->sortBy(fn ($row) => $row->tipo_asignacion === 'acompanamiento_parvularia' ? 0 : 1) as $row) {
+                $this->deleteAssignmentAndRecalculate($establecimiento, $row);
+            }
+
+            return $rows->count();
+        });
+
+        return back()->with('success', 'Se eliminaron '.$cantidad.' asignación(es) del docente y se recalcularon sus horas y saldo.');
+    }
+
+    private function deleteAssignmentAndRecalculate(Establecimiento $establecimiento, DotacionDocenteAsignacion $asignacion): void
+    {
+        $asignacion->refresh();
+        if ($asignacion->estado === 'no_renovada') {
+            throw ValidationException::withMessages(['asignacion' => 'Esta asignación pertenece al historial de no renovación y no se puede eliminar desde Asignación de horas.']);
+        }
+        $this->validateAcompanamientoParvularia($establecimiento, null, $asignacion);
+        $asignacion->delete();
+        $this->recalcularContratoAulaParvularia($establecimiento, (int) $asignacion->anio, (string) $asignacion->docente_rut_normalizado);
+        $this->recalcularContratoAulaDocente($establecimiento, (int) $asignacion->anio, (string) $asignacion->docente_rut_normalizado);
     }
 
     public function destroyGhostAssignments(Request $request, Establecimiento $establecimiento): RedirectResponse
