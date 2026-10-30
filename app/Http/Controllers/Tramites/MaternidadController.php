@@ -8,6 +8,7 @@ use App\Models\MaternidadCaso;
 use App\Models\MaternidadDocumento;
 use App\Models\MaternidadImportacion;
 use App\Services\Maternidad\MaternidadImportador;
+use App\Services\Maternidad\MaternidadAntecedentesService;
 use App\Services\Maternidad\MaternidadPersonalResolver;
 use App\Services\Maternidad\MaternidadRegistroService;
 use Illuminate\Http\Request;
@@ -80,10 +81,12 @@ class MaternidadController extends Controller
         return redirect()->route('tramites.maternidad.show', $caso)->with('success', 'Caso de maternidad registrado.');
     }
 
-    public function show(MaternidadCaso $caso)
+    public function show(Request $request, MaternidadCaso $caso)
     {
+        $request->validate(['licencias_page' => ['nullable', 'integer', 'min:1', 'max:100000'], 'reemplazos_page' => ['nullable', 'integer', 'min:1', 'max:100000']]);
         $caso->load(['hijos', 'documentos', 'historial.autor']);
-        return response()->view('tramites.maternidad.show', compact('caso'))->header('Cache-Control', 'private, no-store');
+        $antecedentes = app(MaternidadAntecedentesService::class)->obtener($caso);
+        return response()->view('tramites.maternidad.show', compact('caso', 'antecedentes'))->header('Cache-Control', 'private, no-store');
     }
 
     public function edit(MaternidadCaso $caso)

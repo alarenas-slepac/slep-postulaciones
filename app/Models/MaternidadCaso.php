@@ -14,10 +14,10 @@ class MaternidadCaso extends Model
     protected function casts(): array
     {
         $casts = ['ley_dominga' => 'boolean', 'lactancia' => 'boolean', 'postnatal_parental' => 'boolean',
-            'fuente_snapshot' => 'array', 'documentos_pendientes' => 'array', 'version' => 'integer'];
+            'fuente_snapshot' => 'array', 'documentos_pendientes' => 'array', 'version' => 'integer', 'horas_semanales_lactancia' => 'decimal:2'];
         foreach (['fecha_ingreso', 'fecha_termino', 'fecha_registro', 'fecha_certificado_embarazo', 'fpc', 'fpp', 'fnh',
             'fecha_ley_dominga', 'fecha_inicio_lactancia', 'fecha_inicio_postnatal', 'fecha_termino_postnatal',
-            'fecha_rex_postnatal', 'fuero_estimado', 'fuero_nacimiento', 'fuero_dominga', 'fecha_termino_fuero', 'fecha_termino_lactancia'] as $campo) $casts[$campo] = 'date:Y-m-d';
+            'fecha_rex_postnatal', 'fecha_rex_dominga', 'fecha_rex_lactancia', 'fuero_estimado', 'fuero_nacimiento', 'fuero_dominga', 'fecha_termino_fuero', 'fecha_termino_lactancia'] as $campo) $casts[$campo] = 'date:Y-m-d';
         return $casts;
     }
 

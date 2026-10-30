@@ -17,10 +17,11 @@ use ZipArchive;
 
 final class MaternidadImportador
 {
-    public const COLUMNAS = ['referencia_caso', 'rut', 'rbd', 'fuente', 'nombres', 'apellido_paterno', 'apellido_materno',
+    public const COLUMNAS_ANTERIORES = ['referencia_caso', 'rut', 'rbd', 'fuente', 'nombres', 'apellido_paterno', 'apellido_materno',
         'estamento', 'calidad_juridica', 'fecha_ingreso', 'fecha_termino', 'fecha_registro', 'fecha_certificado_embarazo',
         'fpc', 'fpp', 'fnh', 'ley_dominga', 'fecha_ley_dominga', 'lactancia', 'fecha_inicio_lactancia',
         'postnatal_parental', 'fecha_inicio_postnatal', 'fecha_termino_postnatal', 'modalidad_postnatal', 'fecha_rex_postnatal', 'observacion'];
+    public const COLUMNAS = [...self::COLUMNAS_ANTERIORES, 'fecha_rex_dominga', 'fecha_rex_lactancia', 'horas_semanales_lactancia'];
     public const COLUMNAS_HIJOS = ['rut_funcionaria', 'referencia_caso', 'nombre_completo', 'fecha_nacimiento', 'rut_hijo'];
 
     public function plantilla(): Spreadsheet
@@ -42,6 +43,7 @@ final class MaternidadImportador
             ['Nacimiento sin certificado: el fuero continúa como estimado por FPP hasta adjuntar el certificado.'],
             ['La previsualización no crea expedientes. Revise y confirme la importación dentro de 30 minutos.'],
             ['Máximo '.config('maternidad.max_casos_importacion').' casos y '.config('maternidad.max_hijos_importacion').' hijos por archivo.'],
+            ['Informe fecha_rex_dominga, fecha_rex_lactancia y horas_semanales_lactancia si dispone de esos antecedentes. Los archivos REX se adjuntan después.'],
         ]);
         foreach ([$libro->getSheet(0), $libro->getSheet(1)] as $hoja) {
             $ultima = $hoja->getHighestColumn();
@@ -55,7 +57,7 @@ final class MaternidadImportador
             $hoja->getStyle('A2:'.$ultima.'501')->getNumberFormat()->setFormatCode('@');
         }
         $libro->getSheet(2)->getColumnDimension('A')->setWidth(120);
-        $libro->getSheet(2)->getStyle('A1:A13')->getAlignment()->setWrapText(true);
+        $libro->getSheet(2)->getStyle('A1:A14')->getAlignment()->setWrapText(true);
         return $libro;
     }
 
@@ -158,6 +160,7 @@ final class MaternidadImportador
     private function cabecera($hoja, array $esperada): void
     {
         $actual = $hoja->rangeToArray('A1:'.\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($esperada)).'1', null, false, false)[0];
+        if ($esperada === self::COLUMNAS && $actual === [...self::COLUMNAS_ANTERIORES, null, null, null]) return;
         if ($actual !== $esperada) throw ValidationException::withMessages(['archivo' => 'Los encabezados de '.$hoja->getTitle().' no coinciden con la plantilla.']);
     }
 

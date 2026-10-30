@@ -10,6 +10,7 @@
     </div></section>
     <section class="slep-listing__panel"><div class="slep-listing__panel-header"><h2>2. Validar y revisar</h2></div><form class="slep-listing__filters" action="{{ route('tramites.maternidad.previsualizar') }}" method="POST" enctype="multipart/form-data">@csrf
         <label class="form-label" for="mat-excel">Libro Excel (.xlsx), máximo 10 MB</label><input class="form-control @error('archivo') is-invalid @enderror" id="mat-excel" type="file" name="archivo" accept=".xlsx" required><div class="invalid-feedback">@error('archivo'){{ $message }}@enderror</div>
+        <p class="form-text mt-3">Puede informar las fechas de REX de Ley Dominga y lactancia y las horas semanales de lactancia en las columnas finales de la plantilla. Los archivos REX se completan después. Se aceptan las plantillas anteriores sin estas tres columnas.</p>
         <p class="form-text mt-3">Primero verá una previsualización. La confirmación crea todos los casos en una sola operación; si hay errores, no se registra ninguno. Las referencias existentes no se sobrescriben.</p><button type="submit" class="slep-listing__button slep-listing__button--primary">Validar archivo</button>
     </form></section>
 </div>
