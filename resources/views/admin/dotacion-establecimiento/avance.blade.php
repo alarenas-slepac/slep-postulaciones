@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@push('styles')
+    @vite('resources/css/dotacion-establecimiento.css')
+@endpush
+
 @section('content')
     @php
         $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
@@ -25,7 +29,7 @@
                 <div>
                     <div class="avance-eyebrow mb-1">Administración · Dotación Establecimiento</div>
                     <h1 class="display-6 fw-bold mb-1">Informe de avance</h1>
-                    <p class="mb-0 text-muted">Seguimiento de configuración de planes y asignación de horas aula por establecimiento.</p>
+                    <p class="mb-0 text-muted">Seguimiento de planes, asignación de horas y etapas del proceso por establecimiento.</p>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
@@ -104,6 +108,17 @@
         <div class="col-xl-3 col-md-6"><div class="card avance-kpi border-0"><div class="card-body"><div class="text-muted small fw-semibold">Promedio general</div><div class="fs-3 fw-bold text-success">{{ number_format($resumenPagina['promedio_general'] ?? 0, 1, ',', '.') }}%</div><div class="small text-muted">{{ number_format($resumenPagina['completos'] ?? 0, 0, ',', '.') }} completo(s) en la página.</div></div></div></div>
     </div>
 
+    @if (data_get($resumenPagina, 'justificaciones.aplica', false))
+        <div class="card avance-card mb-4"><div class="card-body p-4">
+            <h2 class="h5 fw-bold mb-2">Etapa 7 · Horas por justificar en esta página</h2>
+            <div class="fw-semibold">{{ $fmt(data_get($resumenPagina, 'justificaciones.horas_pendientes', 0)) }} de {{ $fmt(data_get($resumenPagina, 'justificaciones.horas_total', 0)) }} horas por justificar.</div>
+            <div class="small text-muted mt-1">Saldos contractuales actuales de Plan de estudio, Parvularia y PIE. Las justificaciones cuyo saldo cambió requieren actualización.</div>
+            @if (data_get($resumenPagina, 'justificaciones.establecimientos_sin_calculo', 0) > 0)
+                <p class="small text-danger mb-0 mt-2">Totales parciales: {{ data_get($resumenPagina, 'justificaciones.establecimientos_sin_calculo') }} establecimiento(s) sin cálculo disponible.</p>
+            @endif
+        </div></div>
+    @endif
+
     <div class="card avance-card overflow-hidden">
         <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div>
@@ -157,9 +172,10 @@
                                     'label' => 'Avance consolidado',
                                     'porcentaje' => data_get($avance, 'porcentaje_general', 0),
                                     'detalle' => ($anio === 2027 && data_get($avance, 'proceso_2027.aplica', false))
-                                        ? 'Etapas 2027: planes, combinaciones, funciones normativas, máximos y asignación obligatoria'
+                                        ? collect(data_get($avance, 'proceso_2027.pasos', []))->where('completo', true)->count().' de 7 etapas completas, incluida la justificación de horas'
                                         : '50% planes + 50% asignación de horas aula',
                                 ])
+                                @include('admin.dotacion-establecimiento.partials._avance-justificaciones')
                             </td>
                             <td class="avance-desglose">
                                 @foreach (collect(data_get($avance, 'desglose', [])) as $grupo)

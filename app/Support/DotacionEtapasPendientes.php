@@ -28,6 +28,11 @@ class DotacionEtapasPendientes
                     ->values()->all(),
                 'maximos' => self::maximos($proceso),
                 'asignacion' => self::asignacion($proceso, $asignacion),
+                'justificaciones' => [[
+                    'texto' => (data_get($proceso, 'justificaciones.disponible', false))
+                        ? 'Registre o actualice los fundamentos de supresión de horas titulares y no renovación de contrata para los saldos actuales de Plan de estudio, Parvularia y PIE.'
+                        : 'El registro de justificaciones no está disponible. Solicite su habilitación a Administración.',
+                ]],
                 default => [],
             };
 

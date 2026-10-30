@@ -5,6 +5,7 @@ namespace App\Exports;
 use App\Models\Establecimiento;
 use App\Support\DotacionEstablecimientoAvanceCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionProceso2027Calculator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -156,6 +157,19 @@ class DotacionEstablecimientoAvanceExport
         $sheet->getStyle('B'.($kpiStart + 7).':B'.($kpiStart + 8))->getNumberFormat()->setFormatCode('0.00');
         $sheet->getStyle('B'.($kpiStart + 9).':B'.($kpiStart + 11))->getNumberFormat()->setFormatCode('0.0%');
 
+        if ($resumen['justificaciones']['aplica'] ?? false) {
+            $inicioJustificaciones = $kpiEnd + 2;
+            $sheet->fromArray([
+                ['Etapa 7 · Horas por justificar', 'Horas contrato'],
+                ['Total de horas que requieren justificación', $resumen['justificaciones']['horas_total']],
+                ['Horas justificadas vigentes', $resumen['justificaciones']['horas_justificadas']],
+                ['Horas pendientes de justificar', $resumen['justificaciones']['horas_pendientes']],
+                ['Establecimientos sin cálculo de justificaciones', $resumen['justificaciones']['establecimientos_sin_calculo']],
+            ], null, 'A'.$inicioJustificaciones, true);
+            $this->styleHeader($sheet, 'A'.$inicioJustificaciones.':B'.$inicioJustificaciones);
+            $sheet->getStyle('B'.($inicioJustificaciones + 1).':B'.($inicioJustificaciones + 3))->getNumberFormat()->setFormatCode('0.00');
+        }
+
         $sheet->getColumnDimension('A')->setWidth(42);
         $sheet->getColumnDimension('B')->setWidth(42);
         $sheet->getColumnDimension('C')->setWidth(3);
@@ -209,11 +223,9 @@ class DotacionEstablecimientoAvanceExport
             $headers[] = $label.' - excedidas';
             $headers[] = $label.' - avance';
         }
-        $headers[] = 'Proceso 2027 - planes';
-        $headers[] = 'Proceso 2027 - combinación';
-        $headers[] = 'Proceso 2027 - funciones normativas';
-        $headers[] = 'Proceso 2027 - máximos';
-        $headers[] = 'Proceso 2027 - asignación obligatoria';
+        foreach (DotacionProceso2027Calculator::ETAPAS as $label) {
+            $headers[] = 'Proceso 2027 - '.$label;
+        }
         foreach ([
             'bloque_1' => 'Plan general, trabajo colaborativo PIE y funciones normativas',
             'bloque_2' => 'Educación Parvularia y trabajo colaborativo PIE NT1/NT2',
@@ -228,6 +240,10 @@ class DotacionEstablecimientoAvanceExport
             $headers[] = $label.' - pendiente obligatorio';
             $headers[] = $label.' - saldo máximo';
         }
+        $inicioHorasJustificacion = count($headers) + 1;
+        $headers[] = 'Etapa 7 - Total horas que requieren justificación';
+        $headers[] = 'Etapa 7 - Horas justificadas vigentes';
+        $headers[] = 'Etapa 7 - Horas pendientes de justificar';
         $headers[] = 'Observaciones';
 
         $sheet->fromArray([$headers], null, 'A1');
@@ -275,8 +291,9 @@ class DotacionEstablecimientoAvanceExport
             }
 
             $proceso2027 = data_get($avance, 'proceso_2027', []);
-            foreach (['planes', 'combinaciones', 'normativas', 'maximos', 'asignacion'] as $paso) {
-                $values[] = data_get($proceso2027, 'pasos.'.$paso.'.completo', false) ? 'Completada' : 'Pendiente';
+            foreach (array_keys(DotacionProceso2027Calculator::ETAPAS) as $paso) {
+                $values[] = ! ($proceso2027['aplica'] ?? false) ? 'No aplica'
+                    : (data_get($proceso2027, 'pasos.'.$paso.'.completo', false) ? 'Completada' : 'Pendiente');
             }
             foreach (['bloque_1', 'bloque_2', 'bloque_3'] as $bloqueKey) {
                 $bloque = data_get($proceso2027, 'bloques.'.$bloqueKey, []);
@@ -290,8 +307,12 @@ class DotacionEstablecimientoAvanceExport
                 $values[] = data_get($bloque, 'saldo_maximo') === null ? null : $this->hoursValue((float) data_get($bloque, 'saldo_maximo', 0));
             }
 
+            foreach (['horas_total', 'horas_justificadas', 'horas_pendientes'] as $campo) {
+                $horas = data_get($proceso2027, 'justificaciones.'.$campo);
+                $values[] = $horas === null ? null : $this->hoursValue((float) $horas);
+            }
             $values[] = collect(data_get($avance, 'observaciones', []))->filter()->implode(' | ');
-            $sheet->fromArray([$values], null, "A{$row}");
+            $sheet->fromArray([$values], null, "A{$row}", true);
             $sheet->setCellValueExplicit("B{$row}", (string) data_get($avance, 'rbd', ''), DataType::TYPE_STRING);
 
             $statusColor = match ((string) data_get($avance, 'estado.key', '')) {
@@ -312,7 +333,7 @@ class DotacionEstablecimientoAvanceExport
             $sheet->getStyle("{$column}2:{$column}{$lastRow}")->getNumberFormat()->setFormatCode('0.0%');
         }
 
-        $hourIndexes = [11, 12, 13, 14, 16, 17, 18, 19];
+        $hourIndexes = [11, 12, 13, 14, 16, 17, 18, 19, $inicioHorasJustificacion, $inicioHorasJustificacion + 1, $inicioHorasJustificacion + 2];
         for ($start = 22; $start <= 37; $start += 5) {
             for ($offset = 0; $offset < 4; $offset++) {
                 $hourIndexes[] = $start + $offset;
