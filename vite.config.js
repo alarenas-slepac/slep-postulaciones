@@ -15,6 +15,7 @@ export default defineConfig({
                 'resources/scss/app.scss',
                 'resources/js/app.js',
                 'resources/js/slep-listados.js',
+                'resources/js/maternidad.js',
                 'resources/js/postulante-ficha.js',
                 'resources/js/postulante-perfil.js',
                 'resources/css/centro-operaciones.css',
