@@ -1263,9 +1263,12 @@ class DotacionAsignacionCalculator
         }
 
         $key = trim((string) ($row->necesidad_key ?? ''));
-        if ($key !== '' && $necesidadesPlanEstudio->contains(fn ($item) => (string) ($item['key'] ?? '') === $key
-            || in_array($key, $item['necesidad_keys_historicas'] ?? [], true))) {
-            return true;
+        if ($key !== '') {
+            $porClave = $necesidadesPlanEstudio->filter(fn ($item) => (string) ($item['key'] ?? '') === $key
+                || in_array($key, $item['necesidad_keys_historicas'] ?? [], true));
+            if ($porClave->isNotEmpty()) {
+                return $porClave->contains(fn (array $item) => DotacionAsignacionPlanNombre::coincide($row, $item));
+            }
         }
 
         $candidatos = $necesidadesPlanEstudio;
@@ -1330,7 +1333,8 @@ class DotacionAsignacionCalculator
         if ($nombre !== '') {
             $usoIdentificador = true;
             $candidatos = $candidatos
-                ->filter(fn ($item) => self::nombreNecesidadNormalizado($item) === $nombre)
+                ->filter(fn ($item) => self::nombreNecesidadNormalizado($item) !== ''
+                    && DotacionAsignacionPlanNombre::coincide($row, $item))
                 ->values();
         }
 
@@ -1339,6 +1343,12 @@ class DotacionAsignacionCalculator
 
     private static function motivoPlanEstudioHuerfano(object $row, Collection $necesidadesPlanEstudio): string
     {
+        $key = trim((string) ($row->necesidad_key ?? ''));
+        $mismaClave = $key !== '' ? $necesidadesPlanEstudio->first(fn (array $item) =>
+            (string) ($item['key'] ?? '') === $key || in_array($key, $item['necesidad_keys_historicas'] ?? [], true)) : null;
+        if ($mismaClave && ! DotacionAsignacionPlanNombre::coincide($row, $mismaClave)) {
+            return 'El nombre de la asignatura cambió: la asignación conserva «'.($row->asignatura_nombre ?? '').'», pero la necesidad vigente es «'.($mismaClave['asignatura_nombre'] ?? $mismaClave['titulo'] ?? '').'». Sus horas anteriores requieren revisión manual.';
+        }
         $subtipo = trim((string) ($row->subtipo_asignacion ?? ''));
         $subtipoLabel = $subtipo !== '' ? str_replace('_', ' ', $subtipo) : 'sin subtipo';
         $cursoId = (int) ($row->establecimiento_curso_id ?? 0);
@@ -1513,7 +1523,10 @@ class DotacionAsignacionCalculator
         $dotacionFuncionId = (int) ($data['dotacion_funcion_id'] ?? 0);
         $dotacionFuncionReglaId = (int) ($data['dotacion_funcion_regla_id'] ?? 0);
         $keys = [$key, ...($data['necesidad_keys_historicas'] ?? [])];
-        $assigned = $asignaciones->filter(function ($row) use ($key, $keys, $dotacionFuncionId, $dotacionFuncionReglaId) {
+        $assigned = $asignaciones->filter(function ($row) use ($key, $keys, $dotacionFuncionId, $dotacionFuncionReglaId, $tipo, $data) {
+            if ($tipo === 'plan_estudio' && ! DotacionAsignacionPlanNombre::coincide($row, $data)) {
+                return false;
+            }
             // El identificador de la función declarada es estable aunque una
             // asignación histórica conserve una necesidad_key generada antes
             // de reordenar o renombrar los bloques del establecimiento. Cuando

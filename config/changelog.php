@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.30.659',
+    'current_version' => '2026.10.30.660',
     'entries' => [
+        [
+            'version' => '2026.10.30.660',
+            'title' => 'Detección de horas fantasmas por cambio de nombre personalizado',
+            'summary' => 'Identifica las asignaciones que conservan el nombre anterior de una asignatura personalizada, aunque su clave curricular no haya cambiado.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Contrasta el nombre registrado en la asignación con los nombres vigentes del plan, incluidos los componentes de cursos combinados. Las horas anteriores dejan de cubrir la asignatura renombrada y se muestran como fantasmas para revisión manual.',
+                'Explica el cambio de nombre cuando se conserva la clave curricular. Mantiene los registros y su carga contractual hasta que se eliminen expresamente; no reasigna ni borra horas al consultar.',
+                'Permite retirar manualmente acompañamientos huérfanos y evita descontar dos veces la cobertura al borrar una asignación fantasma. La edición sólo libera horas que realmente cubrían la necesidad vigente y conserva las restricciones del acompañamiento activo.',
+                'Conserva equivalencias de importación, diferencias de mayúsculas, tildes y espacios, y vínculos históricos sin nombre informado. Incluye pruebas de renombrado, retirada del nombre personalizado, nuevas asignaciones y cursos combinados. No requiere migraciones.',
+            ],
+            'published_at' => '2026-10-30',
+        ],
         [
             'version' => '2026.10.30.659',
             'title' => 'Detalle y eliminación de asignaciones de horas por docente',
