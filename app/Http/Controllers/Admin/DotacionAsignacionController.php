@@ -857,7 +857,8 @@ class DotacionAsignacionController extends Controller
 
         $required = (float) ($need['horas_plan_requeridas'] ?? 0);
         $assigned = (float) ($need['horas_plan_asignadas'] ?? 0);
-        $currentHours = $current && $current->necesidad_key === $key
+        $currentHours = $current && (int) $current->id > 0
+            && collect($need['asignaciones'] ?? [])->contains(fn ($row) => (int) data_get($row, 'id') === (int) $current->id)
             ? (float) ($current->horas_plan_pedagogicas ?? 0)
             : 0.0;
         $available = max(0.0, round($required - $assigned + $currentHours, 2));
@@ -888,12 +889,19 @@ class DotacionAsignacionController extends Controller
             $establecimiento, (int) ($payload['anio'] ?? $current?->anio ?? 0), $key
         );
         if (! $need) {
-            if ($tipo === 'acompanamiento_parvularia') {
+            if ($tipo === 'acompanamiento_parvularia' && $payload !== null) {
                 throw ValidationException::withMessages(['necesidad_key' => 'La libre disposición asociada ya no está vigente.']);
             }
             return;
         }
 
+        $currentConsiderado = $current && (int) $current->id > 0
+            && collect($need['asignaciones'] ?? [])->concat($need['acompanamientos'] ?? [])
+                ->contains(fn ($row) => (int) data_get($row, 'id') === (int) $current->id);
+        if ($payload === null && $current && ! $currentConsiderado) {
+            // Una asignación fantasma no sostiene la cobertura ni el acompañamiento vigentes.
+            return;
+        }
         $curso = $need['curso'] ?? null;
         $limiteLibreDisposicion = DotacionAcompanamientoParvularia::horasLibreDisposicion($need);
         $esLibreDisposicion = $limiteLibreDisposicion > 0;
@@ -909,7 +917,7 @@ class DotacionAsignacionController extends Controller
 
         $externas = (float) ($need['horas_externas_libre_disposicion'] ?? 0);
         $acompanadas = (float) ($need['horas_acompanamiento_asignadas'] ?? 0);
-        if ($current && $current->tipo_asignacion === 'acompanamiento_parvularia') {
+        if ($currentConsiderado && $current->tipo_asignacion === 'acompanamiento_parvularia') {
             $acompanadas -= (float) ($current->horas_plan_pedagogicas ?? 0);
         }
         if ($tipo === 'acompanamiento_parvularia' && $payload !== null) {
@@ -919,7 +927,7 @@ class DotacionAsignacionController extends Controller
             }
             return;
         }
-        if ($current && $current->tipo_asignacion === 'plan_estudio') {
+        if ($currentConsiderado && $current->tipo_asignacion === 'plan_estudio') {
             $current->loadMissing('declaracionSostenedor');
             $eraExterna = ($current->estamento_cobertura ?? 'docente') === 'docente'
                 && ! DotacionProfesionDocenteResolver::esAsignacionParvularia($current);

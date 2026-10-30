@@ -96,7 +96,7 @@ class DotacionPlanConfiguradoSinDuplicadosTest extends IsolatedSecurityTestCase
         $this->assertSame($before, $this->snapshot());
     }
 
-    public function test_conserva_asignaciones_oficiales_y_configuradas_sin_fantasmas_ni_doble_conteo(): void
+    public function test_conserva_asignaciones_equivalentes_y_separa_la_asignatura_reemplazada_sin_doble_conteo(): void
     {
         $this->configurar('1M', 2027);
         $keys = [$this->key('asignatura', 'Matemática'), $this->key('plan_comun_formacion_general', 'Matemática')];
@@ -116,14 +116,17 @@ class DotacionPlanConfiguradoSinDuplicadosTest extends IsolatedSecurityTestCase
         $this->assertCount(2, $math['asignaciones']);
         $this->assertSame(2.0, $needs->firstWhere('titulo', 'Orientación')['horas_plan_asignadas']);
         $this->assertSame(4.0, $needs->firstWhere('titulo', 'Inglés')['horas_plan_asignadas']);
-        $this->assertSame(2.0, $needs->firstWhere('titulo', 'Educación Física')['horas_plan_asignadas']);
-        $this->assertSame(13.0, (float) $needs->sum('horas_plan_asignadas'));
+        // Religión fue reemplazada por Educación Física mediante el nombre
+        // personalizado: sus horas previas no se trasladan a la materia nueva.
+        $this->assertSame(0.0, $needs->firstWhere('titulo', 'Educación Física')['horas_plan_asignadas']);
+        $this->assertSame(11.0, (float) $needs->sum('horas_plan_asignadas'));
         foreach ([$keys[0], $keys[1], $ori, $ldOri] as $key) {
             $this->assertNotNull(DotacionAsignacionCalculator::planNeedForKey($this->ee, 2027, $key));
         }
         $huerfanas = (new ReflectionMethod(DotacionAsignacionCalculator::class, 'asignacionesHuerfanas'))->invoke(null,
             DotacionAsignacionCalculator::assignmentsFor($this->ee, 2027), ['plan_estudio' => $needs]);
-        $this->assertCount(0, $huerfanas);
+        $this->assertCount(1, $huerfanas);
+        $this->assertSame('Religión', $huerfanas->first()->asignatura_nombre);
         $this->assertSame($before, $this->snapshot());
     }
 

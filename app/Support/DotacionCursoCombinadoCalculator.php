@@ -95,7 +95,16 @@ class DotacionCursoCombinadoCalculator
                         : 0.0)
                     : null;
                 $needKey = self::needKey((int) $grupo->id, (string) $subjectKey);
-                $allAssigned = $asignaciones->where('necesidad_key', $needKey)->values();
+                $title = $configuredDetail
+                    ? trim((string) ($subjectItems->first()['asignatura_nombre'] ?? $subjectItems->first()['titulo']))
+                    : self::subjectName($subjectItems);
+                $detail = self::configuredDetail($subjectItems);
+                $representative = $subjectItems->first();
+                $nombreVigente = array_merge($representative, [
+                    'asignatura_nombre' => $title, 'curso_combinado_desglose' => $detail,
+                ]);
+                $allAssigned = $asignaciones->where('necesidad_key', $needKey)
+                    ->filter(fn ($row) => DotacionAsignacionPlanNombre::coincide($row, $nombreVigente))->values();
                 $assigned = $allAssigned->reject(fn ($row) => $row->tipo_asignacion === 'acompanamiento_parvularia')->values();
                 $assignedPlan = round((float) $assigned->sum(
                     fn ($row) => (float) ($row->horas_plan_pedagogicas ?? 0)
@@ -103,10 +112,6 @@ class DotacionCursoCombinadoCalculator
                 $assignedContract = round((float) $assigned->sum(
                     fn ($row) => (float) ($row->horas_contrato ?? 0)
                 ), 2);
-                $title = $configuredDetail
-                    ? trim((string) ($subjectItems->first()['asignatura_nombre'] ?? $subjectItems->first()['titulo']))
-                    : self::subjectName($subjectItems);
-                $detail = self::configuredDetail($subjectItems);
                 $source = 'Necesidad consolidada de cursos combinados';
                 if ($configuredDetail) {
                     $source .= $isLibreDisposicion ? ' · Libre disposición configurada' : ' · Plan común';
@@ -115,7 +120,6 @@ class DotacionCursoCombinadoCalculator
                         $part['nombre'].' ('.$part['bloque'].')'
                     )->implode(' + ');
                 }
-                $representative = $subjectItems->first();
                 $ruleId = $rule?->id;
                 $planIds = $subjectItems->pluck('plan_estudio_id')->filter()->unique()->values();
                 $subjectIds = $subjectItems->pluck('asignatura_id')->filter()->unique()->values();
