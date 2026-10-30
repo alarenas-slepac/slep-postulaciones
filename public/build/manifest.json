@@ -2336,6 +2336,10 @@
     "file": "assets/gobCL_Heavy-jsmmpudq.otf",
     "src": "resources/fonts/gobCL_Heavy.otf"
   },
+  "resources/icons/baby.svg": {
+    "file": "assets/baby-BmJi2iCA.svg",
+    "src": "resources/icons/baby.svg"
+  },
   "resources/js/app.js": {
     "file": "assets/app-Bv2Gn_Vc.js",
     "name": "app",
@@ -2494,7 +2498,7 @@
     "isEntry": true
   },
   "resources/scss/app.scss": {
-    "file": "assets/app-gsxBnehD.css",
+    "file": "assets/app-DZTO4Hq-.css",
     "src": "resources/scss/app.scss",
     "isEntry": true,
     "name": "app",
