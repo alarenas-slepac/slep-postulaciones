@@ -52,7 +52,7 @@
 .slep-listing .select2-container--bootstrap-5.select2-container--open .select2-selection { border-color: var(--listing-blue); box-shadow: 0 0 0 .2rem rgb(13 110 253 / 14%); }
 .slep-listing .select2-container { max-width: 100%; }
 .slep-listing .select2-selection__rendered { white-space: normal !important; padding-right: 1rem !important; overflow-wrap: anywhere; }
-.slep-listing .select2-selection--single { display: flex; align-items: center; }
+.slep-listing .select2-selection--single { display: flex; align-items: center; height: auto; }
 .slep-listing .select2-container--disabled .select2-selection { background-color: #f8fafc; }
 .slep-listing .is-invalid, .slep-listing .select2-container.is-invalid .select2-selection { border-color: #b42318; }
 .slep-listing .invalid-feedback { color: #b42318; font-size: .8rem; }

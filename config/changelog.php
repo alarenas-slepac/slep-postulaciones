@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.29.657',
+    'current_version' => '2026.10.30.658',
     'entries' => [
+        [
+            'version' => '2026.10.30.658',
+            'title' => 'Catálogo completo y buscador integrado de menciones en Mi Perfil',
+            'summary' => 'Permite recorrer y buscar todas las menciones al completar los antecedentes académicos del postulante.',
+            'roles' => ['postulante'],
+            'items' => [
+                'Carga todas las menciones del catálogo, agrupadas por subsector, sin el límite anterior de 300 opciones.',
+                'Reutiliza el selector institucional con búsqueda incorporada por nombre, universidad o año, foco azul, texto completo y navegación por teclado.',
+                'Conserva la selección al buscar y los valores históricos que ya no están en el catálogo. Mantiene las reglas del área de desempeño y la validación del perfil. No requiere migraciones.',
+            ],
+            'published_at' => '2026-10-30',
+        ],
         [
             'version' => '2026.10.29.657',
             'title' => 'Detalle de exclusiones y referencias normativas en el aviso de participación',

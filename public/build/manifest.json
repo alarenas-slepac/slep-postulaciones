@@ -2373,7 +2373,7 @@
     "isEntry": true
   },
   "resources/js/postulante-ficha.js": {
-    "file": "assets/postulante-ficha-DdVBeGOP.js",
+    "file": "assets/postulante-ficha-C-GA-OIB.js",
     "name": "postulante-ficha",
     "src": "resources/js/postulante-ficha.js",
     "isEntry": true,
@@ -2385,6 +2385,16 @@
       "assets/postulante-ficha-epTGVVwF.css"
     ]
   },
+  "resources/js/postulante-perfil.js": {
+    "file": "assets/postulante-perfil-Dtb3nBWR.js",
+    "name": "postulante-perfil",
+    "src": "resources/js/postulante-perfil.js",
+    "isEntry": true,
+    "imports": [
+      "resources/js/slep-listados.js",
+      "__commonjsHelpers-92s3wAHG.js"
+    ]
+  },
   "resources/js/progreso-animado.js": {
     "file": "assets/progreso-animado-DMoDUQvq.js",
     "name": "progreso-animado",
@@ -2392,7 +2402,7 @@
     "isEntry": true
   },
   "resources/js/slep-listados.js": {
-    "file": "assets/slep-listados-GYjQ2UVH.js",
+    "file": "assets/slep-listados-cEpRc85z.js",
     "name": "slep-listados",
     "src": "resources/js/slep-listados.js",
     "isEntry": true,
@@ -2400,7 +2410,7 @@
       "__commonjsHelpers-92s3wAHG.js"
     ],
     "css": [
-      "assets/slep-listados-wCeML6_C.css"
+      "assets/slep-listados-DpajWfzE.css"
     ],
     "assets": [
       "assets/bootstrap-icons-mSm7cUeB.woff2",

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\AreaDesempeno;
+use App\Models\Mencion;
 use Illuminate\Validation\Rule;
 
 class PostulantProfileController extends Controller
@@ -48,6 +49,9 @@ class PostulantProfileController extends Controller
         $pronombres = ['él', 'ella', 'elle', 'él/ella', 'ella/elle', 'él/elle'];
         $areasDocente = AreaDesempeno::activos()->docente()->orderBy('nombre')->get(['id', 'nombre']);
         $areasAsistente = AreaDesempeno::activos()->asistente()->orderBy('nombre')->get(['id', 'nombre']);
+        $menciones = Mencion::query()->with('subsector')
+            ->orderBy('subsector_id')->orderBy('nombre')->get()
+            ->groupBy(fn (Mencion $mencion) => $mencion->subsector?->subsector ?? 'Sin subsector');
         $nivelesTodos = ['Enseñanza Media', 'Enseñanza Media Laboral', 'Enseñanza Media TP', 'Técnico Nivel Superior', 'Universitaria'];
 
         // Comunas por región para dirección (desde DB para validar id)
@@ -99,6 +103,7 @@ class PostulantProfileController extends Controller
             'pronombres',
             'areasDocente',
             'areasAsistente',
+            'menciones',
             'nivelesTodos',
             'communesByRegion',
             'allCommunes',

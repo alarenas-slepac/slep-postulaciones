@@ -276,31 +276,7 @@
 
 
                             {{-- (Docente) Mención --}}
-                            <div class="mb-3 d-none" id="wrap-mencion">
-                                <label class="form-label" for="mencion">Mención</label>
-
-                                {{-- Buscador --}}
-                                <input type="text" id="mencion_search" class="form-control form-control-sm mb-2"
-                                    placeholder="Buscar mención (nombre, universidad, año)…" autocomplete="off">
-
-                                {{-- Select (llenado por JS con optgroups por subsector) --}}
-                                <select class="form-select @error('mencion') is-invalid @enderror" id="mencion"
-                                    name="mencion">
-                                    @php $mencionSel = old('mencion', $profile->mencion ?? ''); @endphp
-                                    @if ($mencionSel)
-                                        <option value="{{ $mencionSel }}" selected>{{ $mencionSel }}</option>
-                                    @else
-                                        <option value="">Seleccione…</option>
-                                    @endif
-                                </select>
-
-                                @error('mencion')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @else
-                                    <div class="invalid-feedback">{{ $requiredMessage ?? 'Este campo es obligatorio.' }}</div>
-                                @enderror
-                                <div class="form-text">Formato: <code>mención - Universidad - año</code>.</div>
-                            </div>
+                            @include('postulant.profile.partials.mencion')
 
                             {{-- (Docente TP) Especialidad TP --}}
                             <div class="mb-3 d-none" id="wrap-especialidad_tp">
@@ -835,6 +811,10 @@
     </form>
     </div>
 
+    @push('styles')
+        @vite('resources/js/postulante-perfil.js')
+    @endpush
+
     @push('scripts')
         <script>
             (function() {
@@ -1184,6 +1164,7 @@
                     const esDocenteReligion = (est === 'docente' && (ar === 'Religión Católica' || ar ===
                         'Religión Evangélica'));
                     const esTP = (est === 'docente' && ar === 'Docente Técnico Profesional');
+                    inputMencion.disabled = est !== 'docente' || esTP;
 
                     // Reset base (ocultar y quitar required)
                     [wrapArea, wrapMencion, wrapEspTP, wrapNivel, wrapInst, wrapSem, wrapHoras, wrapExp, wrapCargo,
@@ -1268,7 +1249,6 @@
                                 ast && ast.classList.remove('d-none');
                             } else {
                                 inputMencion.removeAttribute('required');
-                                inputMencion.classList.remove('is-invalid');
                                 ast && ast.classList.add('d-none');
                             }
                         }
@@ -1279,84 +1259,6 @@
                 }
 
 
-
-                // --- Buscador para Mención (sin dependencias) ---
-                (function initMencionPicker() {
-                    const sel = document.getElementById('mencion');
-                    const input = document.getElementById('mencion_search');
-                    if (!sel || !input) return;
-
-                    const initialSelected = @json($mencionSel ?? '');
-                    let lastQ = '';
-                    let pending = 0;
-                    const endpoint = "{{ route('api.menciones.search') }}";
-
-                    function rebuild(groups, selectedValue) {
-                        const hasSelected = !!selectedValue && String(selectedValue).trim() !== '';
-                        const selected = hasSelected ? String(selectedValue) : String(sel.value || '');
-                        let matched = false;
-
-                        sel.innerHTML = '<option value="">Seleccione…</option>';
-
-                        groups.forEach(g => {
-                            const og = document.createElement('optgroup');
-                            og.label = g.subsector || 'Sin subsector';
-                            g.items.forEach(it => {
-                                const opt = document.createElement('option');
-                                opt.value = it.value; // guardaremos el texto completo en el perfil
-                                opt.textContent = it.label;
-                                if (String(it.value) === selected) {
-                                    opt.selected = true;
-                                    matched = true;
-                                }
-                                og.appendChild(opt);
-                            });
-                            sel.appendChild(og);
-                        });
-
-                        if (hasSelected && !matched) {
-                            const opt = document.createElement('option');
-                            opt.value = selected;
-                            opt.textContent = selected;
-                            opt.selected = true;
-                            sel.insertBefore(opt, sel.children[1] ?? null);
-                        }
-                    }
-
-                    async function search(q, selectedOnInit = false) {
-                        const query = (q || '').trim();
-                        lastQ = query;
-                        pending++;
-                        try {
-                            const url = endpoint + (query ? ('?q=' + encodeURIComponent(query)) : '');
-                            const resp = await fetch(url, {
-                                headers: {
-                                    'X-Requested-With': 'XMLHttpRequest'
-                                }
-                            });
-                            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                            const data = await resp.json();
-                            // evita condición de carrera
-                            if (query !== lastQ) return;
-                            rebuild(data, selectedOnInit ? initialSelected : undefined);
-                        } catch (e) {
-                            console.error('Búsqueda de menciones falló:', e);
-                        } finally {
-                            pending--;
-                        }
-                    }
-
-                    // Debounce del input
-                    let t;
-                    input.addEventListener('input', function() {
-                        clearTimeout(t);
-                        const val = this.value;
-                        t = setTimeout(() => search(val), 200);
-                    });
-
-                    // Carga inicial (sin filtro) para mostrar grupos
-                    search('', true);
-                })();
 
                 // --- Buscador para Especialidad TP (sin dependencias) ---
                 const espSearch = document.getElementById('especialidad_tp_search');
