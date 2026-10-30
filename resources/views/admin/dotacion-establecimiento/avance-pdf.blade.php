@@ -27,7 +27,7 @@
         .progress-wrap { background: #e8edf5; border-radius: 8px; height: 10px; overflow: hidden; margin-top: 4px; }
         .progress-fill { background: #0d6efd; height: 10px; }
         .progress-green { background: #198754; }
-        .progress-purple { background: #6f42c1; }
+        .progress-general { background: #0b3d91; }
         .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 7px; font-weight: 700; }
         .badge-success { background: #dcfce7; color: #166534; }
         .badge-primary { background: #dbeafe; color: #1d4ed8; }
@@ -102,6 +102,20 @@
         </tr>
     </thead>
     <tbody>
+        @if (data_get($resumenGlobal, 'proceso_2027.aplica', false))
+            @foreach (data_get($resumenGlobal, 'proceso_2027.pasos', []) as $key => $paso)
+                <tr>
+                    <td><strong>{{ $loop->iteration }}. {{ $paso['label'] }}</strong></td>
+                    <td class="text-center"><strong>{{ number_format($paso['porcentaje'], 1, ',', '.') }}%</strong></td>
+                    <td><div class="progress-wrap"><div class="progress-fill" style="width: {{ min(100, max(0, $paso['porcentaje'])) }}%;"></div></div></td>
+                    <td>{{ $paso['completos'] }} de {{ $paso['total'] }} establecimiento(s) completaron esta etapa.
+                        @if ($key === 'justificaciones')
+                            <div>{{ $fmt(data_get($resumenGlobal, 'justificaciones.horas_pendientes', 0)) }} de {{ $fmt(data_get($resumenGlobal, 'justificaciones.horas_total', 0)) }} horas por justificar.</div>
+                        @endif
+                    </td>
+                </tr>
+            @endforeach
+        @else
         <tr>
             <td><strong>1. Configuracion de planes</strong></td>
             <td class="text-center"><strong>{{ number_format($planes, 1, ',', '.') }}%</strong></td>
@@ -114,14 +128,19 @@
             <td><div class="progress-wrap"><div class="progress-fill progress-green" style="width: {{ min(100, max(0, $asignacion)) }}%;"></div></div></td>
             <td>{{ $fmt(data_get($resumenGlobal, 'asignacion.horas_aula_asignadas', 0)) }} de {{ $fmt(data_get($resumenGlobal, 'asignacion.horas_aula_requeridas', 0)) }} horas aula asignadas; {{ $fmt(data_get($resumenGlobal, 'asignacion.horas_aula_pendientes', 0)) }} pendientes.</td>
         </tr>
+        @endif
         <tr>
             <td><strong>Avance general</strong></td>
             <td class="text-center"><strong>{{ number_format($general, 1, ',', '.') }}%</strong></td>
-            <td><div class="progress-wrap"><div class="progress-fill progress-purple" style="width: {{ min(100, max(0, $general)) }}%;"></div></div></td>
-            <td>Promedio de configuracion de planes y asignacion de horas aula.</td>
+            <td><div class="progress-wrap"><div class="progress-fill progress-general" style="width: {{ min(100, max(0, $general)) }}%;"></div></div></td>
+            <td>{{ data_get($resumenGlobal, 'proceso_2027.aplica', false) ? 'Promedio de avance de las siete etapas por establecimiento.' : 'Promedio de configuracion de planes y asignacion de horas aula.' }}</td>
         </tr>
     </tbody>
 </table>
+
+@if (data_get($resumenGlobal, 'justificaciones.establecimientos_sin_calculo', 0) > 0)
+    <div class="note"><strong>Totales de justificación parciales:</strong> {{ data_get($resumenGlobal, 'justificaciones.establecimientos_sin_calculo') }} establecimiento(s) sin cálculo disponible.</div>
+@endif
 
 <div class="section-title">Resumen territorial</div>
 <table class="kpis avoid-break">
@@ -198,6 +217,7 @@
             <th>Avance general</th>
             <th>Cursos pendientes</th>
             <th>Horas aula pendientes</th>
+            @if (data_get($resumenGlobal, 'proceso_2027.aplica', false))<th>Horas por justificar (etapa 7)</th>@endif
         </tr>
     </thead>
     <tbody>
@@ -210,15 +230,16 @@
                 <td class="text-center"><strong>{{ number_format((float) $item['porcentaje_general'], 1, ',', '.') }}%</strong></td>
                 <td class="text-right">{{ number_format((int) $item['planes_pendientes'], 0, ',', '.') }}</td>
                 <td class="text-right">{{ $fmt($item['horas_aula_pendientes'] ?? $item['horas_pendientes']) }}</td>
+                @if (data_get($resumenGlobal, 'proceso_2027.aplica', false))<td class="text-right">{{ ($item['horas_por_justificar'] ?? null) === null ? 'Sin cálculo' : $fmt($item['horas_por_justificar']) }}</td>@endif
             </tr>
         @empty
-            <tr><td colspan="7" class="text-center muted">No existen establecimientos para los filtros seleccionados.</td></tr>
+            <tr><td colspan="{{ data_get($resumenGlobal, 'proceso_2027.aplica', false) ? 8 : 7 }}" class="text-center muted">No existen establecimientos para los filtros seleccionados.</td></tr>
         @endforelse
     </tbody>
 </table>
 
 <div class="note small">
-    El avance general pondera en partes iguales la configuracion de planes y la asignacion de horas aula. El bloque Plan de estudios se informa en horas aula; PIE, funciones y planes normativos se informan en horas de contrato para no mezclar unidades.
+    {{ data_get($resumenGlobal, 'proceso_2027.aplica', false) ? 'El avance general 2027 pondera por igual las siete etapas. La etapa 7 considera los saldos actuales y exige actualizar las justificaciones si cambian las horas.' : 'El avance general pondera en partes iguales la configuracion de planes y la asignacion de horas aula.' }} El bloque Plan de estudios se informa en horas aula; PIE, funciones y planes normativos se informan en horas de contrato para no mezclar unidades.
 </div>
 
 <div class="footer">Informe global de avance de Dotacion Establecimiento - {{ $anio }}</div>

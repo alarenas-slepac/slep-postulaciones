@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.30.660',
+    'current_version' => '2026.10.30.661',
     'entries' => [
+        [
+            'version' => '2026.10.30.661',
+            'title' => 'Etapa 7 de justificación de horas en Dotación Establecimiento',
+            'summary' => 'Incorpora las horas pendientes de justificar al proceso guiado 2027 y a sus informes de avance.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade la Etapa 7 con la cantidad de horas pendientes respecto del total que requiere justificación y acceso a los saldos de Plan de estudio, Parvularia y PIE.',
+                'Descuenta sólo fundamentos vigentes para el docente, bloque, calidad contractual, establecimiento y año. Si cambia el saldo, las horas vuelven a quedar pendientes hasta actualizar su justificación.',
+                'Incluye la etapa en el avance general y en los informes web, PDF global y Excel, con totales, horas justificadas y pendientes. El PDF 2027 informa las siete etapas y conserva los cálculos históricos de otros años.',
+                'Reutiliza las reglas de saldos y los permisos existentes; excluye contratos protegidos y cupos sin docente. No modifica asignaciones ni requiere migraciones.',
+            ],
+            'published_at' => '2026-10-30',
+        ],
         [
             'version' => '2026.10.30.660',
             'title' => 'Detección de horas fantasmas por cambio de nombre personalizado',

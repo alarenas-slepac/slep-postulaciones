@@ -48,7 +48,7 @@ class DotacionConfiguracionUsabilidadTest extends IsolatedSecurityTestCase
         unset($step);
         $complete = $this->xpath(view('admin.dotacion-establecimiento.partials._proceso_etapas', $data)->render());
         $this->assertSame(0, $complete->query('//*[@aria-current="step"]')->length);
-        $this->assertStringContainsString('Cobertura obligatoria completa', $complete->document->textContent);
+        $this->assertStringContainsString('Todas las etapas completas', $complete->document->textContent);
         $data['proceso2027']['aplica'] = false;
         $this->assertSame('', trim(view('admin.dotacion-establecimiento.partials._proceso_etapas', $data)->render()));
     }

@@ -21,6 +21,16 @@ class DotacionProceso2027Calculator
 {
     public const ANIO = 2027;
 
+    public const ETAPAS = [
+        'planes' => 'Planes de estudio',
+        'subsectores' => 'Docentes por asignatura',
+        'combinaciones' => 'Combinación de cursos',
+        'normativas' => 'Definición de funciones normativas',
+        'maximos' => 'Máximos por bloque',
+        'asignacion' => 'Asignación obligatoria',
+        'justificaciones' => 'Horas por justificar',
+    ];
+
     private const ESTADOS_PLAN_CONFIGURADO = ['enviado', 'aprobado', 'cerrado'];
 
     public const BLOQUES = [
@@ -435,6 +445,16 @@ class DotacionProceso2027Calculator
             max(0.0, $horasDisponiblesDocentes - (float) collect($bloques)->sum('pendientes'))
         );
 
+        $justificaciones = DotacionJustificacionesAvanceCalculator::resumen(
+            (int) $establecimiento->id,
+            $anio,
+            DotacionSobredotacionCalculator::build(
+                $docentes->reject(fn (array $docente) => isset($docente['cupo_contrata_id'])),
+                $resumenContractual,
+                $necesidades->get('funciones', [])
+            )
+        );
+
         return [
             'aplica' => true,
             'configuracion' => $config,
@@ -448,6 +468,7 @@ class DotacionProceso2027Calculator
                     && data_get($row, 'estado', 'activa') === 'activa')->values(),
             'funciones_normativas' => $funcionesNormativas->values(),
             'docentes' => $docentes->values(),
+            'justificaciones' => $justificaciones,
             'pasos' => [
                 'planes' => [
                     'label' => 'Planes de estudio',
@@ -463,6 +484,11 @@ class DotacionProceso2027Calculator
                 'normativas' => ['label' => 'Definición de funciones normativas', 'completo' => $funcionesNormativasDefinidas],
                 'maximos' => ['label' => 'Máximos por bloque', 'completo' => $maximosConfigurados && $topesSuficientes],
                 'asignacion' => ['label' => 'Asignación obligatoria', 'completo' => $necesidadesCubiertas],
+                'justificaciones' => [
+                    'label' => self::ETAPAS['justificaciones'],
+                    'completo' => $justificaciones['completo'],
+                    'detalle' => $justificaciones['detalle'],
+                ],
             ],
             'asignacion_habilitada' => $asignacionHabilitada,
             'funciones_no_normativas_habilitadas' => $asignacionHabilitada && $necesidadesCubiertas,

@@ -138,6 +138,10 @@ class DotacionEstablecimientoAvanceCalculator
                 'docentes_disponibles' => 0,
             ],
             'desglose' => collect(),
+            'proceso_2027' => [
+                'aplica' => DotacionProceso2027Calculator::aplica($anio),
+                'pasos' => array_map(fn ($label) => ['label' => $label, 'completo' => false], DotacionProceso2027Calculator::ETAPAS),
+            ],
             'porcentaje_general' => 0.0,
             'estado' => self::estado(0.0, true),
             'observaciones' => collect(['No fue posible calcular el avance de este establecimiento.']),
@@ -162,6 +166,7 @@ class DotacionEstablecimientoAvanceCalculator
             'promedio_planes' => $total > 0 ? round((float) $avances->avg('planes.porcentaje'), 1) : 0.0,
             'promedio_asignacion' => $total > 0 ? round((float) $avances->avg('asignacion.porcentaje'), 1) : 0.0,
             'promedio_general' => $total > 0 ? round((float) $avances->avg('porcentaje_general'), 1) : 0.0,
+            'justificaciones' => self::resumenJustificaciones($avances),
         ];
     }
 
@@ -185,6 +190,17 @@ class DotacionEstablecimientoAvanceCalculator
         ));
         $porcentajeAsignacion = self::porcentaje($horasAulaCubiertas, $horasAulaRequeridas);
         $porcentajeGeneral = round(($porcentajePlanes + $porcentajeAsignacion) / 2, 1);
+        $proceso2027 = ['aplica' => $avances->contains(fn ($item) => data_get($item, 'proceso_2027.aplica', false))];
+        if ($proceso2027['aplica']) {
+            $proceso2027['pasos'] = collect(DotacionProceso2027Calculator::ETAPAS)
+                ->map(function (string $label, string $key) use ($avances, $total): array {
+                    $completos = $avances->filter(fn ($item) => data_get($item, 'proceso_2027.pasos.'.$key.'.completo', false))->count();
+
+                    return ['label' => $label, 'completos' => $completos, 'total' => $total,
+                        'porcentaje' => self::porcentaje($completos, $total)];
+                })->all();
+            $porcentajeGeneral = $total > 0 ? round((float) $avances->avg('porcentaje_general'), 1) : 0.0;
+        }
 
         $horasContratoRequeridas = (float) $avances->sum(fn ($item) => (float) data_get($item, 'asignacion.horas_contrato_requeridas', 0));
         $horasContratoAsignadas = (float) $avances->sum(fn ($item) => (float) data_get($item, 'asignacion.horas_contrato_asignadas', 0));
@@ -235,6 +251,7 @@ class DotacionEstablecimientoAvanceCalculator
                 'horas_pendientes' => (float) data_get($item, 'asignacion.horas_aula_pendientes', 0),
                 'horas_aula_pendientes' => (float) data_get($item, 'asignacion.horas_aula_pendientes', 0),
                 'estado' => (string) data_get($item, 'estado.label', 'Sin estado'),
+                'horas_por_justificar' => data_get($item, 'proceso_2027.justificaciones.horas_pendientes'),
             ])
             ->values();
 
@@ -270,6 +287,8 @@ class DotacionEstablecimientoAvanceCalculator
                 'docentes_sobrecarga' => (int) $avances->sum(fn ($item) => (int) data_get($item, 'asignacion.docentes_sobrecarga', 0)),
             ],
             'porcentaje_general' => $porcentajeGeneral,
+            'proceso_2027' => $proceso2027,
+            'justificaciones' => self::resumenJustificaciones($avances),
             'desglose' => $desglose,
             'establecimientos_criticos' => $establecimientosCriticos,
         ];
@@ -311,6 +330,19 @@ class DotacionEstablecimientoAvanceCalculator
                 'porcentaje' => self::porcentaje(min($asignadas, $requeridas), $requeridas),
             ];
         })->values();
+    }
+
+    private static function resumenJustificaciones(Collection $avances): array
+    {
+        $aplicables = $avances->filter(fn ($item) => data_get($item, 'proceso_2027.aplica', false));
+
+        return [
+            'aplica' => $aplicables->isNotEmpty(),
+            'horas_total' => round((float) $aplicables->sum('proceso_2027.justificaciones.horas_total'), 2),
+            'horas_justificadas' => round((float) $aplicables->sum('proceso_2027.justificaciones.horas_justificadas'), 2),
+            'horas_pendientes' => round((float) $aplicables->sum('proceso_2027.justificaciones.horas_pendientes'), 2),
+            'establecimientos_sin_calculo' => $aplicables->filter(fn ($item) => data_get($item, 'proceso_2027.justificaciones') === null)->count(),
+        ];
     }
 
     private static function porcentaje(float|int $valor, float|int $total): float

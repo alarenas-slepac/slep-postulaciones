@@ -11,6 +11,7 @@
             'normativas' => ['url' => '#dotacion-definicion-normativas', 'label' => 'Definir funciones'],
             'maximos' => ['url' => '#dotacion-maximos', 'label' => 'Revisar máximos'],
             'asignacion' => ['url' => route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'asignacion', 'asig_pendientes' => 1]).'#dotacion-asignacion', 'label' => 'Asignar horas pendientes'],
+            'justificaciones' => ['url' => \App\Support\DotacionSobredotacionCalculator::canView($rolProceso) ? route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'sobredotacion']).'#vacantes-plan_estudio' : null, 'label' => 'Revisar horas por justificar', 'ayuda' => 'Solicite la revisión de justificaciones al establecimiento, Administración o Supervisión de Planificación.'],
         ];
     @endphp
     <section class="card dotacion-section mb-4" aria-labelledby="dotacion-etapas-titulo">
@@ -25,7 +26,7 @@
             @elseif ($etapaActual)
                 <p class="small text-muted mb-0">{{ $accionesEtapas[$etapaActual]['ayuda'] ?? 'Revise la configuración pendiente.' }}</p>
             @else
-                <span class="badge rounded-pill text-bg-success"><i class="bi bi-check-circle" aria-hidden="true"></i> Cobertura obligatoria completa</span>
+                <span class="badge rounded-pill text-bg-success"><i class="bi bi-check-circle" aria-hidden="true"></i> Todas las etapas completas</span>
             @endif
         </div>
         <nav class="card-body" aria-label="Etapas del proceso de dotación">
