@@ -6457,8 +6457,16 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.30.664',
+    'current_version' => '2026.10.30.665',
     'entries' => [
+        [
+            'version' => '2026.10.30.665',
+            'title' => 'Icono de bebé para Maternidad',
+            'summary' => 'Identifica Maternidad con una carita de bebé en la navegación y sus cabeceras.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani'],
+            'items' => ['Reemplaza el icono de persona con corazón por un bebé en el menú Trámites y operación, acceso rápido, listado, formulario y expediente. El icono vectorial adopta los colores y tamaños institucionales y se incluye en los recursos compilados.'],
+            'published_at' => '2026-10-30',
+        ],
         [
             'version' => '2026.10.30.664',
             'title' => 'Maternidad: REX de beneficios y antecedentes asociados por período',

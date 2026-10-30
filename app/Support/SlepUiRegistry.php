@@ -83,7 +83,7 @@ class SlepUiRegistry
                 self::entry('Mantenedor de riesgo IRTE', 'centro-operaciones.riesgos.configuracion', 'bi-ui-checks-grid', ['admin', 'comunicaciones', 'gabinete_slep']),
             ],
             'Trámites y operación' => [
-                self::entry('Maternidad', 'tramites.maternidad.index', 'bi-person-heart', ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani']),
+                self::entry('Maternidad', 'tramites.maternidad.index', 'slep-icon-baby', ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani']),
                 self::entry('Consulta de funcionarios', 'funcionarios.consulta.index', 'bi-person-vcard', ['admin', 'funcionario_estab', 'funcionario_establecimiento']),
                 self::entry('Votaciones CCAF y Mutualidades', 'votaciones.admin.dashboard', 'bi-geo-alt-fill', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'votaciones'),
                 self::entry('Operación de votaciones', 'votaciones.operacion.index', 'bi-sign-turn-right-fill', ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_ac'], 'votaciones'),
@@ -178,7 +178,7 @@ class SlepUiRegistry
     public static function quickModules($user, ?string $activeRole): array
     {
         $items = [
-            self::entry('Maternidad', 'tramites.maternidad.index', 'bi-person-heart', ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani']),
+            self::entry('Maternidad', 'tramites.maternidad.index', 'slep-icon-baby', ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani']),
             self::entry('Centro de Operaciones', 'centro-operaciones.index', 'bi-broadcast-pin', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva'], 'centro-operaciones'),
             self::entry('Reporte diario', 'centro-operaciones.reportes.create', 'bi-clipboard2-pulse', ['funcionario_directivo_estab', 'comunicaciones', 'gabinete_slep'], 'centro-operaciones'),
             self::entry('Historial operacional', 'centro-operaciones.reportes.history', 'bi-clock-history', ['admin', 'director_ejecutivo', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'comunicaciones', 'gabinete_slep', 'secretaria_direccion_ejecutiva', 'funcionario_directivo_estab'], 'centro-operaciones'),

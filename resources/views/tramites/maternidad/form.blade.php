@@ -10,7 +10,7 @@
     $reglaDominga = old('regla_fuero_dominga', $caso?->regla_fuero_dominga ?? config('maternidad.regla_fuero_dominga'));
 @endphp
 <div class="slep-listing mat-workspace" data-slep-listing>
-    <header class="slep-listing__header"><div class="slep-listing__heading"><span class="slep-listing__icon"><i class="bi bi-person-heart" aria-hidden="true"></i></span><div><p class="slep-listing__eyebrow">Maternidad · {{ $caso?->codigo ?? 'Ingreso individual' }}</p><h1>{{ $caso ? 'Editar caso' : 'Registrar caso' }}</h1><p class="slep-listing__muted mb-0">Datos laborales, antecedentes del embarazo, beneficios y documentos de respaldo.</p></div></div><a class="slep-listing__button slep-listing__button--secondary" href="{{ $caso ? route('tramites.maternidad.show', $caso) : route('tramites.maternidad.index') }}">Volver</a></header>
+    <header class="slep-listing__header"><div class="slep-listing__heading"><span class="slep-listing__icon"><i class="bi slep-icon-baby" aria-hidden="true"></i></span><div><p class="slep-listing__eyebrow">Maternidad · {{ $caso?->codigo ?? 'Ingreso individual' }}</p><h1>{{ $caso ? 'Editar caso' : 'Registrar caso' }}</h1><p class="slep-listing__muted mb-0">Datos laborales, antecedentes del embarazo, beneficios y documentos de respaldo.</p></div></div><a class="slep-listing__button slep-listing__button--secondary" href="{{ $caso ? route('tramites.maternidad.show', $caso) : route('tramites.maternidad.index') }}">Volver</a></header>
     @include('tramites.maternidad.partials._mensajes')
     @if (! $caso)
         <section class="slep-listing__panel" aria-labelledby="mat-buscar-titulo"><div class="slep-listing__panel-header"><h2 id="mat-buscar-titulo">1. Buscar funcionaria por RUT</h2></div>

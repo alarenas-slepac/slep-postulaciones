@@ -3,7 +3,7 @@
 @section('content')
 <div class="slep-listing mat-workspace" data-slep-listing>
     <header class="slep-listing__header">
-        <div class="slep-listing__heading"><span class="slep-listing__icon"><i class="bi bi-person-heart" aria-hidden="true"></i></span><div>
+        <div class="slep-listing__heading"><span class="slep-listing__icon"><i class="bi slep-icon-baby" aria-hidden="true"></i></span><div>
             <p class="slep-listing__eyebrow">Trámites y operación</p><h1>Maternidad</h1>
             <p class="mb-0 slep-listing__muted">Seguimiento de casos, beneficios, documentos e historial de las funcionarias.</p>
         </div></div>
