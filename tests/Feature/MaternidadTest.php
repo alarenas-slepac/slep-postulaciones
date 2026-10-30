@@ -9,6 +9,7 @@ use App\Services\Maternidad\MaternidadImportador;
 use App\Services\Maternidad\MaternidadPersonalResolver;
 use App\Services\Maternidad\MaternidadRegistroService;
 use App\Services\Maternidad\MaternidadRut;
+use App\Services\Maternidad\MaternidadAntecedentesService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -44,8 +45,11 @@ class MaternidadTest extends IsolatedSecurityTestCase
             $t->unsignedBigInteger('contrato_trabajo_postulant_profile_id')->nullable(); $t->string('rut_reemplazo_normalizado')->nullable();
             $t->string('estado'); $t->string('numero_solicitud'); $t->date('fecha_inicio'); $t->date('fecha_termino')->nullable();
             $t->date('fecha_inicio_trabajo')->nullable(); $t->date('contrato_trabajo_fecha_inicio_trabajo')->nullable();
+            $t->unsignedBigInteger('reemplazo_personal_id')->nullable(); $t->string('rut_titular_normalizado')->nullable();
+            $t->json('padron_personal_snapshot')->nullable();
         });
         (require database_path('migrations/2026_10_30_180000_create_maternidad_tables.php'))->up();
+        (require database_path('migrations/2026_10_30_190000_add_resoluciones_lactancia_to_maternidad_casos.php'))->up();
         DB::table('establecimientos')->insert(['id' => 1, 'rbd' => '99001', 'nombre_establecimiento' => 'Establecimiento de prueba', 'comuna' => 'Comuna de prueba']);
         $this->padron();
         foreach (array_slice(config('maternidad.roles'), 1) as $i => $role) DB::table('roles')->insert(['id' => 10 + $i, 'name' => $role, 'guard_name' => 'web']);
@@ -95,6 +99,186 @@ class MaternidadTest extends IsolatedSecurityTestCase
     private function pdf(string $name = 'certificado.pdf'): UploadedFile
     {
         return UploadedFile::fake()->createWithContent($name, "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF");
+    }
+
+    private function licenciasFixture(): void
+    {
+        Schema::create('licencias_medicas', function (Blueprint $t) {
+            $t->id(); $t->string('rut_normalizado')->nullable(); $t->string('rut_formateado')->nullable();
+            $t->string('rut_funcionario')->nullable(); $t->string('dv_funcionario')->nullable();
+            $t->string('folio_licencia'); $t->date('fecha_inicio'); $t->date('fecha_termino')->nullable();
+            $t->string('establecimiento_nombre')->nullable(); $t->string('tipo_licencia')->nullable(); $t->string('tipo_licencia_glosa')->nullable();
+            $t->string('estado_actual')->nullable(); $t->string('estado_administrativo_codigo')->nullable();
+        });
+    }
+
+    private function licencia(array $extra = []): int
+    {
+        return DB::table('licencias_medicas')->insertGetId(array_replace(['rut_normalizado' => '123456785',
+            'folio_licencia' => 'FOLIO-PRUEBA', 'fecha_inicio' => '2026-01-10', 'fecha_termino' => '2026-01-20',
+            'establecimiento_nombre' => 'Establecimiento de prueba', 'tipo_licencia' => '3', 'estado_actual' => 'Ingresada'], $extra));
+    }
+
+    private function solicitud(array $extra = []): int
+    {
+        return DB::table('solicitudes_reemplazo')->insertGetId(array_replace(['establecimiento_id' => 1,
+            'numero_solicitud' => 'REEMPLAZO-PRUEBA', 'estado' => 'aceptada', 'fecha_inicio' => '2026-01-10', 'fecha_termino' => '2026-01-20'], $extra));
+    }
+
+    private function casoEnero(): MaternidadCaso
+    {
+        return $this->caso(['fpc' => '2026-01-01', 'ley_dominga' => true, 'fecha_ley_dominga' => '2026-01-01'], ['ley_dominga' => $this->pdf()]);
+    }
+
+    public function test_rex_dominga_y_lactancia_con_horas_semanales_y_versiones_privadas(): void
+    {
+        $caso = $this->caso(['ley_dominga' => true, 'fecha_ley_dominga' => '2026-10-01', 'fecha_rex_dominga' => '2026-10-02',
+            'fnh' => '2026-09-01', 'lactancia' => true, 'fecha_inicio_lactancia' => '2026-10-01', 'fecha_rex_lactancia' => '2026-10-03', 'horas_semanales_lactancia' => '7,50'],
+            ['ley_dominga' => $this->pdf(), 'rex_dominga' => $this->pdf('rex-dominga.pdf'), 'nacimiento' => $this->pdf(), 'lactancia' => $this->pdf(), 'rex_lactancia' => UploadedFile::fake()->image('rex-lactancia.png')]);
+        $this->assertSame('7.50', $caso->horas_semanales_lactancia); $this->assertSame('2026-10-03', $caso->fecha_rex_lactancia->toDateString());
+        $doc = $caso->documentos()->where('tipo', 'rex_lactancia')->firstOrFail();
+        Storage::disk('public')->assertMissing($doc->path);
+        $this->get(route('tramites.maternidad.documento', [$caso, $doc]))->assertOk()->assertDownload('rex-lactancia.png');
+        $s = app(MaternidadRegistroService::class); $data = $caso->toArray(); $data['horas_semanales_lactancia'] = 8;
+        $files = ['rex_lactancia' => $this->pdf('segunda-rex.pdf')];
+        $actual = $s->guardar($s->preparar($data, $files, $caso), $files, $this->actor->id, $caso, 1);
+        $this->assertSame(2, $actual->documentos()->where('tipo', 'rex_lactancia')->count());
+        $this->assertSame('8.00', $actual->horas_semanales_lactancia); Storage::disk('local')->assertExists($doc->path);
+        $this->assertSame('8.00', $actual->historial()->first()->cambios['horas_semanales_lactancia']['despues']);
+        $this->get(route('tramites.maternidad.show', $actual))->assertOk()->assertSee('8,00 horas')->assertSee('02-10-2026')->assertSee('segunda-rex.pdf');
+        if (getenv('MATERNIDAD_UI_PREVIEW')) {
+            $this->licenciasFixture();
+            $this->licencia(['folio_licencia' => 'LICENCIA-DE-PRUEBA', 'fecha_inicio' => '2026-10-10', 'fecha_termino' => '2026-10-20']);
+            $this->solicitud(['numero_solicitud' => 'TITULAR-DE-PRUEBA', 'rut_titular_normalizado' => self::RUT, 'fecha_inicio' => '2026-10-10', 'fecha_termino' => '2026-10-20']);
+            $this->solicitud(['numero_solicitud' => 'REEMPLAZANTE-DE-PRUEBA', 'rut_reemplazo_normalizado' => self::RUT, 'fecha_inicio' => '2026-10-10', 'fecha_termino' => '2026-10-20']);
+            $dir = base_path('.codex_work/maternidad'); if (!is_dir($dir)) mkdir($dir, 0777, true);
+            file_put_contents($dir.'/show-beneficios.html', $this->get(route('tramites.maternidad.show', $actual))->getContent());
+            file_put_contents($dir.'/edit-beneficios.html', $this->get(route('tramites.maternidad.edit', $actual))->getContent());
+        }
+    }
+
+    public function test_valida_horas_y_fecha_de_cada_rex(): void
+    {
+        foreach ([0, -1, 169, '1.234', 'texto', ['arreglo']] as $horas) {
+            $this->post(route('tramites.maternidad.store'), $this->entrada(['horas_semanales_lactancia' => $horas]))->assertSessionHasErrors('horas_semanales_lactancia');
+        }
+        $this->post(route('tramites.maternidad.store'), $this->entrada(['lactancia' => true]))->assertSessionHasErrors('horas_semanales_lactancia');
+        foreach (['dominga', 'lactancia'] as $tipo) {
+            $this->post(route('tramites.maternidad.store'), $this->entrada(['documentos' => ['rex_'.$tipo => $this->pdf()]]))->assertSessionHasErrors('fecha_rex_'.$tipo);
+            $this->post(route('tramites.maternidad.store'), $this->entrada(['fecha_rex_'.$tipo => '2026-10-31']))->assertSessionHasErrors('fecha_rex_'.$tipo);
+            $this->post(route('tramites.maternidad.store'), $this->entrada(['fecha_rex_'.$tipo => '2026-10-01']))->assertSessionHasErrors('documentos.rex_'.$tipo);
+        }
+        $this->assertDatabaseCount('maternidad_casos', 0);
+    }
+
+    public function test_antecedentes_licencias_solo_por_rut_y_solapamiento_inclusivo(): void
+    {
+        $this->licenciasFixture(); $caso = $this->casoEnero();
+        $ids = [$this->licencia(), $this->licencia(['fecha_inicio' => '2025-12-20', 'fecha_termino' => '2026-01-01']),
+            $this->licencia(['fecha_inicio' => '2026-01-31', 'fecha_termino' => '2026-02-01']),
+            $this->licencia(['rut_normalizado' => null, 'rut_funcionario' => '12345678', 'dv_funcionario' => '5']),
+            $this->licencia(['rut_normalizado' => null, 'rut_formateado' => '12.345.678-5']),
+            $this->licencia(['fecha_termino' => null])];
+        $this->licencia(['fecha_inicio' => '2025-12-01', 'fecha_termino' => '2025-12-31']);
+        $this->licencia(['fecha_inicio' => '2026-02-01', 'fecha_termino' => '2026-02-03']);
+        $this->licencia(['rut_normalizado' => '111111111', 'rut_formateado' => '12.345.678-5']);
+        $this->licencia(['fecha_inicio' => '2026-01-20', 'fecha_termino' => '2026-01-10']);
+        $datos = app(MaternidadAntecedentesService::class)->obtener($caso);
+        $this->assertSame('2026-01-01', $datos['periodo']['inicio']); $this->assertSame('2026-01-31', $datos['periodo']['fin']);
+        $this->assertEqualsCanonicalizing($ids, $datos['licencias']->pluck('id')->all());
+    }
+
+    public function test_reemplazos_respetan_titular_historico_y_reemplazante_real(): void
+    {
+        $caso = $this->casoEnero();
+        $titular = $this->solicitud(['reemplazo_personal_id' => 1, 'padron_personal_snapshot' => json_encode(['version' => 1, 'personal' => ['id' => 1, 'rut' => self::RUT]])]);
+        $this->solicitud(['reemplazo_personal_id' => 1, 'rut_titular_normalizado' => self::RUT,
+            'padron_personal_snapshot' => json_encode(['version' => 1, 'personal' => ['id' => 1, 'rut' => '11111111-1']])]);
+        DB::table('reemplazos_personal')->where('id', 1)->update(['rut' => '11111111-1']);
+        $legacy = $this->solicitud(['rut_titular_normalizado' => '12.345.678-5']);
+        $usuario = $this->testUser(90, 1); $otro = $this->testUser(91, 1);
+        DB::table('users')->where('id', $usuario->id)->update(['rut' => self::RUT]);
+        DB::table('users')->where('id', $otro->id)->update(['rut' => '11111111-1']);
+        DB::table('postulant_profiles')->insert([['id' => 1, 'user_id' => $usuario->id, 'estamento' => 'docente'], ['id' => 2, 'user_id' => $otro->id, 'estamento' => 'docente']]);
+        $contratada = $this->solicitud(['postulant_profile_id' => 2, 'contrato_trabajo_postulant_profile_id' => 1]);
+        $this->solicitud(['postulant_profile_id' => 1, 'contrato_trabajo_postulant_profile_id' => 2, 'rut_reemplazo_normalizado' => self::RUT]);
+        $ambos = $this->solicitud(['rut_titular_normalizado' => self::RUT, 'rut_reemplazo_normalizado' => self::RUT]);
+        $this->solicitud(['rut_reemplazo_normalizado' => self::RUT, 'fecha_inicio' => '2026-02-01', 'fecha_termino' => '2026-02-02']);
+        $this->solicitud(['rut_reemplazo_normalizado' => self::RUT, 'fecha_inicio' => '2026-01-01', 'contrato_trabajo_fecha_inicio_trabajo' => '2026-02-01', 'fecha_termino' => '2026-02-02']);
+        $usuario->delete(); // La identidad de una persona archivada sigue formando parte del historial.
+        $datos = app(MaternidadAntecedentesService::class)->obtener($caso);
+        $this->assertEqualsCanonicalizing([$titular, $legacy, $contratada, $ambos], $datos['reemplazos']->pluck('id')->all());
+        $this->assertSame(['Titular'], $datos['reemplazos']->firstWhere('id', $titular)->participaciones_maternidad);
+        $this->assertSame(['Reemplazante'], $datos['reemplazos']->firstWhere('id', $contratada)->participaciones_maternidad);
+        $this->assertSame(['Titular', 'Reemplazante'], $datos['reemplazos']->firstWhere('id', $ambos)->participaciones_maternidad);
+    }
+
+    public function test_periodo_incluye_lactancia_y_paginacion_conserva_el_caso(): void
+    {
+        $this->licenciasFixture(); $caso = $this->casoEnero();
+        $caso->fecha_termino_lactancia = '2026-04-01'; $caso->save();
+        for ($i = 0; $i < 13; $i++) { $this->licencia(['folio_licencia' => 'FOLIO-'.$i, 'fecha_inicio' => '2026-03-01', 'fecha_termino' => '2026-03-10']); $this->solicitud(['rut_reemplazo_normalizado' => self::RUT]); }
+        $this->get(route('tramites.maternidad.show', $caso).'?licencias_page=2&reemplazos_page=2')->assertOk()
+            ->assertViewHas('antecedentes', fn ($a) => $a['licencias']->total() === 13 && $a['licencias']->count() === 3
+                && $a['reemplazos']->total() === 13 && $a['reemplazos']->count() === 3 && $a['periodo']['fin'] === '2026-04-01')
+            ->assertSee('Licencias médicas ingresadas')->assertSee('Reemplazante');
+        $this->getJson(route('tramites.maternidad.show', $caso).'?licencias_page=-1')->assertUnprocessable();
+    }
+
+    public function test_excel_nuevas_fechas_horas_y_plantilla_anterior(): void
+    {
+        $s = app(MaternidadImportador::class);
+        $batch = $s->previsualizar($this->excel([$this->entrada(['fecha_rex_dominga' => '2026-10-01', 'fecha_rex_lactancia' => '2026-10-02', 'horas_semanales_lactancia' => '5,5'])]), $this->actor->id);
+        $s->confirmar($batch, $this->actor->id);
+        $caso = MaternidadCaso::firstOrFail();
+        $this->assertSame('5.50', $caso->horas_semanales_lactancia); $this->assertContains('rex_dominga', $caso->documentos_pendientes); $this->assertContains('rex_lactancia', $caso->documentos_pendientes);
+        $book = $s->plantilla(); $book->getSheet(0)->removeColumn('AA', 3);
+        $book->getSheet(0)->setCellValue('A2', 'ANTERIOR'); $book->getSheet(0)->setCellValue('B2', self::RUT);
+        $file = Storage::disk('local')->path('anterior.xlsx'); (new Xlsx($book))->save($file); $book->disconnectWorksheets();
+        $old = $s->previsualizar(new UploadedFile($file, 'anterior.xlsx', null, null, true), $this->actor->id);
+        $s->confirmar($old, $this->actor->id);
+        $this->assertNull(MaternidadCaso::where('referencia_caso', 'ANTERIOR')->firstOrFail()->horas_semanales_lactancia);
+    }
+
+    public function test_formulario_anterior_conserva_rex_y_horas_y_no_inventa_horas_historicas(): void
+    {
+        $caso = $this->caso(['fecha_rex_dominga' => '2026-10-01', 'fecha_rex_lactancia' => '2026-10-02', 'horas_semanales_lactancia' => '5.50'],
+            ['rex_dominga' => $this->pdf(), 'rex_lactancia' => $this->pdf()]);
+        $datos = $caso->toArray(); unset($datos['fecha_rex_dominga'], $datos['fecha_rex_lactancia'], $datos['horas_semanales_lactancia']);
+        $s = app(MaternidadRegistroService::class);
+        $nuevo = $s->guardar($s->preparar($datos, [], $caso), [], $this->actor->id, $caso, 1);
+        $this->assertSame('2026-10-01', $nuevo->fecha_rex_dominga->toDateString());
+        $this->assertSame('2026-10-02', $nuevo->fecha_rex_lactancia->toDateString()); $this->assertSame('5.50', $nuevo->horas_semanales_lactancia);
+        $historico = $this->caso(['referencia_caso' => 'HISTORICO', 'fnh' => '2026-09-01', 'lactancia' => true, 'fecha_inicio_lactancia' => '2026-10-01'], [], true);
+        $data = $historico->toArray(); $data['observacion'] = 'Se conserva el antecedente incompleto';
+        $updated = $s->guardar($s->preparar($data, [], $historico), [], $this->actor->id, $historico, 1);
+        $this->assertNull($updated->horas_semanales_lactancia);
+    }
+
+    public function test_consulta_sin_termino_hasta_hoy_y_no_expone_antecedentes_a_otros_roles(): void
+    {
+        $this->licenciasFixture(); $caso = $this->caso(['fpp' => null]);
+        $this->licencia(['folio_licencia' => 'FOLIO-RESTRINGIDO', 'fecha_inicio' => '2026-10-10', 'fecha_termino' => '2026-10-20']);
+        $this->licencia(['folio_licencia' => 'FOLIO-FUTURO', 'fecha_inicio' => '2026-11-01', 'fecha_termino' => '2026-11-20']);
+        $this->get(route('tramites.maternidad.show', $caso))->assertOk()->assertSee('FOLIO-RESTRINGIDO')->assertDontSee('FOLIO-FUTURO')
+            ->assertViewHas('antecedentes', fn ($a) => $a['periodo']['fin_provisional'] && $a['periodo']['fin'] === '2026-10-30');
+        foreach ([12 => 'coordinador_uatp', 13 => 'supervisor_plani'] as $id => $rol) {
+            $user = $this->testUser($id + 100, $id);
+            $this->actingAs($user)->withSession(['active_role' => $rol])->get(route('tramites.maternidad.show', $caso))->assertOk()->assertSee('FOLIO-RESTRINGIDO')->assertDontSee('/licencias-medicas/', false);
+        }
+        $user = $this->testUser(115, 1);
+        $this->actingAs($user)->withSession(['active_role' => 'postulante'])->getJson(route('tramites.maternidad.show', $caso))->assertForbidden()->assertDontSee('FOLIO-RESTRINGIDO');
+    }
+
+    public function test_confirma_previsualizacion_del_parche_anterior_sin_campos_nuevos(): void
+    {
+        $s = app(MaternidadRegistroService::class); $payload = $s->preparar($this->entrada(), [], null, true);
+        unset($payload['datos']['fecha_rex_dominga'], $payload['datos']['fecha_rex_lactancia'], $payload['datos']['horas_semanales_lactancia']);
+        $batch = MaternidadImportacion::create(['uuid' => (string) \Illuminate\Support\Str::uuid(), 'user_id' => $this->actor->id,
+            'payload' => [$payload], 'cantidad' => 1, 'expira_at' => now()->addMinutes(10)]);
+        $this->assertSame(1, app(MaternidadImportador::class)->confirmar($batch, $this->actor->id));
+        $this->assertNull(MaternidadCaso::firstOrFail()->fecha_rex_dominga);
+        $this->assertNull(MaternidadCaso::firstOrFail()->horas_semanales_lactancia);
     }
 
     public function test_fechas_respetan_respaldos_prioridad_y_anios_bisiestos(): void

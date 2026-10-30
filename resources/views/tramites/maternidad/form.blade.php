@@ -62,6 +62,8 @@
             <div class="row g-3" data-mat-condicional="ley_dominga">
                 @include('tramites.maternidad.partials._campo', ['name' => 'fecha_ley_dominga', 'label' => 'Fecha Ley Dominga', 'tipo' => 'date', 'col' => 'col-md-6'])
                 @include('tramites.maternidad.partials._archivo', ['tipoDocumento' => 'ley_dominga'])
+                @include('tramites.maternidad.partials._campo', ['name' => 'fecha_rex_dominga', 'label' => 'Fecha de resolución / REX Ley Dominga', 'tipo' => 'date', 'col' => 'col-md-6'])
+                @include('tramites.maternidad.partials._archivo', ['tipoDocumento' => 'rex_dominga'])
                 @if ($puedeAmpliar)
                     <div class="col-md-6"><label class="form-label" for="mat-regla-dominga">Seguimiento Ley Dominga · decisión GDP</label><select class="form-select @error('regla_fuero_dominga') is-invalid @enderror" name="regla_fuero_dominga" id="mat-regla-dominga" data-slep-select="compact"><option value="30_dias" @selected($reglaDominga === '30_dias')>30 días</option><option value="anio_84_dias" @selected($reglaDominga === 'anio_84_dias')>Ampliar a un año y 84 días</option></select><div class="invalid-feedback">@error('regla_fuero_dominga'){{ $message }}@enderror</div></div>
                     <div class="col-md-6"><label class="form-label" for="mat-causal-dominga">Causal de la ampliación</label><select class="form-select @error('causal_ampliacion_dominga') is-invalid @enderror" name="causal_ampliacion_dominga" id="mat-causal-dominga" data-slep-select="compact"><option value="">Sin ampliación</option>@foreach (config('maternidad.causales_ampliacion_dominga') as $key => $label)<option value="{{ $key }}" @selected(old('causal_ampliacion_dominga', $caso?->causal_ampliacion_dominga) === $key)>{{ $label }}</option>@endforeach</select><div class="invalid-feedback">@error('causal_ampliacion_dominga'){{ $message }}@enderror</div></div>
@@ -76,6 +78,9 @@
             <div class="row g-3" data-mat-condicional="lactancia">
                 @include('tramites.maternidad.partials._campo', ['name' => 'fecha_inicio_lactancia', 'label' => 'Fecha de inicio del beneficio', 'tipo' => 'date', 'col' => 'col-md-6'])
                 @include('tramites.maternidad.partials._archivo', ['tipoDocumento' => 'lactancia'])
+                @include('tramites.maternidad.partials._campo', ['name' => 'horas_semanales_lactancia', 'label' => 'Cantidad de horas de lactancia a la semana', 'tipo' => 'number', 'minimo' => '0.01', 'col' => 'col-md-6', 'ayuda' => 'Registre las horas semanales autorizadas en la resolución. Admite hasta dos decimales.'])
+                @include('tramites.maternidad.partials._campo', ['name' => 'fecha_rex_lactancia', 'label' => 'Fecha de resolución / REX de lactancia', 'tipo' => 'date', 'col' => 'col-md-6'])
+                @include('tramites.maternidad.partials._archivo', ['tipoDocumento' => 'rex_lactancia'])
                 <p class="form-text mb-0">El término se calcula a los dos años del nacimiento, con solicitud del beneficio y nacimiento acreditados.</p>
             </div>
         </div></section>

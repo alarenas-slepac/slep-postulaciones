@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.30.663',
+    'current_version' => '2026.10.30.664',
     'entries' => [
+        [
+            'version' => '2026.10.30.664',
+            'title' => 'Maternidad: REX de beneficios y antecedentes asociados por período',
+            'summary' => 'Añade resoluciones de Ley Dominga y lactancia, horas semanales y consulta de licencias médicas y reemplazos del período del caso.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani'],
+            'items' => [
+                'Permite cargar REX de Ley Dominga y del beneficio de lactancia en PDF o imagen, con fecha de resolución, versiones privadas e historial. Registra las horas semanales de lactancia con hasta dos decimales.',
+                'Muestra licencias médicas del RUT que se solapan con el período del caso, con folio, tipo, establecimiento, fechas y estado administrativo. No expone archivos clínicos desde Maternidad.',
+                'Lista los reemplazos coincidentes como titular o reemplazante, respeta la copia histórica del titular y prioriza la persona contratada sobre la propuesta. Las fechas efectivas de contrato y Orden de trabajo prevalecen sobre las solicitadas.',
+                'El intervalo parte de FPC o del primer antecedente disponible y termina con la última fecha de seguimiento, lactancia o postnatal parental. Si falta término, consulta hasta hoy e informa ese criterio. Las listas tienen paginación independiente y no modifican los registros de origen.',
+                'Amplía la plantilla Excel con fechas de REX y horas semanales; conserva las plantillas anteriores y permite completar documentos después de la carga. Incorpora una migración aditiva de tres campos sin reescribir datos históricos.',
+            ],
+            'published_at' => '2026-10-30',
+        ],
         [
             'version' => '2026.10.30.663',
             'title' => 'Maternidad: expedientes individuales y carga masiva',

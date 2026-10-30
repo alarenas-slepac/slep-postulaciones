@@ -8,6 +8,7 @@
     <label class="form-label" for="{{ $id }}">{{ $label }}@if ($obligatorio ?? false) <span class="text-danger" aria-hidden="true">*</span><span class="visually-hidden"> obligatorio</span>@endif</label>
     <input class="form-control @error($name) is-invalid @enderror" id="{{ $id }}" name="{{ $nombreHtml }}" type="{{ $tipo }}" value="{{ $valor }}"
            @if ($tipo === 'date') data-mat-date @endif @if ($obligatorio ?? false) required @endif @if ($soloLectura ?? false) readonly @endif
+           @if ($tipo === 'number') min="{{ $minimo ?? 0 }}" max="{{ $limite ?? 168 }}" step="{{ $paso ?? '0.01' }}" inputmode="decimal" @endif
            maxlength="{{ $maximo ?? 255 }}" aria-describedby="{{ $id }}-ayuda {{ $id }}-error" @error($name) aria-invalid="true" @enderror>
     <div class="form-text" id="{{ $id }}-ayuda">{{ $ayuda ?? '' }}</div>
     <div class="invalid-feedback" id="{{ $id }}-error">@error($name){{ $message }}@enderror</div>

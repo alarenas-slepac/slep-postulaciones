@@ -16,6 +16,10 @@ El ingreso individual requiere certificado de embarazo y su fecha. La Orden de t
 
 Los casos importados pueden completar los documentos gradualmente. «Pendiente de respaldo» distingue un beneficio informado de uno registrado con documento; cargar un archivo no equivale a una aprobación administrativa. Los archivos se guardan en el disco **local privado**, bajo `maternidad/casos/{uuid}`, y se descargan mediante rutas autenticadas y autorizadas. Nunca se crea un enlace público. Adjuntar otro archivo conserva todas las versiones anteriores. No hay acciones de borrado de expedientes, documentos u observaciones.
 
+Ley Dominga y lactancia permiten además su **REX propia en PDF o imagen**, con `fecha_rex_dominga` y `fecha_rex_lactancia`. Se conservan separados del certificado y de la solicitud original. Todo archivo REX requiere su fecha; informar una fecha sin archivo deja pendiente el respaldo en cargas masivas y lo exige en ingreso individual. Se reutilizan los controles privados de acceso, formatos, tamaño e historial.
+
+`horas_semanales_lactancia` registra la cantidad autorizada a la semana, con hasta dos decimales (punto o coma en Excel). Al activar un beneficio individual se solicita esta cantidad; un caso histórico que no la tiene conserva «Sin informar», sin inferir cero ni bloquear la edición de otros antecedentes. En Excel puede completarse después. Este campo no calcula ni determina por sí mismo las horas legalmente procedentes.
+
 ## Fechas de seguimiento
 
 Las fechas se calculan en el servidor, con fechas civiles y sin desbordar el año en los 29 de febrero:
@@ -34,16 +38,30 @@ Se informa el permiso Ley Dominga de siete días hábiles; no se deduce un calen
 
 FPC se ingresa desde el antecedente, sin inferir una concepción. Los datos de hijos permiten nombre completo, nacimiento y RUT; se admiten hasta diez por caso. El nacimiento de seguimiento FNH se registra expresamente para el caso.
 
+## Licencias y reemplazos asociados
+
+El expediente muestra **sólo los registros del mismo RUT que coinciden con el período de maternidad**, conforme al alcance solicitado. El inicio usa FPC; en su ausencia, fecha del certificado de embarazo, FNH o fecha de registro, en ese orden. El término es el más tardío entre el fin de seguimiento del fuero, lactancia y postnatal parental activo. Si ninguno existe se usa hoy como corte provisional. El intervalo y sus criterios se muestran en pantalla; fechas contradictorias impiden consultar hasta corregirlas.
+
+El solapamiento incluye los extremos. Un término desconocido se trata como fecha puntual del inicio informado, sin presumir vigencia indefinida. No se muestran períodos invertidos o de inicio desconocido. La coincidencia por RUT y período no acredita una causa médica relacionada con ese embarazo.
+
+Licencias: folio, tipo, fechas, establecimiento y estado administrativo, sin archivos clínicos ni enlaces que amplíen permisos de Licencias Médicas. Reemplazos: solicitud, establecimiento, fechas efectivas, estado y participación **Titular**, **Reemplazante** o ambas. La identidad del titular respeta el snapshot histórico; para la reemplazante prevalece el perfil contratado sobre el propuesto, incluyendo identidades de usuarios archivados. Un perfil propuesto reemplazado por otra persona no se atribuye a la candidata anterior. Se conservan registros de todos los estados, que se muestran expresamente.
+
+Las listas consultan sus fuentes en lectura y usan paginación independiente de diez filas (`licencias_page` y `reemplazos_page`). No modifican licencias, solicitudes ni su relación de origen.
+
 ## Excel
 
 Descargar la plantilla desde Ingreso masivo; no cambiar encabezados. Hoja **Casos**: `referencia_caso` y `rut` obligatorios. Los nombres, estamento y datos contractuales vacíos se completan desde la fuente; revisar la separación automática. `rbd` resuelve varios establecimientos y `fuente` permite elegir exactamente `padron:ID` o `reemplazo:ID`, identificable en el buscador individual. Estamento: `docente` o `asistente` (también AAEE); beneficios: Sí/No; modalidad: completo/compartido. Registro vacío usa la fecha de carga.
 
 Hoja **Hijos**: `rut_funcionaria`, `referencia_caso`, `nombre_completo`, `fecha_nacimiento`, `rut_hijo`. Se vincula por RUT y referencia. Se rechazan hijos sin caso, referencias duplicadas para el mismo RUT y casos ya existentes. Puede repetirse el RUT con referencias distintas. Se admiten fechas de Excel y texto AAAA-MM-DD, DD-MM-AAAA o DD/MM/AAAA. No se evalúan fórmulas ni se importan archivos adjuntos.
 
+La plantilla actual añade al final `fecha_rex_dominga`, `fecha_rex_lactancia` y `horas_semanales_lactancia`. Se mantienen las 26 columnas anteriores en su orden y se aceptan libros anteriores sin las tres columnas nuevas. Las previsualizaciones pendientes anteriores también pueden confirmarse: los campos omitidos permanecen nulos.
+
 Límites: 500 casos, 2.000 filas de hijos, 10 MB de XLSX y 50 MB de contenido descomprimido. La previsualización valida todo antes de crear expedientes; errores identifican hoja, fila y campo. El contenido temporal queda cifrado, pertenece al usuario que lo cargó y vence en 30 minutos. Confirmar vuelve a comprobar duplicados y crea el lote en una transacción; un fallo revierte todo. Reconfirmar el mismo lote no duplica casos y al confirmar se elimina el contenido temporal cifrado. Los casos existentes nunca se actualizan desde Excel.
 
 ## Instalación y verificación
 
 El parche 2026.10.30.663 incorpora la migración aditiva `2026_10_30_180000_create_maternidad_tables.php`: casos, hijos, documentos, historial e importaciones. Las claves foráneas restringen la eliminación de antecedentes asociados. `down()` no borra expedientes ni respaldos; cualquier reversión de datos requiere un procedimiento autorizado. Desplegar el código y los recursos compilados y ejecutar las migraciones pendientes con el binario **absoluto de PHP 8.3** del servidor y `artisan migrate --force`; luego `artisan optimize:clear`. No se requiere un seeder ni nuevas notificaciones. No ejecutar operaciones destructivas ni Artisan con el PHP predeterminado de Composer en cPanel.
+
+El parche **2026.10.30.664** requiere además `2026_10_30_190000_add_resoluciones_lactancia_to_maternidad_casos.php`. Añade las dos fechas de REX y las horas semanales como campos nulos; no modifica la migración publicada ni altera los expedientes existentes. Los nuevos tipos de archivo usan la tabla de documentos vigente.
 
 Pruebas: `php artisan test --compact tests/Feature/MaternidadTest.php`, aisladas en SQLite en memoria y almacenamiento temporal. Cubren fechas, roles, fuente del reemplazante, nombres, copia histórica, adjuntos privados y versiones, observaciones, concurrencia, rollback, Excel, expiración y confirmación repetida. La aplicación requiere la clave habitual de cifrado de Laravel para previsualizaciones; no se añade ninguna clave ni dato personal al parche.

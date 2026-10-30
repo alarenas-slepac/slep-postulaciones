@@ -22,9 +22,9 @@ final class MaternidadRegistroService
     }
     public const FECHAS = ['fecha_ingreso', 'fecha_termino', 'fecha_registro', 'fecha_certificado_embarazo',
         'fpc', 'fpp', 'fnh', 'fecha_ley_dominga', 'fecha_inicio_lactancia', 'fecha_inicio_postnatal',
-        'fecha_termino_postnatal', 'fecha_rex_postnatal'];
+        'fecha_termino_postnatal', 'fecha_rex_postnatal', 'fecha_rex_dominga', 'fecha_rex_lactancia'];
     public const CAMPOS = ['referencia_caso', 'rut', 'nombres', 'apellido_paterno', 'apellido_materno', 'estamento',
-        'calidad_juridica', 'ley_dominga', 'lactancia', 'postnatal_parental', 'modalidad_postnatal'];
+        'calidad_juridica', 'ley_dominga', 'lactancia', 'postnatal_parental', 'modalidad_postnatal', 'horas_semanales_lactancia'];
 
     public function preparar(array $entrada, array $archivos = [], ?MaternidadCaso $caso = null, bool $masivo = false): array
     {
@@ -39,6 +39,16 @@ final class MaternidadRegistroService
             'fuente_personal', 'fuente_personal_id', 'fuente_snapshot'])
             : app(MaternidadPersonalResolver::class)->resolver($rut, $entrada['fuente'] ?? null, isset($entrada['rbd']) ? (string) $entrada['rbd'] : null);
         $datos = array_merge($fuente, Arr::only($entrada, [...self::CAMPOS, ...self::FECHAS]));
+        // Formularios anteriores y casos históricos conservan los nuevos antecedentes al omitirlos.
+        foreach (['fecha_rex_dominga', 'fecha_rex_lactancia', 'horas_semanales_lactancia'] as $campo) {
+            if (! array_key_exists($campo, $entrada)) {
+                $anterior = $caso?->$campo;
+                $datos[$campo] = $anterior instanceof \DateTimeInterface ? $anterior->format('Y-m-d') : $anterior;
+            }
+        }
+        $horas = $datos['horas_semanales_lactancia'] ?? null;
+        if (is_string($horas)) $horas = str_replace(',', '.', trim($horas));
+        $datos['horas_semanales_lactancia'] = filled($horas) ? $horas : null;
         $datos['rut'] = $rut;
         $datos['referencia_caso'] = $caso?->referencia_caso ?? trim((string) ($entrada['referencia_caso'] ?? ''));
         if ($datos['referencia_caso'] === '') $datos['referencia_caso'] = (string) Str::uuid();
@@ -55,12 +65,13 @@ final class MaternidadRegistroService
             'apellido_materno' => ['nullable', 'string', 'max:100'], 'estamento' => ['required', Rule::in(array_keys(config('maternidad.estamentos')))],
             'calidad_juridica' => ['required', 'string', 'max:120'], 'fecha_registro' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
             'modalidad_postnatal' => ['nullable', Rule::in(array_keys(config('maternidad.modalidades')))],
+            'horas_semanales_lactancia' => ['nullable', 'numeric', 'decimal:0,2', 'between:0.01,168'],
             'observacion' => ['nullable', 'string', 'max:5000'], 'hijos' => ['nullable', 'array', 'max:10'],
             'hijos.*.nombre_completo' => ['nullable', 'string', 'max:255'],
             'hijos.*.fecha_nacimiento' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'hijos.*.rut' => ['nullable', 'string', 'max:32']];
         foreach (self::FECHAS as $campo) $reglas[$campo] ??= ['nullable', 'date_format:Y-m-d'];
-        foreach (['fnh', 'fecha_certificado_embarazo', 'fecha_ley_dominga', 'fecha_rex_postnatal'] as $campo) $reglas[$campo][] = 'before_or_equal:today';
+        foreach (['fnh', 'fecha_certificado_embarazo', 'fecha_ley_dominga', 'fecha_rex_postnatal', 'fecha_rex_dominga', 'fecha_rex_lactancia'] as $campo) $reglas[$campo][] = 'before_or_equal:today';
         foreach (config('maternidad.documentos') as $tipo => $label) {
             $reglas['documentos.'.$tipo] = ['nullable', 'file', 'mimes:'.($tipo === 'orden_trabajo' ? 'pdf' : 'pdf,jpg,jpeg,png,webp'), 'max:'.config('maternidad.max_documento_kb')];
         }
@@ -87,6 +98,9 @@ final class MaternidadRegistroService
                 $limite = \Carbon\CarbonImmutable::parse($datos['fnh'])->addYearsNoOverflow(2)->toDateString();
                 if ($datos['fecha_inicio_lactancia'] < $datos['fnh'] || $datos['fecha_inicio_lactancia'] > $limite) $v->errors()->add('fecha_inicio_lactancia', 'El inicio debe estar entre el nacimiento y el segundo cumpleaños.');
             }
+            if (! $masivo && $datos['lactancia'] && ! $caso?->lactancia && blank($datos['horas_semanales_lactancia'])) {
+                $v->errors()->add('horas_semanales_lactancia', 'Indique la cantidad de horas de lactancia a la semana.');
+            }
             if (! $masivo && $caso?->origen_registro !== 'masivo') {
                 $tipos = array_unique([...(array) $caso?->documentos()->pluck('tipo')->all(), ...array_keys($archivos)]);
                 foreach ($this->pendientes($datos, $tipos) as $tipo) {
@@ -94,7 +108,10 @@ final class MaternidadRegistroService
                 }
             }
             if (isset($archivos['embarazo']) && ! $datos['fecha_certificado_embarazo']) $v->errors()->add('fecha_certificado_embarazo', 'Indique la fecha del certificado adjunto.');
-            if (isset($archivos['rex_postnatal']) && ! $datos['fecha_rex_postnatal']) $v->errors()->add('fecha_rex_postnatal', 'Indique la fecha de la REX adjunta.');
+            $existentes = $caso?->documentos()->pluck('tipo')->all() ?? [];
+            foreach (['rex_postnatal' => 'fecha_rex_postnatal', 'rex_dominga' => 'fecha_rex_dominga', 'rex_lactancia' => 'fecha_rex_lactancia'] as $tipo => $campo) {
+                if ((isset($archivos[$tipo]) || in_array($tipo, $existentes, true)) && ! $datos[$campo]) $v->errors()->add($campo, 'Indique la fecha de la REX adjunta.');
+            }
         });
         $validator->validate();
         $hijos = [];
@@ -179,6 +196,8 @@ final class MaternidadRegistroService
         if (! empty($datos['fnh'])) $requeridos[] = 'nacimiento';
         foreach (['ley_dominga', 'lactancia', 'postnatal_parental'] as $tipo) if ($datos[$tipo] ?? false) $requeridos[] = $tipo;
         if (! empty($datos['fecha_rex_postnatal'])) $requeridos[] = 'rex_postnatal';
+        if (! empty($datos['fecha_rex_dominga'])) $requeridos[] = 'rex_dominga';
+        if (! empty($datos['fecha_rex_lactancia'])) $requeridos[] = 'rex_lactancia';
         return array_values(array_diff($requeridos, $tipos));
     }
 
