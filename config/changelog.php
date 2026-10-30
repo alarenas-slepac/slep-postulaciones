@@ -6457,8 +6457,23 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.30.662',
+    'current_version' => '2026.10.30.663',
     'entries' => [
+        [
+            'version' => '2026.10.30.663',
+            'title' => 'Maternidad: expedientes individuales y carga masiva',
+            'summary' => 'Añade seguimiento de maternidad en Trámites y operación, con pestañas de Asistentes y Docentes, documentos privados e historial.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani'],
+            'items' => [
+                'Busca por RUT en padrón y solicitudes de reemplazo; conserva la copia del vínculo laboral y separa nombres y apellidos para su revisión. Permite varios embarazos o procesos por RUT e hijos por caso.',
+                'Registra embarazo, nacimiento certificado, lactancia, postnatal parental, REX, Orden de trabajo opcional y Ley Dominga; conserva versiones de archivos y observaciones con fecha y responsable.',
+                'Calcula el término estimado con FPP + un año y 84 días, el definitivo con FNH certificada + un año y 84 días y la lactancia a los dos años del nacimiento acreditado.',
+                'Ley Dominga acreditada tiene prioridad: 30 días desde su fecha. GDP y Administración pueden ampliar a un año y 84 días por fallecimiento por parto prematuro o durante el parto, con causal y fundamento auditados.',
+                'Ofrece plantilla Excel de Casos e Hijos, validación completa, previsualización privada de 30 minutos y confirmación transaccional sin sobrescribir casos. Los documentos se completan después y los beneficios sin respaldo quedan pendientes.',
+                'Incorpora migración aditiva de cinco tablas, control de edición simultánea, permisos por rol activo, interfaz adaptable del Design System y pruebas aisladas. No altera padrón ni solicitudes existentes.',
+            ],
+            'published_at' => '2026-10-30',
+        ],
         [
             'version' => '2026.10.30.662',
             'title' => 'Contrato de 18 horas para el tramo de 16 horas aula de Religión',
