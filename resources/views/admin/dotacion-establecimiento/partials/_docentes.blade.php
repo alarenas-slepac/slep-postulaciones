@@ -176,7 +176,12 @@
             <h2 class="h5 fw-bold mb-1">Base contractual y cálculo por proporción</h2>
             <div class="text-muted small">Asignadas y reservadas están separadas. Abra «Ver detalle» para consultar la conversión, las funciones y la situación docente.</div>
         </div>
-        <span class="badge rounded-pill text-bg-light border">{{ $docentes->count() }} registro(s)</span>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="badge rounded-pill text-bg-light border">{{ $docentes->count() }} registro(s)</span>
+            @if(\App\Exports\DotacionNominaDocentesExport::canExport($activeRole ?? auth()->user()?->activeRoleName()))
+                <a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ route('admin.dotacion-establecimiento.docentes.export', [$establecimiento, 'anio' => $anio]) }}" aria-label="Exportar nómina completa de docentes en orden de prelación, año {{ $anio }}, RBD {{ $establecimiento->rbd }}"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i>Exportar docentes (Excel)</a>
+            @endif
+        </div>
     </div>
     <div class="table-responsive">
         <table class="table dotacion-docentes-table align-middle mb-0">

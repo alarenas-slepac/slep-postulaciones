@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Exports\DotacionNominaDocentesExport;
+use App\Http\Controllers\Controller;
+use App\Models\Establecimiento;
+use App\Support\DotacionNominaDocentes;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class DotacionNominaDocentesController extends Controller
+{
+    public function __invoke(Request $request, Establecimiento $establecimiento, DotacionNominaDocentes $nomina, DotacionNominaDocentesExport $export): StreamedResponse
+    {
+        $rol = $request->user()?->activeRoleName();
+        abort_unless(DotacionNominaDocentesExport::canExport($rol), 403);
+        abort_if((bool) ($establecimiento->sala_cuna ?? false), 404);
+        if ($rol === 'funcionario_directivo_estab') {
+            abort_unless((int) ($request->user()->establecimiento_id ?? 0) > 0
+                && (int) $request->user()->establecimiento_id === (int) $establecimiento->id, 403);
+        }
+        $data = $request->validate(['anio' => ['nullable', 'integer', 'between:1,9999']]);
+        $anio = (int) ($data['anio'] ?? now()->year);
+
+        return $export->download($establecimiento, $anio, $nomina->datos($establecimiento, $anio));
+    }
+}

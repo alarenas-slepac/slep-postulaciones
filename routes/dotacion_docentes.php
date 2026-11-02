@@ -1,0 +1,9 @@
+<?php
+
+use App\Exports\DotacionNominaDocentesExport;
+use App\Http\Controllers\Admin\DotacionNominaDocentesController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('admin/dotacion-establecimiento/{establecimiento}/docentes/nomina.xlsx', DotacionNominaDocentesController::class)
+    ->middleware(['auth', 'verified', 'ensure.role:'.implode('|', DotacionNominaDocentesExport::ROLES), 'ensure.module'])
+    ->whereNumber('establecimiento')->name('admin.dotacion-establecimiento.docentes.export');
