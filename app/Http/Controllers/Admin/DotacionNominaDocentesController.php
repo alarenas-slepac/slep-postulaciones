@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exports\DotacionNominaDocentesExport;
+use App\Exports\DotacionSobredotacionExport;
 use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Support\DotacionNominaDocentes;
@@ -13,6 +14,20 @@ class DotacionNominaDocentesController extends Controller
 {
     public function __invoke(Request $request, Establecimiento $establecimiento, DotacionNominaDocentes $nomina, DotacionNominaDocentesExport $export): StreamedResponse
     {
+        $anio = $this->anioAutorizado($request, $establecimiento);
+
+        return $export->download($establecimiento, $anio, $nomina->datos($establecimiento, $anio));
+    }
+
+    public function sobredotacion(Request $request, Establecimiento $establecimiento, DotacionNominaDocentes $nomina, DotacionSobredotacionExport $export): StreamedResponse
+    {
+        $anio = $this->anioAutorizado($request, $establecimiento);
+
+        return $export->download($establecimiento, $anio, $nomina->datosSobredotacion($establecimiento, $anio));
+    }
+
+    private function anioAutorizado(Request $request, Establecimiento $establecimiento): int
+    {
         $rol = $request->user()?->activeRoleName();
         abort_unless(DotacionNominaDocentesExport::canExport($rol), 403);
         abort_if((bool) ($establecimiento->sala_cuna ?? false), 404);
@@ -21,8 +36,6 @@ class DotacionNominaDocentesController extends Controller
                 && (int) $request->user()->establecimiento_id === (int) $establecimiento->id, 403);
         }
         $data = $request->validate(['anio' => ['nullable', 'integer', 'between:1,9999']]);
-        $anio = (int) ($data['anio'] ?? now()->year);
-
-        return $export->download($establecimiento, $anio, $nomina->datos($establecimiento, $anio));
+        return (int) ($data['anio'] ?? now()->year);
     }
 }

@@ -223,6 +223,9 @@ class DotacionNominaDocentesExportTest extends IsolatedSecurityTestCase
         });
         $informe = (new DotacionNominaDocentes)->datos($this->ee, $year);
         $this->assertCount(0, $informe['filas']); $this->assertFalse($informe['justificaciones_disponibles']);
+        $sobredotacion = (new DotacionNominaDocentes)->datosSobredotacion($this->ee, $year);
+        foreach ($sobredotacion['bloques'] as $rows) { $this->assertCount(0, $rows); }
+        $this->assertFalse($sobredotacion['justificaciones_disponibles']);
         $this->assertSame([], $writes);
     }
 
@@ -252,10 +255,19 @@ class DotacionNominaDocentesExportTest extends IsolatedSecurityTestCase
         $row = $informe['filas']->first();
         $this->assertSame('Pedagogía sintética', $row['titulo']); $this->assertEquals(44, $row['contrato_considerado']);
         $this->assertEquals(44, $row['pendientes']); $this->assertEquals(0, $row['con_justificacion']); $this->assertEquals(44, $row['sin_justificacion']);
+        $sinRespaldo = $source->datosSobredotacion($this->ee, 2027);
+        $this->assertCount(1, $sinRespaldo['bloques']['plan_estudio']);
+        $this->assertCount(0, $sinRespaldo['bloques']['parvularia']); $this->assertCount(0, $sinRespaldo['bloques']['pie']);
+        $this->assertSame('Sin justificación', $sinRespaldo['bloques']['plan_estudio']->first()['justificacion_contrata']);
+        $this->assertEquals(44, $sinRespaldo['bloques']['plan_estudio']->first()['saldo_bloque']);
         $actual = DotacionSobredotacionJustificacion::create($registro);
         $this->assertEquals(44, $source->datos($this->ee, 2027)['filas']->first()['con_justificacion']);
+        $justificada = $source->datosSobredotacion($this->ee, 2027)['bloques']['plan_estudio']->first();
+        $this->assertSame('Respaldo sintético.', $justificada['justificacion_contrata']);
+        $this->assertSame('Vigente', $justificada['estado_contrata']); $this->assertEquals(44, $justificada['con_justificacion']);
         $actual->update(['horas_detectadas' => 43]);
         $this->assertEquals(44, $source->datos($this->ee, 2027)['filas']->first()['sin_justificacion']);
+        $this->assertStringContainsString('Desactualizada', $source->datosSobredotacion($this->ee, 2027)['bloques']['plan_estudio']->first()['estado_contrata']);
     }
 
     private function createDotacionTables(): void

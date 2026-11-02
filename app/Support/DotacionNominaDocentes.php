@@ -11,7 +11,17 @@ class DotacionNominaDocentes
 {
     public function datos(Establecimiento $establecimiento, int $anio): array
     {
-        return DotacionLecturaCache::ejecutar(function () use ($establecimiento, $anio) {
+        return $this->informe($establecimiento, $anio, false);
+    }
+
+    public function datosSobredotacion(Establecimiento $establecimiento, int $anio): array
+    {
+        return $this->informe($establecimiento, $anio, true);
+    }
+
+    private function informe(Establecimiento $establecimiento, int $anio, bool $porBloque): array
+    {
+        return DotacionLecturaCache::ejecutar(function () use ($establecimiento, $anio, $porBloque) {
             $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio, true, false);
             $proceso = DotacionProceso2027Calculator::resumen($establecimiento, $anio, $data);
             $docentes = collect(($proceso['aplica'] ?? false) ? $proceso['docentes'] : $data['docentes'])
@@ -22,12 +32,57 @@ class DotacionNominaDocentes
             $periodos = $docentes->map(fn (array $docente) => !empty($docente['anio']) && !empty($docente['mes'])
                 ? sprintf('%02d/%04d', $docente['mes'], $docente['anio']) : 'Período no informado')->unique()->values();
 
-            return [
-                'filas' => $this->filas($docentes, $sobredotacion, DotacionSobredotacionJustificacion::registrosPara((int) $establecimiento->id, $anio)),
+            $registros = DotacionSobredotacionJustificacion::registrosPara((int) $establecimiento->id, $anio);
+            $filas = $porBloque
+                ? ['bloques' => $this->filasPorBloque($docentes, $sobredotacion, $registros)]
+                : ['filas' => $this->filas($docentes, $sobredotacion, $registros)];
+
+            return $filas + [
                 'periodos_padron' => $periodos->implode(', ') ?: 'Sin docentes en la nómina',
                 'justificaciones_disponibles' => Schema::hasTable('dotacion_sobredotacion_justificaciones'),
             ];
         });
+    }
+
+    /** Una fila por docente y bloque con saldo, conservando ambos tipos de fundamento. */
+    public function filasPorBloque(Collection $docentes, array $sobredotacion, Collection $registros): array
+    {
+        $porClave = $registros->keyBy(fn ($registro) => DotacionSobredotacionJustificacion::clave(
+            $registro->bloque, $registro->docente_rut_normalizado, $registro->tipo_horas
+        ));
+        $bloques = [];
+        foreach (['plan_estudio', 'parvularia', 'pie'] as $bloque) {
+            $vacantes = collect(data_get($sobredotacion, 'vacantes_por_bloque.'.$bloque.'.items', []))
+                ->filter(fn (array $item) => (float) ($item['horas_sobredotacion_total'] ?? 0) > 0.01)
+                ->keyBy(fn (array $item) => DotacionEstablecimientoCalculator::normalizeRut((string) $item['rut']));
+            $personas = $docentes->filter(fn (array $docente) => $vacantes->has(
+                DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut'] ?? ''))
+            ));
+            $bloques[$bloque] = $this->filas($personas, ['vacantes_por_bloque' => [$bloque => ['items' => $vacantes]]], $registros)
+                ->map(function (array $fila) use ($bloque, $vacantes, $porClave): array {
+                    $rut = DotacionEstablecimientoCalculator::normalizeRut($fila['rut']);
+                    $vacante = $vacantes->get($rut);
+                    $fila['contrato_bloque'] = round((float) $vacante['horas_contrato_categoria'], 2);
+                    $fila['saldo_bloque'] = round((float) $vacante['horas_sobredotacion_total'], 2);
+                    foreach (['titular' => 'horas_sobredotacion_planta', 'contrata' => 'horas_sobredotacion_contrata'] as $tipo => $campo) {
+                        $horas = round((float) $vacante[$campo], 2);
+                        $registro = $porClave->get(DotacionSobredotacionJustificacion::clave($bloque, $rut, $tipo));
+                        $texto = trim((string) ($registro?->justificacion ?? ''));
+                        $fila['horas_'.$tipo] = $horas;
+                        $fila['justificacion_'.$tipo] = $texto !== '' ? $texto : ($horas > 0.01 ? 'Sin justificación' : 'No aplica');
+                        $fila['estado_'.$tipo] = match (true) {
+                            $horas <= 0.01 => 'Sin saldo actual',
+                            $texto === '' => 'Sin justificación',
+                            $registro->vigentePara($horas) => 'Vigente',
+                            default => 'Desactualizada · registrada para '.DotacionEstablecimientoCalculator::formatHoras($registro->horas_detectadas).' h',
+                        };
+                    }
+
+                    return $fila;
+                })->values();
+        }
+
+        return $bloques;
     }
 
     /** Usa la prelación y los saldos de Etapa 7 sin modificar los cálculos operativos. */

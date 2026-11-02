@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.2.671',
+    'current_version' => '2026.11.2.672',
     'entries' => [
+        [
+            'version' => '2026.11.2.672',
+            'title' => 'Exportación de sobredotación docente por bloque y prelación',
+            'summary' => 'Añade Excel de los saldos de Etapa 7 con una hoja por bloque, orden de prelación y fundamentos de supresión o no renovación.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Exporta Plan de estudio, Educación Parvularia y PIE por separado, con los antecedentes, contrato y asignación del docente, contrato del bloque y saldo titular/contrata, conservando el orden de prelación del SGA.',
+                'Incluye la justificación registrada por calidad o indica Sin justificación. Conserva fundamentos desactualizados identificando sus horas anteriores y distingue su vigencia para contabilizar las horas pendientes.',
+                'Mantiene filtros, fechas y cantidades nativas de Excel, totales por bloque y hoja de definiciones. Respeta permisos, alcance del establecimiento y disponibilidad de lectura durante bloqueos de edición, sin nuevas migraciones.',
+                'Corrige el desbordamiento móvil del texto accesible de Ver contrato, conservando la identificación del docente mediante su etiqueta accesible.',
+            ],
+            'published_at' => '2026-11-02',
+        ],
         [
             'version' => '2026.11.2.671',
             'title' => 'Exportación de nómina docente en orden de prelación',
