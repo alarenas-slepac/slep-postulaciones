@@ -6457,8 +6457,16 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.2.666',
+    'current_version' => '2026.11.2.667',
     'entries' => [
+        [
+            'version' => '2026.11.2.667',
+            'title' => 'Fondo gris completo en los botones de carga de archivos',
+            'summary' => 'Corrige el alto del botón Elegir archivo en los formularios del Design System compartido.',
+            'roles' => [],
+            'items' => ['Ajusta el botón interno de los campos de archivo de slep-listados para que su fondo gris cubra todo el alto interior del control, eliminando la franja blanca inferior. Conserva selección nativa, nombre del archivo, estados de foco, hover, deshabilitado y validación. Documenta el patrón en docs/DESIGN_SYSTEM.md e incluye el CSS compilado.'],
+            'published_at' => '2026-11-02',
+        ],
         [
             'version' => '2026.11.2.666',
             'title' => 'Reapertura de reemplazos por reducción de licencia médica o reposo',

@@ -82,6 +82,12 @@ Agrupar campos por tarea en secciones con título e icono. Asociar `label` e `id
 
 En una fila, alinear los bloques por su borde superior y dejar la ayuda y los errores **dentro** del bloque al que pertenecen. No aplicar `height: 100%` a un contenedor si sus etiquetas, ayudas o errores quedan fuera de él: el contenido puede invadir la fila siguiente. Las secciones condicionales deben ocupar su propia celda de la cuadrícula y mantener espacio al aparecer o desaparecer.
 
+#### Carga de archivos
+
+Dentro de `.slep-listing`, conservar el `<input type="file" class="form-control">` nativo, su etiqueta, tipos admitidos, nombre del archivo, ayudas y validación. El campo tiene un alto mínimo de `2.75rem`; el botón «Elegir archivo» debe ocupar todo el alto interior, con fondo gris `#e9ecef`, borde separador junto al nombre del archivo y el mismo recorte redondeado del campo. Usar `::file-selector-button` en el componente compartido, con altura `calc(2.75rem - 2px)` para descontar los dos bordes de un píxel. El alto automático del botón de Bootstrap deja una franja blanca cuando el campo crece por su altura mínima.
+
+El hover usa gris `#dee2e6`; deshabilitado usa superficie `#f8fafc` y texto atenuado. Conservar el foco azul y el estado de error del campo completo. No reemplazar la carga nativa con un botón que oculte el nombre seleccionado. Verificar escritorio, móvil, teclado, nombres largos y selección múltiple.
+
 ### Selectores
 
 Usar el `select` nativo para listas cortas y fáciles de recorrer. Para catálogos largos, como establecimientos o roles disponibles en un filtro, ofrecer búsqueda con Select2 y el tema Bootstrap 5 ya usado en el proyecto. El selector visible debe respetar el alto mínimo de `2.65rem`, radio cercano a `0.75rem`, borde `#dbe4f0`, texto `#0f172a` y foco azul. El desplegable debe mostrar búsqueda, opciones con espacio suficiente y el mismo estilo de foco/selección.
