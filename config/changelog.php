@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.2.668',
+    'current_version' => '2026.11.2.669',
     'entries' => [
+        [
+            'version' => '2026.11.2.669',
+            'title' => 'Diseño institucional para la gestión individual del padrón',
+            'summary' => 'Rediseña la consulta, ingreso y actualización individual del padrón conforme al Design System.',
+            'roles' => ['admin'],
+            'items' => [
+                'Organiza la pantalla en consulta de RUT, selección de contrato y formulario por secciones, con período abierto, estados, mensajes, historial y tablas adaptadas a fichas en móvil.',
+                'Integra selectores institucionales con búsqueda por establecimiento y tramo, texto libre para tramos históricos, calendarios en español, cantidades sin flechas nativas y autorizaciones con controles institucionales.',
+                'Añade errores junto a los campos, ayudas, foco accesible, indicador de asignaciones seleccionadas y estados de consulta y guardado. Conserva los datos enviados, permisos, ID, huellas, auditoría y las reglas de contratos, jornadas y liberación de asignaciones.',
+            ],
+            'published_at' => '2026-11-02',
+        ],
         [
             'version' => '2026.11.2.668',
             'title' => 'Corrección general del diseño de carga de archivos',

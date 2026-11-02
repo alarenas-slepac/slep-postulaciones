@@ -33,6 +33,10 @@
     "file": "assets/leaflet-CLLlcC51.css",
     "src": "_leaflet-CLLlcC51.css"
   },
+  "_postulante-ficha-B6ouyF3r.css": {
+    "file": "assets/postulante-ficha-B6ouyF3r.css",
+    "src": "_postulante-ficha-B6ouyF3r.css"
+  },
   "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff": {
     "file": "assets/bootstrap-icons-BeopsB42.woff",
     "src": "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff"
@@ -2404,6 +2408,21 @@
       "assets/maternidad-BYFPqKCO.css"
     ]
   },
+  "resources/js/padron-individual.js": {
+    "file": "assets/padron-individual-DlpHqEaz.js",
+    "name": "padron-individual",
+    "src": "resources/js/padron-individual.js",
+    "isEntry": true,
+    "imports": [
+      "_flatpickr.min-DLZBE2Zc.js",
+      "resources/js/slep-listados.js",
+      "__commonjsHelpers-92s3wAHG.js"
+    ],
+    "css": [
+      "assets/padron-individual-CO8c-6Rz.css",
+      "assets/postulante-ficha-B6ouyF3r.css"
+    ]
+  },
   "resources/js/pie-comparison.js": {
     "file": "assets/pie-comparison-CQRO3NbM.js",
     "name": "pie-comparison",
@@ -2411,7 +2430,7 @@
     "isEntry": true
   },
   "resources/js/postulante-ficha.js": {
-    "file": "assets/postulante-ficha-CKnelBor.js",
+    "file": "assets/postulante-ficha-_Pq20vlg.js",
     "name": "postulante-ficha",
     "src": "resources/js/postulante-ficha.js",
     "isEntry": true,

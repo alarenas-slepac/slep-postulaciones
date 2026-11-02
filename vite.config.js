@@ -19,6 +19,7 @@ export default defineConfig({
                 'resources/js/reemplazo-modificacion-termino.js',
                 'resources/js/postulante-ficha.js',
                 'resources/js/postulante-perfil.js',
+                'resources/js/padron-individual.js',
                 'resources/css/centro-operaciones.css',
                 'resources/js/centro-operaciones.js',
                 'resources/css/votaciones-publicas.css',
