@@ -10,6 +10,15 @@ Acceso: **Reemplazos → Gestionar registro individual**, solo administrador.
 6. En un traslado, revisar las asignaciones agrupadas por RBD/establecimiento. Marcar únicamente las de origen que se desea liberar, confirmar su liberación y justificarla. Las del destino no pueden liberarse desde este flujo.
 7. Guardar y verificar el ID informado, la cantidad de asignaciones liberadas y la auditoría al pie de la consulta.
 
+## Presentación y controles
+
+La vista sigue `docs/DESIGN_SYSTEM.md`: encabezado con período y operación, consulta de RUT, tabla de contratos, formulario por secciones y trazabilidad. Las tablas se presentan como fichas con etiquetas en móvil. Los controles mantienen sus nombres, valores históricos y validación de servidor.
+
+- Establecimiento permite buscar por nombre o RBD. Tramo usa un selector con búsqueda y admite otros valores de hasta 100 caracteres, incluidos los históricos. Tipo de contrato conserva las opciones autorizadas para crear o actualizar.
+- Los calendarios locales se muestran en español, con formato DD-MM-AAAA y acción para limpiar; se envía AAAA-MM-DD. Sin JavaScript, las fechas pueden ingresarse con ese formato ISO y los selectores HTML siguen disponibles.
+- Las jornadas y bienios usan entrada numérica sin flechas del navegador, con unidad y rangos visibles. Las autorizaciones, selección de asignaciones y errores usan controles institucionales accesibles por teclado.
+- La selección de asignaciones se anuncia antes de guardar. No se premarca ninguna ni se libera al seleccionarla. El formulario conserva confirmación, justificación y revalidación transaccional del servidor.
+
 ## Protecciones
 
 - El período es el último abierto del padrón, no el mes calendario. Un ingreso individual no adelanta el padrón completo a otro mes. Los contratos regulares de períodos anteriores se concilian mediante la carga completa para conservar el historial mensual; no se duplican aquí.
