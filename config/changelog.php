@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.2.670',
+    'current_version' => '2026.11.2.671',
     'entries' => [
+        [
+            'version' => '2026.11.2.671',
+            'title' => 'Exportación de nómina docente en orden de prelación',
+            'summary' => 'Incorpora la descarga Excel de la pestaña Docentes por establecimiento y año, con antecedentes, contrato, asignación y justificaciones de Etapa 7.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Exporta RUT, nombre completo, título, grupo de prelación, tramo, antigüedad, contrato original y considerado del proceso, horas aula, contrato asignado, reservas y saldo pendiente. Reutiliza la prelación y los cálculos consolidados del SGA, incluido el redondeo de Parvularia.',
+                'Separa las horas de supresión titular y no renovación a contrata de Etapa 7 con y sin justificación vigente, sumando Plan general, Educación Parvularia y PIE. Las justificaciones vacías o registradas para otra cantidad quedan pendientes; se incluye su detalle explicativo.',
+                'Añade filtros, paneles inmovilizados, fechas y horas nativas de Excel, totales y hoja de definiciones. Identifica el período contractual de origen y excluye cupos virtuales y asistentes de la nómina de personas docentes.',
+                'Conserva acceso por rol activo y alcance del establecimiento del directivo, también durante bloqueos de edición. No modifica datos ni requiere nuevas migraciones.',
+            ],
+            'published_at' => '2026-11-02',
+        ],
         [
             'version' => '2026.11.2.670',
             'title' => 'Bloqueos de edición de Dotación para directivos',
