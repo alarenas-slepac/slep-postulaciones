@@ -47,14 +47,6 @@
     font-size: .95rem;
 }
 .slep-listing .form-text { color: var(--listing-muted); margin-bottom: 0; font-size: .8rem; }
-/* Bootstrap dimensiona este botón por su texto; debe cubrir los 44 px del campo menos sus bordes. */
-.slep-listing .form-control[type="file"]::file-selector-button {
-    height: calc(2.75rem - 2px);
-    background-color: #e9ecef;
-    color: var(--listing-text);
-}
-.slep-listing .form-control[type="file"]:hover:not(:disabled):not([readonly])::file-selector-button { background-color: #dee2e6; }
-.slep-listing .form-control[type="file"]:disabled::file-selector-button { background-color: #f8fafc; color: var(--listing-muted); }
 .slep-listing .form-control:focus, .slep-listing .form-select:focus,
 .slep-listing .select2-container--bootstrap-5.select2-container--focus .select2-selection,
 .slep-listing .select2-container--bootstrap-5.select2-container--open .select2-selection { border-color: var(--listing-blue); box-shadow: 0 0 0 .2rem rgb(13 110 253 / 14%); }
