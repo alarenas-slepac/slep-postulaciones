@@ -56,6 +56,7 @@
                                 @csrf
                                 <input type="hidden" name="anio" value="{{ $anio }}">
                                 <input type="hidden" name="asignatura_key" value="{{ $asignatura['key'] }}">
+                                <fieldset class="border-0 p-0 m-0" @disabled($dotacionEdicionBloqueada ?? false)>
                                 <div class="row g-3 align-items-center">
                                     <div class="col-lg-4">
                                         <div class="fw-semibold">{{ $asignatura['nombre'] }}</div>
@@ -86,6 +87,7 @@
                                         <button type="submit" class="btn btn-primary rounded-pill w-100"><i class="bi bi-save" aria-hidden="true"></i> Guardar</button>
                                     </div>
                                 </div>
+                                </fieldset>
                             </form>
                         @endforeach
                     </div>

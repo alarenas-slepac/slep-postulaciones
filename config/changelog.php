@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.2.669',
+    'current_version' => '2026.11.2.670',
     'entries' => [
+        [
+            'version' => '2026.11.2.670',
+            'title' => 'Bloqueos de edición de Dotación para directivos',
+            'summary' => 'Permite bloquear la edición de Dotación y módulos asociados para directivos, en todos los años, de forma general o por establecimiento.',
+            'roles' => ['admin', 'supervisor_plani', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_directivo_estab'],
+            'items' => [
+                'Añade controles de bloqueo general y por establecimiento, inicialmente desactivados, administrables por Administrador, Supervisor de Planificación y coordinaciones GDP y UATP. El general prevalece sin borrar los bloqueos individuales.',
+                'Restringe las escrituras de Dotación, funciones, planes de estudio y módulos asociados únicamente cuando el rol activo es funcionario_directivo_estab. Abarca todos los años, altas, cambios, eliminaciones, importaciones y la configuración de planes que crea registros mediante GET; conserva consultas y descargas.',
+                'Registra usuario, rol, fecha, motivo y versiones de los cambios. Rechaza formularios de configuración desactualizados y conserva la auditoría dentro de la misma transacción.',
+                'Muestra el estado y los controles al entrar a Dotación; oculta o deshabilita las acciones de edición bloqueadas y mantiene la protección del servidor para formularios anteriores y peticiones sin JavaScript. Requiere la migración aditiva de bloqueos.',
+            ],
+            'published_at' => '2026-11-02',
+        ],
         [
             'version' => '2026.11.2.669',
             'title' => 'Diseño institucional para la gestión individual del padrón',

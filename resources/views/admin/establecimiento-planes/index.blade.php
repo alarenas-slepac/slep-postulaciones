@@ -124,9 +124,15 @@
                                 <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
                                     @if ($item->establecimiento_plan_id)
                                         <a class="btn btn-sm btn-outline-info" href="{{ route('admin.establecimiento-planes.show', $item->establecimiento_plan_id) }}">Ver</a>
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ route('admin.establecimiento-planes.edit', $item->establecimiento_plan_id) }}">Editar</a>
+                                        @if(!($dotacionEdicionBloqueada ?? false))
+                                            <a class="btn btn-sm btn-outline-primary" href="{{ route('admin.establecimiento-planes.edit', $item->establecimiento_plan_id) }}">Editar</a>
+                                        @endif
                                     @else
-                                        <a class="btn btn-sm btn-primary" href="{{ route('admin.establecimiento-planes.configure', $item->establecimiento_curso_id) }}">Configurar</a>
+                                        @if(!($dotacionEdicionBloqueada ?? false))
+                                            <a class="btn btn-sm btn-primary" href="{{ route('admin.establecimiento-planes.configure', $item->establecimiento_curso_id) }}">Configurar</a>
+                                        @else
+                                            <span class="text-muted small">Pendiente de configuración · Sólo consulta</span>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
