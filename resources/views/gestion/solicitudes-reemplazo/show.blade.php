@@ -1255,55 +1255,7 @@
         </div>
     </div>
     @if ($canReabrirTermino ?? false)
-        @php
-            $fechaMaximaModificacion = $s->fecha_termino?->copy()->subDay()->toDateString();
-            $esReposoMutualidad = \App\Support\TipoReemplazo::esReposoMutualidad($s->tipo_reemplazo);
-        @endphp
-        <div class="card mb-4 border-warning">
-            <div class="card-header fw-semibold text-warning-emphasis">Reapertura para modificar término</div>
-            <div class="card-body">
-                <div class="alert alert-warning small">
-                    Esta acción conserva la fecha y los documentos vigentes en el historial. La nueva fecha de término debe ser anterior a la actual.
-                    @if ($esReposoMutualidad)
-                        Para <strong>Reposo Mutualidad</strong>, utilice la causal de reducción de reposo cuando la mutualidad disminuya su duración.
-                    @endif
-                </div>
-                <form method="POST" enctype="multipart/form-data" action="{{ route('gestion.solicitudes-reemplazo.reabrir-modificar-termino', $s) }}">
-                    @csrf
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Causal <span class="text-danger">*</span></label>
-                            <select name="causal_modificacion_termino" class="form-select" required>
-                                @if ($esReposoMutualidad)
-                                    <option value="reduccion_reposo_mutualidad">Disminución de reposo médico por mutualidad</option>
-                                @endif
-                                <option value="renuncia_voluntaria">Renuncia voluntaria del trabajador</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Nueva fecha de término <span class="text-danger">*</span></label>
-                            <input type="date" name="fecha_termino_nueva" class="form-control" required
-                                min="{{ optional($s->fecha_inicio)->toDateString() }}" max="{{ $fechaMaximaModificacion }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Motivo de la modificación <span class="text-danger">*</span></label>
-                            <input type="text" name="motivo_modificacion_termino" class="form-control" maxlength="5000" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Carta de renuncia (PDF)</label>
-                            <input type="file" name="carta_renuncia_pdf" class="form-control" accept="application/pdf,.pdf">
-                            <div class="form-text">Obligatoria cuando la causal sea renuncia voluntaria.</div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Resolución de renuncia (PDF)</label>
-                            <input type="file" name="resolucion_renuncia_pdf" class="form-control" accept="application/pdf,.pdf">
-                            <div class="form-text">Obligatoria cuando la causal sea renuncia voluntaria.</div>
-                        </div>
-                    </div>
-                    <button class="btn btn-warning mt-3" type="submit">Reabrir y registrar modificación</button>
-                </form>
-            </div>
-        </div>
+        @include('gestion.solicitudes-reemplazo.partials._reapertura-termino')
     @elseif ($modificacionTerminoActiva ?? false)
         <div class="alert alert-warning mb-4">
             <strong>Modificación de término en curso.</strong> Complete la regeneración de los documentos operativos indicados para cerrar esta reapertura.
@@ -1322,7 +1274,7 @@
                                 <tr>
                                     <td>{{ cl_datetime($modificacion->created_at, 'd/m/Y H:i') }}</td>
                                     <td>
-                                        <div class="fw-semibold">{{ $modificacion->causal === 'renuncia_voluntaria' ? 'Renuncia voluntaria' : 'Disminución de reposo médico por mutualidad' }}</div>
+                                        <div class="fw-semibold">{{ $modificacion->causal_label }}</div>
                                         <div class="small text-muted">{{ optional($modificacion->fecha_termino_anterior)->format('d/m/Y') }} → {{ optional($modificacion->fecha_termino_nueva)->format('d/m/Y') }}</div>
                                     </td>
                                     <td>
@@ -1333,6 +1285,7 @@
                                         <div class="d-flex flex-wrap gap-1">
                                             @foreach ([
                                                 'carta_renuncia_path' => ['carta_renuncia', 'Carta de renuncia'],
+                                                'respaldo_licencia_path' => ['respaldo_licencia', 'Respaldo Licencia'],
                                                 'resolucion_renuncia_path' => ['resolucion_renuncia', 'Resolución de renuncia'],
                                                 'orden_trabajo_anterior_path' => ['orden_trabajo_anterior', 'OT anterior'],
                                                 'resolucion_docente_docx_anterior_path' => ['resolucion_docente_docx_anterior', 'Resolución DOCX anterior'],

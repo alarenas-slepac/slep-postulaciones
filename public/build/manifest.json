@@ -2440,6 +2440,16 @@
     "src": "resources/js/progreso-animado.js",
     "isEntry": true
   },
+  "resources/js/reemplazo-modificacion-termino.js": {
+    "file": "assets/reemplazo-modificacion-termino-Ce82A6js.js",
+    "name": "reemplazo-modificacion-termino",
+    "src": "resources/js/reemplazo-modificacion-termino.js",
+    "isEntry": true,
+    "imports": [
+      "resources/js/slep-listados.js",
+      "__commonjsHelpers-92s3wAHG.js"
+    ]
+  },
   "resources/js/slep-listados.js": {
     "file": "assets/slep-listados-cEpRc85z.js",
     "name": "slep-listados",
