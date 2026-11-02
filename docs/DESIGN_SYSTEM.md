@@ -84,9 +84,11 @@ En una fila, alinear los bloques por su borde superior y dejar la ayuda y los er
 
 #### Carga de archivos
 
-Dentro de `.slep-listing`, conservar el `<input type="file" class="form-control">` nativo, su etiqueta, tipos admitidos, nombre del archivo, ayudas y validación. El campo tiene un alto mínimo de `2.75rem`; el botón «Elegir archivo» debe ocupar todo el alto interior, con fondo gris `#e9ecef`, borde separador junto al nombre del archivo y el mismo recorte redondeado del campo. Usar `::file-selector-button` en el componente compartido, con altura `calc(2.75rem - 2px)` para descontar los dos bordes de un píxel. El alto automático del botón de Bootstrap deja una franja blanca cuando el campo crece por su altura mínima.
+En todos los formularios y modales, conservar el `<input type="file" class="form-control">` nativo, su etiqueta, tipos admitidos, nombre del archivo, ayudas y validación. El estilo común está en `resources/scss/_file-input.scss`, importado por el tema general `app.scss`; también cubre los campos agregados dinámicamente. No requiere `.slep-listing` ni JavaScript.
 
-El hover usa gris `#dee2e6`; deshabilitado usa superficie `#f8fafc` y texto atenuado. Conservar el foco azul y el estado de error del campo completo. No reemplazar la carga nativa con un botón que oculte el nombre seleccionado. Verificar escritorio, móvil, teclado, nombres largos y selección múltiple.
+El campo normal tiene un alto de `2.75rem`; las variantes `.form-control-sm` y `.form-control-lg` conservan sus tamaños de Bootstrap y se respetan alturas mínimas superiores de cada módulo. El botón «Elegir archivo» debe ocupar todo el alto interior, con fondo gris `#e9ecef`, borde separador junto al nombre del archivo y el mismo recorte redondeado del campo. Usar `::file-selector-button` con altura `100%`, sin relleno vertical en el campo ni márgenes negativos en el botón. Así el fondo se adapta al alto real sin dejar franjas blancas. No fijar un alto de botón por módulo ni volver a introducir relleno vertical en los campos de archivo.
+
+El hover usa gris `#dee2e6`; deshabilitado usa superficie `#f8fafc` y texto atenuado, también dentro de un `fieldset` deshabilitado. Conservar el foco azul y el estado de error del campo completo. No reemplazar la carga nativa con un botón que oculte el nombre seleccionado. Los campos ocultos de cargas personalizadas deben permanecer ocultos. Verificar escritorio, móvil, teclado, nombres largos, selección múltiple, tamaños compacto/grande, modales y filas dinámicas.
 
 ### Selectores
 

@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.2.667',
+    'current_version' => '2026.11.2.668',
     'entries' => [
+        [
+            'version' => '2026.11.2.668',
+            'title' => 'Corrección general del diseño de carga de archivos',
+            'summary' => 'Extiende el fondo gris completo del botón Elegir archivo a todos los formularios y modales del sistema.',
+            'roles' => [],
+            'items' => [
+                'Centraliza el estilo de los campos nativos de archivo en el tema general, cubriendo formularios de documentos, importaciones, fotos y ventanas modales, incluidos los campos agregados dinámicamente.',
+                'El botón se adapta al alto interior real del campo, conserva los tamaños normal, compacto y grande, y respeta las alturas mínimas superiores de cada módulo. Elimina el ajuste de alto fijo limitado a slep-listados.',
+                'Conserva selección nativa, nombre del archivo, selección múltiple, foco, validación y estados deshabilitados, sin alterar los controles ocultos de las cargas personalizadas. Actualiza la guía del Design System e incluye los recursos compilados.',
+            ],
+            'published_at' => '2026-11-02',
+        ],
         [
             'version' => '2026.11.2.667',
             'title' => 'Fondo gris completo en los botones de carga de archivos',

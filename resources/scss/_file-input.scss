@@ -1,0 +1,44 @@
+/* Cargas nativas: el botón ocupa el alto interior aunque el módulo aumente min-height. */
+input.form-control[type="file"] {
+    height: 2.75rem;
+    padding-block: 0;
+    padding-inline: 0 .75rem;
+
+    &::file-selector-button {
+        height: 100%;
+        padding: 0 .75rem;
+        margin: 0;
+        margin-inline-end: .75rem;
+        color: #0f172a;
+        background-color: #e9ecef;
+    }
+
+    &:hover:not(:disabled):not([readonly])::file-selector-button {
+        background-color: #dee2e6;
+    }
+
+    &:disabled::file-selector-button {
+        color: #64748b;
+        background-color: #f8fafc;
+    }
+
+    &.form-control-sm {
+        height: calc(1.5em + .5rem + 2px);
+        padding-inline-end: .5rem;
+
+        &::file-selector-button {
+            padding-inline: .5rem;
+            margin-inline-end: .5rem;
+        }
+    }
+
+    &.form-control-lg {
+        height: calc(1.5em + 1rem + 2px);
+        padding-inline-end: 1rem;
+
+        &::file-selector-button {
+            padding-inline: 1rem;
+            margin-inline-end: 1rem;
+        }
+    }
+}
