@@ -97,7 +97,12 @@
                 <div class="text-muted small">Saldos contractuales por bloque, descontando las asignaciones registradas y las horas reservadas para otras funciones. Los contratos protegidos quedan fuera de esta nómina.</div>
                 <div class="text-muted small mt-1">En Parvularia, la fracción inferior a 1 h que completa el contrato al redondear hacia arriba se netea y no figura como vacante.</div>
             </div>
-            <span class="badge rounded-pill text-bg-danger">{{ collect($vacantesPorBloque)->sum(fn ($bloque) => collect($bloque['items'] ?? [])->count()) }} saldo(s)</span>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="badge rounded-pill text-bg-danger">{{ collect($vacantesPorBloque)->sum(fn ($bloque) => collect($bloque['items'] ?? [])->count()) }} saldo(s)</span>
+                @if(\App\Exports\DotacionNominaDocentesExport::canExport($activeRole ?? auth()->user()?->activeRoleName()))
+                    <a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ route('admin.dotacion-establecimiento.sobredotacion.export', [$establecimiento, 'anio' => $anio]) }}" aria-label="Exportar nómina de sobredotación por bloque y prelación, año {{ $anio }}, RBD {{ $establecimiento->rbd }}"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i>Exportar sobredotación (Excel)</a>
+                @endif
+            </div>
         </div>
         @if (session('success'))
             <div class="alert alert-success rounded-4 mx-3 mt-3 mb-0" role="status"><i class="bi bi-check-circle me-1"></i>{{ session('success') }}</div>
@@ -145,7 +150,7 @@
                                     <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td>
                                     <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td>
                                     <td class="text-nowrap">
-                                        <a class="btn btn-sm btn-outline-secondary rounded-pill mb-1" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'docentes', 'revision_docentes_q' => $docente['rut']]) }}">Ver contrato<span class="visually-hidden"> de {{ $docente['nombre'] }}</span></a>
+                                        <a class="btn btn-sm btn-outline-secondary rounded-pill mb-1" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'docentes', 'revision_docentes_q' => $docente['rut']]) }}" aria-label="Ver contrato de {{ $docente['nombre'] }}">Ver contrato</a>
                                         @if (($justificacionesSobredotacionTableReady ?? false))
                                             <span class="badge rounded-pill {{ $pendientes ? 'text-bg-warning' : 'text-bg-success' }}">{{ $pendientes ? $pendientes.' pendiente(s)' : 'Completa' }}</span>
                                             <button type="button" class="btn btn-sm btn-outline-primary rounded-pill ms-1" data-bs-toggle="collapse" data-bs-target="#{{ $idJustificacion }}" aria-expanded="{{ $mostrarErrores ? 'true' : 'false' }}" aria-controls="{{ $idJustificacion }}">{{ ($canManageJustificacionesSobredotacion ?? false) ? 'Justificar' : 'Ver motivos' }}</button>
