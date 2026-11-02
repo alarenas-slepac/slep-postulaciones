@@ -22,6 +22,9 @@
     <meta property="og:image" content="{{ asset('branding/android-chrome-512x512.png') }}">
 
     @vite(['resources/js/app.js', 'resources/scss/app.scss'])
+    @if(!empty($dotacionEdicionPanel))
+        @vite('resources/js/dotacion-bloqueos.js')
+    @endif
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/font/bootstrap-icons.css') }}">
     <link rel="preload" as="font" href="{{ Vite::asset('resources/fonts/MuseoSans_900.otf') }}" type="font/otf" crossorigin>
     <link rel="preload" as="font" href="{{ Vite::asset('resources/fonts/Gilmer-Regular.otf') }}" type="font/otf" crossorigin>
@@ -355,6 +358,9 @@
 
             <main class="slep-content">
                 <div class="slep-content-inner">
+                    @if(!empty($dotacionEdicionPanel))
+                        @include('partials.dotacion-bloqueo-edicion', ['panelBloqueo' => $dotacionEdicionPanel])
+                    @endif
                     @yield('content')
                 </div>
             </main>

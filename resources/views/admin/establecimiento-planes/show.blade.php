@@ -21,12 +21,14 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a class="btn btn-outline-secondary" href="{{ route('admin.establecimiento-planes.index') }}">Volver</a>
+            @if(!($dotacionEdicionBloqueada ?? false))
             <a class="btn btn-outline-primary" href="{{ route('admin.establecimiento-planes.edit', $configuracion) }}">Editar</a>
             <form method="POST" action="{{ route('admin.establecimiento-planes.destroy', $configuracion) }}" onsubmit="return confirm('¿Eliminar esta configuración?');">
                 @csrf
                 @method('DELETE')
                 <button class="btn btn-outline-danger" type="submit">Eliminar</button>
             </form>
+            @endif
         </div>
     </div>
 

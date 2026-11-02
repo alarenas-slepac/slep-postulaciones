@@ -2379,6 +2379,19 @@
     "src": "resources/js/dotacion-asignacion.js",
     "isEntry": true
   },
+  "resources/js/dotacion-bloqueos.js": {
+    "file": "assets/dotacion-bloqueos-DSg_tACS.js",
+    "name": "dotacion-bloqueos",
+    "src": "resources/js/dotacion-bloqueos.js",
+    "isEntry": true,
+    "imports": [
+      "resources/js/slep-listados.js",
+      "__commonjsHelpers-92s3wAHG.js"
+    ],
+    "css": [
+      "assets/dotacion-bloqueos-D_OMa1Xf.css"
+    ]
+  },
   "resources/js/dotacion-docente-asignaciones.js": {
     "file": "assets/dotacion-docente-asignaciones-DjNpUxAW.js",
     "name": "dotacion-docente-asignaciones",

@@ -20,6 +20,7 @@ export default defineConfig({
                 'resources/js/postulante-ficha.js',
                 'resources/js/postulante-perfil.js',
                 'resources/js/padron-individual.js',
+                'resources/js/dotacion-bloqueos.js',
                 'resources/css/centro-operaciones.css',
                 'resources/js/centro-operaciones.js',
                 'resources/css/votaciones-publicas.css',

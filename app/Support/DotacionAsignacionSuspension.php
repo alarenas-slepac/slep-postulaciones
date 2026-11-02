@@ -8,6 +8,10 @@ class DotacionAsignacionSuspension
 {
     public static function bloqueada(int $anio, ?string $rol): bool
     {
+        if ($rol === \App\Services\Dotacion\EdicionBloqueoService::ROL_BLOQUEADO
+            && (request()->attributes->get('dotacion_edicion_estado')['bloqueado'] ?? false)) {
+            return true;
+        }
         $config = config('dotacion_asignacion.suspension_temporal');
         if (! ($config['habilitada'] ?? false)
             || $anio !== (int) ($config['anio'] ?? 0)
@@ -24,6 +28,10 @@ class DotacionAsignacionSuspension
 
     public static function mensaje(): string
     {
+        $estado = request()->attributes->get('dotacion_edicion_estado');
+        if (($estado['bloqueado'] ?? false) && auth()->user()?->activeRoleName() === \App\Services\Dotacion\EdicionBloqueoService::ROL_BLOQUEADO) {
+            return $estado['mensaje'];
+        }
         $config = config('dotacion_asignacion.suspension_temporal');
         $reapertura = Carbon::parse($config['hasta'], $config['zona_horaria'])->format('d/m/Y H:i');
 

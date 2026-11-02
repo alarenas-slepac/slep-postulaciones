@@ -30,6 +30,7 @@
                     <form id="dotacion-decision-combinacion" method="POST" action="{{ route('admin.dotacion-establecimiento.proceso-2027.update', $establecimiento) }}" class="border rounded-4 p-3 h-100" data-dotacion-save>
                         @csrf
                         <input type="hidden" name="anio" value="2027">
+                        <fieldset class="border-0 p-0 m-0" @disabled($dotacionEdicionBloqueada ?? false)>
                         <label for="proceso-decision-combinacion" class="form-label fw-semibold">Decisión sobre combinación de cursos</label>
                         <select id="proceso-decision-combinacion" name="decision_combinacion" class="form-select mb-2 @error('decision_combinacion') is-invalid @enderror" required>
                             <option value="">Seleccione una decisión...</option>
@@ -43,6 +44,7 @@
                         @error('observacion_combinacion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         <a class="d-block small mb-3" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'cursos-combinados']) }}">Revisar cursos combinados</a>
                         <button class="btn btn-outline-primary btn-sm rounded-pill" type="submit"><i class="bi bi-check2-circle"></i> Guardar decisión</button>
+                        </fieldset>
                     </form>
                 </div>
                 <div class="col-lg-7">
