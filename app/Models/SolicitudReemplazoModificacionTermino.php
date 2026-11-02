@@ -6,6 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class SolicitudReemplazoModificacionTermino extends Model
 {
+    public const REDUCCION_LICENCIA_REPOSO = 'reduccion_licencia_reposo';
+    public const CAUSALES = [
+        'reduccion_reposo_mutualidad' => 'Disminución de reposo médico por mutualidad',
+        'renuncia_voluntaria' => 'Renuncia voluntaria del trabajador',
+        self::REDUCCION_LICENCIA_REPOSO => 'Término anticipado por reducción de licencia médica o reposo mutualidad',
+    ];
+
     protected $table = 'solicitudes_reemplazo_modificaciones_termino';
 
     protected $fillable = [
@@ -17,6 +24,7 @@ class SolicitudReemplazoModificacionTermino extends Model
         'motivo',
         'carta_renuncia_path',
         'resolucion_renuncia_path',
+        'respaldo_licencia_path',
         'orden_trabajo_anterior_path',
         'orden_trabajo_anterior_creada_at',
         'resolucion_docente_docx_anterior_path',
@@ -43,6 +51,11 @@ class SolicitudReemplazoModificacionTermino extends Model
     public function solicitud()
     {
         return $this->belongsTo(SolicitudReemplazo::class, 'solicitud_reemplazo_id');
+    }
+
+    public function getCausalLabelAttribute(): string
+    {
+        return self::CAUSALES[$this->causal] ?? (string) $this->causal;
     }
 
     public function reabiertaPor()

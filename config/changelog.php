@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.10.30.665',
+    'current_version' => '2026.11.2.666',
     'entries' => [
+        [
+            'version' => '2026.11.2.666',
+            'title' => 'Reapertura de reemplazos por reducción de licencia médica o reposo',
+            'summary' => 'Añade una causal de término anticipado con Respaldo Licencia en PDF, sin documentos de renuncia.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'items' => [
+                'Incorpora «Término anticipado por reducción de licencia médica o reposo mutualidad» al selector de Reapertura para modificar término. Para esta causal exige Respaldo Licencia (PDF), hasta 10 MB, y no solicita ni guarda carta o resolución de renuncia.',
+                'Conserva las causales anteriores, la exigencia de carta y resolución para renuncia voluntaria, los permisos por rol y derivación, y los límites de fecha que sólo permiten acortar el período vigente.',
+                'Guarda el respaldo en almacenamiento privado y lo muestra en el historial de modificaciones mediante la descarga autenticada existente. Conserva fechas, documentos operativos anteriores, usuario y seguimiento de regeneración.',
+                'Alinea el bloque intervenido al Design System, conserva valores tras errores y adapta los documentos requeridos al cambiar de causal. El formulario sigue siendo utilizable sin JavaScript y valida siempre en el servidor.',
+                'Añade la migración aditiva 2026_11_02_100000_add_respaldo_licencia_to_modificaciones_termino.php con una columna nullable. Los archivos nuevos usan nombres únicos y se eliminan si falla el registro transaccional, sin afectar respaldos históricos.',
+            ],
+            'published_at' => '2026-11-02',
+        ],
         [
             'version' => '2026.10.30.665',
             'title' => 'Icono de bebé para Maternidad',

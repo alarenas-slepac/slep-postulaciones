@@ -909,26 +909,25 @@ class SolicitudReemplazoGestionController extends Controller
         abort_unless($this->modificacionTerminoActiva($solicitud) === null, 403);
 
         $data = $request->validate([
-            'causal_modificacion_termino' => ['required', Rule::in(['reduccion_reposo_mutualidad', 'renuncia_voluntaria'])],
+            'causal_modificacion_termino' => ['required', Rule::in(array_keys(SolicitudReemplazoModificacionTermino::CAUSALES))],
             'fecha_termino_nueva' => ['required', 'date'],
             'motivo_modificacion_termino' => ['required', 'string', 'max:5000'],
-            'carta_renuncia_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
-            'resolucion_renuncia_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'carta_renuncia_pdf' => [Rule::excludeIf($request->input('causal_modificacion_termino') === SolicitudReemplazoModificacionTermino::REDUCCION_LICENCIA_REPOSO), Rule::requiredIf($request->input('causal_modificacion_termino') === 'renuncia_voluntaria'), 'nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'resolucion_renuncia_pdf' => [Rule::excludeIf($request->input('causal_modificacion_termino') === SolicitudReemplazoModificacionTermino::REDUCCION_LICENCIA_REPOSO), Rule::requiredIf($request->input('causal_modificacion_termino') === 'renuncia_voluntaria'), 'nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'respaldo_licencia_pdf' => ['exclude_unless:causal_modificacion_termino,'.SolicitudReemplazoModificacionTermino::REDUCCION_LICENCIA_REPOSO, 'required', 'file', 'mimes:pdf', 'max:10240'],
         ], [
+            'carta_renuncia_pdf.required' => 'Debe adjuntar la carta de renuncia en PDF.',
+            'resolucion_renuncia_pdf.required' => 'Debe adjuntar la resolución de renuncia en PDF.',
             'carta_renuncia_pdf.mimes' => 'La carta de renuncia debe estar en formato PDF.',
             'resolucion_renuncia_pdf.mimes' => 'La resolución de renuncia debe estar en formato PDF.',
+            'respaldo_licencia_pdf.required' => 'Debe adjuntar el Respaldo Licencia en PDF.',
+            'respaldo_licencia_pdf.mimes' => 'El Respaldo Licencia debe estar en formato PDF.',
+            'respaldo_licencia_pdf.max' => 'El Respaldo Licencia no debe superar los 10 MB.',
         ]);
 
         $causal = (string) $data['causal_modificacion_termino'];
         if ($causal === 'reduccion_reposo_mutualidad' && !TipoReemplazo::esReposoMutualidad($solicitud->tipo_reemplazo)) {
             return back()->withErrors(['causal_modificacion_termino' => 'La reducción de reposo sólo aplica a solicitudes de tipo Reposo Mutualidad.'])->withInput();
-        }
-
-        if ($causal === 'renuncia_voluntaria' && (!$request->hasFile('carta_renuncia_pdf') || !$request->hasFile('resolucion_renuncia_pdf'))) {
-            return back()->withErrors([
-                'carta_renuncia_pdf' => 'Debe adjuntar la carta de renuncia en PDF.',
-                'resolucion_renuncia_pdf' => 'Debe adjuntar la resolución de renuncia en PDF.',
-            ])->withInput();
         }
 
         $nuevaFechaTermino = Carbon::parse($data['fecha_termino_nueva'])->startOfDay();
@@ -943,60 +942,71 @@ class SolicitudReemplazoGestionController extends Controller
             return back()->withErrors(['fecha_termino_nueva' => 'La nueva fecha de término debe ser anterior a la fecha vigente.'])->withInput();
         }
 
-        $cartaRenunciaPath = null;
-        $resolucionRenunciaPath = null;
-        $directorio = "reemplazos/solicitudes/{$solicitud->id}/modificaciones-termino";
-        if ($request->hasFile('carta_renuncia_pdf')) {
-            $cartaRenunciaPath = $request->file('carta_renuncia_pdf')->storeAs($directorio, 'CARTA_RENUNCIA_' . now()->format('Ymd_His') . '.pdf', 'local');
+        $archivosNuevos = [];
+        try {
+            DB::transaction(function () use ($solicitud, $user, $causal, $data, $nuevaFechaTermino, &$archivosNuevos) {
+                $s = SolicitudReemplazo::query()->whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+                abort_unless($this->puedeGestionarModificacionTermino($user, $s), 403);
+                abort_unless(in_array((string) $s->estado, ['aceptada', 'cerrado', 'cerrada'], true), 403);
+                abort_unless($this->modificacionTerminoActiva($s) === null, 403);
+                if ($nuevaFechaTermino->lt(Carbon::parse($s->fecha_inicio)->startOfDay()) || !$nuevaFechaTermino->lt(Carbon::parse($s->fecha_termino)->startOfDay())) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['fecha_termino_nueva' => 'El período cambió. Revise la fecha de término antes de volver a guardar.']);
+                }
+
+                $documentos = ['carta_renuncia_path' => null, 'resolucion_renuncia_path' => null];
+                foreach ([
+                    'carta_renuncia_pdf' => ['carta_renuncia_path', 'CARTA_RENUNCIA'],
+                    'resolucion_renuncia_pdf' => ['resolucion_renuncia_path', 'RESOLUCION_RENUNCIA'],
+                    'respaldo_licencia_pdf' => ['respaldo_licencia_path', 'RESPALDO_LICENCIA'],
+                ] as $campo => [$columna, $prefijo]) {
+                    if (!isset($data[$campo]) || !$data[$campo] instanceof \Illuminate\Http\UploadedFile) continue;
+                    $path = $data[$campo]->storeAs("reemplazos/solicitudes/{$s->id}/modificaciones-termino", $prefijo.'_'.\Illuminate\Support\Str::uuid().'.pdf', 'local');
+                    if (!$path) throw \Illuminate\Validation\ValidationException::withMessages([$campo => 'No se pudo guardar el documento. Intente nuevamente.']);
+                    $archivosNuevos[] = $path;
+                    $documentos[$columna] = $path;
+                }
+
+                $titularEsDocente = $this->estamentoFromEstatuto($s->funcionarioTitular?->estatuto) === 'docente';
+                $modificacion = SolicitudReemplazoModificacionTermino::create([
+                    'solicitud_reemplazo_id' => $s->id,
+                    'causal' => $causal,
+                    'estado_origen' => $s->estado,
+                    'fecha_termino_anterior' => $s->fecha_termino,
+                    'fecha_termino_nueva' => $nuevaFechaTermino->toDateString(),
+                    'motivo' => trim((string) $data['motivo_modificacion_termino']),
+                    'orden_trabajo_anterior_path' => $s->orden_trabajo_pdf_path,
+                    'orden_trabajo_anterior_creada_at' => $s->orden_trabajo_creada_at,
+                    'resolucion_docente_docx_anterior_path' => $s->resolucion_docente_docx_path,
+                    'resolucion_docente_firmada_anterior_path' => $s->resolucion_docente_firmada_pdf_path,
+                    'orden_trabajo_requiere_regeneracion' => !empty($s->orden_trabajo_pdf_path),
+                    'resolucion_docente_requiere_regeneracion' => $titularEsDocente && (!empty($s->resolucion_docente_docx_path) || !empty($s->resolucion_docente_firmada_pdf_path)),
+                    'reabierta_por_user_id' => $user->id,
+                ] + $documentos);
+
+                $s->forceFill([
+                    'fecha_termino' => $nuevaFechaTermino->toDateString(),
+                    'estado' => 'aceptada',
+                    'cerrado_por_user_id' => null,
+                    'cerrado_at' => null,
+                ])->save();
+
+                SolicitudReemplazoObservacion::create([
+                    'solicitud_reemplazo_id' => $s->id,
+                    'etapa' => 'gdp',
+                    'accion' => 'reapertura_modificacion_termino',
+                    'estado_origen' => $modificacion->estado_origen,
+                    'estado_destino' => 'aceptada',
+                    'motivo' => $modificacion->motivo,
+                    'observacion' => "Causal: {$causal}.\nFecha término anterior: {$modificacion->fecha_termino_anterior->format('d/m/Y')}.\nNueva fecha término: {$modificacion->fecha_termino_nueva->format('d/m/Y')}",
+                    'user_id' => $user->id,
+                ]);
+
+                $this->finalizarModificacionTerminoSiCorresponde($modificacion);
+            });
+        } catch (\Throwable $error) {
+            foreach ($archivosNuevos as $path) Storage::disk('local')->delete($path);
+            throw $error;
         }
-        if ($request->hasFile('resolucion_renuncia_pdf')) {
-            $resolucionRenunciaPath = $request->file('resolucion_renuncia_pdf')->storeAs($directorio, 'RESOLUCION_RENUNCIA_' . now()->format('Ymd_His') . '.pdf', 'local');
-        }
-
-        DB::transaction(function () use ($solicitud, $user, $causal, $data, $nuevaFechaTermino, $cartaRenunciaPath, $resolucionRenunciaPath) {
-            $s = SolicitudReemplazo::query()->whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
-            abort_unless(in_array((string) $s->estado, ['aceptada', 'cerrado', 'cerrada'], true), 403);
-            abort_unless($this->modificacionTerminoActiva($s) === null, 403);
-
-            $titularEsDocente = $this->estamentoFromEstatuto($s->funcionarioTitular?->estatuto) === 'docente';
-            $modificacion = SolicitudReemplazoModificacionTermino::create([
-                'solicitud_reemplazo_id' => $s->id,
-                'causal' => $causal,
-                'estado_origen' => $s->estado,
-                'fecha_termino_anterior' => $s->fecha_termino,
-                'fecha_termino_nueva' => $nuevaFechaTermino->toDateString(),
-                'motivo' => trim((string) $data['motivo_modificacion_termino']),
-                'carta_renuncia_path' => $cartaRenunciaPath,
-                'resolucion_renuncia_path' => $resolucionRenunciaPath,
-                'orden_trabajo_anterior_path' => $s->orden_trabajo_pdf_path,
-                'orden_trabajo_anterior_creada_at' => $s->orden_trabajo_creada_at,
-                'resolucion_docente_docx_anterior_path' => $s->resolucion_docente_docx_path,
-                'resolucion_docente_firmada_anterior_path' => $s->resolucion_docente_firmada_pdf_path,
-                'orden_trabajo_requiere_regeneracion' => !empty($s->orden_trabajo_pdf_path),
-                'resolucion_docente_requiere_regeneracion' => $titularEsDocente && (!empty($s->resolucion_docente_docx_path) || !empty($s->resolucion_docente_firmada_pdf_path)),
-                'reabierta_por_user_id' => $user->id,
-            ]);
-
-            $s->forceFill([
-                'fecha_termino' => $nuevaFechaTermino->toDateString(),
-                'estado' => 'aceptada',
-                'cerrado_por_user_id' => null,
-                'cerrado_at' => null,
-            ])->save();
-
-            SolicitudReemplazoObservacion::create([
-                'solicitud_reemplazo_id' => $s->id,
-                'etapa' => 'gdp',
-                'accion' => 'reapertura_modificacion_termino',
-                'estado_origen' => $modificacion->estado_origen,
-                'estado_destino' => 'aceptada',
-                'motivo' => $modificacion->motivo,
-                'observacion' => "Causal: {$causal}.\nFecha término anterior: {$modificacion->fecha_termino_anterior->format('d/m/Y')}.\nNueva fecha término: {$modificacion->fecha_termino_nueva->format('d/m/Y')}",
-                'user_id' => $user->id,
-            ]);
-
-            $this->finalizarModificacionTerminoSiCorresponde($modificacion);
-        });
 
         return back()->with('status', 'Solicitud reabierta con trazabilidad. Actualiza los documentos operativos que el sistema indique.');
     }
@@ -1010,6 +1020,7 @@ class SolicitudReemplazoGestionController extends Controller
 
         $campos = [
             'carta_renuncia' => ['campo' => 'carta_renuncia_path', 'nombre' => 'CARTA_RENUNCIA.pdf', 'inline' => true],
+            'respaldo_licencia' => ['campo' => 'respaldo_licencia_path', 'nombre' => 'RESPALDO_LICENCIA.pdf', 'inline' => true],
             'resolucion_renuncia' => ['campo' => 'resolucion_renuncia_path', 'nombre' => 'RESOLUCION_RENUNCIA.pdf', 'inline' => true],
             'orden_trabajo_anterior' => ['campo' => 'orden_trabajo_anterior_path', 'nombre' => 'ORDEN_TRABAJO_ANTERIOR.pdf', 'inline' => true],
             'resolucion_docente_docx_anterior' => ['campo' => 'resolucion_docente_docx_anterior_path', 'nombre' => 'RESOLUCION_DOCENTE_ANTERIOR.docx', 'inline' => false],

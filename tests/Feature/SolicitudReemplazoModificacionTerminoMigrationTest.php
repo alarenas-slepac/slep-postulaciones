@@ -36,4 +36,17 @@ class SolicitudReemplazoModificacionTerminoMigrationTest extends TestCase
             'finalizada_at',
         ]));
     }
+
+    public function test_licencia_attachment_column_preserves_existing_history(): void
+    {
+        (require database_path('migrations/2026_09_23_130000_create_solicitud_reemplazo_modificaciones_termino_table.php'))->up();
+        DB::table('solicitudes_reemplazo')->insert(['id' => 1]);
+        $anterior = ['solicitud_reemplazo_id' => 1, 'causal' => 'renuncia_voluntaria', 'estado_origen' => 'cerrado',
+            'fecha_termino_anterior' => '2026-11-30', 'fecha_termino_nueva' => '2026-11-15', 'motivo' => 'Antecedente histórico de prueba',
+            'carta_renuncia_path' => 'historico/carta.pdf', 'resolucion_renuncia_path' => 'historico/resolucion.pdf'];
+        DB::table('solicitudes_reemplazo_modificaciones_termino')->insert($anterior);
+        (require database_path('migrations/2026_11_02_100000_add_respaldo_licencia_to_modificaciones_termino.php'))->up();
+        $this->assertDatabaseCount('solicitudes_reemplazo_modificaciones_termino', 1);
+        $this->assertDatabaseHas('solicitudes_reemplazo_modificaciones_termino', $anterior + ['respaldo_licencia_path' => null]);
+    }
 }
