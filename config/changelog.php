@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.3.675',
+    'current_version' => '2026.11.3.676',
     'entries' => [
+        [
+            'version' => '2026.11.3.676',
+            'title' => 'Nóminas de Cometidos por autorizar y filtro mensual',
+            'summary' => 'Permite exportar las solicitudes por autorizar o gestionar y filtrarlas por el mes de la solicitud.',
+            'roles' => ['admin', 'coordinador_uatp', 'director_ejecutivo', 'supervisor_plani', 'coordinador_plani', 'coordinador_gdp', 'funcionario_slep', 'funcionario_daf', 'funcionario_daf_compra', 'funcionario_juridica'],
+            'items' => [
+                'Añade descarga Excel XLSX en las bandejas pendientes de Administración Central y Establecimientos, con todas las páginas y los filtros aplicados. Conserva el alcance del rol activo y la separación por origen, incluidos los registros históricos sin origen informado.',
+                'Incorpora mes de solicitud en los filtros generales y reutiliza su validación en Seguimiento. Filtra por mes y año completos, incluidos meses cortos y años bisiestos, sin confundirlos con las fechas del viaje.',
+                'Informa número de cometido, funcionario, RUT, estamento, cargo, dependencia, destino, fechas y estados de viático, reembolso y pasaje aéreo. Conserva fechas de Excel y textos seguros, filtros de columna, encabezado fijo y total de solicitudes.',
+                'Integra selectores con búsqueda, estados de búsqueda y validación, y paginación institucional en la bandeja. No modifica solicitudes, permisos ni notificaciones y no requiere migraciones.',
+            ],
+            'published_at' => '2026-11-03',
+        ],
         [
             'version' => '2026.11.3.675',
             'title' => 'PDF por asignatura vertical y separado por bloque',
