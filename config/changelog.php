@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.2.673',
+    'current_version' => '2026.11.3.674',
     'entries' => [
+        [
+            'version' => '2026.11.3.674',
+            'title' => 'PDF de docentes por asignatura y prelación',
+            'summary' => 'Añade en la pestaña Docentes un informe por asignatura con la nómina ordenada por prelación y sus horas aula asignadas.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Agrupa las asignaturas como el consolidado curricular y suma las horas aula vigentes de cada docente en todos sus cursos, con RUT, nombre, título, grupo de prelación, tramo, antigüedad y total por asignatura.',
+                'Conserva asignaciones sin antecedentes en la nómina anual identificándolas al final, y excluye asistentes, cupos, reservas, acompañamientos y horas fantasmas. Respeta el año, establecimiento, rol activo y acceso de lectura durante bloqueos.',
+                'Genera PDF México Oficio horizontal con una sección por asignatura, cabeceras de tabla repetidas y numeración de páginas. No modifica datos ni requiere migraciones.',
+            ],
+            'published_at' => '2026-11-03',
+        ],
         [
             'version' => '2026.11.2.673',
             'title' => 'Nómina docente por bloques en Excel y PDF México Oficio',
