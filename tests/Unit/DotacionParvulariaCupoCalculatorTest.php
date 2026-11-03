@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Support\DotacionContratoParvulariaCalculator;
+use App\Support\DotacionCierreParvularia;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -47,6 +48,31 @@ class DotacionParvulariaCupoCalculatorTest extends TestCase
             $resultado = DotacionContratoParvulariaCalculator::consolidarParaMaximo($orden);
             $this->assertEqualsWithDelta(55, $resultado->sum('horas_contrato'), 0.000001);
         }
+    }
+
+    public function test_cierre_consumo_individual_fijo_y_base_institucional_sin_alterar_el_aula_ordinaria(): void
+    {
+        $normal = $this->fila(1, 18);
+        $cierre = DotacionCierreParvularia::marcar(array_replace($this->fila(1, 2), ['id' => 2, 'horas_contrato' => 3]));
+        $filas = collect([11 => $normal, 23 => $cierre]); $antes = $filas->all();
+        $individual = DotacionContratoParvulariaCalculator::consolidar($filas);
+        $institucional = DotacionContratoParvulariaCalculator::consolidarParaMaximo($individual);
+        $this->assertSame(27.0, $individual[11]['horas_contrato']);
+        $this->assertSame(2.0, $individual[23]['horas_contrato']);
+        $this->assertSame(29.0, (float) $individual->sum('horas_contrato'));
+        $this->assertEqualsWithDelta(20 / 38 * 55, $institucional->sum('horas_contrato'), 0.000001);
+        $this->assertSame($individual->all(), DotacionContratoParvulariaCalculator::consolidar($institucional)->all());
+        $this->assertSame($antes, $filas->all());
+        $this->assertSame([11, 23], $individual->keys()->all());
+        $this->assertSame(27.0, (float) DotacionContratoParvulariaCalculator::consolidar(collect([$normal]))->sum('horas_contrato'));
+    }
+
+    #[DataProvider('excluidas')]
+    public function test_la_marca_de_cierre_no_extiende_la_regla_a_otros_anos_estamentos_o_tipos(array $cambios): void
+    {
+        $cierre = DotacionCierreParvularia::marcar(array_replace($this->fila(1, 2), ['horas_contrato' => 3]));
+        $this->assertFalse(DotacionCierreParvularia::es(array_replace($cierre, $cambios)));
+        $this->assertFalse(DotacionCierreParvularia::es(array_replace($cierre, ['horas_plan_pedagogicas' => 3])));
     }
 
     public static function excluidas(): array

@@ -43,7 +43,25 @@ class DotacionContratoParvulariaCalculator
 
     private static function convertirAsignaciones(Collection $asignaciones, bool $redondearPorDocente): Collection
     {
-        $candidatas = $asignaciones->filter(fn ($row) => self::aplica($row));
+        if ($redondearPorDocente) {
+            $asignaciones = $asignaciones->map(function ($row) {
+                if (! DotacionCierreParvularia::es($row)) {
+                    return $row;
+                }
+                $horas = (float) data_get($row, 'horas_plan_pedagogicas');
+                if (is_array($row)) {
+                    return array_replace($row, ['horas_contrato' => $horas]);
+                }
+                $copia = clone $row;
+                $copia->horas_contrato = $horas;
+
+                return $copia;
+            });
+        }
+        // El cierre consume su contrato aprobado, separado del aula ordinaria.
+        // Para el máximo del bloque sigue aportando la base proporcional NT.
+        $candidatas = $asignaciones->filter(fn ($row) => self::aplica($row)
+            && (! $redondearPorDocente || ! DotacionCierreParvularia::es($row)));
         if ($candidatas->isEmpty()) {
             return $asignaciones;
         }

@@ -6,10 +6,12 @@ use App\Exports\DotacionNominaAsignaturasPdfExport;
 use App\Exports\DotacionNominaDocentesExport;
 use App\Exports\DotacionNominaDocentesPdfExport;
 use App\Exports\DotacionSobredotacionExport;
+use App\Exports\DotacionSobredotacionPdfExport;
 use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Support\DotacionNominaAsignaturas;
 use App\Support\DotacionNominaDocentes;
+use App\Support\DotacionSobredotacionInforme;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -35,6 +37,13 @@ class DotacionNominaDocentesController extends Controller
         $anio = $this->anioAutorizado($request, $establecimiento);
 
         return $export->download($establecimiento, $anio, $nomina->datos($establecimiento, $anio));
+    }
+
+    public function sobredotacionPdf(Request $request, Establecimiento $establecimiento, DotacionSobredotacionInforme $informe, DotacionSobredotacionPdfExport $export): Response
+    {
+        $anio = $this->anioAutorizado($request, $establecimiento);
+
+        return $export->download($establecimiento, $anio, $informe->datos($establecimiento, $anio));
     }
 
     public function asignaturasPdf(Request $request, Establecimiento $establecimiento, DotacionNominaAsignaturas $nomina, DotacionNominaAsignaturasPdfExport $export): Response

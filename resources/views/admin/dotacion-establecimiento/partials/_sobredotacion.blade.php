@@ -21,7 +21,7 @@
 @include('admin.dotacion-establecimiento.partials._resumen_contractual_bloques')
 
 <div class="card dotacion-section mb-4">
-    <div class="dotacion-section-header">
+    <div class="dotacion-section-header d-flex flex-wrap justify-content-between align-items-start gap-3">
         <div class="d-flex align-items-start gap-3">
             <span class="dotacion-icon" style="width:40px;height:40px;background:#dc3545;"><i class="bi bi-person-exclamation"></i></span>
             <div>
@@ -30,6 +30,9 @@
                 <div class="text-muted small">Distingue las horas contractuales realmente sin asignación de las horas declaradas que sí están asignadas, pero pueden revisarse o redistribuirse.</div>
             </div>
         </div>
+        @if(\App\Exports\DotacionNominaDocentesExport::canExport($activeRole ?? auth()->user()?->activeRoleName()))
+            <a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ route('admin.dotacion-establecimiento.sobredotacion.pdf', [$establecimiento, 'anio' => $anio]) }}" aria-label="Descargar detalle completo de sobredotación en PDF por bloques, año {{ $anio }}, RBD {{ $establecimiento->rbd }}"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>Descargar detalle PDF</a>
+        @endif
     </div>
     <div class="card-body">
         <p class="small text-muted">Los contratos con Fuero maternal u Horas gremiales quedan protegidos en su totalidad y se excluyen de las nóminas de posible reducción y del universo sujeto a revisión. Las horas no necesarias siguen fuera del contrato contabilizado.</p>
