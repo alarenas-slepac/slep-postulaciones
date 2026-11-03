@@ -3,10 +3,13 @@
 namespace App\Support;
 
 use App\Models\Establecimiento;
+use App\Models\EstablecimientoCurso;
 use Illuminate\Support\Collection;
 
 class DotacionNominaAsignaturas
 {
+    public const BLOQUES = DotacionNominaDocentes::BLOQUES;
+
     public function datos(Establecimiento $establecimiento, int $anio): array
     {
         return DotacionLecturaCache::ejecutar(function () use ($establecimiento, $anio): array {
@@ -55,9 +58,35 @@ class DotacionNominaAsignaturas
             DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) => $index,
         ]);
         $personas = $priorizados->keyBy(fn (array $docente) => DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')));
-        $consolidado = DotacionAsignaturaResumenCalculator::build($necesidades, $docentes);
+        $necesidadesPorBloque = array_fill_keys(array_keys(self::BLOQUES), []);
+        foreach ($necesidades as $necesidad) {
+            $curso = $necesidad['curso'] ?? null;
+            $bloqueBase = $curso instanceof EstablecimientoCurso && DotacionProfesionDocenteResolver::esCursoNt($curso)
+                ? 'parvularia' : 'plan_estudio';
+            $grupos = collect($necesidad['asignaciones'])->groupBy(function ($asignacion) use ($bloqueBase, $personas): string {
+                $rut = DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($asignacion, 'docente_rut_normalizado') ?: data_get($asignacion, 'docente_rut', '')));
+                if ($bloqueBase === 'parvularia' && DotacionProceso2027Calculator::bloqueLibreDisposicionNtOtroDocente(
+                    $asignacion, 'bloque_2', $personas->get($rut)
+                ) === 'bloque_1') {
+                    return 'plan_estudio';
+                }
 
-        return collect($consolidado['items'])->map(function (array $asignatura) use ($personas, $orden): array {
+                return $bloqueBase;
+            });
+            if ($grupos->isEmpty()) { $grupos = collect([$bloqueBase => collect()]); }
+            foreach ($grupos as $bloque => $asignaciones) {
+                $necesidadesPorBloque[$bloque][] = array_replace($necesidad, ['asignaciones' => $asignaciones]);
+            }
+        }
+        $items = collect();
+        foreach (self::BLOQUES as $bloque => $label) {
+            $consolidado = DotacionAsignaturaResumenCalculator::build($necesidadesPorBloque[$bloque], $docentes);
+            foreach ($consolidado['items'] as $asignatura) {
+                $items->push($asignatura + ['bloque' => $bloque, 'bloque_label' => $label]);
+            }
+        }
+
+        return $items->map(function (array $asignatura) use ($personas, $orden): array {
             $filas = collect($asignatura['detalle'])->flatMap(fn (array $detalle) => $detalle['asignaciones'])
                 ->groupBy(fn (array $asignacion) => DotacionEstablecimientoCalculator::normalizeRut($asignacion['rut']))
                 ->map(function (Collection $asignaciones, string $rut) use ($personas, $orden): array {
@@ -74,7 +103,8 @@ class DotacionNominaAsignaturas
                     ];
                 })->sort(fn (array $a, array $b) => ($a['orden'] <=> $b['orden']) ?: strnatcasecmp($a['nombre'], $b['nombre']))->values();
 
-            return ['nombre' => $asignatura['asignatura'], 'docentes' => $filas, 'horas_asignadas' => round((float) $filas->sum('horas_asignadas'), 2)];
+            return ['bloque' => $asignatura['bloque'], 'bloque_label' => $asignatura['bloque_label'],
+                'nombre' => $asignatura['asignatura'], 'docentes' => $filas, 'horas_asignadas' => round((float) $filas->sum('horas_asignadas'), 2)];
         })->values();
     }
 }

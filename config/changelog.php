@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.3.674',
+    'current_version' => '2026.11.3.675',
     'entries' => [
+        [
+            'version' => '2026.11.3.675',
+            'title' => 'PDF por asignatura vertical y separado por bloque',
+            'summary' => 'Adapta el informe de docentes por asignatura a México Oficio vertical y separa sus horas por bloque de Dotación.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Ordena primero por Plan de estudio y Educación Parvularia, después por asignatura y prelación docente. Una asignatura o docente en ambos bloques informa únicamente las horas correspondientes a cada uno, con subtotales independientes.',
+                'Conserva la regla de libre disposición NT impartida por otro docente como Plan de estudio. PIE especializado no genera asignaturas artificiales a partir de funciones o apoyos.',
+                'Usa México Oficio vertical de 216 × 340 mm, con columnas agrupadas para conservar los antecedentes, cabeceras repetidas de bloque/asignatura y paginación. No modifica horas guardadas ni requiere migraciones.',
+            ],
+            'published_at' => '2026-11-03',
+        ],
         [
             'version' => '2026.11.3.674',
             'title' => 'PDF de docentes por asignatura y prelación',
