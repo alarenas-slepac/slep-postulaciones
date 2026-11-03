@@ -45,9 +45,9 @@ class DotacionEdicionServiceProvider extends ServiceProvider
             $gestiona = $service->puedeAdministrar($request->user());
             $directivo = $request->user()?->activeRoleName() === EdicionBloqueoService::ROL_BLOQUEADO;
             $controles = $gestiona && $request->routeIs('admin.dotacion-establecimiento.index', 'admin.dotacion-establecimiento.show');
-            if ($controles || ($directivo && $estado['bloqueado']) || session()->has('dotacion_bloqueo_status') || session('errors')?->has('dotacion_bloqueo')) {
+            if ($controles || ($directivo && ($estado['bloqueado'] || $estado['desbloqueo_activo'])) || session()->has('dotacion_bloqueo_status') || session('errors')?->has('dotacion_bloqueo')) {
                 $view->with('dotacionEdicionPanel', [
-                    'estado' => $estado, 'gestiona' => $controles, 'soloConsulta' => $directivo && $estado['bloqueado'],
+                    'estado' => $estado, 'gestiona' => $controles, 'soloConsulta' => $directivo && $estado['bloqueado'], 'esDirectivo' => $directivo,
                     'establecimiento' => $request->routeIs('admin.dotacion-establecimiento.show') ? $request->route('establecimiento') : null,
                     'anio' => (int) $request->query('anio', now()->year),
                 ]);

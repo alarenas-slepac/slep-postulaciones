@@ -2380,16 +2380,18 @@
     "isEntry": true
   },
   "resources/js/dotacion-bloqueos.js": {
-    "file": "assets/dotacion-bloqueos-DSg_tACS.js",
+    "file": "assets/dotacion-bloqueos-DVfzpsCZ.js",
     "name": "dotacion-bloqueos",
     "src": "resources/js/dotacion-bloqueos.js",
     "isEntry": true,
     "imports": [
       "resources/js/slep-listados.js",
+      "_flatpickr.min-DLZBE2Zc.js",
       "__commonjsHelpers-92s3wAHG.js"
     ],
     "css": [
-      "assets/dotacion-bloqueos-D_OMa1Xf.css"
+      "assets/dotacion-bloqueos-CDCt7bVs.css",
+      "assets/postulante-ficha-B6ouyF3r.css"
     ]
   },
   "resources/js/dotacion-docente-asignaciones.js": {

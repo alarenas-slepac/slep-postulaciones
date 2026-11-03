@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.3.678',
+    'current_version' => '2026.11.3.679',
     'entries' => [
+        [
+            'version' => '2026.11.3.679',
+            'title' => 'Desbloqueo temporal autorizado por establecimiento en Dotación',
+            'summary' => 'Permite exceptuar del bloqueo general sólo a los establecimientos autorizados, con fecha y hora obligatorias para volver a bloquear automáticamente.',
+            'roles' => ['admin', 'supervisor_plani', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_directivo_estab'],
+            'items' => [
+                'Administrador, supervisor de Planificación y coordinadores GDP/UATP pueden autorizar, renovar o revocar el desbloqueo de un establecimiento. Se exige motivo y una fecha y hora futuras, en la zona horaria de presentación del SGA.',
+                'La excepción sólo afecta al rol activo Funcionario Directivo del establecimiento autorizado, en todos sus años y módulos de Dotación. Los demás establecimientos continúan bloqueados y los otros roles conservan sus permisos existentes.',
+                'El servidor comprueba la vigencia en cada solicitud y rechaza escrituras desde el instante del vencimiento, incluidos formularios abiertos anteriormente. El cierre automático no requiere cron y se conserva aunque se desactive el bloqueo general.',
+                'Incorpora calendario institucional con hora, aviso de autorización vigente/vencida y registro de los plazos anterior y nuevo en auditoría. Conserva el control de versiones y los bloqueos históricos; requiere la migración aditiva de desbloqueos temporales.',
+            ],
+            'published_at' => '2026-11-03',
+        ],
         [
             'version' => '2026.11.3.678',
             'title' => 'Informe completo de Sobredotación en PDF por bloques',
