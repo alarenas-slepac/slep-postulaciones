@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @push('styles')
+    @vite('resources/js/slep-listados.js')
     <style>
         .cf-page-header {
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
@@ -189,6 +190,9 @@
 
         .cf-btn-primary:hover { color: #fff; background: #1d4ed8; border-color: #1d4ed8; }
 
+        .cf-filter-actions a:focus-visible,
+        .cf-filter-actions button:focus-visible { outline: 3px solid #0d6efd; outline-offset: 3px; }
+
         .cf-btn-secondary {
             border: 1px solid #d9e4f3;
             background: #fff;
@@ -312,71 +316,6 @@
             margin-bottom: 1rem;
         }
 
-        .cf-pagination {
-            padding: 1rem 1.5rem 1.4rem;
-            border-top: 1px solid #e8eef5;
-        }
-
-        .cf-pagination-footer {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-
-        .cf-pagination-summary {
-            color: #64748b;
-            font-size: .86rem;
-            line-height: 1.45;
-        }
-
-        .cf-pagination-summary strong {
-            color: #0f172a;
-        }
-
-        .cf-pagination-actions {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: flex-end;
-            gap: .5rem;
-        }
-
-        .cf-pagination-pages {
-            width: 100%;
-        }
-
-        .cf-page-link,
-        .cf-page-link-disabled {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            min-height: 2.2rem;
-            padding: .5rem .85rem;
-            border-radius: .85rem;
-            border: 1px solid #bfdbfe;
-            background: #eff6ff;
-            color: #1d4ed8;
-            text-decoration: none;
-            font-weight: 700;
-            font-size: .84rem;
-        }
-
-        .cf-page-link:hover {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .cf-page-link-disabled {
-            border-color: #e2e8f0;
-            background: #f8fafc;
-            color: #94a3b8;
-            cursor: not-allowed;
-        }
-
-
-
         .cf-tabs-panel {
             border: 1px solid #d9e4f3;
             border-radius: 22px;
@@ -499,10 +438,11 @@
         $estadoSeleccionado = request('estado');
         $nombreSeleccionado = request('nombre');
         $rutSeleccionado = request('rut');
+        $mesSeleccionado = old('mes', request('mes'));
         $establecimientoSeleccionado = request('establecimiento_id');
         $seguimientoEstadoSeleccionado = request('seguimiento_estado');
         $seguimientoEstablecimientoSeleccionado = request('seguimiento_establecimiento_id');
-        $seguimientoMesSeleccionado = request('seguimiento_mes');
+        $seguimientoMesSeleccionado = old('seguimiento_mes', request('seguimiento_mes'));
         $seguimientoQueryParams = collect([
             'seguimiento_estado' => $seguimientoEstadoSeleccionado,
             'seguimiento_establecimiento_id' => $seguimientoEstablecimientoSeleccionado,
@@ -610,11 +550,11 @@
             : $bandejasCometidos;
         $activeCometidosTab = $activeBandeja['key'] ?? $activeCometidosTab;
         $esTabSeguimiento = in_array($activeCometidosTab, ['ac_autorizados', 'estab_autorizados'], true);
-        $tabQueryBase = request()->except(['tab', 'ac_por_autorizar_page', 'ac_autorizados_page', 'estab_por_autorizar_page', 'estab_autorizados_page', 'page']);
-        $filterActionParams = ['tab' => $activeCometidosTab];
+        $tabQueryBase = request()->except(['tab', 'exportar', 'ac_por_autorizar_page', 'ac_autorizados_page', 'estab_por_autorizar_page', 'estab_autorizados_page', 'page']);
+        $gestionQueryParams = array_merge(request()->only(['mes', 'estado', 'nombre', 'rut', 'establecimiento_id']), ['tab' => $activeCometidosTab, 'exportar' => 'excel']);
     @endphp
 
-    <div class="container py-4">
+    <div class="container py-4 slep-listing" data-slep-listing>
         <div class="cf-page-header mb-4">
             <div class="cf-page-header__top">
                 <div>
@@ -624,7 +564,7 @@
                     </div>
                     <h1 class="cf-page-header__title">Cometidos funcionarios</h1>
                     <p class="cf-page-header__subtitle">
-                        Bandeja de solicitudes de cometido funcionario con visual renovada, filtros rápidos y acceso al detalle del trámite según el rol activo del usuario.
+                        Consulta y gestiona las solicitudes de cometido funcionario según tu rol activo.
                         @if ($usaBandejasInternas)
                             Para roles internos se muestran bandejas separadas por origen: Administración Central y Establecimientos, además de gestión y seguimiento.
                         @endif
@@ -655,7 +595,7 @@
                 <div class="cf-summary-card">
                     <div class="cf-summary-card__label"><i class="bi bi-funnel"></i> Estado actual del filtro</div>
                     <div class="cf-summary-card__value" style="font-size: 1.15rem; line-height: 1.25;">{{ $estadoLabel }}</div>
-                    <p class="cf-summary-card__help">Refina la bandeja por estado, nombre, RUT y establecimiento.</p>
+                    <p class="cf-summary-card__help">Refina la bandeja por mes de solicitud, estado, nombre, RUT y establecimiento.</p>
                 </div>
                 <div class="cf-summary-card">
                     <div class="cf-summary-card__label"><i class="bi bi-cash-coin"></i> Con viático</div>
@@ -697,7 +637,14 @@
             </div>
         @endif
 
-        <form method="GET" class="cf-panel mb-4">
+        @if ($errors->any())
+            <div class="alert alert-danger mb-4" role="alert" tabindex="-1" data-slep-errors>
+                <p class="fw-bold mb-1">Revisa los filtros de búsqueda.</p>
+                <ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+            </div>
+        @endif
+
+        <form method="GET" action="{{ route('tramites.cometidos-funcionarios.index') }}" class="cf-panel mb-4" data-slep-filter-form>
             <input type="hidden" name="tab" value="{{ $activeCometidosTab }}">
             <div class="cf-panel__header">
                 <div class="cf-panel__eyebrow">Búsqueda y filtrado</div>
@@ -716,7 +663,7 @@
                     @if ($esTabSeguimiento)
                         <div class="col-lg-4 col-md-6">
                             <label for="seguimiento_estado" class="cf-form-label">Estado</label>
-                            <select id="seguimiento_estado" name="seguimiento_estado" class="form-select">
+                            <select id="seguimiento_estado" name="seguimiento_estado" class="form-select" data-slep-select>
                                 <option value="">Todos</option>
                                 @foreach ($estados as $key => $label)
                                     <option value="{{ $key }}" @selected($seguimientoEstadoSeleccionado === $key)>{{ $label }}</option>
@@ -726,7 +673,7 @@
 
                         <div class="col-lg-4 col-md-6">
                             <label for="seguimiento_establecimiento_id" class="cf-form-label">Establecimiento</label>
-                            <select id="seguimiento_establecimiento_id" name="seguimiento_establecimiento_id" class="form-select" @disabled($activeCometidosTab === 'ac_autorizados')>
+                            <select id="seguimiento_establecimiento_id" name="seguimiento_establecimiento_id" class="form-select" data-slep-select @disabled($activeCometidosTab === 'ac_autorizados')>
                                 <option value="">{{ $activeCometidosTab === 'ac_autorizados' ? 'No aplica para Administración Central' : 'Todos' }}</option>
                                 @if ($activeCometidosTab !== 'ac_autorizados')
                                     @foreach ($establecimientos as $establecimiento)
@@ -742,13 +689,15 @@
                         </div>
 
                         <div class="col-lg-4 col-md-6">
-                            <label for="seguimiento_mes" class="cf-form-label">Mes</label>
-                            <input id="seguimiento_mes" type="month" name="seguimiento_mes" value="{{ $seguimientoMesSeleccionado }}" class="form-control">
+                            <label for="seguimiento_mes" class="cf-form-label">Mes de solicitud</label>
+                            <input id="seguimiento_mes" type="month" name="seguimiento_mes" value="{{ $seguimientoMesSeleccionado }}" class="form-control @error('seguimiento_mes') is-invalid @enderror" aria-describedby="seguimiento_mes-help seguimiento_mes-error" @if($errors->has('seguimiento_mes')) aria-invalid="true" @endif>
+                            <div class="form-text" id="seguimiento_mes-help">Déjalo vacío para consultar todos los meses. Formato: AAAA-MM.</div>
+                            <div class="invalid-feedback" id="seguimiento_mes-error">@error('seguimiento_mes'){{ $message }}@enderror</div>
                         </div>
                     @else
                         <div class="col-lg-3 col-md-6">
                             <label for="estado" class="cf-form-label">Estado</label>
-                            <select id="estado" name="estado" class="form-select">
+                            <select id="estado" name="estado" class="form-select" data-slep-select>
                                 <option value="">Todos</option>
                                 @foreach ($estados as $key => $label)
                                     <option value="{{ $key }}" @selected($estadoSeleccionado === $key)>{{ $label }}</option>
@@ -769,7 +718,7 @@
                         @if ($puedeFiltrarEstablecimiento)
                             <div class="col-lg-3 col-md-6">
                                 <label for="establecimiento_id" class="cf-form-label">Establecimiento</label>
-                                <select id="establecimiento_id" name="establecimiento_id" class="form-select" @disabled($activeCometidosTab === 'ac_por_autorizar')>
+                                <select id="establecimiento_id" name="establecimiento_id" class="form-select" data-slep-select @disabled($activeCometidosTab === 'ac_por_autorizar')>
                                     <option value="">{{ $activeCometidosTab === 'ac_por_autorizar' ? 'No aplica para Administración Central' : 'Todos' }}</option>
                                     @if ($activeCometidosTab !== 'ac_por_autorizar')
                                         @foreach ($establecimientos as $establecimiento)
@@ -784,31 +733,46 @@
                                 </select>
                             </div>
                         @endif
+                        <div class="col-lg-3 col-md-6">
+                            <label for="mes" class="cf-form-label">Mes de solicitud</label>
+                            <input id="mes" type="month" name="mes" value="{{ $mesSeleccionado }}" class="form-control @error('mes') is-invalid @enderror" aria-describedby="mes-help mes-error" @if($errors->has('mes')) aria-invalid="true" @endif>
+                            <div class="form-text" id="mes-help">Déjalo vacío para consultar todos los meses. Formato: AAAA-MM.</div>
+                            <div class="invalid-feedback" id="mes-error">@error('mes'){{ $message }}@enderror</div>
+                        </div>
                     @endif
 
                     <div class="col-12 pt-2">
                         <div class="cf-filter-actions">
-                            <button class="cf-btn-outline" type="submit">
-                                <i class="bi bi-search"></i>
-                                Filtrar pestaña
+                            <button class="cf-btn-primary" type="submit" data-slep-submit>
+                                <i class="bi bi-search" aria-hidden="true"></i>
+                                <span data-slep-submit-label>Buscar</span>
                             </button>
                             <a href="{{ route('tramites.cometidos-funcionarios.index', ['tab' => $activeCometidosTab]) }}" class="cf-btn-danger">
-                                <i class="bi bi-x-circle"></i>
+                                <i class="bi bi-x-circle" aria-hidden="true"></i>
                                 Limpiar pestaña
                             </a>
+                            @if ($usaBandejasInternas && !$esTabSeguimiento)
+                                <a href="{{ route('tramites.cometidos-funcionarios.index', $gestionQueryParams) }}" class="cf-btn-secondary" aria-describedby="gestion-export-help">
+                                    <i class="bi bi-file-earmark-excel" aria-hidden="true"></i>
+                                    Descargar nómina Excel
+                                </a>
+                            @endif
                             @if ($esTabSeguimiento && Route::has('tramites.cometidos-funcionarios.seguimiento.exportar-excel'))
                                 <a href="{{ route('tramites.cometidos-funcionarios.seguimiento.exportar-excel', $seguimientoQueryParams) }}" class="cf-btn-secondary">
-                                    <i class="bi bi-file-earmark-excel"></i>
+                                    <i class="bi bi-file-earmark-excel" aria-hidden="true"></i>
                                     Descargar nómina Excel
                                 </a>
                             @endif
                             @if ($esTabSeguimiento && Route::has('tramites.cometidos-funcionarios.seguimiento.documentos-zip'))
                                 <a href="{{ route('tramites.cometidos-funcionarios.seguimiento.documentos-zip', $seguimientoQueryParams) }}" class="cf-btn-secondary">
-                                    <i class="bi bi-file-earmark-zip"></i>
+                                    <i class="bi bi-file-earmark-zip" aria-hidden="true"></i>
                                     Descargar documentos ZIP
                                 </a>
                             @endif
                         </div>
+                        @if ($usaBandejasInternas && !$esTabSeguimiento)
+                            <p class="form-text mt-2" id="gestion-export-help">La descarga incluye todas las páginas de la pestaña activa y respeta los filtros aplicados.</p>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -951,43 +915,7 @@
                     </div>
                 </div>
 
-                @php
-                    $paginadorBandeja = $bandeja['items'];
-                    $desdeBandeja = $paginadorBandeja->firstItem() ?? 0;
-                    $hastaBandeja = $paginadorBandeja->lastItem() ?? 0;
-                    $paginaActualBandeja = $paginadorBandeja->currentPage();
-                    $ultimaPaginaBandeja = max(1, $paginadorBandeja->lastPage());
-                @endphp
-
-                <div class="cf-pagination">
-                    <div class="cf-pagination-footer">
-                        <div class="cf-pagination-summary">
-                            <strong>{{ $bandeja['title'] }}</strong><br>
-                            Mostrando {{ number_format($desdeBandeja, 0, ',', '.') }} a {{ number_format($hastaBandeja, 0, ',', '.') }} de {{ number_format($paginadorBandeja->total(), 0, ',', '.') }} registro(s).
-                            Página {{ number_format($paginaActualBandeja, 0, ',', '.') }} de {{ number_format($ultimaPaginaBandeja, 0, ',', '.') }}.
-                        </div>
-
-                        <div class="cf-pagination-actions">
-                            @if ($paginadorBandeja->onFirstPage())
-                                <span class="cf-page-link-disabled"><i class="bi bi-chevron-left"></i> Anterior</span>
-                            @else
-                                <a class="cf-page-link" href="{{ $paginadorBandeja->previousPageUrl() }}"><i class="bi bi-chevron-left"></i> Anterior</a>
-                            @endif
-
-                            @if ($paginadorBandeja->hasMorePages())
-                                <a class="cf-page-link" href="{{ $paginadorBandeja->nextPageUrl() }}">Siguiente <i class="bi bi-chevron-right"></i></a>
-                            @else
-                                <span class="cf-page-link-disabled">Siguiente <i class="bi bi-chevron-right"></i></span>
-                            @endif
-                        </div>
-
-                        @if ($paginadorBandeja->hasPages())
-                            <div class="cf-pagination-pages">
-                                {{ $paginadorBandeja->links() }}
-                            </div>
-                        @endif
-                    </div>
-                </div>
+                @include('partials.ui.paginacion', ['paginador' => $bandeja['items'], 'etiqueta' => 'Páginas de '.$bandeja['title']])
             </div>
         @endforeach
     </div>

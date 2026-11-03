@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Tramites;
 
+use App\Exports\CometidosNominaGestionExport;
 use App\Http\Controllers\Controller;
 use App\Models\CometidoFuncionario;
 use App\Models\CometidoNotificacionConfiguracion;
@@ -78,15 +79,43 @@ class CometidoFuncionarioController extends Controller
 
         $baseQuery = CometidoFuncionario::query()
             ->with(['establecimiento', 'solicitante', 'funcionarioAcAutorizado'])
-            ->latest();
+            ->latest()->latest('id');
 
         $this->applyIndexRoleScope($baseQuery, $user, $activeRole);
 
         $puedeFiltrarEstablecimiento = $activeRole !== 'funcionario_estab';
+
+        if ($request->query('exportar') === 'excel') {
+            abort_unless($usaBandejasInternas && in_array($request->query('tab'), ['ac_por_autorizar', 'estab_por_autorizar'], true), 403);
+            $request->validate([
+                'estado' => ['nullable', 'string', 'max:255'],
+                'nombre' => ['nullable', 'string', 'max:255'],
+                'rut' => ['nullable', 'string', 'max:32'],
+                'establecimiento_id' => ['nullable', 'integer'],
+            ]);
+            $query = clone $baseQuery;
+            if ($activeCometidosTab === 'ac_por_autorizar') {
+                $query->where('origen_cometido', 'administracion_central');
+            } else {
+                $query->where(function ($q) {
+                    $q->where('origen_cometido', 'establecimiento')->orWhereNull('origen_cometido');
+                });
+            }
+            $this->applyIndexRequestFilters($query, $request, $puedeFiltrarEstablecimiento);
+            $this->applyBandejaCometidosScope($query, $user, $activeRole, 'por_autorizar');
+
+            return app(CometidosNominaGestionExport::class)->download(
+                $query->with('pasajeAereo')->lazy(500),
+                $activeCometidosTab,
+                $request->only(['mes', 'estado', 'nombre', 'rut', 'establecimiento_id'])
+            );
+        }
+
         $establecimientos = collect();
 
         if ($puedeFiltrarEstablecimiento) {
             $establecimientoIds = (clone $baseQuery)
+                ->reorder()
                 ->whereNotNull('establecimiento_id')
                 ->select('establecimiento_id')
                 ->distinct()
@@ -204,6 +233,8 @@ class CometidoFuncionarioController extends Controller
 
     private function applyIndexRequestFilters($query, Request $request, bool $puedeFiltrarEstablecimiento): void
     {
+        $this->applyMesSolicitudFilter($query, $request, 'mes');
+
         if ($request->filled('estado')) {
             $query->where('estado', $request->query('estado'));
         }
@@ -238,13 +269,18 @@ class CometidoFuncionarioController extends Controller
             $query->where('establecimiento_id', (int) $request->query('seguimiento_establecimiento_id'));
         }
 
-        if ($request->filled('seguimiento_mes')) {
-            $mes = (string) $request->query('seguimiento_mes');
-            if (preg_match('/^\d{4}-\d{2}$/', $mes)) {
-                $inicio = Carbon::createFromFormat('Y-m', $mes)->startOfMonth();
-                $termino = (clone $inicio)->endOfMonth();
-                $query->whereBetween('fecha_solicitud', [$inicio->toDateString(), $termino->toDateString()]);
-            }
+        $this->applyMesSolicitudFilter($query, $request, 'seguimiento_mes');
+    }
+
+    private function applyMesSolicitudFilter($query, Request $request, string $campo): void
+    {
+        $data = $request->validate([$campo => ['nullable', 'date_format:Y-m']], [
+            $campo.'.date_format' => 'Selecciona un mes de solicitud válido (AAAA-MM).',
+        ]);
+        if (filled($data[$campo] ?? null)) {
+            $inicio = Carbon::createFromFormat('!Y-m', $data[$campo]);
+            $query->where('fecha_solicitud', '>=', $inicio->toDateString())
+                ->where('fecha_solicitud', '<', $inicio->copy()->addMonth()->toDateString());
         }
     }
 
