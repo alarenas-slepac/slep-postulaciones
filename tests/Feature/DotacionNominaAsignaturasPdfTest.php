@@ -6,6 +6,8 @@ use App\Exports\DotacionNominaAsignaturasPdfExport;
 use App\Http\Middleware\CoordinarEscrituraPadron;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Models\Establecimiento;
+use App\Models\Curso;
+use App\Models\EstablecimientoCurso;
 use App\Models\User;
 use App\Services\Dotacion\EdicionBloqueoService;
 use App\Support\DotacionAsignacionCalculator;
@@ -140,7 +142,35 @@ class DotacionNominaAsignaturasPdfTest extends IsolatedSecurityTestCase
         $this->assertEquals(5, $asignaturas->first()['horas_asignadas']);
     }
 
-    public function test_pdf_horizontal_con_numeracion_textos_escapados_y_tabla_larga(): void
+    public function test_separa_la_misma_asignatura_y_docente_por_bloque_sin_duplicar_horas(): void
+    {
+        $cursoNt = new EstablecimientoCurso;
+        $cursoNt->setRelation('curso', new Curso(['codigo' => 'NT1', 'nombre' => 'NT1', 'nivel_educativo' => 'Educación Parvularia']));
+        $personas = collect([$this->docente(), $this->docente(['rut' => '99000002-K', 'nombre' => 'Educadora sintética',
+            'titulo' => \App\Support\DotacionProfesionDocenteResolver::TITULO_EDUCACION_PARVULOS])]);
+        $asignaturas = (new DotacionNominaAsignaturas)->asignaturas([
+            $this->necesidad(),
+            $this->necesidad(['curso' => $cursoNt, 'asignaciones' => [$this->asignacion(['id' => 2, 'horas_plan_pedagogicas' => 3])]]),
+            $this->necesidad(['curso' => $cursoNt, 'asignatura_nombre' => 'Refuerzo NT', 'plan_comun_asociado' => 'Matemática', 'asignaciones' => [
+                $this->asignacion(['id' => 3, 'subtipo_asignacion' => 'libre_disposicion', 'horas_plan_pedagogicas' => 5]),
+                $this->asignacion(['id' => 4, 'docente_rut' => '99000002-K', 'subtipo_asignacion' => 'libre_disposicion', 'horas_plan_pedagogicas' => 2]),
+            ]]),
+        ], $personas);
+        $this->assertCount(2, $asignaturas);
+        $this->assertSame(['plan_estudio', 'parvularia'], $asignaturas->pluck('bloque')->all());
+        $this->assertSame(['Matemática', 'Matemática'], $asignaturas->pluck('nombre')->all());
+        $this->assertEquals(7.5, $asignaturas[0]['horas_asignadas']); $this->assertEquals(5, $asignaturas[1]['horas_asignadas']);
+        $this->assertEquals(7.5, $asignaturas[0]['docentes']->first()['horas_asignadas']);
+        $this->assertEquals(3, $asignaturas[1]['docentes']->firstWhere('rut', '99000001-K')['horas_asignadas']);
+        $this->assertEquals(2, $asignaturas[1]['docentes']->firstWhere('rut', '99000002-K')['horas_asignadas']);
+        $this->assertEquals(12.5, $asignaturas->sum('horas_asignadas'));
+        $html = view('admin.dotacion-establecimiento.nomina-asignaturas-pdf', ['establecimiento' => $this->ee, 'anio' => 2027,
+            'informe' => $this->informe(['asignaturas' => $asignaturas])])->render();
+        $this->assertStringContainsString('Bloque: Plan de estudio', $html); $this->assertStringContainsString('Bloque: Educación Parvularia', $html);
+        $this->assertStringContainsString('Total Educación Parvularia', $html);
+    }
+
+    public function test_pdf_vertical_con_numeracion_textos_escapados_y_tabla_larga(): void
     {
         $personas = collect(range(1, 65))->map(fn ($n) => $this->docente(['rut' => (99000000 + $n).'-K', 'nombre' => 'Docente sintético '.str_pad((string) $n, 2, '0', STR_PAD_LEFT)]));
         $asignadas = $personas->map(fn ($p, $index) => $this->asignacion(['id' => $index + 1, 'docente_rut' => $p['rut'], 'horas_plan_pedagogicas' => .5]))->all();
@@ -150,8 +180,8 @@ class DotacionNominaAsignaturasPdfTest extends IsolatedSecurityTestCase
         ], $personas)]);
         $pdf = (new DotacionNominaAsignaturasPdfExport)->documento($this->ee, 2027, $informe);
         $this->assertStringStartsWith('%PDF-', $pdf->output());
-        $this->assertEqualsWithDelta(340 / 25.4 * 72, $pdf->getDomPDF()->getCanvas()->get_width(), .01);
-        $this->assertEqualsWithDelta(216 / 25.4 * 72, $pdf->getDomPDF()->getCanvas()->get_height(), .01);
+        $this->assertEqualsWithDelta(216 / 25.4 * 72, $pdf->getDomPDF()->getCanvas()->get_width(), .01);
+        $this->assertEqualsWithDelta(340 / 25.4 * 72, $pdf->getDomPDF()->getCanvas()->get_height(), .01);
         $this->assertGreaterThanOrEqual(3, $pdf->getDomPDF()->getCanvas()->get_page_count());
         $html = view('admin.dotacion-establecimiento.nomina-asignaturas-pdf', ['establecimiento' => $this->ee, 'anio' => 2027, 'informe' => $informe])->render();
         $this->assertStringNotContainsString('<script>Asignatura', $html); $this->assertStringContainsString('Docente sintético 65', $html);

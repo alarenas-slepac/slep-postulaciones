@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Establecimiento;
+use App\Support\DotacionNominaAsignaturas;
 use Barryvdh\DomPDF\Facade\Pdf as PdfFacade;
 use Barryvdh\DomPDF\PDF;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,9 +19,15 @@ class DotacionNominaAsignaturasPdfExport
 
     public function documento(Establecimiento $establecimiento, int $anio, array $informe): PDF
     {
-        $pdf = PdfFacade::loadView('admin.dotacion-establecimiento.nomina-asignaturas-pdf', compact('establecimiento', 'anio', 'informe'))
+        $asignaturas = collect($informe['asignaturas'] ?? []);
+        $bloques = collect(DotacionNominaAsignaturas::BLOQUES)->map(function (string $titulo, string $key) use ($asignaturas): array {
+            $items = $asignaturas->filter(fn (array $item) => ($item['bloque'] ?? 'plan_estudio') === $key)->values();
+
+            return ['titulo' => $titulo, 'asignaturas' => $items, 'horas_asignadas' => round((float) $items->sum('horas_asignadas'), 2)];
+        })->filter(fn (array $bloque) => $bloque['asignaturas']->isNotEmpty());
+        $pdf = PdfFacade::loadView('admin.dotacion-establecimiento.nomina-asignaturas-pdf', compact('establecimiento', 'anio', 'informe', 'bloques'))
             ->setOptions(['defaultFont' => 'DejaVu Sans', 'isRemoteEnabled' => false, 'isPhpEnabled' => false, 'isFontSubsettingEnabled' => true])
-            ->setPaper(DotacionNominaDocentesPdfExport::PAPEL, 'landscape');
+            ->setPaper(DotacionNominaDocentesPdfExport::PAPEL, 'portrait');
         $pdf->render();
         $canvas = $pdf->getDomPDF()->getCanvas();
         $font = $pdf->getDomPDF()->getFontMetrics()->getFont('DejaVu Sans');
