@@ -1,4 +1,16 @@
-# Nómina de sobredotación en Excel
+# Informes de sobredotación
+
+## Detalle completo en PDF
+
+En **Dotación Establecimiento → Detalle sobredotación**, usar **Descargar detalle PDF** en el encabezado. Genera `detalle_sobredotacion_rbd_{RBD}_{año}.pdf`, tamaño **México Oficio (216 × 340 mm), horizontal**, con encabezado institucional y páginas numeradas.
+
+Incluye el resumen general y su base estructural, la conciliación contractual y tres bloques: **Plan de estudio**, **Educación Parvularia** y **PIE**. Cada bloque contiene cuadratura contractual cuando aplica el proceso 2027, nómina de saldos en orden de prelación, antecedentes y contrato individual, totales por calidad, fundamentos completos con su estado, horas originalmente justificadas y fecha de actualización, justificaciones fuera de la nómina de saldos, contratos protegidos, sobreasignaciones y funciones declaradas revisables con su desglose. Las funciones declaradas se agrupan una sola vez por perfil docente y conservan las cifras de la base Aula de la pestaña.
+
+Las justificaciones extensas continúan en las páginas siguientes sin recortarse; las tablas repiten sus encabezados. Se informa **Sin justificación** cuando corresponde y se distinguen fundamentos vigentes, desactualizados y sin saldo actual. Los contratos generales pueden repetirse si una persona aporta a varios bloques; no deben sumarse entre secciones.
+
+Ruta: `admin.dotacion-establecimiento.sobredotacion.pdf`. Consulta los cálculos compartidos en modo lectura y conserva los mismos permisos y alcance que los otros informes docentes. Exporta el establecimiento y año completos, sin aplicar filtros de revisión de pantalla. La descarga es privada, no se almacena en una ruta pública y sigue disponible durante los bloqueos de edición. No requiere nuevas migraciones.
+
+## Nómina de saldos en Excel
 
 En **Dotación Establecimiento → Detalle sobredotación → Contrato sin asignación registrada**, usar **Exportar sobredotación (Excel)**. Exporta todos los saldos del establecimiento y año seleccionados; los filtros de revisión en pantalla no limitan la descarga.
 

@@ -6457,8 +6457,34 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.3.676',
+    'current_version' => '2026.11.3.678',
     'entries' => [
+        [
+            'version' => '2026.11.3.678',
+            'title' => 'Informe completo de Sobredotación en PDF por bloques',
+            'summary' => 'Añade un PDF México Oficio horizontal desde Detalle sobredotación, con las nóminas, antecedentes y fundamentos completos del establecimiento y año seleccionados.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Separa Plan de estudio, Educación Parvularia y PIE, conservando la prelación docente, el contrato original y considerado, horas aula y contrato asignados, reservas y saldos por calidad contractual.',
+                'Incluye resumen general, conciliación y cuadratura contractual por bloque, justificaciones completas con estado y fecha, registros fuera de la nómina de saldos, contratos protegidos, sobreasignaciones y funciones declaradas con su desglose.',
+                'Exporta todo el detalle sin limitarse a los filtros de revisión de pantalla. Mantiene el alcance del rol activo, el acceso del directivo sólo a su establecimiento y la lectura durante los bloqueos de edición.',
+                'Reutiliza los cálculos vigentes, informa las justificaciones desactualizadas o faltantes y conserva los años anteriores. No modifica datos ni requiere migraciones.',
+            ],
+            'published_at' => '2026-11-03',
+        ],
+        [
+            'version' => '2026.11.3.677',
+            'title' => 'Cierre de las últimas horas aula de Educación Parvularia',
+            'summary' => 'Permite cerrar hasta dos horas aula residuales de Parvularia con el saldo contractual disponible de una educadora o cupo por contratar.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Aplica desde 2027 sólo al residuo final de hasta 2 h aula del plan del curso NT1/NT2 o grupo combinado seleccionado, cuando ninguna otra educadora asociada puede cubrir la asignación con la conversión habitual y la persona seleccionada dispone de al menos tantas horas de contrato como horas aula a cerrar.',
+                'Registra el cierre a razón de una hora de contrato por hora aula, para docentes reales y cupos de Educación Parvularia, sin saldo individual negativo. Mantiene asociación, prelación aplicable, topes de aula y contrato, máximos institucionales y permisos existentes.',
+                'Conserva la base proporcional del curso para el máximo del bloque y deja trazabilidad del ajuste en la fuente de cálculo. Las consultas respetan el cierre aprobado sin reescribir el historial; editar, reasignar y eliminar recalculan los saldos correspondientes.',
+                'Valida el aula disponible nuevamente dentro del bloqueo del establecimiento. No modifica planes ni cupos habilitados, no aplica a PIE o acompañamiento y no requiere migraciones.',
+            ],
+            'published_at' => '2026-11-03',
+        ],
         [
             'version' => '2026.11.3.676',
             'title' => 'Nóminas de Cometidos por autorizar y filtro mensual',

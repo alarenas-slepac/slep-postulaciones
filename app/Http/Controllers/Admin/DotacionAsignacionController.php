@@ -19,6 +19,7 @@ use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionAsignacionElegibilidad2027;
 use App\Support\DotacionContratoPlanCalculator;
 use App\Support\DotacionContratoParvulariaCalculator;
+use App\Support\DotacionCierreParvularia;
 use App\Support\DotacionAsignacionPorCursoBloque;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
@@ -92,6 +93,8 @@ class DotacionAsignacionController extends Controller
         $payload = $this->buildPayload($request, $establecimiento, $persona, $data);
         DB::transaction(function () use ($establecimiento, $persona, $payload): void {
             Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
+            $this->validatePlanHoursAvailable($establecimiento, $payload);
+            $payload = $this->ajustarCierreParvularia($establecimiento, $persona, $payload);
             $this->validateAcompanamientoParvularia($establecimiento, $payload);
             $this->validateLimiteAulaParvularia($establecimiento, $payload);
             $this->validateVirtualAssignment($establecimiento, $persona, $payload);
@@ -171,6 +174,8 @@ class DotacionAsignacionController extends Controller
                 throw ValidationException::withMessages(['docente_rut' => 'La asignación cambió de docente o dejó de estar activa. Actualice la página antes de editarla.']);
             }
             $rutAnterior = (string) $asignacion->docente_rut_normalizado;
+            $this->validatePlanHoursAvailable($establecimiento, $payload, $asignacion);
+            $payload = $this->ajustarCierreParvularia($establecimiento, $persona, $payload, $asignacion);
             $this->validateAcompanamientoParvularia($establecimiento, $payload, $asignacion);
             $this->validateLimiteAulaParvularia($establecimiento, $payload, $asignacion);
             $this->validateVirtualAssignment($establecimiento, $persona, $payload, $asignacion);
@@ -958,6 +963,97 @@ class DotacionAsignacionController extends Controller
         if ($acompanadas > min(max(0.0, $externas), $limiteLibreDisposicion) + 0.01) {
             throw ValidationException::withMessages(['horas_plan_pedagogicas' => 'Reduzca primero el acompañamiento de la Educadora de Párvulos antes de disminuir o eliminar las horas del otro docente.']);
         }
+    }
+
+    private function ajustarCierreParvularia(
+        Establecimiento $establecimiento, array &$persona, array $payload,
+        ?DotacionDocenteAsignacion $current = null
+    ): array {
+        $aula = (float) ($payload['horas_plan_pedagogicas'] ?? 0);
+        if ((int) $payload['anio'] < 2027 || ($payload['tipo_asignacion'] ?? '') !== 'plan_estudio'
+            || ($payload['estamento_cobertura'] ?? '') !== 'docente'
+            || $aula <= 0 || $aula > DotacionCierreParvularia::MAXIMO_AULA
+            || (! str_starts_with((string) ($payload['proporcion_aplicada'] ?? ''), 'NT Con JEC · base contractual')
+                && ! str_starts_with((string) ($payload['proporcion_aplicada'] ?? ''), 'NT Sin JEC · base contractual'))
+            || ! DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos']) {
+            return $payload;
+        }
+        $datos = DotacionEstablecimientoCalculator::build($establecimiento, (int) $payload['anio'], false, false);
+        $necesidades = collect(data_get($datos, 'asignacion.necesidades.plan_estudio', []))
+            ->filter(fn ($need) => ($need['curso'] ?? null) instanceof EstablecimientoCurso
+                && DotacionProfesionDocenteResolver::esCursoNt($need['curso']));
+        $need = $necesidades->firstWhere('key', $payload['necesidad_key']);
+        if (! $need) {
+            return $payload;
+        }
+        // El saldo mostrado al pie de la tabla pertenece al curso o grupo
+        // combinado seleccionado, no a los demás cursos del establecimiento.
+        $grupo = (int) ($need['dotacion_curso_combinado_id'] ?? 0);
+        $necesidades = $necesidades->filter(fn ($item) => $grupo > 0
+            ? (int) ($item['dotacion_curso_combinado_id'] ?? 0) === $grupo
+            : (int) ($item['dotacion_curso_combinado_id'] ?? 0) === 0
+                && (int) $item['establecimiento_curso_id'] === (int) $need['establecimiento_curso_id']);
+        $rut = (string) $payload['docente_rut_normalizado'];
+        $docentes = collect(data_get($datos, 'asignacion.docentes', []));
+        $vigente = $docentes->first(fn ($row) => ($row['rut_normalizado'] ?? '') === $rut);
+        if (! $vigente) {
+            return $payload;
+        }
+        $persona = $vigente;
+        $filas = collect(data_get($datos, 'asignacion.asignaciones', []))
+            ->filter(fn ($row) => DotacionAsignacionCalculator::esAsignacionDocenteReal($row)
+                && (int) data_get($row, 'id', 0) !== (int) ($current?->id ?? 0));
+        $previas = $filas->filter(fn ($row) => data_get($row, 'docente_rut_normalizado') === $rut);
+        $contratoAnterior = (float) DotacionContratoPlanCalculator::consolidar($previas, $persona)->sum('horas_contrato');
+        $disponibles = round(max(0.0, (float) $persona['horas_contrato'] - $contratoAnterior), 2);
+        // Recalcular dentro del bloqueo del establecimiento, sin usar el saldo
+        // ni el contrato marginal capturados antes de iniciar la transacción.
+        $payload['horas_contrato'] = $this->contratoMarginalAulaEspecial(
+            $establecimiento, (int) $payload['anio'], $rut, $payload, $current
+        );
+        if ($disponibles + 0.01 < $aula) {
+            return $payload;
+        }
+        if ($current && DotacionCierreParvularia::es($current)
+            && $current->docente_rut_normalizado === $rut
+            && abs((float) $current->horas_plan_pedagogicas - $aula) < 0.001) {
+            // Conservar un cierre ya aprobado al editar su observación.
+            return DotacionCierreParvularia::marcar($payload);
+        }
+        if ((float) $payload['horas_contrato'] <= $disponibles + 0.01) {
+            return $payload;
+        }
+        $restituidas = $current && collect($need['asignaciones'] ?? [])->contains(fn ($row) => (int) data_get($row, 'id') === $current->id)
+            ? (float) $current->horas_plan_pedagogicas : 0.0;
+        $pendientes = round((float) $necesidades->sum('horas_plan_pendientes') + $restituidas, 2);
+        if ($pendientes <= 0 || $pendientes > DotacionCierreParvularia::MAXIMO_AULA) {
+            return $payload;
+        }
+        $permitidos = DotacionDocentesSubsector::rutsParaNecesidad($establecimiento, (int) $payload['anio'], $need);
+        foreach ($docentes as $otra) {
+            $otroRut = (string) ($otra['rut_normalizado'] ?? '');
+            if ($otroRut === $rut || ! empty($otra['cupo_contrata_id'])
+                || ! in_array($otroRut, $permitidos, true)
+                || ! DotacionProfesionDocenteResolver::perfilTitulo($otra)['es_educacion_parvulos']) {
+                continue;
+            }
+            $anteriores = $filas->filter(fn ($row) => data_get($row, 'docente_rut_normalizado') === $otroRut);
+            $usadas = (float) DotacionContratoPlanCalculator::consolidar($anteriores, $otra)->sum('horas_contrato');
+            $saldo = max(0.0, (float) ($otra['horas_contrato'] ?? 0) - $usadas);
+            $candidata = array_replace($payload, ['id' => $current?->id ?? ((int) $filas->max('id') + 1),
+                'docente_rut' => $otra['rut'], 'docente_rut_normalizado' => $otroRut]);
+            $habituales = round((float) DotacionContratoPlanCalculator::consolidar($anteriores->concat([$candidata]), $otra)->sum('horas_contrato') - $usadas, 2);
+            $aulaJec = $anteriores->filter(fn ($row) => str_starts_with((string) data_get($row, 'proporcion_aplicada'), 'NT Con JEC')
+                || data_get($row, 'proporcion_aplicada') === self::PARVULARIA_CPEIP_LABEL);
+            $limiteJec = \App\Support\DotacionParvulariaCalculator::conJec($need['curso'], $need['proporcion_key'] ?? null)
+                && ((float) $aulaJec->sum('horas_plan_pedagogicas') + $aula > 35.01
+                    || (float) $aulaJec->sum('horas_contrato') + $habituales > 41.01);
+            if ($saldo >= 1 && $habituales <= $saldo + 0.01 && ! $limiteJec) {
+                return $payload;
+            }
+        }
+
+        return DotacionCierreParvularia::marcar($payload);
     }
 
     private function contratoCpeip65(float $horasAula): float
