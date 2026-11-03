@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Exports\DotacionNominaDocentesExport;
+use App\Exports\DotacionNominaDocentesPdfExport;
 use App\Http\Middleware\CoordinarEscrituraPadron;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Models\DotacionSobredotacionJustificacion;
@@ -147,7 +148,7 @@ class DotacionNominaDocentesExportTest extends IsolatedSecurityTestCase
         $loaded = IOFactory::load($path);
         try {
             $sheet = $loaded->getSheet(0);
-            $this->assertSame(2, $loaded->getSheetCount()); $this->assertSame('Nómina docente', $sheet->getTitle());
+            $this->assertSame(4, $loaded->getSheetCount()); $this->assertSame('Plan de estudio', $sheet->getTitle());
             $this->assertStringContainsString('2028', $sheet->getCell('H6')->getValue());
             $this->assertSame('08/2026', str_replace('Proceso 2028 · Fuente contractual: ', '', $sheet->getCell('A3')->getValue()));
             $this->assertSame('=SUM(1,2)', $sheet->getCell('C7')->getValue()); $this->assertSame(DataType::TYPE_STRING, $sheet->getCell('C7')->getDataType());
@@ -157,7 +158,9 @@ class DotacionNominaDocentesExportTest extends IsolatedSecurityTestCase
             $this->assertEquals(26, $sheet->getCell('K7')->getValue()); $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('K7')->getDataType());
             $this->assertEquals(10, $sheet->getCell('M8')->getValue());
             $this->assertSame('A6:P7', $sheet->getAutoFilter()->getRange()); $this->assertSame('D7', $sheet->getFreezePane());
-            $this->assertSame('Definiciones', $loaded->getSheet(1)->getTitle());
+            $this->assertSame('Educación Parvularia', $loaded->getSheet(1)->getTitle());
+            $this->assertSame('PIE', $loaded->getSheet(2)->getTitle());
+            $this->assertSame('Definiciones', $loaded->getSheet(3)->getTitle());
         } finally { $loaded->disconnectWorksheets(); }
     }
 
@@ -170,6 +173,80 @@ class DotacionNominaDocentesExportTest extends IsolatedSecurityTestCase
         } finally { $book->disconnectWorksheets(); }
     }
 
+    public function test_nomina_completa_por_bloque_conserva_prelacion_cuadrados_protegidos_y_contratos_desconocidos(): void
+    {
+        $personas = collect([
+            $this->docente(['rut' => '99000001-K', 'horas_contrato_pie' => 0, 'diferencia' => 0]),
+            $this->docente(['rut' => '99000002-K', 'titulo' => \App\Support\DotacionProfesionDocenteResolver::TITULO_EDUCACION_PARVULOS, 'horas_contrato_pie' => 0]),
+            $this->docente(['rut' => '99000003-K', 'titulo' => 'Educación Diferencial', 'horas_contrato_pie' => 40]),
+            $this->docente(['rut' => '99000004-K', 'horas_contrato_pie' => 20]),
+            $this->docente(['rut' => '99000005-K', 'horas_contrato' => null, 'horas_contrato_base' => null, 'diferencia' => null, 'horas_contrato_pie' => 0]),
+            $this->docente(['rut' => '99000006-K', 'horas_contrato_pie' => 0, 'exclusion_docente' => ['motivo' => 'fuero_maternal']]),
+            $this->docente(['rut' => 'CUPO-1', 'cupo_contrata_id' => 1]),
+            $this->docente(['rut' => '99000007-K', 'estamento_cobertura' => 'asistente']),
+        ]);
+        $source = new DotacionNominaDocentes;
+        $filas = $source->filas($personas, [], collect());
+        $bloques = $source->bloquesNomina($personas, $filas);
+        $this->assertSame(array_keys(DotacionNominaDocentes::BLOQUES), array_keys($bloques));
+        $this->assertSame(['99000006-K', '99000001-K', '99000004-K', '99000005-K'], $bloques['plan_estudio']->pluck('rut')->all());
+        $this->assertSame(['99000002-K'], $bloques['parvularia']->pluck('rut')->all());
+        $this->assertSame(['99000003-K', '99000004-K'], $bloques['pie']->pluck('rut')->all());
+        $this->assertCount(6, collect($bloques)->flatten(1)->unique('rut'));
+        $this->assertNull($bloques['plan_estudio']->last()['contrato_considerado']);
+        $especial = $source->bloquesNomina($personas, $filas, true);
+        $this->assertCount(0, $especial['pie']);
+        $this->assertContains('99000003-K', $especial['plan_estudio']->pluck('rut')->all());
+        $informe = $this->informe(['filas' => $filas, 'bloques' => $bloques]);
+        $book = (new DotacionNominaDocentesExport)->workbook($this->ee, 2027, $informe);
+        try {
+            $this->assertSame('99000002-K', $book->getSheet(1)->getCell('B7')->getValue());
+            $this->assertSame('99000003-K', $book->getSheet(2)->getCell('B7')->getValue());
+            $this->assertNull($book->getSheet(0)->getCell('I11')->getValue());
+        } finally { $book->disconnectWorksheets(); }
+    }
+
+    public function test_bloques_incluyen_parvularia_con_aporte_general_y_perfiles_sin_contrato(): void
+    {
+        $personas = collect([
+            $this->docente(['rut' => '99000001-K', 'titulo' => \App\Support\DotacionProfesionDocenteResolver::TITULO_EDUCACION_PARVULOS,
+                'horas_contrato_pie' => 0, 'asignaciones' => [['tipo_asignacion' => 'plan_estudio', 'estado' => 'activa', 'horas_contrato' => 8]]]),
+            $this->docente(['rut' => '99000002-K', 'titulo' => \App\Support\DotacionProfesionDocenteResolver::TITULO_EDUCACION_PARVULOS,
+                'horas_contrato' => 0, 'horas_contrato_pie' => 0]),
+            $this->docente(['rut' => '99000003-K', 'titulo' => 'PEDAGOGIA EN EDUCACION DIFERENCIAL',
+                'horas_contrato' => null, 'horas_contrato_pie' => 0]),
+        ]);
+        $source = new DotacionNominaDocentes;
+        $filas = $source->filas($personas, [], collect());
+        $bloques = $source->bloquesNomina($personas, $filas);
+        $this->assertSame(['99000001-K'], $bloques['plan_estudio']->pluck('rut')->all());
+        $this->assertSame(['99000001-K', '99000002-K'], $bloques['parvularia']->pluck('rut')->all());
+        $this->assertSame(['99000003-K'], $bloques['pie']->pluck('rut')->all());
+        $this->assertEquals(0, $bloques['parvularia']->last()['contrato_considerado']);
+        $this->assertNull($bloques['pie']->first()['contrato_considerado']);
+    }
+
+    public function test_pdf_mexico_oficio_horizontal_escapa_textos_y_conserva_fundamentos_extensos(): void
+    {
+        $fila = $this->informe()['filas']->first();
+        $fila['nombre'] = '<script>Persona sintética</script>';
+        $fila['detalle_justificaciones'] = str_repeat('Fundamento sintético de prueba. ', 100).'FIN FUNDAMENTO';
+        $informe = $this->informe(['bloques' => ['plan_estudio' => collect([$fila]), 'parvularia' => collect(), 'pie' => collect()]]);
+        $documento = (new DotacionNominaDocentesPdfExport)->documento($this->ee, 2027, $informe);
+        $this->assertStringStartsWith('%PDF-', $documento->output());
+        $this->assertEqualsWithDelta(340 / 25.4 * 72, $documento->getDomPDF()->getCanvas()->get_width(), .01);
+        $this->assertEqualsWithDelta(216 / 25.4 * 72, $documento->getDomPDF()->getCanvas()->get_height(), .01);
+        $this->assertGreaterThanOrEqual(4, $documento->getDomPDF()->getCanvas()->get_page_count());
+        $html = view('admin.dotacion-establecimiento.nomina-docentes-pdf', [
+            'establecimiento' => $this->ee, 'anio' => 2027, 'informe' => $informe,
+            'bloques' => [['titulo' => 'Plan de estudio', 'filas' => collect([$fila]), 'totales' => array_fill_keys(DotacionNominaDocentesPdfExport::HORAS, 0)]],
+            'definiciones' => (new DotacionNominaDocentesExport)->definiciones(2027, $informe),
+        ])->render();
+        $this->assertStringNotContainsString('<script>Persona', $html);
+        $this->assertStringContainsString('FIN FUNDAMENTO', $html);
+        $this->get(route('admin.dotacion-establecimiento.docentes.pdf', 1))->assertRedirect(route('login'));
+    }
+
     public static function roles(): array { return [[3, 'admin', true], [4, 'funcionario_directivo_estab', true], [5, 'coordinador_uatp', true], [6, 'coordinador_gdp', true], [7, 'supervisor_plani', true], [8, 'funcionario_slep', false], [1, 'postulante', false]]; }
 
     #[DataProvider('roles')]
@@ -178,14 +255,16 @@ class DotacionNominaDocentesExportTest extends IsolatedSecurityTestCase
         $user = $this->testUser($id, $id); $user->forceFill(['establecimiento_id' => 1])->save();
         $this->actingAs($user)->withSession(['active_role' => $rol]);
         $mock = $this->mock(DotacionNominaDocentes::class);
-        if ($allowed) { $mock->shouldReceive('datos')->once()->withArgs(fn ($ee, $year) => $ee->id === 1 && $year === 2028)->andReturn($this->informe()); }
+        if ($allowed) { $mock->shouldReceive('datos')->twice()->withArgs(fn ($ee, $year) => $ee->id === 1 && $year === 2028)->andReturn($this->informe()); }
         else { $mock->shouldNotReceive('datos'); }
-        $response = $this->get(route('admin.dotacion-establecimiento.docentes.export', [1, 'anio' => 2028]));
-        if ($allowed) {
-            $response->assertOk()->assertDownload('nomina_docentes_prelacion_rbd_99999_2028.xlsx')->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
-            $this->assertStringStartsWith('PK', $response->streamedContent());
-        } else { $response->assertForbidden(); }
+        foreach (['export' => 'xlsx', 'pdf' => 'pdf'] as $ruta => $extension) {
+            $response = $this->get(route('admin.dotacion-establecimiento.docentes.'.$ruta, [1, 'anio' => 2028]));
+            if ($allowed) {
+                $response->assertOk()->assertDownload('nomina_docentes_prelacion_rbd_99999_2028.'.$extension)->assertHeader('Content-Type', $extension === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+                $this->assertStringStartsWith($extension === 'pdf' ? '%PDF-' : 'PK', $extension === 'pdf' ? $response->getContent() : $response->streamedContent());
+            } else { $response->assertForbidden(); }
+        }
     }
 
     public function test_directivo_incluso_multirrol_no_exporta_otro_establecimiento_ni_salas_cuna(): void
@@ -198,6 +277,11 @@ class DotacionNominaDocentesExportTest extends IsolatedSecurityTestCase
         $this->get(route('admin.dotacion-establecimiento.docentes.export', [3, 'anio' => 2027]))->assertNotFound();
         $user->forceFill(['establecimiento_id' => null])->save();
         $this->get(route('admin.dotacion-establecimiento.docentes.export', 1))->assertForbidden();
+        $user->forceFill(['establecimiento_id' => 1])->save();
+        $this->get(route('admin.dotacion-establecimiento.docentes.pdf', [2, 'anio' => 2027]))->assertForbidden();
+        $this->get(route('admin.dotacion-establecimiento.docentes.pdf', [3, 'anio' => 2027]))->assertNotFound();
+        $user->forceFill(['establecimiento_id' => null])->save();
+        $this->get(route('admin.dotacion-establecimiento.docentes.pdf', 1))->assertForbidden();
     }
 
     public function test_descarga_continua_disponible_con_edicion_bloqueada_y_rechaza_anios_invalidos(): void
@@ -206,9 +290,11 @@ class DotacionNominaDocentesExportTest extends IsolatedSecurityTestCase
         $admin = $this->testUser(10, 3); app(EdicionBloqueoService::class)->guardar(null, true, 0, null, $admin);
         $user = $this->testUser(4, 4); $user->forceFill(['establecimiento_id' => 1])->save();
         $this->actingAs($user)->withSession(['active_role' => 'funcionario_directivo_estab']);
-        $this->mock(DotacionNominaDocentes::class)->shouldReceive('datos')->once()->andReturn($this->informe());
+        $this->mock(DotacionNominaDocentes::class)->shouldReceive('datos')->twice()->andReturn($this->informe());
         $this->get(route('admin.dotacion-establecimiento.docentes.export', [1, 'anio' => 2027]))->assertOk()->assertDownload();
+        $this->get(route('admin.dotacion-establecimiento.docentes.pdf', [1, 'anio' => 2027]))->assertOk()->assertDownload();
         $this->getJson(route('admin.dotacion-establecimiento.docentes.export', [1, 'anio' => 'invalido']))->assertUnprocessable()->assertJsonValidationErrors('anio');
+        $this->getJson(route('admin.dotacion-establecimiento.docentes.pdf', [1, 'anio' => 'invalido']))->assertUnprocessable()->assertJsonValidationErrors('anio');
     }
 
     public static function years(): array { return [[2026], [2027]]; }

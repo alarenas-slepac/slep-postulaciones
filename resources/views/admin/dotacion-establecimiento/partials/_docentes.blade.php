@@ -180,6 +180,7 @@
             <span class="badge rounded-pill text-bg-light border">{{ $docentes->count() }} registro(s)</span>
             @if(\App\Exports\DotacionNominaDocentesExport::canExport($activeRole ?? auth()->user()?->activeRoleName()))
                 <a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ route('admin.dotacion-establecimiento.docentes.export', [$establecimiento, 'anio' => $anio]) }}" aria-label="Exportar nómina completa de docentes en orden de prelación, año {{ $anio }}, RBD {{ $establecimiento->rbd }}"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i>Exportar docentes (Excel)</a>
+                <a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ route('admin.dotacion-establecimiento.docentes.pdf', [$establecimiento, 'anio' => $anio]) }}" aria-label="Exportar nómina docente por bloques en PDF México Oficio horizontal, año {{ $anio }}, RBD {{ $establecimiento->rbd }}"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>Exportar docentes (PDF)</a>
             @endif
         </div>
     </div>

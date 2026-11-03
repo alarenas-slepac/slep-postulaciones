@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.2.672',
+    'current_version' => '2026.11.2.673',
     'entries' => [
+        [
+            'version' => '2026.11.2.673',
+            'title' => 'Nómina docente por bloques en Excel y PDF México Oficio',
+            'summary' => 'Separa la exportación de Docentes en Plan de estudio, Educación Parvularia y PIE y añade PDF horizontal ajustado a México Oficio.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Conserva la nómina completa y su prelación al distribuirla por aporte contractual, incluidos docentes sin saldo, protegidos y con datos desconocidos. Identifica que las cifras generales se repiten cuando una persona pertenece a varios bloques.',
+                'Añade descarga PDF de 340 x 216 mm con secciones por bloque, tabla dentro de márgenes, cabeceras repetidas, numeración y detalle completo de fundamentos después de cada tabla.',
+                'Reutiliza las definiciones del Excel y conserva fechas, cantidades, permisos de descarga, alcance del establecimiento y lectura durante bloqueos. No requiere migraciones.',
+            ],
+            'published_at' => '2026-11-02',
+        ],
         [
             'version' => '2026.11.2.672',
             'title' => 'Exportación de sobredotación docente por bloque y prelación',

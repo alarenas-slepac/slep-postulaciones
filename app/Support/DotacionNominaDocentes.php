@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Schema;
 
 class DotacionNominaDocentes
 {
+    public const BLOQUES = ['plan_estudio' => 'Plan de estudio', 'parvularia' => 'Educación Parvularia', 'pie' => 'PIE'];
+
     public function datos(Establecimiento $establecimiento, int $anio): array
     {
         return $this->informe($establecimiento, $anio, false);
@@ -33,15 +35,54 @@ class DotacionNominaDocentes
                 ? sprintf('%02d/%04d', $docente['mes'], $docente['anio']) : 'Período no informado')->unique()->values();
 
             $registros = DotacionSobredotacionJustificacion::registrosPara((int) $establecimiento->id, $anio);
-            $filas = $porBloque
-                ? ['bloques' => $this->filasPorBloque($docentes, $sobredotacion, $registros)]
-                : ['filas' => $this->filas($docentes, $sobredotacion, $registros)];
+            if ($porBloque) {
+                $filas = ['bloques' => $this->filasPorBloque($docentes, $sobredotacion, $registros)];
+            } else {
+                $nomina = $this->filas($docentes, $sobredotacion, $registros);
+                $filas = ['filas' => $nomina, 'bloques' => $this->bloquesNomina(
+                    $docentes, $nomina, (bool) ($data['resumen']['establecimiento_especial'] ?? false)
+                )];
+            }
 
             return $filas + [
                 'periodos_padron' => $periodos->implode(', ') ?: 'Sin docentes en la nómina',
                 'justificaciones_disponibles' => Schema::hasTable('dotacion_sobredotacion_justificaciones'),
             ];
         });
+    }
+
+    /** Nómina completa por aporte contractual, incluidos docentes sin saldo y protegidos. */
+    public function bloquesNomina(Collection $docentes, Collection $filas, bool $especial = false): array
+    {
+        $pertenencia = array_fill_keys(array_keys(self::BLOQUES), []);
+        foreach ($docentes as $docente) {
+            if (isset($docente['cupo_contrata_id']) || ($docente['estamento_cobertura'] ?? 'docente') === 'asistente') { continue; }
+            $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut'] ?? ''));
+            $contrato = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
+            $pie = $especial ? 0.0 : min($contrato, max(0.0, (float) ($docente['horas_contrato_pie']
+                ?? DotacionAsignacionCalculator::contratoPiePorDocente($docente))));
+            $aula = max(0.0, round($contrato - $pie, 2));
+            $parvularia = min($aula, (float) DotacionEstablecimientoCalculator::contratoParvularia([$docente], $aula, 0)['horas_contrato_docentes_parvularia']);
+            $aportes = ['plan_estudio' => round($aula - $parvularia, 2), 'parvularia' => $parvularia, 'pie' => $pie];
+            foreach ($aportes as $bloque => $horas) {
+                if ($horas > 0.01) { $pertenencia[$bloque][$rut] = true; }
+            }
+            // Conserva docentes con contrato cero o desconocido: no se pierden por agrupar.
+            if (max($aportes) <= 0.01) {
+                $perfil = DotacionProfesionDocenteResolver::perfilTitulo($docente);
+                $bloque = $perfil['es_educacion_parvulos'] ? 'parvularia'
+                    : (!$especial && $perfil['es_educacion_diferencial'] ? 'pie' : 'plan_estudio');
+                $pertenencia[$bloque][$rut] = true;
+            }
+        }
+        $bloques = [];
+        foreach (self::BLOQUES as $bloque => $titulo) {
+            $bloques[$bloque] = $filas->filter(fn (array $fila) => isset($pertenencia[$bloque][
+                DotacionEstablecimientoCalculator::normalizeRut((string) $fila['rut'])
+            ]))->values();
+        }
+
+        return $bloques;
     }
 
     /** Una fila por docente y bloque con saldo, conservando ambos tipos de fundamento. */
