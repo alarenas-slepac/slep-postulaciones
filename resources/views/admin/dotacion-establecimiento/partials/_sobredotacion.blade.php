@@ -153,13 +153,13 @@
                                     $mostrarErrores = $errors->any() && (int) old('anio') === (int) $anio
                                         && old('bloque') === $claveBloque && \App\Support\DotacionEstablecimientoCalculator::normalizeRut(old('docente_rut')) === $rutNormalizado;
                                 @endphp
-                                <tr data-revision-row="{{ sha1($claveBloque.$rutNormalizado) }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['funcion'] }} {{ data_get($docentesRevisionPorRut->get($docente['rut']), 'titulo', '') }}" data-revision-block="{{ $claveBloque }}" data-revision-state="saldo {{ $pendientes && ($justificacionesSobredotacionTableReady ?? false) ? 'justificacion' : '' }}" data-revision-error="{{ $mostrarErrores && $errors->any() ? '1' : '0' }}">
+                                <tr data-revision-row="{{ sha1($claveBloque.$rutNormalizado) }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['funcion'] }} {{ $antecedentesPrelacion['titulo'] ?? '' }}" data-revision-block="{{ $claveBloque }}" data-revision-state="saldo {{ $pendientes && ($justificacionesSobredotacionTableReady ?? false) ? 'justificacion' : '' }}" data-revision-error="{{ $mostrarErrores && $errors->any() ? '1' : '0' }}">
                                     <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
                                     <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
                                     <td>{{ $antecedentesPrelacion['prioridad_2027_label'] ?? 'Sin información' }}</td>
                                     <td>{{ ($antecedentesPrelacion['tramo'] ?? null) ?: 'Sin tramo' }}</td>
                                     <td class="text-nowrap">{{ $fechaAntiguedadVacante($antecedentesPrelacion['fecha_antiguedad'] ?? null) }}</td>
-                                    <td>{{ $docente['funcion'] }}</td>
+                                    <td><div>{{ $docente['funcion'] }}</div><div class="small text-muted text-break">{{ ($antecedentesPrelacion['titulo'] ?? null) ?: 'Sin título declarado' }}</div></td>
                                     <td class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td>
                                     <td class="text-end text-danger fw-bold">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
                                     <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td>
