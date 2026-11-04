@@ -6457,8 +6457,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.4.680',
+    'current_version' => '2026.11.4.681',
     'entries' => [
+        [
+            'version' => '2026.11.4.681',
+            'title' => 'Antecedentes de prelación en las nóminas de sobredotación',
+            'summary' => 'Añade Grupo de prelación, Tramo y Fecha de antigüedad en las tablas de horas contractuales vacantes de cada bloque.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Plan de estudio, Educación Parvularia y PIE muestran los antecedentes del docente junto al nombre, usando la clasificación de prelación compartida con los informes.',
+                'Presenta las fechas válidas como día-mes-año y señala la ausencia de tramo o antigüedad. Conserva las fechas históricas no normalizadas y la asociación por RUT normalizado.',
+                'Ajusta la alineación de totales, estados vacíos y formularios de justificación a las nuevas columnas. No modifica saldos, orden, permisos ni cálculos y no requiere migraciones.',
+            ],
+            'published_at' => '2026-11-04',
+        ],
         [
             'version' => '2026.11.4.680',
             'title' => 'Nómina compacta de horas contractuales vacantes en PDF vertical',
