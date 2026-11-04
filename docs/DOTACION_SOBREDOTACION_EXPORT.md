@@ -10,6 +10,14 @@ Las justificaciones extensas continúan en las páginas siguientes sin recortars
 
 Ruta: `admin.dotacion-establecimiento.sobredotacion.pdf`. Consulta los cálculos compartidos en modo lectura y conserva los mismos permisos y alcance que los otros informes docentes. Exporta el establecimiento y año completos, sin aplicar filtros de revisión de pantalla. La descarga es privada, no se almacena en una ruta pública y sigue disponible durante los bloqueos de edición. No requiere nuevas migraciones.
 
+## Nómina compacta de saldos en PDF vertical
+
+En **Detalle sobredotación → Horas contractuales vacantes → Contrato sin asignación registrada**, usar **Exportar sobredotación (PDF)** junto al botón Excel. Genera `nomina_sobredotacion_prelacion_rbd_{RBD}_{año}.pdf`, en **México Oficio (216 × 340 mm), vertical**, con páginas numeradas.
+
+Usa exactamente `DotacionNominaDocentes::datosSobredotacion`, igual que el Excel, y conserva sus bloques, filas, orden de prelación, antecedentes y doce campos de horas. Cada docente aparece en una ficha compacta, con sus justificaciones titular y contrata completas y su estado. Los fundamentos extensos pueden continuar en las páginas siguientes. También conserva el texto anterior cuando una calidad ya no tiene saldo, indica **Sin justificación** cuando falta y presenta totales por bloque con el mismo criterio del Excel. Los valores no determinados se muestran como «-» y no se convierten en cero.
+
+Ruta: `admin.dotacion-establecimiento.sobredotacion.nomina.pdf`. Exporta todos los saldos del establecimiento y año, sin limitarse a filtros de pantalla, y mantiene los permisos y la descarga durante bloqueos de edición. El botón **Descargar detalle PDF** del encabezado conserva el informe general horizontal. No requiere migraciones.
+
 ## Nómina de saldos en Excel
 
 En **Dotación Establecimiento → Detalle sobredotación → Contrato sin asignación registrada**, usar **Exportar sobredotación (Excel)**. Exporta todos los saldos del establecimiento y año seleccionados; los filtros de revisión en pantalla no limitan la descarga.

@@ -104,6 +104,7 @@
                 <span class="badge rounded-pill text-bg-danger">{{ collect($vacantesPorBloque)->sum(fn ($bloque) => collect($bloque['items'] ?? [])->count()) }} saldo(s)</span>
                 @if(\App\Exports\DotacionNominaDocentesExport::canExport($activeRole ?? auth()->user()?->activeRoleName()))
                     <a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ route('admin.dotacion-establecimiento.sobredotacion.export', [$establecimiento, 'anio' => $anio]) }}" aria-label="Exportar nómina de sobredotación por bloque y prelación, año {{ $anio }}, RBD {{ $establecimiento->rbd }}"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i>Exportar sobredotación (Excel)</a>
+                    <a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ route('admin.dotacion-establecimiento.sobredotacion.nomina.pdf', [$establecimiento, 'anio' => $anio]) }}" aria-label="Exportar horas contractuales vacantes con justificaciones en PDF México Oficio vertical, año {{ $anio }}, RBD {{ $establecimiento->rbd }}"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>Exportar sobredotación (PDF)</a>
                 @endif
             </div>
         </div>

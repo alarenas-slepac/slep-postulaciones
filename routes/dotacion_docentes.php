@@ -16,6 +16,10 @@ Route::get('admin/dotacion-establecimiento/{establecimiento}/sobredotacion/nomin
     ->middleware(['auth', 'verified', 'ensure.role:'.implode('|', DotacionNominaDocentesExport::ROLES), 'ensure.module'])
     ->whereNumber('establecimiento')->name('admin.dotacion-establecimiento.sobredotacion.export');
 
+Route::get('admin/dotacion-establecimiento/{establecimiento}/sobredotacion/nomina.pdf', [DotacionNominaDocentesController::class, 'sobredotacionNominaPdf'])
+    ->middleware(['auth', 'verified', 'ensure.role:'.implode('|', DotacionNominaDocentesExport::ROLES), 'ensure.module'])
+    ->whereNumber('establecimiento')->name('admin.dotacion-establecimiento.sobredotacion.nomina.pdf');
+
 Route::get('admin/dotacion-establecimiento/{establecimiento}/sobredotacion/detalle.pdf', [DotacionNominaDocentesController::class, 'sobredotacionPdf'])
     ->middleware(['auth', 'verified', 'ensure.role:'.implode('|', DotacionNominaDocentesExport::ROLES), 'ensure.module'])
     ->whereNumber('establecimiento')->name('admin.dotacion-establecimiento.sobredotacion.pdf');

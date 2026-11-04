@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.3.679',
+    'current_version' => '2026.11.4.680',
     'entries' => [
+        [
+            'version' => '2026.11.4.680',
+            'title' => 'Nómina compacta de horas contractuales vacantes en PDF vertical',
+            'summary' => 'Añade Exportar sobredotación (PDF) junto al Excel de Contrato sin asignación registrada, en México Oficio vertical y con justificaciones completas.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Reutiliza la misma fuente del Excel y conserva bloques de Plan de estudio, Educación Parvularia y PIE, prelación, RUT, nombre, título, tramo, antigüedad y todos los campos de horas y totales.',
+                'Presenta una ficha compacta por docente con contrato original y considerado, aula y contrato asignados, reservas, saldos y horas titulares/contrata. Incluye el texto y estado de cada justificación, vigente, desactualizada, sin saldo o faltante.',
+                'Los fundamentos extensos continúan entre páginas sin recortarse. La descarga mantiene el establecimiento y año seleccionados, el alcance del rol activo y la lectura durante bloqueos de edición, sin aplicar los filtros de revisión de pantalla.',
+                'Conserva los informes existentes, los valores no determinados y los cálculos compartidos. No modifica datos ni requiere migraciones.',
+            ],
+            'published_at' => '2026-11-04',
+        ],
         [
             'version' => '2026.11.3.679',
             'title' => 'Desbloqueo temporal autorizado por establecimiento en Dotación',
