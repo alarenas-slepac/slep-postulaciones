@@ -8,6 +8,13 @@
     $vacantesPorBloque = $sobredotacion['vacantes_por_bloque'] ?? [];
     $justificacionesSobredotacion = $justificacionesSobredotacion ?? collect();
     $docentesRevisionPorRut = collect($docentes ?? [])->keyBy('rut');
+    $antecedentesVacantesPorRut = \App\Support\DotacionProceso2027Calculator::docentesPriorizados(collect($docentes ?? []))
+        ->keyBy(fn ($persona) => \App\Support\DotacionEstablecimientoCalculator::normalizeRut((string) ($persona['rut'] ?? '')));
+    $fechaAntiguedadVacante = static function ($valor) {
+        if (!$valor) { return 'Sin antigüedad'; }
+        $fecha = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $valor);
+        return $fecha && $fecha->format('Y-m-d') === (string) $valor ? $fecha->format('d-m-Y') : (string) $valor;
+    };
     $declaradasAsignadas = $sobredotacionResumen['horas_declaradas_asignadas'] ?? $sobredotacionResumen['horas_declaradas_ajustables'] ?? 0;
     $formula = $detalle['formula'] ?? [];
     $brechaEstructural = (float) ($sobredotacionResumen['brecha_estructural'] ?? 0);
@@ -127,11 +134,12 @@
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
-                        <thead class="table-light"><tr><th scope="col">RUT</th><th scope="col">Docente</th><th scope="col">Función</th><th scope="col" class="text-end">Contrato del bloque</th><th scope="col" class="text-end">Sin asignación</th><th scope="col" class="text-end">Planta</th><th scope="col" class="text-end">Contrata</th><th scope="col">Justificación</th></tr></thead>
+                        <thead class="table-light"><tr><th scope="col">RUT</th><th scope="col">Docente</th><th scope="col">Grupo de prelación</th><th scope="col">Tramo</th><th scope="col">Fecha de antigüedad</th><th scope="col">Función</th><th scope="col" class="text-end">Contrato del bloque</th><th scope="col" class="text-end">Sin asignación</th><th scope="col" class="text-end">Planta</th><th scope="col" class="text-end">Contrata</th><th scope="col">Justificación</th></tr></thead>
                         <tbody>
                             @forelse (($bloqueVacante['items'] ?? collect()) as $docente)
                                 @php
                                     $rutNormalizado = \App\Support\DotacionEstablecimientoCalculator::normalizeRut($docente['rut']);
+                                    $antecedentesPrelacion = $antecedentesVacantesPorRut->get($rutNormalizado, []);
                                     $idJustificacion = 'justificacion-'.$claveBloque.'-'.$rutNormalizado;
                                     $tiposHoras = [
                                         'titular' => ['horas' => (float) $docente['horas_sobredotacion_planta'], 'titulo' => 'Supresión de horas titulares'],
@@ -148,6 +156,9 @@
                                 <tr data-revision-row="{{ sha1($claveBloque.$rutNormalizado) }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['funcion'] }} {{ data_get($docentesRevisionPorRut->get($docente['rut']), 'titulo', '') }}" data-revision-block="{{ $claveBloque }}" data-revision-state="saldo {{ $pendientes && ($justificacionesSobredotacionTableReady ?? false) ? 'justificacion' : '' }}" data-revision-error="{{ $mostrarErrores && $errors->any() ? '1' : '0' }}">
                                     <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
                                     <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
+                                    <td>{{ $antecedentesPrelacion['prioridad_2027_label'] ?? 'Sin información' }}</td>
+                                    <td>{{ ($antecedentesPrelacion['tramo'] ?? null) ?: 'Sin tramo' }}</td>
+                                    <td class="text-nowrap">{{ $fechaAntiguedadVacante($antecedentesPrelacion['fecha_antiguedad'] ?? null) }}</td>
                                     <td>{{ $docente['funcion'] }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td>
                                     <td class="text-end text-danger fw-bold">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
@@ -164,7 +175,7 @@
                                     </td>
                                 </tr>
                                 @if (($justificacionesSobredotacionTableReady ?? false))
-                                    <tr data-revision-related="{{ sha1($claveBloque.$rutNormalizado) }}"><td colspan="8" class="p-0 border-0">
+                                    <tr data-revision-related="{{ sha1($claveBloque.$rutNormalizado) }}"><td colspan="11" class="p-0 border-0">
                                         <div id="{{ $idJustificacion }}" class="collapse {{ $mostrarErrores ? 'show' : '' }}">
                                             <div class="p-3 bg-light border-top border-bottom">
                                                 <div class="row g-3">
@@ -219,11 +230,11 @@
                                     </td></tr>
                                 @endif
                             @empty
-                                <tr><td colspan="8" class="text-center text-muted py-4">No hay horas contractuales sin asignación en este bloque.</td></tr>
+                                <tr><td colspan="11" class="text-center text-muted py-4">No hay horas contractuales sin asignación en este bloque.</td></tr>
                             @endforelse
                         </tbody>
                         @if (collect($bloqueVacante['items'] ?? [])->isNotEmpty())
-                            <tfoot class="table-light fw-bold"><tr><td colspan="4">Total {{ $tituloBloque }}</td><td class="text-end text-danger">{{ $fmt($bloqueVacante['horas_total']) }}</td><td class="text-end text-primary">{{ $fmt($bloqueVacante['horas_planta']) }}</td><td class="text-end text-info">{{ $fmt($bloqueVacante['horas_contrata']) }}</td><td></td></tr></tfoot>
+                            <tfoot class="table-light fw-bold"><tr><td colspan="7">Total {{ $tituloBloque }}</td><td class="text-end text-danger">{{ $fmt($bloqueVacante['horas_total']) }}</td><td class="text-end text-primary">{{ $fmt($bloqueVacante['horas_planta']) }}</td><td class="text-end text-info">{{ $fmt($bloqueVacante['horas_contrata']) }}</td><td></td></tr></tfoot>
                         @endif
                     </table>
                 </div>
