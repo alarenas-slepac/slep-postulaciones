@@ -6457,8 +6457,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.4.681',
+    'current_version' => '2026.11.4.682',
     'entries' => [
+        [
+            'version' => '2026.11.4.682',
+            'title' => 'Título profesional bajo la función en sobredotación',
+            'summary' => 'Muestra el título profesional del docente debajo de su función en las nóminas de horas contractuales vacantes.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Plan de estudio, Educación Parvularia y PIE presentan el título en texto secundario dentro de la columna Función, con ajuste de líneas y el mensaje Sin título declarado cuando falta el antecedente.',
+                'Usa el mismo título asociado por RUT normalizado para la visualización y la búsqueda. Conserva las columnas, saldos y acciones existentes; no requiere migraciones.',
+            ],
+            'published_at' => '2026-11-04',
+        ],
         [
             'version' => '2026.11.4.681',
             'title' => 'Antecedentes de prelación en las nóminas de sobredotación',
