@@ -7,6 +7,7 @@ use App\Exports\DotacionNominaDocentesExport;
 use App\Exports\DotacionNominaDocentesPdfExport;
 use App\Exports\DotacionSobredotacionExport;
 use App\Exports\DotacionSobredotacionPdfExport;
+use App\Exports\DotacionSobredotacionNominaPdfExport;
 use App\Http\Controllers\Controller;
 use App\Models\Establecimiento;
 use App\Support\DotacionNominaAsignaturas;
@@ -44,6 +45,13 @@ class DotacionNominaDocentesController extends Controller
         $anio = $this->anioAutorizado($request, $establecimiento);
 
         return $export->download($establecimiento, $anio, $informe->datos($establecimiento, $anio));
+    }
+
+    public function sobredotacionNominaPdf(Request $request, Establecimiento $establecimiento, DotacionNominaDocentes $nomina, DotacionSobredotacionNominaPdfExport $export): Response
+    {
+        $anio = $this->anioAutorizado($request, $establecimiento);
+
+        return $export->download($establecimiento, $anio, $nomina->datosSobredotacion($establecimiento, $anio));
     }
 
     public function asignaturasPdf(Request $request, Establecimiento $establecimiento, DotacionNominaAsignaturas $nomina, DotacionNominaAsignaturasPdfExport $export): Response
