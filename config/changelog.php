@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.4.682',
+    'current_version' => '2026.11.5.683',
     'entries' => [
+        [
+            'version' => '2026.11.5.683',
+            'title' => 'Exclusión de docentes justificados en asignaciones de Plan de estudio y PIE',
+            'summary' => 'Los docentes con justificación registrada en Sobredotación 2027 dejan de aparecer en las listas para asignar horas de Plan de estudio y PIE.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Extiende la exclusión existente a Plan de estudio, Religión, libre disposición, acompañamiento de Parvularia, trabajo colaborativo PIE y bolsa de Educación Diferencial, para el mismo año y establecimiento de la justificación.',
+                'Filtra los catálogos de selección y los candidatos que determinan la prelación, evitando que un docente justificado bloquee la asignación a otro docente elegible.',
+                'Valida la exclusión al crear y reasignar, incluso ante formularios anteriores o indicadores alterados. Conserva el contrato, las asignaciones existentes y la consulta de sobredotación; no requiere migraciones.',
+                'Incluye pruebas con datos sintéticos para listas, creación, reasignación, acompañamiento, reservas y titularidad primero.',
+            ],
+            'published_at' => '2026-11-05',
+        ],
         [
             'version' => '2026.11.4.682',
             'title' => 'Título profesional bajo la función en sobredotación',

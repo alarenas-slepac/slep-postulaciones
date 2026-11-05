@@ -811,8 +811,11 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
         $this->assertSame('99000003K', $saved->fresh()->docente_rut_normalizado);
     }
 
-    public function test_sobredotacion_justificada_no_permite_nuevas_reservas_pero_conserva_plan(): void
+    public function test_sobredotacion_justificada_bloquea_reservas_plan_y_pie_sin_borrar_asignaciones(): void
     {
+        $this->store();
+        $saved = DotacionDocenteAsignacion::sole();
+        $before = $saved->getAttributes();
         $this->justify('99000001-K', 'parvularia', 'titular');
         $process = DotacionProceso2027Calculator::resumen($this->ee, 2027);
         $this->assertNotContains('99000001-K', \App\Support\DotacionReservaNoNormativa::candidatos($process)->pluck('rut')->all());
@@ -822,17 +825,93 @@ class DotacionLibreDisposicionParvulariaTest extends IsolatedSecurityTestCase
             $this->reserveEducadora(2);
             $this->fail('No debe reservar contrato del docente ya justificado.');
         } catch (ValidationException $error) { $this->assertArrayHasKey('docente_rut', $error->errors()); }
-        $this->assertSame(0, DotacionDocenteAsignacion::count());
-        $this->store(['docente_rut' => '99000001-K'], $this->need(false));
-        $this->assertSame('plan_estudio', DotacionDocenteAsignacion::sole()->tipo_asignacion);
+        $this->assertSame(0, $xpath->query('//select[starts-with(@id,"acompanamiento-docente-")]/option[@value="99000001-K"]')->length);
+        try {
+            $this->store(['docente_rut' => '99000001-K'], $this->need(false));
+            $this->fail('El docente justificado no debe recibir nuevas horas del plan.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('docente_rut', $error->errors()); }
         $this->differentialNeed();
         $pie = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.pie_colaborativo'))->sole();
-        app(DotacionAsignacionController::class)->store($this->request([
-            'anio' => 2027, 'docente_rut' => '99000001-K', 'estamento_cobertura' => 'docente',
-            'tipo_asignacion' => 'pie_colaborativo', 'necesidad_key' => $pie['key'],
-            'establecimiento_curso_id' => $pie['establecimiento_curso_id'], 'horas_contrato' => 3,
-        ]), $this->ee);
-        $this->assertSame(1, DotacionDocenteAsignacion::where('tipo_asignacion', 'pie_colaborativo')->count());
+        try {
+            app(DotacionAsignacionController::class)->store($this->request([
+                'anio' => 2027, 'docente_rut' => '99000001-K', 'estamento_cobertura' => 'docente',
+                'tipo_asignacion' => 'pie_colaborativo', 'necesidad_key' => $pie['key'],
+                'establecimiento_curso_id' => $pie['establecimiento_curso_id'], 'horas_contrato' => 3,
+            ]), $this->ee);
+            $this->fail('El docente justificado no debe recibir nuevas horas PIE.');
+        } catch (ValidationException $error) { $this->assertArrayHasKey('docente_rut', $error->errors()); }
+        $this->assertSame(1, DotacionDocenteAsignacion::count());
+        $this->assertSame($before, $saved->fresh()->getAttributes());
+    }
+
+    public static function destinosCurricularesJustificados(): array
+    {
+        return [
+            'plan obligatorio' => ['plan'],
+            'libre disposición NT' => ['libre'],
+            'Religión' => ['religion'],
+            'trabajo colaborativo PIE' => ['colaborativo'],
+            'bolsa diferencial PIE' => ['diferencial'],
+        ];
+    }
+
+    #[DataProvider('destinosCurricularesJustificados')]
+    public function test_justificado_no_aparece_en_plan_o_pie_y_no_admite_creacion_ni_reasignacion(string $destination): void
+    {
+        $target = '99000002-K';
+        $owner = '99000003-K';
+        $block = 'plan_estudio';
+        if ($destination === 'diferencial') {
+            $this->personal($owner = '99000005-K', 'Diferencial titular sintética', 'PLANTA', 'Educación Diferencial');
+            $this->personal($target = '99000006-K', 'Diferencial contrata sintética', 'CONTRATA', 'Educación Diferencial');
+            $need = $this->differentialNeed();
+            $fields = ['tipo_asignacion' => 'pie_educadora_diferencial', 'subtipo_asignacion' => 'bolsa_total', 'horas_contrato' => 2];
+            $block = 'pie';
+        } elseif ($destination === 'colaborativo') {
+            $this->differentialNeed();
+            $need = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.pie_colaborativo'))->sole();
+            $fields = ['tipo_asignacion' => 'pie_colaborativo', 'horas_contrato' => 1];
+        } else {
+            if ($destination === 'libre') {
+                $this->associate('99000003K');
+                $need = $this->need();
+            } else {
+                $need = $this->basicSubject($destination === 'religion' ? 'Religión Católica' : 'Matemática');
+                DB::table('dotacion_docente_subsectores')->where('asignatura_key', DotacionDocentesSubsector::keyParaNecesidad($need))
+                    ->where('docente_rut_normalizado', '99000001K')->delete();
+            }
+            $fields = ['tipo_asignacion' => 'plan_estudio', 'subtipo_asignacion' => $need['subtipo_asignacion'], 'horas_plan_pedagogicas' => 2];
+        }
+        $fields += ['anio' => 2027, 'estamento_cobertura' => 'docente', 'necesidad_key' => $need['key'],
+            'establecimiento_curso_id' => $need['establecimiento_curso_id'] ?? null, 'docente_rut' => $owner];
+        $controller = app(DotacionAsignacionController::class);
+        $controller->store($this->request($fields), $this->ee);
+        $saved = DotacionDocenteAsignacion::sole();
+        $before = $saved->getAttributes();
+        $this->justify($target, $block, 'contrata');
+
+        $xpath = $this->assignmentXpath();
+        $form = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$need['key'].'"]]')->item(0);
+        $this->assertNotNull($form);
+        $values = [];
+        foreach ($this->catalogOptions($xpath, $form) as $option) { $values[] = $option->getAttribute('value'); }
+        $this->assertNotContains($target, $values);
+        $this->assertContains($owner, $values);
+
+        $fields['docente_rut'] = $target;
+        $fields['sobredotacion_justificada'] = false;
+        foreach (['crear', 'reasignar'] as $action) {
+            try {
+                $request = $this->request($fields);
+                $action === 'crear' ? $controller->store($request, $this->ee) : $controller->update($request, $this->ee, $saved);
+                $this->fail('Un formulario anterior no puede asignar horas a un docente justificado.');
+            } catch (ValidationException $error) {
+                $this->assertArrayHasKey('docente_rut', $error->errors());
+                $this->assertStringContainsString('justificación de horas de contrato sin asignación', $error->getMessage());
+            }
+            $this->assertSame(1, DotacionDocenteAsignacion::count());
+            $this->assertSame($before, $saved->fresh()->getAttributes());
+        }
     }
 
     public function test_justificaciones_se_acotan_por_anio_y_establecimiento_y_normalizan_rut(): void

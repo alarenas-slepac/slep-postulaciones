@@ -47,13 +47,19 @@ final class DotacionAsignacionElegibilidad2027
                 || ($asignacion['tipo_asignacion'] ?? '') === 'reserva_no_normativa');
     }
 
+    public static function excluidoDeAsignacion(array $docente, array $asignacion): bool
+    {
+        return self::excluidoDeOtrasFunciones($docente, $asignacion)
+            || ((bool) ($docente['sobredotacion_justificada'] ?? false)
+                && in_array($asignacion['tipo_asignacion'] ?? '', [
+                    'plan_estudio', 'acompanamiento_parvularia', 'pie_colaborativo', 'pie_educadora_diferencial',
+                ], true));
+    }
+
     /** @param Collection<int, array<string, mixed>> $docentes */
     public static function candidatosParaPrelacion(Collection $docentes, array $asignacion): Collection
     {
-        if (self::esFuncionSinPrelacion($asignacion)
-            || ($asignacion['tipo_asignacion'] ?? '') === 'reserva_no_normativa') {
-            return $docentes->reject(fn (array $docente) => self::excluidoDeOtrasFunciones($docente, $asignacion))->values();
-        }
+        $docentes = $docentes->reject(fn (array $docente) => self::excluidoDeAsignacion($docente, $asignacion))->values();
 
         return ($asignacion['tipo_asignacion'] ?? '') === 'pie_educadora_diferencial'
             ? $docentes->filter(fn (array $docente) => self::puedeRecibirBolsaDiferencial($docente))->values()

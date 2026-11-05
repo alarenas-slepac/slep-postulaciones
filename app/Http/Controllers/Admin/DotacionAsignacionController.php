@@ -1286,9 +1286,9 @@ class DotacionAsignacionController extends Controller
             DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) === $rutSeleccionado
         );
         if (($payload['estamento_cobertura'] ?? 'docente') === 'docente'
-            && DotacionAsignacionElegibilidad2027::excluidoDeOtrasFunciones($docenteProceso ?? [], $payload)) {
+            && DotacionAsignacionElegibilidad2027::excluidoDeAsignacion($docenteProceso ?? [], $payload)) {
             throw ValidationException::withMessages([
-                'docente_rut' => 'El docente tiene una justificación de horas de contrato sin asignación en Sobredotación para este año y establecimiento. No puede recibir horas de otras funciones.',
+                'docente_rut' => 'El docente tiene una justificación de horas de contrato sin asignación en Sobredotación para este año y establecimiento. No puede recibir nuevas asignaciones de horas mientras mantenga esa justificación.',
             ]);
         }
         if (! ($proceso['asignacion_habilitada'] ?? false)) {

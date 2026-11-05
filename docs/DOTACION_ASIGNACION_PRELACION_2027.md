@@ -69,6 +69,26 @@ Permanecen las validaciones de saldo, bloque contractual, máximo individual, ho
 
 ## Compatibilidad y archivos
 
+### Docentes con justificación en Sobredotación · 2026.11.5.683
+
+Para 2027, una justificación registrada en Sobredotación con horas positivas y
+fundamento excluye al docente de las listas para asignar nuevas horas en el mismo
+establecimiento y año. La exclusión comprende Plan de estudio, Religión, libre
+disposición, acompañamiento de Parvularia, trabajo colaborativo PIE y bolsa de
+Educación Diferencial, además de las funciones y reservas ya restringidas.
+
+El filtro se aplica tanto al catálogo de selección como a los candidatos que
+determinan la fase y la prelación. Un titular justificado no bloquea a otro
+docente elegible. El servidor verifica la justificación al crear y reasignar,
+aunque el formulario haya quedado abierto antes de registrarla.
+
+Se conserva el criterio de justificación registrada: no es necesario que el
+saldo actual coincida con las horas originales para mantener esta exclusión.
+Retirar la última justificación habilita nuevamente al docente según su saldo,
+perfil y asociaciones. La consulta de Sobredotación, los contratos y las
+asignaciones ya registradas conservan sus datos. Los demás años mantienen sus
+reglas. No requiere migraciones.
+
 Se mantienen las asignaciones guardadas y los datos históricos. No se realizan migraciones ni correcciones automáticas. Al editar una asignación 2027 se comprueba su elegibilidad actual.
 
 Archivos de los parches de prelación anteriores, conservando sus rutas:
