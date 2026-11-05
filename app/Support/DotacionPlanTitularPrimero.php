@@ -40,6 +40,8 @@ class DotacionPlanTitularPrimero
             ? DotacionEstablecimientoCalculator::normalizeRut((string) ($current->docente_rut_normalizado ?: $current->docente_rut))
             : null;
 
+        $docentes = DotacionAsignacionElegibilidad2027::candidatosParaPrelacion($docentes, ['tipo_asignacion' => 'plan_estudio']);
+
         return $docentes->filter(function (array $docente) use ($permitidos, $soloParvularia): bool {
             $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? ''));
 

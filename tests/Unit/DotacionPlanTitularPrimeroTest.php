@@ -10,6 +10,25 @@ use Tests\TestCase;
 
 class DotacionPlanTitularPrimeroTest extends TestCase
 {
+    public function test_titular_justificado_no_aparece_ni_bloquea_la_fase_contrata_al_crear_o_editar(): void
+    {
+        $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([
+            [...$this->docente('99000001K', 44, 0, 0), 'sobredotacion_justificada' => true],
+            $this->docente('99000002K', 0, 12, 0),
+        ]));
+        $current = new DotacionDocenteAsignacion([
+            'docente_rut_normalizado' => '99000001K', 'estamento_cobertura' => 'docente', 'horas_contrato' => 2,
+        ]);
+
+        foreach ([null, $current] as $assignment) {
+            $elegibles = DotacionPlanTitularPrimero::elegibles($docentes, ['99000001K', '99000002K'], [], $assignment);
+
+            $this->assertSame('contrata', DotacionPlanTitularPrimero::fase($elegibles));
+            $this->assertSame(['99000002K'], DotacionPlanTitularPrimero::opciones($elegibles)->pluck('rut_normalizado')->all());
+            DotacionPlanTitularPrimero::validar($elegibles, $elegibles->sole(), 2, false);
+        }
+    }
+
     public function test_muestra_primero_solos_los_titulares_asociados_y_despues_las_horas_a_contrata(): void
     {
         $docentes = DotacionProceso2027Calculator::docentesPriorizados(collect([

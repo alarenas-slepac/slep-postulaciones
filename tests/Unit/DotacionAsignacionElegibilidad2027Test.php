@@ -43,7 +43,32 @@ class DotacionAsignacionElegibilidad2027Test extends TestCase
         ]);
         $filtered = DotacionAsignacionElegibilidad2027::candidatosParaPrelacion($candidates, ['tipo_asignacion' => 'pie_educadora_diferencial']);
         $this->assertSame(['99000002K', '99000003K'], $filtered->pluck('rut')->all());
-        $this->assertSame($candidates, DotacionAsignacionElegibilidad2027::candidatosParaPrelacion($candidates, ['tipo_asignacion' => 'plan_estudio']));
+        $this->assertSame($candidates->all(), DotacionAsignacionElegibilidad2027::candidatosParaPrelacion($candidates, ['tipo_asignacion' => 'plan_estudio'])->all());
+    }
+
+    public static function tiposAsignacion(): array
+    {
+        $types = [
+            'plan_estudio', 'acompanamiento_parvularia', 'pie_colaborativo', 'pie_educadora_diferencial',
+            'funcion_directiva', 'funcion_tecnico_pedagogica', 'plan_normativo', 'otra_funcion', 'reserva_no_normativa',
+        ];
+
+        return array_combine($types, array_map(fn (string $type) => [$type], $types));
+    }
+
+    #[DataProvider('tiposAsignacion')]
+    public function test_docente_justificado_queda_fuera_de_los_candidatos_de_asignacion(string $type): void
+    {
+        $candidates = collect([
+            ['rut' => '99000001K', 'titulo' => 'Educación Diferencial', 'sobredotacion_justificada' => true],
+            ['rut' => '99000002K', 'titulo' => 'Educación Diferencial', 'sobredotacion_justificada' => false],
+            ['rut' => '99000003K', 'titulo' => ''],
+        ]);
+        $assignment = ['tipo_asignacion' => $type];
+
+        $this->assertTrue(DotacionAsignacionElegibilidad2027::excluidoDeAsignacion($candidates[0], $assignment));
+        $this->assertSame(['99000002K', '99000003K'], DotacionAsignacionElegibilidad2027::candidatosParaPrelacion($candidates, $assignment)->pluck('rut')->all());
+        $this->assertCount(3, $candidates);
     }
 
     public function test_solo_los_tipos_de_funcion_tienen_orden_informativo(): void

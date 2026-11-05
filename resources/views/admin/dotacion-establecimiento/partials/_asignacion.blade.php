@@ -9,7 +9,9 @@
     $docentesAsignacion = $asignacion['docentes'] ?? $docentes;
     $proceso2027Asignacion = $proceso2027 ?? ['aplica' => false];
     if ($proceso2027Asignacion['aplica'] ?? false) {
-        $docentesAsignacion = $proceso2027Asignacion['docentes'] ?? $docentesAsignacion;
+        $docentesAsignacion = \App\Support\DotacionAsignacionElegibilidad2027::candidatosParaPrelacion(
+            collect($proceso2027Asignacion['docentes'] ?? $docentesAsignacion), ['tipo_asignacion' => 'plan_estudio']
+        );
     }
     $asignacionesSoloConsulta = \App\Support\DotacionAsignacionSuspension::bloqueada((int) $anio, $activeRole ?? auth()->user()?->activeRoleName());
     $subsectoresAsignacion = collect(($anio === 2026 ? ($subsectoresEpja2026 ?? []) : ($proceso2027Asignacion['docentes_subsector'] ?? []))['asignaturas'] ?? [])->keyBy('key');
