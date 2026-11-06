@@ -128,6 +128,8 @@ class DotacionEstablecimientoController extends Controller
             'q' => $q,
             'comuna' => $comuna,
             'activeRole' => $activeRole,
+            'revisionesDotacionDisponibles' => \App\Services\Dotacion\DotacionRevisionService::disponible(),
+            'revisionesDotacion' => app(\App\Services\Dotacion\DotacionRevisionService::class)->historial($establecimientos->pluck('id'), $anio),
         ]);
     }
 
