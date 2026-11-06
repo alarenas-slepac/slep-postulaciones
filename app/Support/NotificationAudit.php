@@ -42,6 +42,7 @@ class NotificationAudit
             || !app(\App\Services\Notifications\NotificationEventPolicy::class)->enabled($eventKey, 'whatsapp'))) return;
 
         try {
+            $mailable->with('sga_dispatch_log_id', $log?->id);
             $mailer = Mail::to($to);
             if (!empty($cc)) {
                 $mailer->cc($cc);
@@ -49,10 +50,15 @@ class NotificationAudit
             $sent = $mailer->send($mailable);
 
             if ($log) {
-                $log->update([
-                    'status' => $sent === null && !($mailable instanceof ShouldQueue) && !Mail::isFake() ? 'suppressed' : 'sent',
-                    'sent_at' => $sent === null && !($mailable instanceof ShouldQueue) && !Mail::isFake() ? null : now(),
-                ]);
+                $queued = $sent instanceof \App\Services\Mail\QueuedMail;
+                $values = [
+                    'status' => $queued ? 'queued' : ($sent === null && !($mailable instanceof ShouldQueue) && !Mail::isFake() ? 'suppressed' : 'sent'),
+                    'sent_at' => $queued || ($sent === null && !($mailable instanceof ShouldQueue) && !Mail::isFake()) ? null : now(),
+                ];
+                if ($queued) {
+                    // El worker puede terminar antes de que push devuelva el acuse.
+                    NotificationDispatchLog::whereKey($log->id)->whereIn('status', ['pending', 'queued'])->whereNull('sent_at')->update($values);
+                } else { $log->update($values); }
             }
         } catch (Throwable $e) {
             if ($log) {
@@ -69,7 +75,7 @@ class NotificationAudit
 
     public static function dispatchNotification(User $user, Notification $notification, array $meta = []): void
     {
-        $queued = $notification instanceof ShouldQueue;
+        $queued = $notification instanceof ShouldQueue || in_array('mail', (array) $notification->via($user), true);
 
         $log = self::createBaseLog(array_merge($meta, [
             'channel' => 'mail',
@@ -81,6 +87,7 @@ class NotificationAudit
         ]));
 
         try {
+            if (property_exists($notification, 'mailAuditLogId')) { $notification->mailAuditLogId = $log?->id; }
             $user->notify($notification);
 
             if ($log && !$queued) {

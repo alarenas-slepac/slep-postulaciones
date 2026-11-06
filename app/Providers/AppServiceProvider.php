@@ -26,6 +26,13 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(\App\Services\Padron\PadronEscrituraService::class);
         $this->app->scoped(ChangeLogViewData::class);
         $this->app->singleton(\App\Services\Notifications\NotificationEventOccurrence::class);
+        $this->app->scoped(\App\Services\Mail\MailDelivery::class);
+        $this->app->extend('mail.manager', fn ($manager, $app) => new \App\Services\Mail\QueuedMailManager($app));
+        $this->app->afterResolving(\Illuminate\Notifications\ChannelManager::class, function ($manager, $app) {
+            $manager->extend('mail', fn ($app) => new \App\Services\Mail\QueuedMailChannel(
+                $app->make(\Illuminate\Contracts\Mail\Factory::class), $app->make(\Illuminate\Mail\Markdown::class)
+            ));
+        });
 
         // No bindear manualmente 'request' aquí.
         $this->app->singleton(Client::class, function () {
@@ -38,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Mail\Events\MessageSent::class, fn () => app(\App\Services\Mail\MailDelivery::class)->markSent());
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Mail\Events\MessageSending::class, \App\Listeners\ConfigureNotificationMail::class.'@configure');
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Queue\Events\JobProcessing::class, \App\Services\Notifications\NotificationEventOccurrence::class.'@processing');
         foreach ([\Illuminate\Queue\Events\JobProcessed::class, \Illuminate\Queue\Events\JobExceptionOccurred::class] as $event) {
