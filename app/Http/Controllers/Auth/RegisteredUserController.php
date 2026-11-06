@@ -77,7 +77,7 @@ class RegisteredUserController extends Controller
 
         return redirect()->route('verification.notice')
             ->with('status', $roleName === 'funcionario'
-                ? 'Cuenta creada como funcionario. Te enviamos un enlace de verificación a tu correo.'
-                : 'Cuenta creada como postulante. Te enviamos un enlace de verificación a tu correo.');
+                ? 'Cuenta creada como funcionario. El correo de verificación quedó en cola para su envío.'
+                : 'Cuenta creada como postulante. El correo de verificación quedó en cola para su envío.');
     }
 }

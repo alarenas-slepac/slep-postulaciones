@@ -3,20 +3,27 @@
 namespace App\Notifications\Auth;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use App\Services\Mail\QueuesMailNotification;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 
-class CustomVerifyEmail extends Notification implements ShouldQueue
+class CustomVerifyEmail extends Notification implements ShouldQueueAfterCommit, ShouldBeEncrypted
 {
-    use Queueable;
+    use Queueable, QueuesMailNotification;
 
     public function via($notifiable): array
     {
-        return ['mail'];
+        return $this->mailChannels($notifiable);
+    }
+
+    public function shouldSend($notifiable, $channel): bool
+    {
+        return !$notifiable->hasVerifiedEmail() && $this->sameMailRecipient($notifiable);
     }
 
     protected function verificationUrl($notifiable): string

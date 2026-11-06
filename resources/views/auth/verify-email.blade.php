@@ -9,20 +9,20 @@
 
                     @if (session('status') === 'verification-link-sent')
                         <div class="alert alert-success">
-                            Te enviamos un nuevo enlace de verificación a <strong>{{ auth()->user()->email }}</strong>.
+                            El nuevo correo de verificación quedó en cola para <strong>{{ auth()->user()->email }}</strong>.
                         </div>
                     @endif
 
                     <p class="mb-3">
-                        Hemos enviado un enlace de verificación a tu correo <strong>{{ auth()->user()->email }}</strong>.
-                        Revisa también la carpeta <em>Spam/Correo no deseado</em>.
+                        El enlace de verificación para <strong>{{ auth()->user()->email }}</strong> se envía cuando el servicio de correo está disponible.
+                        Si hay una interrupción, tu cuenta y el aviso se conservan. Cuando recibas el correo, abre el enlace para verificar tu cuenta.
                     </p>
 
                     <p class="text-muted">
-                        Si no recibiste el correo, puedes solicitar otro enlace a continuación.
+                        Revisa también la carpeta <em>Spam/Correo no deseado</em>. Si necesitas otro enlace, puedes solicitarlo a continuación.
                     </p>
 
-                    <div class="d-flex gap-2 mt-3">
+                    <div class="d-flex flex-wrap gap-2 mt-3">
                         {{-- Reenviar verificación --}}
                         <form method="POST" action="{{ route('verification.send') }}">
                             @csrf

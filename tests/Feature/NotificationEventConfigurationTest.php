@@ -53,6 +53,12 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
             'recipient_mode' => 'all', 'recipient_ids' => [], 'additional_emails' => [], 'revision' => 1] + $changes);
     }
 
+    /** Ejercita la configuraci?n durante la entrega del worker; el encolado se prueba en SystemMailQueueTest. */
+    private function deliver($mail)
+    {
+        return app(\App\Services\Mail\MailDelivery::class)->duringDelivery(null, fn () => Mail::send($mail));
+    }
+
     private function mail(): BaseMailable
     {
         return (new BaseMailable('Asunto original', lines: ['Datos originales del evento'], actionText: 'Ingresar al SGA', actionUrl: 'https://sga.example.test/'))
@@ -167,7 +173,7 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     {
         $this->setting('system.generic_mail', 'mail')->update(['subject_template' => 'SGA: {{asunto_original}}',
             'body_template' => "Presentación propia\n{{contenido_original}}\n".'Cierre propio $0', 'additional_emails' => ['ORIGINAL@example.test', 'copy@example.test']]);
-        $sent = Mail::send($this->mail()); $email = $sent->getSymfonySentMessage()->getOriginalMessage();
+        $sent = $this->deliver($this->mail()); $email = $sent->getSymfonySentMessage()->getOriginalMessage();
         $this->assertSame('SGA: Asunto original', $email->getSubject());
         $this->assertSame(1, substr_count($email->getHtmlBody(), 'Presentación propia'));
         $this->assertStringContainsString('Datos originales del evento', $email->getHtmlBody());
@@ -180,14 +186,14 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     public function test_disabled_mail_is_suppressed_even_when_setting_changes_after_queueing(): void
     {
         $mail = $this->mail(); $this->setting('system.generic_mail', 'mail')->update(['enabled' => false]);
-        $this->assertNull(Mail::send($mail));
+        $this->assertNull($this->deliver($mail));
         $this->assertCount(0, Mail::mailer()->getSymfonyTransport()->messages());
     }
 
     public function test_missing_configuration_table_preserves_historical_mail_and_whatsapp(): void
     {
         Schema::drop('notification_event_settings');
-        $this->assertNotNull(Mail::send($this->mail()));
+        $this->assertNotNull($this->deliver($this->mail()));
         $this->assertNotNull(app(WhatsAppDispatcher::class)->enqueue('+99900000000', 'Sintético', 'legacy', 'admin.test'));
     }
 
@@ -321,7 +327,7 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
             if (!($event['whatsapp_from_mail'] ?? false)) continue;
             $this->assertContains('whatsapp', $event['channels']); $this->assertFalse($policy->enabled($key, 'whatsapp'));
         }
-        $user = $this->phoneUser(); Mail::send($this->eventMail($user));
+        $user = $this->phoneUser(); $this->deliver($this->eventMail($user));
         $this->assertSame(0, \App\Models\WhatsAppDispatch::count()); Queue::assertNothingPushed();
         $this->setting('system.generic_mail', 'whatsapp')->update(['enabled' => null]);
         $this->assertFalse($policy->enabled('system.generic_mail', 'whatsapp'));
@@ -331,7 +337,7 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     {
         $user = $this->phoneUser();
         $this->setting('system.generic_mail', 'mail')->update(['enabled' => false]); $this->setting('system.generic_mail', 'whatsapp');
-        $this->assertNull(Mail::send($this->eventMail($user)->attachData('%PDF-synthetic', 'private.pdf')));
+        $this->assertNull($this->deliver($this->eventMail($user)->attachData('%PDF-synthetic', 'private.pdf')));
         $dispatch = \App\Models\WhatsAppDispatch::sole();
         $this->assertSame('+56900000001', $dispatch->payload['to']);
         $this->assertSame('notification_event', $dispatch->payload['policy']['scope']);
@@ -346,7 +352,7 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     {
         (require database_path('migrations/2026_03_20_110000_create_notification_dispatch_logs_table.php'))->up();
         $user = $this->phoneUser(); $this->setting('system.generic_mail', 'mail')->update(['enabled' => false]); $this->setting('system.generic_mail', 'whatsapp');
-        NotificationAudit::sendMail($user->email, $this->eventMail($user), ['event_key' => 'system.generic_mail']);
+        app(\App\Services\Mail\MailDelivery::class)->duringDelivery(null, fn () => NotificationAudit::sendMail($user->email, $this->eventMail($user), ['event_key' => 'system.generic_mail']));
         $this->assertSame('suppressed', DB::table('notification_dispatch_logs')->value('status'));
         $this->assertSame(1, \App\Models\WhatsAppDispatch::count());
     }
@@ -354,11 +360,11 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     public function test_mail_retry_uses_same_whatsapp_dispatch_after_template_or_phone_change(): void
     {
         $user = $this->phoneUser(); $this->setting('system.generic_mail', 'whatsapp');
-        Mail::send($this->eventMail($user)); $first = \App\Models\WhatsAppDispatch::sole();
+        $this->deliver($this->eventMail($user)); $first = \App\Models\WhatsAppDispatch::sole();
         NotificationEventSetting::sole()->update(['body_template' => "Nueva presentación\n{{contenido_original}}"]);
         DB::table('postulant_profiles')->update(['telefono1' => '900000002']);
         $retryMail = $this->eventMail($user); $retryMail->subjectText = 'Asunto actualizado durante el reintento';
-        Mail::send($retryMail);
+        $this->deliver($retryMail);
         $this->assertSame(1, \App\Models\WhatsAppDispatch::count()); $this->assertSame($first->payload, $first->fresh()->payload);
         Queue::assertPushed(SendWhatsAppMessage::class, 1);
         (new SendWhatsAppMessage($first->id))->handle(app(WhatsAppClient::class));
@@ -369,10 +375,10 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     {
         $first = $this->phoneUser(); $second = $this->phoneUser(2, '900000002');
         $this->setting('system.generic_mail', 'whatsapp')->update(['recipient_mode' => 'selected', 'recipient_ids' => [$second->id]]);
-        Mail::send($this->eventMail($first)); $this->assertSame(0, \App\Models\WhatsAppDispatch::count());
+        $this->deliver($this->eventMail($first)); $this->assertSame(0, \App\Models\WhatsAppDispatch::count());
         $this->actingAs($this->testUser(3, 3))->put('/admin/eventos-notificaciones/system.generic_mail/whatsapp',
             $this->data(['revision' => 1, 'recipient_mode' => 'selected', 'recipient_ids' => [$first->id]]))->assertRedirect();
-        Mail::send($this->eventMail($first)); $this->assertSame(1, \App\Models\WhatsAppDispatch::count());
+        $this->deliver($this->eventMail($first)); $this->assertSame(1, \App\Models\WhatsAppDispatch::count());
     }
 
     public function test_mail_copies_added_by_admin_do_not_become_whatsapp_recipients(): void
@@ -380,7 +386,7 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
         $first = $this->phoneUser(); $second = $this->phoneUser(2, '900000002');
         $this->setting('system.generic_mail', 'whatsapp');
         $this->setting('system.generic_mail', 'mail')->update(['additional_emails' => [$second->email]]);
-        Mail::send($this->eventMail($first)); $dispatch = \App\Models\WhatsAppDispatch::sole();
+        $this->deliver($this->eventMail($first)); $dispatch = \App\Models\WhatsAppDispatch::sole();
         $this->assertSame($first->id, $dispatch->payload['policy']['user_id']);
     }
 
@@ -391,7 +397,7 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
         $third = $this->phoneUser(3, '900000003'); $third->delete();
         $fourth = $this->phoneUser(4, '900000004'); $fifth = $this->phoneUser(5, '56900000004');
         $this->setting('system.generic_mail', 'whatsapp');
-        Mail::send($this->eventMail($first)->cc([$second->email, $third->email, $fourth->email, $fifth->email, 'unknown@example.test']));
+        $this->deliver($this->eventMail($first)->cc([$second->email, $third->email, $fourth->email, $fifth->email, 'unknown@example.test']));
         $this->assertSame(0, \App\Models\WhatsAppDispatch::count()); Queue::assertNothingPushed();
     }
 
@@ -420,7 +426,7 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
 
     public function test_generic_queued_message_retries_with_same_id_and_cancels_when_event_disabled(): void
     {
-        $user = $this->phoneUser(); $setting = $this->setting('system.generic_mail', 'whatsapp'); Mail::send($this->eventMail($user));
+        $user = $this->phoneUser(); $setting = $this->setting('system.generic_mail', 'whatsapp'); $this->deliver($this->eventMail($user));
         $dispatch = \App\Models\WhatsAppDispatch::sole(); $job = new SendWhatsAppMessage($dispatch->id); $ids = [];
         $client = $this->mock(WhatsAppClient::class);
         $client->shouldReceive('request')->twice()->andReturnUsing(function ($method, $path, $data) use (&$ids) {
@@ -466,11 +472,11 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     {
         $user = $this->phoneUser(); $this->setting('system.generic_mail', 'whatsapp');
         $mail = $this->eventMail($user); $mail->actionUrl = 'https://other.example.test/secret?token=synthetic';
-        $this->assertNotNull(Mail::send($mail));
+        $this->assertNotNull($this->deliver($mail));
         $text = \App\Models\WhatsAppDispatch::sole()->payload['text'];
         $this->assertStringContainsString('https://sga.example.test/', $text); $this->assertStringNotContainsString('synthetic', $text);
         config(['app.url' => 'http://insecure.example.test']);
-        $this->assertNotNull(Mail::send($this->eventMail($user, 'different-occurrence')));
+        $this->assertNotNull($this->deliver($this->eventMail($user, 'different-occurrence')));
         $this->assertSame(1, \App\Models\WhatsAppDispatch::count()); Http::assertNothingSent();
     }
 }

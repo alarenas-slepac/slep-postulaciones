@@ -30,6 +30,12 @@ return [
 
     'connections' => [
 
+        // Independiente de QUEUE_CONNECTION=sync; misma BD del trámite y sólo tras commit.
+        'sga_mail' => [
+            'driver' => 'database', 'connection' => null, 'table' => 'mail_jobs',
+            'queue' => 'sga-mail', 'retry_after' => 120, 'after_commit' => true,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],

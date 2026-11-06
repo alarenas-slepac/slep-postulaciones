@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.5.683',
+    'current_version' => '2026.11.6.684',
     'entries' => [
+        [
+            'version' => '2026.11.6.684',
+            'title' => 'Continuidad del SGA durante interrupciones del correo',
+            'summary' => 'Permite continuar operando durante una interrupción del correo: los avisos se conservan pendientes y se reintenta su envío, incluida la verificación de cuentas.',
+            'roles' => ['admin', 'postulante', 'funcionario', 'funcionario_ac', 'funcionario_directivo_estab', 'funcionario_slep', 'supervisor_plani', 'coordinador_uatp', 'coordinador_gdp'],
+            'items' => [
+                'Los correos de los distintos módulos quedan pendientes para su envío y no interrumpen la confirmación de las operaciones. Una operación revertida no genera el aviso.',
+                'Los fallos del servicio conservan el mensaje y programan nuevos intentos. El historial distingue En cola de Enviado y mantiene el estado correcto incluso cuando el envío se completa rápidamente.',
+                'La verificación genera el enlace firmado al entregar el aviso y omite cuentas ya verificadas, eliminadas o con otro correo. Recuperación de contraseña omite tokens vencidos o sustituidos; los mensajes de acceso informan que quedaron en cola.',
+                'Mantiene los eventos, las preferencias de notificación, las copias autorizadas y la protección de los datos. Conserva las reglas existentes de WhatsApp.',
+                'Administración puede pausar y reanudar la entrega durante una incidencia sin detener el ingreso de nuevos avisos.',
+            ],
+            'published_at' => '2026-11-06',
+        ],
         [
             'version' => '2026.11.5.683',
             'title' => 'Exclusión de docentes justificados en asignaciones de Plan de estudio y PIE',

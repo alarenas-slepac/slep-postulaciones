@@ -1,8 +1,10 @@
 # Inventario de eventos de notificaciones
 
-Revisión de código: 2026-10-11. Catálogo de `NotificationEventCatalog`, sin consultar destinatarios ni datos reales.
+Revisión de código: 2026-11-06. Catálogo de `NotificationEventCatalog`, sin consultar destinatarios ni datos reales.
 
-90 entradas, 12 módulos, 29 clases Mailable, 38 reglas propias de Cometidos y 88 eventos con WhatsApp. Los 11 existentes (diez automáticos de reemplazos y una prueba manual) conservan sus reglas; los 77 nuevos, derivados de correo, comienzan desactivados y requieren un destinatario original con cuenta verificada y teléfono válido. Una entrada no implica un disparador activo. Los avisos sin invocaciones actuales se indican en el nombre.
+90 entradas, 12 módulos, 30 clases Mailable, 38 reglas propias de Cometidos y 88 eventos con WhatsApp. Los 11 existentes (diez automáticos de reemplazos y una prueba manual) conservan sus reglas; los 77 nuevos, derivados de correo, comienzan desactivados y requieren un destinatario original con cuenta verificada y teléfono válido. Una entrada no implica un disparador activo. Los avisos sin invocaciones actuales se indican en el nombre.
+
+El parche 2026.11.6.684 incorpora `QueuedViewMail`, adaptador técnico de las vistas directas bajo `system.generic_mail` que conserva la clave específica del emisor. No agrega eventos de negocio ni destinatarios. Mailables y notificaciones usan una cola persistente posterior al commit; ver [Correo en cola y continuidad](CORREO_COLA_CONTINUIDAD.md) para la migración, el worker y la pausa durante una incidencia SMTP.
 
 Fuentes revisadas por mecanismo:
 

@@ -12,6 +12,7 @@ return [
     'events' => [],
     'non_mail_notifications' => [App\Notifications\ReemplazoWhatsAppNotification::class],
     'mailables' => [
+        App\Mail\QueuedViewMail::class => ['system.generic_mail', 'Sistema', 'Correo base genérico', 'Destinatario indicado por el emisor'],
         App\Mail\SolicitudReemplazoCreada::class => ['solicitud_reemplazo.created', 'Reemplazos', 'Nueva solicitud', 'Contacto del establecimiento'],
         App\Mail\SolicitudReemplazoAprobadaUatpPendientePlani::class => ['solicitud_reemplazo.aprobada_uatp_pendiente_plani', 'Reemplazos', 'Aprobación UATP', 'Contacto del establecimiento'],
         App\Mail\SolicitudReemplazoValidadaPlani::class => ['solicitud_reemplazo.validada_plani', 'Reemplazos', 'Validación de Planificación', 'Contacto del establecimiento'],

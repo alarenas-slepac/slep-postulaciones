@@ -3,18 +3,22 @@
 namespace App\Notifications\Auth;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use App\Services\Mail\QueuesMailNotification;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class WelcomeUser extends Notification implements ShouldQueue
+class WelcomeUser extends Notification implements ShouldQueueAfterCommit, ShouldBeEncrypted
 {
-    use Queueable;
+    use Queueable, QueuesMailNotification;
 
     public function via($notifiable): array
     {
-        return ['mail'];
+        return $this->mailChannels($notifiable);
     }
+
+    public function shouldSend($notifiable, $channel): bool { return $this->sameMailRecipient($notifiable); }
 
     public function toMail($notifiable): MailMessage
     {
