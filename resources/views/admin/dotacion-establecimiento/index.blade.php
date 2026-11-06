@@ -8,6 +8,7 @@
 <div class="dotacion-workspace">
     @php
         $mostrarMatricula = ($activeRole ?? null) !== 'funcionario_directivo_estab';
+        $puedeMarcarRevision = in_array($activeRole ?? null, \App\Services\Dotacion\DocentesDisposicionService::ROLES, true);
         $fmt = fn ($value) => \App\Support\DotacionEstablecimientoCalculator::formatHoras($value);
         $itemsPagina = collect(method_exists($establecimientos, 'items') ? $establecimientos->items() : $establecimientos);
         $totalMatriculaPagina = $itemsPagina->sum(fn ($ee) => (int) (($ee->dotacion_establecimiento_resumen['matricula_total'] ?? 0)));
@@ -36,6 +37,11 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
+                @if (in_array($activeRole, \App\Services\Dotacion\DocentesDisposicionService::ROLES, true))
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.disposicion.index', ['anio' => $anio]) }}">
+                        <i class="bi bi-person-workspace" aria-hidden="true"></i> Docentes a disposición
+                    </a>
+                @endif
                 @if ((int) $anio === 2027 && \App\Support\DotacionPal2027::canView($activeRole))
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.pal-2027.todos') }}">
                         <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Excel PAL 2027 consolidado
@@ -145,6 +151,9 @@
         </div>
     </form>
 
+    @if(session('success'))<div class="alert alert-success rounded-4" role="status">{{ session('success') }}</div>@endif
+    @if($errors->any())<div class="alert alert-danger rounded-4" role="alert"><strong>Revise los datos.</strong><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+    @if($puedeMarcarRevision)<div class="border rounded-4 p-3 mb-4 bg-white" role="note">Marque los establecimientos <strong>Revisados y finalizados para {{ $anio }}</strong>. Sólo éstos aportarán la nómina de docentes a disposición y los establecimientos de destino. La marca se registra por año y no modifica contratos ni bloquea las otras etapas.</div>@endif
     <div class="card dotacion-section">
         <div class="dotacion-section-header d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div>
@@ -169,6 +178,7 @@
                         <th class="text-end">Hrs plan</th>
                         <th class="text-end">Contrato docentes</th>
                         <th class="text-end">Bloque dotación</th>
+                        @if($puedeMarcarRevision)<th scope="col">Revisión {{ $anio }}</th>@endif
                         <th class="text-end">Acciones</th>
                     </tr>
                 </thead>
@@ -191,10 +201,11 @@
                             <td class="text-end fw-semibold text-primary">{{ $fmt($resumen['horas_plan_total'] ?? 0) }}</td>
                             <td class="text-end fw-semibold">{{ $fmt($resumen['horas_contrato_docentes'] ?? 0) }}</td>
                             <td class="text-end fw-semibold text-warning">{{ $fmt($totalBloques) }}</td>
+                            @if($puedeMarcarRevision)<td>@include('admin.dotacion-establecimiento.disposicion.revision-establecimiento')</td>@endif
                             <td class="text-end"><a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio]) }}"><i class="bi bi-eye"></i> Ver dotación</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="{{ $mostrarMatricula ? 10 : 9 }}" class="text-center text-muted py-4">No se encontraron establecimientos para los filtros aplicados.</td></tr>
+                        <tr><td colspan="{{ ($mostrarMatricula ? 10 : 9) + ($puedeMarcarRevision ? 1 : 0) }}" class="text-center text-muted py-4">No se encontraron establecimientos para los filtros aplicados.</td></tr>
                     @endforelse
                 </tbody>
             </table>

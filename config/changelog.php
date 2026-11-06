@@ -6457,8 +6457,23 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.6.684',
+    'current_version' => '2026.11.6.685',
     'entries' => [
+        [
+            'version' => '2026.11.6.685',
+            'title' => 'Docentes a disposición y distribución de horas entre establecimientos',
+            'summary' => 'Consolida por año y bloque las horas sujetas a supresión o no renovación y permite registrar destinos conservando el contrato de origen.',
+            'roles' => ['admin', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani'],
+            'items' => [
+                'Añade Docentes a disposición en la vista general de Dotación Establecimiento para cualquier año, con filtros, justificaciones y saldos por Planes de Estudio, Educación Parvularia y PIE.',
+                'Registra distribuciones, correcciones y anulaciones en una tabla auxiliar con responsable, fechas e historial, sin modificar el padrón, el contrato de origen ni las asignaciones de cursos del destino.',
+                'Controla el saldo acumulado en el servidor con bloqueo transaccional del origen y conserva los antecedentes históricos cuando cambian las horas o una no renovación.',
+                'El destino informa horas ya asignadas a docentes por contratar y docentes reales íntegramente a contrata, por bloque y año. Excluye Director, Inspector, UTP, Coordinación PIE y Convivencia Educativa; las horas detectadas no limitan la distribución.',
+                'Ordena la nómina general por grupo de prelación, antigüedad y nombre, y excluye de las referencias de destino los docentes con fuero maternal u horas gremiales.',
+                'Permite marcar establecimientos revisados y finalizados por año, con responsable e historial de reaperturas. Sólo los establecimientos finalizados para el año consultado aportan docentes y destinos.',
+            ],
+            'published_at' => '2026-11-06',
+        ],
         [
             'version' => '2026.11.6.684',
             'title' => 'Continuidad del SGA durante interrupciones del correo',

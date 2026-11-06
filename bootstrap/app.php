@@ -9,6 +9,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         // Las rutas específicas preceden al /tramites/{tramite} histórico.
         web: [__DIR__ . '/../routes/maternidad.php', __DIR__ . '/../routes/web.php', __DIR__ . '/../routes/padron_individual.php', __DIR__ . '/../routes/reemplazo_documentos.php', __DIR__ . '/../routes/padron_datos.php', __DIR__ . '/../routes/whatsapp.php', __DIR__ . '/../routes/consulta_votacion.php', __DIR__ . '/../routes/votaciones_convocados.php', __DIR__ . '/../routes/dotacion_pal.php', __DIR__ . '/../routes/dotacion_bir.php', __DIR__ . '/../routes/dotacion_bloqueos.php', __DIR__ . '/../routes/dotacion_docentes.php'],
+        then: function (): void {
+            \Illuminate\Support\Facades\Route::middleware('web')->group(__DIR__.'/../routes/dotacion_disposicion.php');
+        },
         api: __DIR__ . '/../routes/api.php',
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
