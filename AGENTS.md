@@ -41,11 +41,21 @@
     canales, enlace al SGA y pruebas de cobertura. Las clases detectadas sin
     catalogar requieren completar sus metadatos; los nuevos WhatsApp comienzan
     desactivados y conservan permisos, preferencias y deduplicación.
+15. En las migraciones, asignar nombres explícitos y cortos a índices, índices
+    únicos y claves foráneas. MySQL limita estos identificadores a 64 caracteres,
+    incluido cualquier prefijo configurado; no depender del nombre automático
+    formado por tabla y columnas. Antes de entregar, revisar el SQL generado con
+    la gramática MySQL y comprobar ese límite: SQLite no detecta este error.
+    Las migraciones con varias sentencias DDL deben permitir reintentar tras un
+    fallo parcial, comprobando por separado la tabla y sus índices/restricciones,
+    sin borrar ni recrear tablas con datos para resolverlo.
 
 ## Validaciones antes de entregar
 
 - Ejecutar `php -l` sobre todos los PHP modificados.
 - Ejecutar pruebas relacionadas cuando existan.
+- Si se modifican migraciones, comprobar los nombres de índices y restricciones
+  en el SQL MySQL y cubrir la recuperación tras un fallo parcial cuando aplique.
 - Ejecutar `php artisan route:list` si se modifican rutas.
 - Ejecutar `php artisan optimize:clear`.
 - Ejecutar `npm run build` cuando se modifiquen CSS o JavaScript compilados.
