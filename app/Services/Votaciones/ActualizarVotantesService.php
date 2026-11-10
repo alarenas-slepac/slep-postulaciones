@@ -12,6 +12,9 @@ class ActualizarVotantesService
     {
         return DB::transaction(function () use ($jornada, $filas, $campos, $agregar, $user) {
             $locked = JornadaVotacion::query()->lockForUpdate()->findOrFail($jornada->id);
+            if (app(PadronDefinitivoService::class)->publicado($locked)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['archivo_actualizacion' => 'El padrón definitivo publicado se conserva. Prepare una nueva versión definitiva para corregirlo.']);
+            }
             $actuales = DB::table('votacion_padron_consulta')->where('jornada_votacion_id', $locked->id)->get()->keyBy('id');
             $porRut = $actuales->groupBy('rut');
             $locales = $locked->localesConsulta()->get()->keyBy(fn ($l) => $l->rbd_origen.'|'.$l->rbd_local);

@@ -3,6 +3,7 @@
 namespace App\Services\Votaciones;
 
 use App\Models\JornadaVotacion;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class ParticipacionVotacionService
@@ -10,11 +11,20 @@ class ParticipacionVotacionService
     /** Sólo agregados: no carga ni entrega identidades del padrón a la vista. */
     public function resumir(?JornadaVotacion $jornada, array $resumen): array
     {
-        $padron = $jornada && Schema::hasTable('votacion_padron_consulta')
-            ? $jornada->padronConsulta()->whereNotNull('rut')->where('rut', '!=', '')->distinct()->count('rut')
-            : 0;
+        return $this->paraVista($jornada, $resumen)['participacion'];
+    }
 
-        return $this->calcular($resumen, $padron);
+    public function paraVista(?JornadaVotacion $jornada, array $resumen): array
+    {
+        return DB::transaction(function () use ($jornada, $resumen): array {
+            // Mismo bloqueo que publicación: cifra, mensaje y documento pertenecen a una sola versión.
+            $locked = $jornada ? JornadaVotacion::whereKey($jornada->id)->sharedLock()->firstOrFail() : null;
+            $definitivos = app(PadronDefinitivoService::class);
+            $version = $definitivos->publicado($locked);
+            $padron = $version?->personas ?? ($locked && Schema::hasTable('votacion_padron_consulta')
+                ? $locked->padronConsulta()->whereNotNull('rut')->where('rut', '!=', '')->distinct()->count('rut') : 0);
+            return ['participacion' => $this->calcular($resumen, $padron), 'padronDefinitivo' => $definitivos->contexto($version)];
+        });
     }
 
     public function calcular(array $resumen, int $padron): array

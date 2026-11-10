@@ -11,13 +11,16 @@ use Illuminate\Validation\ValidationException;
 
 class PadronConsultaService
 {
-    public function importar(JornadaVotacion $jornada, array $analysis, User $user, bool $confirmar): void
+    public function importar(JornadaVotacion $jornada, array $analysis, User $user, bool $confirmar, bool $desdeDefinitivo = false): void
     {
         if ($analysis['resumen']['errores'] > 0 || ! $analysis['padron'] || ! $analysis['locales']) {
             throw ValidationException::withMessages(['archivo' => 'Corrige todas las observaciones del archivo antes de importar.']);
         }
-        DB::transaction(function () use ($jornada, $analysis, $user, $confirmar): void {
+        DB::transaction(function () use ($jornada, $analysis, $user, $confirmar, $desdeDefinitivo): void {
             $locked = JornadaVotacion::query()->lockForUpdate()->findOrFail($jornada->id);
+            if (! $desdeDefinitivo && app(PadronDefinitivoService::class)->publicado($locked)) {
+                throw ValidationException::withMessages(['archivo' => 'Esta jornada tiene un padrón definitivo publicado. Prepare y publique una nueva versión definitiva para modificarlo.']);
+            }
             if ($locked->padronConsulta()->exists() && ! $confirmar) {
                 throw ValidationException::withMessages(['confirmar' => 'Confirma el reemplazo del padrón existente de esta jornada.']);
             }

@@ -18,6 +18,12 @@ En la vista pública y la revisión administrativa del consolidado se muestra el
 
 El padrón corresponde a la **carga vigente de esa jornada**, contando cada RUT normalizado una sola vez aunque tenga varias asignaciones a establecimientos. Se consulta únicamente el agregado y no se envían RUT ni nombres a la página. Los resultados públicos siguen usando sólo los días y conteos de la versión publicada; las cargas o correcciones pendientes de resultados no alteran el numerador público. Si se actualiza el padrón, cambia el denominador vigente mostrado.
 
+Desde el parche de padrón definitivo, **preparar una carga definitiva no modifica los resultados públicos**. Se conserva el denominador vigente hasta pulsar **Publicar padrón definitivo**. Desde esa publicación, participación diaria y acumulada usan el total de personas únicas de esa versión definitiva; preparar otra versión tampoco cambia ese total hasta publicarla. Se conservan los votos y la copia de resultados publicada.
+
+Sólo con padrón definitivo publicado se añade a cada alternativa el **porcentaje sobre el padrón habilitado**. Las barras conservan el porcentaje sobre votos válidos; nulos y blancos forman parte de la participación, pero no del respaldo de una alternativa. Ambos indicadores se identifican por separado y no proclaman ganadores ni certifican automáticamente un quórum. Antes de la primera publicación definitiva, las jornadas conservan el mensaje referencial y su presentación anterior.
+
+La revisión privada del padrón definitivo compara el denominador vigente y el propuesto con los escrutinios **ya publicados**, tanto acumulados como por fecha; no incorpora correcciones pendientes de resultados. Su operación y certificado opcional se describen en `docs/CONSULTA_LOCAL_VOTACION.md`.
+
 Con padrón ausente o vacío se conservan los votantes y se muestra «—» en el porcentaje. Si los votantes superan al padrón, se informa la inconsistencia, se conserva el porcentaje real y se limita el relleno al 100 %. No se modifica ni rechaza un escrutinio histórico por este indicador.
 
 Las barras, votos, totales y porcentajes se animan una sola vez al entrar en pantalla, con el patrón documentado en `docs/DESIGN_SYSTEM.md`. La duración es un segundo y no se altera la base de cálculo de las opciones: sus porcentajes siguen usando votos válidos. Sin JavaScript, con movimiento reducido o al imprimir, los resultados finales permanecen legibles. Se reutilizan los tonos azules institucionales y los paneles claros existentes.

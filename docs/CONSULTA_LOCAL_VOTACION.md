@@ -11,6 +11,27 @@ La dirección `/consulta-local-votacion` permite buscar por RUT, sin iniciar ses
 
 La publicación de la consulta es independiente de la publicación del seguimiento territorial: no exige configurar grupos operativos ni rutas. La jornada puede continuar en borrador operativo. Una jornada suspendida no aparece en la consulta. Si todos sus procesos se desactivan, tampoco aparece. **Retirar consulta pública** deshabilita la búsqueda para esa jornada.
 
+## Padrón definitivo y certificado de dotación
+
+En **Padrón y locales → Padrón definitivo**:
+
+1. Cargar el Excel definitivo con la estructura habitual de padrón y locales. Opcionalmente adjuntar un **certificado de dotación PDF de hasta 10 MB**. Es una publicación posterior; no reutiliza silenciosamente un certificado de otra carga.
+2. Pulsar **Preparar revisión privada**. La versión queda en una tabla auxiliar y el certificado en almacenamiento privado. El padrón vigente, su consulta pública y los porcentajes publicados se conservan.
+3. Revisar el total de personas únicas por RUT y la diferencia respecto del vigente. Los botones Acumulado y cada fecha comparan los porcentajes con los mismos escrutinios ya publicados. La revisión muestra el nuevo mensaje y permite ver o descargar el certificado como administrador.
+4. Confirmar expresamente que esa carga representa el padrón definitivo habilitado y pulsar **Publicar padrón definitivo**. En una sola transacción se reemplazan padrón y locales, se habilita la consulta por RUT y se activan el denominador definitivo, el nuevo mensaje y los porcentajes por alternativa respecto del padrón. Los escrutinios no se modifican.
+
+El PDF es **opcional**: sin certificado se puede publicar y no aparecen mensajes ni enlaces de documento. Si se adjunta, el cuadro Información sobre el padrón ofrece **Ver certificado** y **Descargar certificado** sólo después de la publicación definitiva. Los enlaces públicos permiten exclusivamente el certificado de la última versión definitiva publicada de la jornada, con procesos activos y sin suspensión. Nunca entregan el Excel, los datos personales de las versiones ni sus rutas internas. Retirar la consulta por RUT conserva el antecedente definitivo utilizado por los resultados ya publicados. Para admitir simultáneamente Excel y PDF de 10 MB cada uno, `post_max_size` debe admitir la suma y el formulario (por ejemplo 24 MB), además del límite individual de subida de PHP.
+
+Las versiones publicadas se conservan como historial y no se editan ni eliminan. Para corregirlas, preparar y publicar una nueva versión definitiva. La importación ordinaria y la actualización parcial se rechazan si ya hay un definitivo publicado. Si otro administrador cambia el padrón vigente o prepara una revisión nueva mientras se revisa la anterior, la publicación obsoleta se rechaza. Ante un fallo de guardado o bitácora, la transacción conserva la publicación previa.
+
+Requiere las migraciones anteriores de consulta, resultados diarios y consolidados, más `2026_11_09_230000_create_votacion_padrones_definitivos.php`. La migración nueva sólo crea una tabla auxiliar; no importa, publica ni cambia padrones existentes. Su reversión conserva los antecedentes. Sin esa tabla la interfaz y los cálculos históricos siguen disponibles y no se ofrece preparar definitivos. No requiere dependencias ni eventos de notificación nuevos.
+
+En cPanel, tras revisar los requisitos y disponer de respaldo, usar la ruta absoluta de PHP 8.3:
+
+```bash
+/opt/cpanel/ea-php83/root/usr/bin/php /home/slepac/apps/slep_postulaciones/artisan migrate --path=database/migrations/2026_11_09_230000_create_votacion_padrones_definitivos.php --force
+```
+
 ## Estructura del Excel
 
 Archivo `.xlsx`, máximo 10 MB, 20.000 filas de padrón y 2.000 filas de locales. Encabezados en la fila 1; una persona/asignación por fila, sin celdas combinadas ni fórmulas. Se aceptan encabezados reordenados, espacios exteriores, espacios en lugar de guiones bajos, mayúsculas/minúsculas, tildes y el alias `TIPO_DE_CONTRAT0` (cero final).
