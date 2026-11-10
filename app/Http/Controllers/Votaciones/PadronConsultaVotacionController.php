@@ -20,10 +20,14 @@ class PadronConsultaVotacionController extends Controller
         $jornada = $request->filled('jornada')
             ? JornadaVotacion::query()->with('procesos')->withCount(['padronConsulta', 'localesConsulta'])->where('slug', (string) $request->string('jornada'))->firstOrFail()
             : $jornadas->first();
+        $definitivos = app(\App\Services\Votaciones\PadronDefinitivoService::class);
 
         return view('votaciones.admin.padron-consulta', [
             'jornadas' => $jornadas, 'jornada' => $jornada,
             'locales' => $jornada?->localesConsulta()->orderBy('dia')->orderBy('hora_inicio')->orderBy('rbd_origen')->get(),
+            'definitivoDisponible' => $definitivos->disponible(),
+            'definitivoPendiente' => $jornada ? $definitivos->pendiente($jornada) : null,
+            'definitivoPublicado' => $definitivos->publicado($jornada),
         ]);
     }
 

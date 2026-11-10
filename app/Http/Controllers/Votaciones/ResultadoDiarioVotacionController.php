@@ -30,12 +30,12 @@ class ResultadoDiarioVotacionController extends Controller
         $consolidado = $jornada?->resultadosConsolidados()->latest('version')->first();
         $publicado = $jornada?->resultadosConsolidados()->publicados()->latest('version')->first();
         $consolidadoVigente = $consolidado && hash_equals($huella, $consolidado->huella);
-        $participacion = app(ParticipacionVotacionService::class)->resumir($jornada, $resumen);
+        ['participacion' => $participacion, 'padronDefinitivo' => $padronDefinitivo] = app(ParticipacionVotacionService::class)->paraVista($jornada, $resumen);
         $participacionDia = app(ParticipacionVotacionService::class)->calcular(
             $resultado ? PapeletasVotacion::resumir($papeletas, collect([$resultado])) : [], $participacion['padron']
         );
 
-        return view('votaciones.admin.resultados', compact('jornadas', 'jornada', 'fecha', 'dias', 'resultado', 'papeletas', 'resumen', 'huella', 'consolidado', 'publicado', 'consolidadoVigente', 'participacion', 'participacionDia'));
+        return view('votaciones.admin.resultados', compact('jornadas', 'jornada', 'fecha', 'dias', 'resultado', 'papeletas', 'resumen', 'huella', 'consolidado', 'publicado', 'consolidadoVigente', 'participacion', 'participacionDia', 'padronDefinitivo'));
     }
 
     public function guardar(GuardarResultadoDiarioRequest $request, JornadaVotacion $jornada, ResultadoDiarioService $service): RedirectResponse
@@ -77,9 +77,9 @@ class ResultadoDiarioVotacionController extends Controller
             $fecha = $data['fecha'] ?? null;
             abort_if($fecha && ! $dias->contains(fn ($dia) => $dia->fecha->toDateString() === $fecha), 404);
             $resumen = $fecha ? PapeletasVotacion::resumir($publicado->resumen, $dias->filter(fn ($dia) => $dia->fecha->toDateString() === $fecha)) : $publicado->resumen;
-            $participacion = app(ParticipacionVotacionService::class)->resumir($jornada, $resumen);
+            ['participacion' => $participacion, 'padronDefinitivo' => $padronDefinitivo] = app(ParticipacionVotacionService::class)->paraVista($jornada, $resumen);
 
-            return view('public.votaciones.resultados', compact('jornadas', 'jornada', 'dias', 'fecha', 'resumen', 'publicado', 'participacion'));
+            return view('public.votaciones.resultados', compact('jornadas', 'jornada', 'dias', 'fecha', 'resumen', 'publicado', 'participacion', 'padronDefinitivo'));
         }
         abort_if($jornada && $jornada->resultadosConsolidados()->whereNotNull('publicado_at')->exists(), 404);
         // Selección explícita: ni observaciones internas ni usuarios del registro llegan a la vista pública.
@@ -90,8 +90,8 @@ class ResultadoDiarioVotacionController extends Controller
         abort_if($fecha && ! $dias->contains(fn ($dia) => $dia->fecha->toDateString() === $fecha), 404);
         $seleccionados = $fecha ? $dias->filter(fn ($dia) => $dia->fecha->toDateString() === $fecha) : $dias;
         $resumen = PapeletasVotacion::resumir(PapeletasVotacion::deDias($seleccionados), $seleccionados);
-        $participacion = app(ParticipacionVotacionService::class)->resumir($jornada, $resumen);
+        ['participacion' => $participacion, 'padronDefinitivo' => $padronDefinitivo] = app(ParticipacionVotacionService::class)->paraVista($jornada, $resumen);
 
-        return view('public.votaciones.resultados', compact('jornadas', 'jornada', 'dias', 'fecha', 'resumen', 'publicado', 'participacion'));
+        return view('public.votaciones.resultados', compact('jornadas', 'jornada', 'dias', 'fecha', 'resumen', 'publicado', 'participacion', 'padronDefinitivo'));
     }
 }

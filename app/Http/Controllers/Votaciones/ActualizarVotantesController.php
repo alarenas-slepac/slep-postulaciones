@@ -43,6 +43,8 @@ class ActualizarVotantesController extends Controller
         }
         try {
             $resultado = $service->aplicar($jornada, $filas, $campos, $request->boolean('agregar'), $request->user());
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             // Una excepción SQL puede contener las filas: nunca registrar sus valores.
             Log::error('Falló la actualización masiva de votantes.', ['jornada_id' => $jornada->id, 'tipo' => get_class($e)]);

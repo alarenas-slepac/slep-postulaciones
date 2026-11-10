@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.6.685',
+    'current_version' => '2026.11.9.686',
     'entries' => [
+        [
+            'version' => '2026.11.9.686',
+            'title' => 'Padrón definitivo de votaciones con revisión privada y certificado opcional',
+            'summary' => 'Permite preparar y revisar el padrón definitivo sin cambiar la vista pública hasta su publicación expresa.',
+            'roles' => ['admin'],
+            'items' => [
+                'Conserva las cargas definitivas como versiones privadas y permite comparar participación diaria y acumulada usando los mismos escrutinios ya publicados.',
+                'La publicación expresa activa el total habilitado, el mensaje definitivo y el porcentaje de cada alternativa respecto del padrón, junto al porcentaje sobre votos válidos.',
+                'Admite certificado de dotación PDF opcional: su revisión administrativa es privada y su consulta y descarga públicas se habilitan sólo con el padrón definitivo publicado.',
+                'Valida revisiones desactualizadas y conserva las versiones publicadas, los escrutinios y la compatibilidad con jornadas sin padrón definitivo. Requiere una migración auxiliar no destructiva.',
+            ],
+            'published_at' => '2026-11-09',
+        ],
         [
             'version' => '2026.11.6.685',
             'title' => 'Docentes a disposición y distribución de horas entre establecimientos',

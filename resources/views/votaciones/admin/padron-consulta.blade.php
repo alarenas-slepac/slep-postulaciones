@@ -34,6 +34,7 @@
                 <span class="cv-eyebrow">{{ $jornada->nombre }}</span><h2 id="carga-titulo">2. Carga el padrón y los locales</h2>
                 <p class="text-secondary">Un Excel .xlsx con las hojas <strong>PADRON VOTACIÓN</strong> y <strong>LOCALES VOTACION</strong>. El día y la hora se obtienen de la combinación de RBD de origen y RBD del local.</p>
                 <a class="btn cv-secondary mb-3" href="{{ route('votaciones.admin.padrones.plantilla', [$jornada, 'modo' => 'completo']) }}"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Descargar plantilla de padrón y locales</a>
+                @if(!$definitivoPublicado)
                 <form method="POST" enctype="multipart/form-data" action="{{ route('votaciones.admin.padrones.importar', $jornada) }}">
                     @csrf
                     <div class="mb-3"><label class="form-label" for="archivo">Archivo de padrón y locales</label><input class="form-control" type="file" id="archivo" name="archivo" accept=".xlsx" required aria-describedby="archivo-ayuda"><div class="form-text" id="archivo-ayuda">Hasta 10 MB y 20.000 filas de padrón. Las fórmulas deben convertirse a valores.</div></div>
@@ -44,6 +45,9 @@
                 </form>
                 <details class="mt-4"><summary class="fw-bold">Columnas requeridas</summary><div class="cv-column-help mt-3"><strong>PADRON VOTACIÓN</strong><p>{{ implode(', ', \App\Services\Votaciones\PadronConsultaExcel::PADRON) }}</p><strong>LOCALES VOTACION</strong><p class="mb-0">{{ implode(', ', \App\Services\Votaciones\PadronConsultaExcel::LOCALES) }}</p></div></details>
                 @include('votaciones.partials.actualizar-padron')
+                @else
+                    <p class="cv-inline-note">Esta jornada utiliza un padrón definitivo publicado. Para corregirlo, prepara y revisa una nueva carga en la sección Padrón definitivo.</p>
+                @endif
             </section>
             <section class="cv-panel" aria-labelledby="publicacion-titulo">
                 <h2 id="publicacion-titulo">3. Publica la consulta</h2><p class="text-secondary">Revisa los datos antes de habilitar la búsqueda por RUT.</p>
@@ -55,6 +59,7 @@
                 <a class="btn cv-secondary" href="{{ route('public.consulta-votacion.index', ['jornada' => $jornada->slug]) }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Abrir consulta pública</a>
             </section>
         </div>
+        @include('votaciones.partials.padron-definitivo-carga')
         @if($diagnostico = session('diagnostico_padron'))
             <section class="cv-panel mt-4" aria-labelledby="diagnostico-titulo" role="status">
                 <h2 id="diagnostico-titulo">Resultado de la validación</h2>
