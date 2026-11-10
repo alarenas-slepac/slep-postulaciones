@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.9.686',
+    'current_version' => '2026.11.9.687',
     'entries' => [
+        [
+            'version' => '2026.11.9.687',
+            'title' => 'Migración del padrón definitivo compatible con MySQL y recuperación del despliegue',
+            'summary' => 'Corrige el nombre del índice que interrumpía el despliegue en cPanel y completa instalaciones parciales sin borrar datos.',
+            'roles' => ['admin'],
+            'items' => [
+                'Usa nombres explícitos y cortos para el índice de publicación y la clave foránea de nuevas instalaciones del padrón definitivo.',
+                'Al reintentar la migración completa el índice pendiente aunque la tabla ya exista. Una migración auxiliar cubre los reintentos registrados previamente como aplicados.',
+                'Conserva las versiones del padrón y sus restricciones existentes. Incorpora pruebas de SQL MySQL, conservación de datos e idempotencia.',
+                'Añade en AGENTS.md la regla del límite de 64 caracteres y documenta la recuperación del despliegue sin eliminar tablas ni registros de migraciones.',
+            ],
+            'published_at' => '2026-11-09',
+        ],
         [
             'version' => '2026.11.9.686',
             'title' => 'Padrón definitivo de votaciones con revisión privada y certificado opcional',
