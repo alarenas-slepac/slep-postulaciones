@@ -28,7 +28,7 @@
                         <tr data-revision-row="justificacion-{{ $registro->getKey() }}" data-revision-search="{{ $nombreRegistro }} {{ $rutRegistro }} {{ $bloqueRegistro }}" data-revision-block="{{ $registro->bloque }}" data-revision-state="justificacion">
                             <th scope="row" class="fw-normal"><div class="fw-semibold">{{ $nombreRegistro }}</div><div class="small text-muted">{{ $registro->docente_rut_normalizado }}</div></th>
                             <td>{{ $bloqueRegistro }} · {{ $registro->tipo_horas === 'titular' ? 'Titular' : 'Contrata' }}<div class="small text-muted">Registrada para {{ $fmt($registro->horas_detectadas) }} h</div></td>
-                            <td class="text-break">{{ $registro->justificacion }}</td>
+                            <td class="text-break">{{ $registro->justificacion }}@include('admin.dotacion-establecimiento.partials._sobredotacion_ensenanza_detalle')</td>
                             <td>@include('admin.dotacion-establecimiento.partials._sobredotacion_eliminar_justificacion')</td>
                         </tr>
                     @endforeach

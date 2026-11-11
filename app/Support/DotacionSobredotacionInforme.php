@@ -44,7 +44,7 @@ class DotacionSobredotacionInforme
                 'rut' => $r->docente_rut_normalizado,
                 'nombre' => data_get($personas->get($norm($r->docente_rut_normalizado)), 'nombre', 'Sin antecedentes en la nómina'),
                 'bloque' => $r->bloque, 'tipo' => $r->tipo_horas,
-                'horas' => (float) $r->horas_detectadas, 'texto' => $r->justificacion,
+                'horas' => (float) $r->horas_detectadas, 'texto' => $r->fundamentoCompleto(),
                 'actualizada' => $r->updated_at?->format('d-m-Y H:i'),
             ])->values();
         $ajustesPorBloque = collect(data_get($sobredotacion, 'aula.ajustes', []))->groupBy(function ($fila) use ($personas, $norm) {

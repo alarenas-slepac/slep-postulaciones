@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.9.687',
+    'current_version' => '2026.11.11.688',
     'entries' => [
+        [
+            'version' => '2026.11.11.688',
+            'title' => 'Nivel y áreas de enseñanza en justificaciones de sobredotación',
+            'summary' => 'Permite indicar el nivel de enseñanza y varias áreas de desempeño docente al registrar o actualizar una justificación.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'supervisor_plani', 'coordinador_uatp', 'coordinador_gdp'],
+            'items' => [
+                'Añade los niveles Enseñanza Básica, Enseñanza Media, Educación de Párvulos, EPJA, Educación Especial y PIE, y un selector múltiple con búsqueda que reutiliza las áreas activas de Docentes del perfil del postulante.',
+                'Valida los nuevos datos en el servidor y excluye áreas de Asistentes de la Educación, inactivas o inexistentes. Cada justificación por docente, bloque y calidad conserva su propia selección.',
+                'Guarda los identificadores y nombres del catálogo para conservar el antecedente histórico. Los registros anteriores siguen siendo válidos y pueden completarse al actualizarlos.',
+                'Incluye el nivel y las áreas en la consulta, las nóminas, los informes Excel/PDF y los antecedentes de nuevas distribuciones de docentes a disposición. Requiere una migración aditiva y reintentable, sin modificar contratos ni permisos.',
+            ],
+            'published_at' => '2026-11-11',
+        ],
         [
             'version' => '2026.11.9.687',
             'title' => 'Migración del padrón definitivo compatible con MySQL y recuperación del despliegue',

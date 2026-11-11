@@ -8,18 +8,62 @@ use Illuminate\Support\Facades\Schema;
 
 class DotacionSobredotacionJustificacion extends Model
 {
+    public const NIVELES_ENSENANZA = [
+        'basica' => 'Enseñanza Básica', 'media' => 'Enseñanza Media',
+        'parvularia' => 'Educación de Párvulos', 'epja' => 'EPJA',
+        'especial' => 'Educación Especial', 'pie' => 'PIE',
+    ];
+
     protected $table = 'dotacion_sobredotacion_justificaciones';
 
     protected $fillable = [
         'establecimiento_id', 'anio', 'docente_rut_normalizado', 'bloque',
         'tipo_horas', 'horas_detectadas', 'justificacion', 'created_by', 'updated_by',
+        'nivel_ensenanza', 'areas_ensenanza',
     ];
 
     protected $casts = [
         'horas_detectadas' => 'decimal:2',
+        'areas_ensenanza' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    public static function ensenanzaDisponible(): bool
+    {
+        return Schema::hasTable('dotacion_sobredotacion_justificaciones')
+            && Schema::hasColumns('dotacion_sobredotacion_justificaciones', ['nivel_ensenanza', 'areas_ensenanza']);
+    }
+
+    public static function areasDocentesActivas(): Collection
+    {
+        return Schema::hasTable('areas_desempeno')
+            ? AreaDesempeno::activos()->docente()->orderBy('nombre')->get(['id', 'nombre']) : collect();
+    }
+
+    public function nivelEnsenanzaNombre(): ?string
+    {
+        return self::NIVELES_ENSENANZA[$this->getAttribute('nivel_ensenanza') ?? ''] ?? null;
+    }
+
+    public function areasEnsenanzaIds(): array
+    {
+        return collect($this->getAttribute('areas_ensenanza') ?? [])->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+    }
+
+    public function areasEnsenanzaNombres(): array
+    {
+        return collect($this->getAttribute('areas_ensenanza') ?? [])->pluck('nombre')
+            ->filter(fn ($nombre) => is_string($nombre) && trim($nombre) !== '')->unique()->values()->all();
+    }
+
+    public function fundamentoCompleto(): string
+    {
+        $partes = [(string) $this->justificacion];
+        if ($nivel = $this->nivelEnsenanzaNombre()) { $partes[] = 'Nivel de enseñanza: '.$nivel; }
+        if ($areas = $this->areasEnsenanzaNombres()) { $partes[] = 'Área de enseñanza: '.implode(', ', $areas); }
+        return implode("\n", $partes);
+    }
 
     public static function clave(string $bloque, string $rut, string $tipo): string
     {

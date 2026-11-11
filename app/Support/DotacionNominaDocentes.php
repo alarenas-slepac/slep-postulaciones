@@ -110,7 +110,7 @@ class DotacionNominaDocentes
                         $registro = $porClave->get(DotacionSobredotacionJustificacion::clave($bloque, $rut, $tipo));
                         $texto = trim((string) ($registro?->justificacion ?? ''));
                         $fila['horas_'.$tipo] = $horas;
-                        $fila['justificacion_'.$tipo] = $texto !== '' ? $texto : ($horas > 0.01 ? 'Sin justificación' : 'No aplica');
+                        $fila['justificacion_'.$tipo] = $texto !== '' ? $registro->fundamentoCompleto() : ($horas > 0.01 ? 'Sin justificación' : 'No aplica');
                         $fila['estado_'.$tipo] = match (true) {
                             $horas <= 0.01 => 'Sin saldo actual',
                             $texto === '' => 'Sin justificación',
@@ -147,8 +147,8 @@ class DotacionNominaDocentes
                     $descripcion = $nombreBloque.' · '.($tipo === 'titular' ? 'Supresión titular' : 'No renovación contrata').': '
                         .DotacionEstablecimientoCalculator::formatHoras($horas).' h · '.($vigente ? 'Con justificación vigente' : 'Sin justificación vigente');
                     if ($registro && trim((string) $registro->justificacion) !== '') {
-                        $descripcion .= $vigente ? ': '.$registro->justificacion
-                            : ' (justificación registrada para '.DotacionEstablecimientoCalculator::formatHoras($registro->horas_detectadas).' h): '.$registro->justificacion;
+                        $descripcion .= $vigente ? ': '.$registro->fundamentoCompleto()
+                            : ' (justificación registrada para '.DotacionEstablecimientoCalculator::formatHoras($registro->horas_detectadas).' h): '.$registro->fundamentoCompleto();
                     }
                     $revision[$rut]['detalle'][] = $descripcion;
                 }

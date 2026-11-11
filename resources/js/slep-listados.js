@@ -13,8 +13,9 @@ export function enhanceSelects(scope, root = scope.closest('[data-slep-listing]'
         const mode = select.dataset.slepSelect;
         const label = root.querySelector(`label[for="${select.id}"]`);
         const widget = jquery(select);
+        const dropdownParent = select.closest('.modal') || (select.dataset.slepDropdownParent === 'body' ? document.body : root);
         widget.select2({
-            theme: 'bootstrap-5', width: '100%', dropdownParent: jquery(select.closest('.modal') || root), dropdownCssClass: 'slep-select-dropdown',
+            theme: 'bootstrap-5', width: '100%', dropdownParent: jquery(dropdownParent), dropdownCssClass: 'slep-select-dropdown',
             minimumResultsForSearch: mode === 'compact' ? Infinity : 0,
             tags: mode === 'tags',
             createTag: params => {
@@ -31,7 +32,7 @@ export function enhanceSelects(scope, root = scope.closest('[data-slep-listing]'
             selection.attr('aria-invalid', 'true');
         }
         widget.on('select2:open.slepListing', () => {
-            const search = root.querySelector('.select2-container--open .select2-search__field');
+            const search = dropdownParent.querySelector('.select2-container--open .select2-search__field');
             if (search) {
                 search.setAttribute('aria-label', `Buscar ${label?.textContent.trim().toLocaleLowerCase('es') || 'opción'}`);
                 if (mode === 'tags') search.maxLength = 255;

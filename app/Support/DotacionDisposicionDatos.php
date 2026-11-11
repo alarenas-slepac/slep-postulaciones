@@ -117,7 +117,7 @@ class DotacionDisposicionDatos
                         'contrato' => $contrato, 'horas' => $horas,
                         'tipo' => $tipo === 'contrata' ? 'No renovación' : ($contrato === null ? 'Supresión sin clasificar' : ($total ? 'Supresión total' : 'Supresión parcial')),
                         'situacion' => 'Propuesta en revisión', 'fuente' => 'sobredotacion', 'fuente_id' => $registro?->id,
-                        'justificacion' => $registro?->justificacion ?: 'Sin justificación',
+                        'justificacion' => $registro?->fundamentoCompleto() ?: 'Sin justificación',
                         'estado_justificacion' => $fila['estado_'.$tipo] ?? 'Sin justificación',
                     ]);
                 }
