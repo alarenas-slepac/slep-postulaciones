@@ -330,6 +330,8 @@ class DotacionEstablecimientoController extends Controller
             data_get($data, 'asignacion.necesidades.funciones', [])
         );
         $justificacionesSobredotacionTableReady = Schema::hasTable('dotacion_sobredotacion_justificaciones');
+        $ensenanzaJustificacionDisponible = $justificacionesSobredotacionTableReady && $tab === 'sobredotacion'
+            && DotacionSobredotacionJustificacion::ensenanzaDisponible();
         $justificacionesSobredotacion = $justificacionesSobredotacionTableReady && $canViewSobredotacion
             ? DotacionSobredotacionJustificacion::query()
                 ->where('establecimiento_id', $establecimiento->id)
@@ -393,6 +395,8 @@ class DotacionEstablecimientoController extends Controller
             'canViewSobredotacion' => $canViewSobredotacion,
             'justificacionesSobredotacion' => $justificacionesSobredotacion,
             'justificacionesSobredotacionTableReady' => $justificacionesSobredotacionTableReady,
+            'ensenanzaJustificacionDisponible' => $ensenanzaJustificacionDisponible,
+            'areasDocentesJustificacion' => $ensenanzaJustificacionDisponible ? DotacionSobredotacionJustificacion::areasDocentesActivas() : collect(),
             'canManageJustificacionesSobredotacion' => in_array($activeRole, ['admin', 'funcionario_directivo_estab', 'supervisor_plani'], true),
             'asignacion' => $data['asignacion'] ?? [],
             'subsectoresEpja2026' => $anio === 2026 && $tab === 'asignacion'

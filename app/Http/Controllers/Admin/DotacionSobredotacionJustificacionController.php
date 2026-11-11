@@ -27,7 +27,23 @@ class DotacionSobredotacionJustificacionController extends Controller
             'tipo_horas' => ['required', Rule::in(['titular', 'contrata'])],
             'docente_rut' => ['required', 'string', 'max:32'],
             'justificacion' => ['required', 'string', 'min:10', 'max:3000'],
+            'nivel_ensenanza' => ['required', Rule::in(array_keys(DotacionSobredotacionJustificacion::NIVELES_ENSENANZA))],
+            'areas_desempeno_ids' => ['required', 'array', 'min:1'],
+            'areas_desempeno_ids.*' => ['required', 'integer', 'min:1', 'distinct'],
+        ], [
+            'nivel_ensenanza.required' => 'Seleccione el nivel de enseñanza.',
+            'nivel_ensenanza.in' => 'Seleccione uno de los niveles de enseñanza disponibles.',
+            'areas_desempeno_ids.required' => 'Seleccione una o más áreas de enseñanza docente.',
+            'areas_desempeno_ids.*.distinct' => 'No repita las áreas de enseñanza.',
         ]);
+
+        abort_unless(DotacionSobredotacionJustificacion::ensenanzaDisponible(), 503,
+            'Ejecute la migración de nivel y áreas de enseñanza antes de guardar justificaciones.');
+        $ids = array_map('intval', $datos['areas_desempeno_ids']);
+        $areas = DotacionSobredotacionJustificacion::areasDocentesActivas()->whereIn('id', $ids)->values();
+        if ($areas->count() !== count($ids)) {
+            throw ValidationException::withMessages(['areas_desempeno_ids' => 'Seleccione únicamente áreas de desempeño docente activas del catálogo.']);
+        }
 
         $anio = (int) $datos['anio'];
         $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio);
@@ -64,6 +80,8 @@ class DotacionSobredotacionJustificacionController extends Controller
         $justificacion->fill([
             'horas_detectadas' => $horas,
             'justificacion' => trim($datos['justificacion']),
+            'nivel_ensenanza' => $datos['nivel_ensenanza'],
+            'areas_ensenanza' => $areas->map(fn ($area) => ['id' => (int) $area->id, 'nombre' => $area->nombre])->all(),
             'updated_by' => $usuario->id,
         ])->save();
 

@@ -94,6 +94,21 @@
 .dotacion-workspace .dotacion-editor-content { padding: .75rem; border-top: 1px solid #dbe4f0; }
 .dotacion-workspace .dotacion-editor .dotacion-assignment-form { padding: 0; border: 0; background: none; box-shadow: none; min-width: 0; }
 @media (max-width: 991.98px) {
+    .dotacion-workspace .dotacion-vacantes-table,
+    .dotacion-workspace .dotacion-vacantes-table > tbody,
+    .dotacion-workspace .dotacion-vacantes-table > tfoot { display: block; width: 100%; }
+    .dotacion-workspace .dotacion-vacantes-table > thead { display: none; }
+    .dotacion-workspace .dotacion-vacantes-table > tbody > tr[data-revision-row] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; padding: 1rem; margin: .75rem; border: 1px solid #dbe4f0; border-radius: 1rem; background: #fff; }
+    .dotacion-workspace [data-dotacion-revision] .dotacion-vacantes-table > tbody > tr > td { display: block; min-width: 0; padding: 0; border: 0; text-align: left !important; white-space: normal !important; box-shadow: none; overflow-wrap: anywhere; }
+    .dotacion-workspace .dotacion-vacantes-table > tbody > tr[data-revision-row] > td:first-child,
+    .dotacion-workspace .dotacion-vacantes-table > tbody > tr[data-revision-row] > td:nth-child(2),
+    .dotacion-workspace .dotacion-vacantes-table > tbody > tr[data-revision-row] > td:nth-child(6),
+    .dotacion-workspace .dotacion-vacantes-table > tbody > tr[data-revision-row] > td:last-child { grid-column: 1 / -1; }
+    .dotacion-workspace .dotacion-vacantes-table td[data-label]::before { content: attr(data-label); display: block; margin-bottom: .25rem; font-size: .78rem; font-weight: 600; color: #64748b; }
+    .dotacion-workspace .dotacion-vacantes-table > tbody > tr:not([data-revision-row]) { display: block; }
+    .dotacion-workspace .dotacion-vacantes-table > tfoot > tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .dotacion-workspace .dotacion-vacantes-table > tfoot > tr > td:first-child { grid-column: 1 / -1; }
+    .dotacion-workspace .dotacion-vacantes-table > tfoot > tr > td:last-child { display: none; }
     .dotacion-workspace .dotacion-needs-table { display: block; width: 100%; }
     .dotacion-workspace .dotacion-needs-table > thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
     .dotacion-workspace .dotacion-needs-table > tbody { display: block; width: 100%; }

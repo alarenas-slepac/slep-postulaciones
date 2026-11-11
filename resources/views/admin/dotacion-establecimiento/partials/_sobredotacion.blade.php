@@ -25,6 +25,10 @@
             : ['label' => 'Dotación estructural cuadrada', 'value' => '0', 'class' => 'alert-primary']);
 @endphp
 
+@push('styles')
+    <noscript><style>.dotacion-workspace .dotacion-vacantes-table .collapse { display: block; } .dotacion-workspace .dotacion-vacantes-table button[data-bs-toggle="collapse"] { display: none; }</style></noscript>
+@endpush
+
 @include('admin.dotacion-establecimiento.partials._resumen_contractual_bloques')
 
 <div class="card dotacion-section mb-4">
@@ -122,6 +126,9 @@
             <div class="alert alert-warning rounded-4 mx-3 mt-3 mb-0" role="alert">El registro de justificaciones estará disponible después de ejecutar la migración de esta actualización.</div>
         @else
             <div class="px-3 py-2 small text-muted">El establecimiento debe fundamentar por separado la supresión de horas titulares y la no renovación de horas a contrata de cada docente con saldo. Si el saldo cambia, actualice su justificación.</div>
+            @if(! ($ensenanzaJustificacionDisponible ?? false))
+                <div class="alert alert-warning rounded-4 mx-3 mt-2 mb-3" role="alert">Para guardar nivel y áreas de enseñanza, aplique la migración de esta actualización. Las justificaciones existentes permanecen disponibles para consulta.</div>
+            @endif
         @endif
         @foreach (['plan_estudio' => 'Plan de estudio', 'parvularia' => 'Educación Parvularia', 'pie' => 'PIE'] as $claveBloque => $tituloBloque)
             @php
@@ -133,7 +140,7 @@
                     <span class="badge rounded-pill text-bg-danger">{{ $fmt($bloqueVacante['horas_total'] ?? 0) }} h sin asignación</span>
                 </div>
                 <div class="table-responsive">
-                    <table class="table align-middle mb-0">
+                    <table class="table dotacion-vacantes-table align-middle mb-0">
                         <thead class="table-light"><tr><th scope="col">RUT</th><th scope="col">Docente</th><th scope="col">Grupo de prelación</th><th scope="col">Tramo</th><th scope="col">Fecha de antigüedad</th><th scope="col">Función</th><th scope="col" class="text-end">Contrato del bloque</th><th scope="col" class="text-end">Sin asignación</th><th scope="col" class="text-end">Planta</th><th scope="col" class="text-end">Contrata</th><th scope="col">Justificación</th></tr></thead>
                         <tbody>
                             @forelse (($bloqueVacante['items'] ?? collect()) as $docente)
@@ -154,17 +161,17 @@
                                         && old('bloque') === $claveBloque && \App\Support\DotacionEstablecimientoCalculator::normalizeRut(old('docente_rut')) === $rutNormalizado;
                                 @endphp
                                 <tr data-revision-row="{{ sha1($claveBloque.$rutNormalizado) }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['funcion'] }} {{ $antecedentesPrelacion['titulo'] ?? '' }}" data-revision-block="{{ $claveBloque }}" data-revision-state="saldo {{ $pendientes && ($justificacionesSobredotacionTableReady ?? false) ? 'justificacion' : '' }}" data-revision-error="{{ $mostrarErrores && $errors->any() ? '1' : '0' }}">
-                                    <td class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
-                                    <td><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
-                                    <td>{{ $antecedentesPrelacion['prioridad_2027_label'] ?? 'Sin información' }}</td>
-                                    <td>{{ ($antecedentesPrelacion['tramo'] ?? null) ?: 'Sin tramo' }}</td>
-                                    <td class="text-nowrap">{{ $fechaAntiguedadVacante($antecedentesPrelacion['fecha_antiguedad'] ?? null) }}</td>
-                                    <td><div>{{ $docente['funcion'] }}</div><div class="small text-muted text-break">{{ ($antecedentesPrelacion['titulo'] ?? null) ?: 'Sin título declarado' }}</div></td>
-                                    <td class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td>
-                                    <td class="text-end text-danger fw-bold">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
-                                    <td class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td>
-                                    <td class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td>
-                                    <td class="text-nowrap">
+                                    <td data-label="RUT" class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
+                                    <td data-label="Docente"><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
+                                    <td data-label="Grupo de prelación">{{ $antecedentesPrelacion['prioridad_2027_label'] ?? 'Sin información' }}</td>
+                                    <td data-label="Tramo">{{ ($antecedentesPrelacion['tramo'] ?? null) ?: 'Sin tramo' }}</td>
+                                    <td data-label="Fecha de antigüedad" class="text-nowrap">{{ $fechaAntiguedadVacante($antecedentesPrelacion['fecha_antiguedad'] ?? null) }}</td>
+                                    <td data-label="Función"><div>{{ $docente['funcion'] }}</div><div class="small text-muted text-break">{{ ($antecedentesPrelacion['titulo'] ?? null) ?: 'Sin título declarado' }}</div></td>
+                                    <td data-label="Contrato del bloque" class="text-end fw-semibold">{{ $fmt($docente['horas_contrato_categoria']) }}</td>
+                                    <td data-label="Sin asignación" class="text-end text-danger fw-bold">{{ $fmt($docente['horas_sobredotacion_total']) }}</td>
+                                    <td data-label="Planta" class="text-end text-primary fw-semibold">{{ $fmt($docente['horas_sobredotacion_planta']) }}</td>
+                                    <td data-label="Contrata" class="text-end text-info fw-semibold">{{ $fmt($docente['horas_sobredotacion_contrata']) }}</td>
+                                    <td data-label="Justificación" class="text-nowrap">
                                         <a class="btn btn-sm btn-outline-secondary rounded-pill mb-1" data-dotacion-contexto-salida href="{{ route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $anio, 'tab' => 'docentes', 'revision_docentes_q' => $docente['rut']]) }}" aria-label="Ver contrato de {{ $docente['nombre'] }}">Ver contrato</a>
                                         @if (($justificacionesSobredotacionTableReady ?? false))
                                             <span class="badge rounded-pill {{ $pendientes ? 'text-bg-warning' : 'text-bg-success' }}">{{ $pendientes ? $pendientes.' pendiente(s)' : 'Completa' }}</span>
@@ -204,6 +211,7 @@
                                                                                 <input type="hidden" name="bloque" value="{{ $claveBloque }}">
                                                                                 <input type="hidden" name="tipo_horas" value="{{ $calidad }}">
                                                                                 <input type="hidden" name="docente_rut" value="{{ $docente['rut'] }}">
+                                                                                @include('admin.dotacion-establecimiento.partials._sobredotacion_ensenanza_form')
                                                                                 <label class="form-label fw-semibold" for="{{ $idCampo }}">Fundamento <span class="text-danger">*</span></label>
                                                                                 <textarea class="form-control rounded-3 {{ $esFormularioActivo && $errors->any() ? 'is-invalid' : '' }}" id="{{ $idCampo }}" name="justificacion" rows="3" minlength="10" maxlength="3000" required>{{ $esFormularioActivo ? old('justificacion') : $registro?->justificacion }}</textarea>
                                                                                 @if ($esFormularioActivo && $errors->any())
@@ -211,12 +219,13 @@
                                                                                 @endif
                                                                                 <div class="d-flex justify-content-between align-items-center gap-2 mt-2">
                                                                                     <span class="small text-muted">{{ $registro?->updated_at?->format('d-m-Y H:i') }}</span>
-                                                                                    <button type="submit" class="btn btn-primary rounded-pill px-3"><i class="bi bi-check-circle me-1"></i>Guardar</button>
+                                                                                    <button type="submit" class="btn btn-primary rounded-pill px-3" @disabled(! ($ensenanzaJustificacionDisponible ?? false) || collect($areasDocentesJustificacion ?? [])->isEmpty())><i class="bi bi-check-circle me-1"></i>Guardar</button>
                                                                                 </div>
                                                                             </form>
                                                                             @include('admin.dotacion-establecimiento.partials._sobredotacion_eliminar_justificacion')
                                                                         @else
                                                                             <p class="mb-0 text-break">{{ $registro?->justificacion ?? 'El establecimiento aún no registra el fundamento.' }}</p>
+                                                                            @include('admin.dotacion-establecimiento.partials._sobredotacion_ensenanza_detalle')
                                                                             @if ($registro)<div class="small text-muted mt-2">Actualizada: {{ $registro->updated_at?->format('d-m-Y H:i') }}</div>@endif
                                                                         @endif
                                                                     </div>
@@ -234,7 +243,7 @@
                             @endforelse
                         </tbody>
                         @if (collect($bloqueVacante['items'] ?? [])->isNotEmpty())
-                            <tfoot class="table-light fw-bold"><tr><td colspan="7">Total {{ $tituloBloque }}</td><td class="text-end text-danger">{{ $fmt($bloqueVacante['horas_total']) }}</td><td class="text-end text-primary">{{ $fmt($bloqueVacante['horas_planta']) }}</td><td class="text-end text-info">{{ $fmt($bloqueVacante['horas_contrata']) }}</td><td></td></tr></tfoot>
+                            <tfoot class="table-light fw-bold"><tr><td colspan="7">Total {{ $tituloBloque }}</td><td data-label="Sin asignación" class="text-end text-danger">{{ $fmt($bloqueVacante['horas_total']) }}</td><td data-label="Planta" class="text-end text-primary">{{ $fmt($bloqueVacante['horas_planta']) }}</td><td data-label="Contrata" class="text-end text-info">{{ $fmt($bloqueVacante['horas_contrata']) }}</td><td></td></tr></tfoot>
                         @endif
                     </table>
                 </div>
