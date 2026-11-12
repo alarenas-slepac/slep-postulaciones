@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.11.688',
+    'current_version' => '2026.11.12.689',
     'entries' => [
+        [
+            'version' => '2026.11.12.689',
+            'title' => 'Validación alternativa de cuentas por WhatsApp',
+            'summary' => 'Permite habilitar una cuenta desde la pantalla de verificación mediante un código personal a su celular, manteniendo independiente la confirmación del correo.',
+            'roles' => ['admin', 'postulante', 'funcionario', 'funcionario_ac'],
+            'items' => [
+                'Añade un formulario de celular chileno que acepta 9XXXXXXXX, 569XXXXXXXX y +569XXXXXXXX, normaliza el número y lo conserva como teléfono principal del perfil al confirmar el código. Si todavía no existe perfil, lo incorpora al completarlo.',
+                'Genera códigos de seis dígitos, de un solo uso, con cinco minutos de vigencia y cinco intentos. Permite reenviar tras un minuto, muestra los contadores y valida los plazos también en el servidor. Un nuevo código invalida el anterior.',
+                'La confirmación del teléfono es exclusiva por cuenta mediante una restricción única en base de datos. El acceso admite correo o WhatsApp confirmado, sin marcar el correo como verificado ni cambiar roles y permisos.',
+                'Reutiliza la cola y sesión WhatsApp existentes, cifra el mensaje pendiente y cancela códigos vencidos, sustituidos o de cuentas que cambiaron. Registra auth.whatsapp_verification en Administración → Eventos de notificaciones, desactivado hasta su habilitación expresa.',
+                'Incluye migración aditiva y reintentable, pruebas de formato, autorización, expiración, exclusividad, colas, configuración y recuperación parcial con SQL MySQL. Conserva las verificaciones y los enlaces de correo anteriores.',
+            ],
+            'published_at' => '2026-11-12',
+        ],
         [
             'version' => '2026.11.11.688',
             'title' => 'Nivel y áreas de enseñanza en justificaciones de sobredotación',

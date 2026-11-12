@@ -2344,6 +2344,15 @@
     "file": "assets/baby-BmJi2iCA.svg",
     "src": "resources/icons/baby.svg"
   },
+  "resources/js/account-verification.js": {
+    "file": "assets/account-verification-Cxjm2Wlk.js",
+    "name": "account-verification",
+    "src": "resources/js/account-verification.js",
+    "isEntry": true,
+    "css": [
+      "assets/account-verification-C284Agzf.css"
+    ]
+  },
   "resources/js/app.js": {
     "file": "assets/app-Bv2Gn_Vc.js",
     "name": "app",

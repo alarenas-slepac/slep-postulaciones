@@ -68,10 +68,13 @@ class NotificationEventController extends Controller
         if ($channel === 'whatsapp' && ($definition['whatsapp_from_mail'] ?? false)) {
             $original = "SGA SLEP Andalién Costa\n{$definition['name']}\nTienes una actualización. Consulta el detalle y los documentos disponibles en el SGA:\nhttps://sga.example.test/";
         }
+        if ($definition['account_verification'] ?? false) {
+            $original = "SGA SLEP Andalién Costa\nCódigo de ejemplo: 000000\nVence en 5 minutos y se utiliza una sola vez. No lo compartas.\nhttps://sga.example.test/verify-email?channel=whatsapp";
+        }
         $originalSubject = $channel === 'mail' ? 'Asunto de ejemplo del evento' : '';
         $subject = $channel === 'mail' ? $this->policy->text($data['subject_template'] ?: '{{asunto_original}}', '', $originalSubject, $definition['name']) : $definition['name'];
         $body = $this->policy->text($data['body_template'] ?: NotificationEventPolicy::ORIGINAL, $original, $originalSubject, $definition['name']);
-        if ($channel === 'whatsapp' && ($event === 'solicitud_reemplazo.aceptada_reemplazante' || ($definition['whatsapp_from_mail'] ?? false))) $body .= "\n\nEsta es una notificación automática del SGA.\nPor favor, no respondas a este mensaje.";
+        if ($channel === 'whatsapp' && ($event === 'solicitud_reemplazo.aceptada_reemplazante' || ($definition['whatsapp_from_mail'] ?? false) || ($definition['account_verification'] ?? false))) $body .= "\n\nEsta es una notificación automática del SGA.\nPor favor, no respondas a este mensaje.";
         return response()->view('admin.notification-events.preview', compact('event', 'channel', 'definition', 'subject', 'body'))
             ->header('Cache-Control', 'no-store, private');
     }

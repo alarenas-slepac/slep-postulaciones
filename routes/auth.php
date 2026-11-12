@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Auth\WhatsAppVerificationController;
 use App\Http\Controllers\Auth\RegisterRutLookupController;
 use App\Http\Controllers\FuncionarioAcController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -52,9 +53,13 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->midd
 Route::middleware('auth')->group(function () {
 
     // Vista de aviso
-    Route::get('/verify-email', function () {
-        return view('auth.verify-email');
-    })->name('verification.notice');
+    Route::get('/verify-email', [WhatsAppVerificationController::class, 'notice'])->name('verification.notice');
+    Route::post('/verification/whatsapp/send', [WhatsAppVerificationController::class, 'send'])
+        ->middleware('throttle:account-whatsapp-send')->name('verification.whatsapp.send');
+    Route::post('/verification/whatsapp/confirm', [WhatsAppVerificationController::class, 'confirm'])
+        ->middleware('throttle:account-whatsapp-confirm')->name('verification.whatsapp.confirm');
+    Route::get('/verification/whatsapp/status', [WhatsAppVerificationController::class, 'status'])
+        ->middleware('throttle:30,1')->name('verification.whatsapp.status');
 
     // Enlace de verificación (firmado) -> redirige al dashboard
     Route::get('/verify-email/{id}/{hash}', function (EmailVerificationRequest $request) {

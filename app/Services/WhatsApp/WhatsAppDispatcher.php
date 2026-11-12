@@ -20,7 +20,8 @@ class WhatsAppDispatcher
         if (!$policy->enabled($event, 'whatsapp')) return null;
         try {
             if (isset($deliveryPolicy['user_id']) && !$policy->recipientAllowed($event, (int) $deliveryPolicy['user_id'])) return null;
-            $text = $policy->whatsappText($event, $text, $event === 'solicitud_reemplazo.aceptada_reemplazante' || ($deliveryPolicy['scope'] ?? '') === 'notification_event');
+            $text = $policy->whatsappText($event, $text, $event === 'solicitud_reemplazo.aceptada_reemplazante'
+                || in_array($deliveryPolicy['scope'] ?? '', ['notification_event', 'account_verification'], true));
         } catch (WhatsAppException $exception) {
             throw $exception;
         } catch (Throwable) {

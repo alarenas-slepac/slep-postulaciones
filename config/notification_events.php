@@ -10,6 +10,9 @@ return [
     // Eventos sin clase propia (vistas directas o emisores con sga_event_key).
     // [clave => [módulo, nombre, destinatarios]]; aparecen sin insertar filas en la BD.
     'events' => [],
+    'account_whatsapp' => [
+        'auth.whatsapp_verification' => ['Acceso', 'Verificación de cuenta por WhatsApp', 'Cuenta autenticada que solicita un código a su propio celular; no requiere verificación de correo previa'],
+    ],
     'non_mail_notifications' => [App\Notifications\ReemplazoWhatsAppNotification::class],
     'mailables' => [
         App\Mail\QueuedViewMail::class => ['system.generic_mail', 'Sistema', 'Correo base genérico', 'Destinatario indicado por el emisor'],

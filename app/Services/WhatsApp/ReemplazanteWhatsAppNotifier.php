@@ -101,7 +101,7 @@ class ReemplazanteWhatsAppNotifier
 
     private function hasAccess(?object $user): bool
     {
-        return $user && $user->email_verified_at && $user->hasAnyRole(['postulante', 'funcionario']);
+        return $user && $user->hasVerifiedAccount() && $user->hasAnyRole(['postulante', 'funcionario']);
     }
 
     private function document(string $path, int $id): array

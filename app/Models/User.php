@@ -101,6 +101,31 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(PostulantProfile::class);
     }
 
+    public function whatsappVerification(): HasOne
+    {
+        return $this->hasOne(AccountWhatsAppVerification::class)->whereNotNull('verified_at')->whereNotNull('verified_phone');
+    }
+
+    public function verifiedWhatsAppPhone(): ?string
+    {
+        if (! Schema::hasTable('account_whatsapp_verifications')) { return null; }
+        return \App\Support\ChileanMobilePhone::normalize($this->whatsappVerification?->verified_phone);
+    }
+
+    public function hasVerifiedAccount(): bool
+    {
+        return $this->hasVerifiedEmail() || $this->verifiedWhatsAppPhone() !== null;
+    }
+
+    public function scopeVerifiedAccount(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        $ready = Schema::hasTable('account_whatsapp_verifications');
+        $query->where(function ($q) use ($ready): void {
+            $q->whereNotNull('users.email_verified_at');
+            if ($ready) { $q->orWhereHas('whatsappVerification'); }
+        });
+    }
+
     public function communes(): BelongsToMany
     {
         return $this->belongsToMany(Commune::class, 'commune_user');

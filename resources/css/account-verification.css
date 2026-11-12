@@ -1,0 +1,34 @@
+.sga-account-verification { color: #0f172a; }
+.sga-account-verification .text-secondary,
+.sga-account-verification .form-text { color: #475569 !important; }
+.sga-account-verification .text-primary { color: #0d6efd !important; }
+.sga-account-verification .text-danger,
+.sga-account-verification .invalid-feedback { color: #b42318 !important; }
+.sga-account-verification .card { border-color: #dbe4f0 !important; background: #fff; box-shadow: 0 12px 28px rgb(15 23 42 / 8%); }
+.sga-account-verification .btn { min-height: 2.75rem; box-shadow: none; font-weight: 600; }
+.sga-account-verification .btn-primary:hover { filter: none; }
+.sga-account-verification .btn-primary {
+    --bs-btn-color: #fff; --bs-btn-bg: #0d6efd; --bs-btn-border-color: #0d6efd;
+    --bs-btn-hover-color: #fff; --bs-btn-hover-bg: #0b5ed7; --bs-btn-hover-border-color: #0b5ed7;
+    --bs-btn-active-color: #fff; --bs-btn-active-bg: #0b5ed7; --bs-btn-active-border-color: #0b5ed7;
+    --bs-btn-disabled-color: #fff; --bs-btn-disabled-bg: #0d6efd; --bs-btn-disabled-border-color: #0d6efd;
+    --bs-btn-focus-shadow-rgb: 13, 110, 253;
+}
+.sga-account-verification .btn-outline-primary {
+    --bs-btn-color: #0d6efd; --bs-btn-border-color: #0d6efd;
+    --bs-btn-hover-color: #fff; --bs-btn-hover-bg: #0b5ed7; --bs-btn-hover-border-color: #0b5ed7;
+    --bs-btn-active-color: #fff; --bs-btn-active-bg: #0b5ed7; --bs-btn-active-border-color: #0b5ed7;
+    --bs-btn-focus-shadow-rgb: 13, 110, 253;
+}
+.sga-account-verification .btn-outline-secondary {
+    --bs-btn-color: #334155; --bs-btn-border-color: #94a3b8;
+    --bs-btn-hover-color: #0f172a; --bs-btn-hover-bg: #f1f5f9; --bs-btn-hover-border-color: #64748b;
+    --bs-btn-active-color: #0f172a; --bs-btn-active-bg: #e2e8f0; --bs-btn-active-border-color: #64748b;
+    --bs-btn-focus-shadow-rgb: 100, 116, 139;
+}
+.sga-account-verification .form-control { min-height: 2.75rem; border-color: #dbe4f0; border-radius: .75rem; }
+.sga-account-verification .form-control:focus { border-color: #0d6efd; box-shadow: 0 0 0 .2rem rgb(13 110 253 / 14%); }
+.sga-account-verification .form-control.is-invalid { border-color: #b42318; }
+.sga-account-verification .alert-info { --bs-alert-color: #0d47a1; --bs-alert-bg: #eef6ff; --bs-alert-border-color: #b8d2f5; }
+.sga-account-verification .alert-success { --bs-alert-color: #0f5132; --bs-alert-bg: #ecfdf3; --bs-alert-border-color: #a7d7b8; }
+.sga-account-verification .alert-danger { --bs-alert-color: #b42318; --bs-alert-bg: #fff1f2; --bs-alert-border-color: #efb6bd; }

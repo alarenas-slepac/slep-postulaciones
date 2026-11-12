@@ -56,6 +56,10 @@ class NotificationEventCatalog
         foreach (config('notification_events.events', []) as $key => [$module, $name, $recipients]) {
             $events[$key] = $this->event($module, $name, $recipients, ['mail']);
         }
+        foreach (config('notification_events.account_whatsapp', []) as $key => [$module, $name, $recipients]) {
+            $events[$key] = $this->event($module, $name, $recipients, ['whatsapp'])
+                + ['whatsapp_default' => false, 'whatsapp_roles' => [], 'whatsapp_recipients' => $recipients, 'account_verification' => true];
+        }
         // Incluso una clase aún sin catalogar aparece para revisión; nunca activa WhatsApp por inferencia.
         foreach ($this->mailClasses() as $class) {
             if ($this->registeredClass($class)) continue;
