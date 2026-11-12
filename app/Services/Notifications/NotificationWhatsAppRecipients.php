@@ -14,7 +14,7 @@ class NotificationWhatsAppRecipients
     {
         $records = Schema::hasTable('funcionarios_ac_autorizados') ? FuncionarioAcAutorizado::all() : collect();
         $profiles = Schema::hasTable('postulant_profiles');
-        $users = User::whereNotNull('email_verified_at')->when($emails !== null, fn ($q) => $q->whereIn('email', $emails))
+        $users = User::verifiedAccount()->when($emails !== null, fn ($q) => $q->whereIn('email', $emails))
             ->when($profiles, fn ($q) => $q->with('postulantProfile'))->get();
         return $users->map(function (User $user) use ($records, $profiles) {
             $rut = $user->rut_normalized;

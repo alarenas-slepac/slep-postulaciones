@@ -35,7 +35,7 @@ class ReemplazoWhatsAppRecipients
             $user = $matches->count() === 1 ? $matches->first() : null;
         }
 
-        return $user && $user->email_verified_at && $user->hasAnyRole(self::ROLES)
+        return $user && $user->hasVerifiedAccount() && $user->hasAnyRole(self::ROLES)
             && $user->canModule('gestion.solicitudes-reemplazo') ? $user : null;
     }
 

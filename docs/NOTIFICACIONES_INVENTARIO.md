@@ -1,8 +1,8 @@
 # Inventario de eventos de notificaciones
 
-Revisión de código: 2026-11-06. Catálogo de `NotificationEventCatalog`, sin consultar destinatarios ni datos reales.
+Revisión de código: 2026-11-12. Catálogo de `NotificationEventCatalog`, sin consultar destinatarios ni datos reales.
 
-90 entradas, 12 módulos, 30 clases Mailable, 38 reglas propias de Cometidos y 88 eventos con WhatsApp. Los 11 existentes (diez automáticos de reemplazos y una prueba manual) conservan sus reglas; los 77 nuevos, derivados de correo, comienzan desactivados y requieren un destinatario original con cuenta verificada y teléfono válido. Una entrada no implica un disparador activo. Los avisos sin invocaciones actuales se indican en el nombre.
+91 entradas, 12 módulos, 30 clases Mailable, 38 reglas propias de Cometidos y 89 eventos con WhatsApp. Los 11 existentes (diez automáticos de reemplazos y una prueba manual) conservan sus reglas; los 77 derivados de correo comienzan desactivados y requieren un destinatario original con cuenta verificada y teléfono válido. El nuevo evento de validación de cuenta también comienza desactivado y utiliza su propia política. Una entrada no implica un disparador activo. Los avisos sin invocaciones actuales se indican en el nombre.
 
 El parche 2026.11.6.684 incorpora `QueuedViewMail`, adaptador técnico de las vistas directas bajo `system.generic_mail` que conserva la clave específica del emisor. No agrega eventos de negocio ni destinatarios. Mailables y notificaciones usan una cola persistente posterior al commit; ver [Correo en cola y continuidad](CORREO_COLA_CONTINUIDAD.md) para la migración, el worker y la pausa durante una incidencia SMTP.
 
@@ -20,11 +20,14 @@ La búsqueda global de emisores no identifica otros transportes activos por corr
 
 Configuración, reglas de extensión, archivos y despliegue: [NOTIFICACIONES_ADMINISTRACION.md](NOTIFICACIONES_ADMINISTRACION.md).
 
+La validación alternativa autorizada en el parche 2026.11.12.689 usa `auth.whatsapp_verification`, con política `account_verification`: sólo la cuenta autenticada puede solicitar un código a su celular. No deriva del correo ni requiere una cuenta ya verificada. Los enlaces de correo y recuperación mantienen su canal protegido. Ver [VALIDACION_CUENTA_WHATSAPP.md](VALIDACION_CUENTA_WHATSAPP.md).
+
 | Clave | Módulo | Evento | Canales |
 | --- | --- | --- | --- |
 | auth.welcome | Acceso | Bienvenida (sin invocaciones actuales) | mail, whatsapp (WhatsApp nuevo: desactivado) |
 | auth.password_reset | Acceso | Recuperación de contraseña | mail (protegido) |
 | auth.email_verification | Acceso | Verificación de correo | mail (protegido) |
+| auth.whatsapp_verification | Acceso | Verificación de cuenta por WhatsApp | whatsapp (nuevo: desactivado) |
 | admin.bulk_role_mail | Administración | Correo masivo por rol | mail, whatsapp (WhatsApp nuevo: desactivado) |
 | admin.test | Administración | Prueba manual de WhatsApp | whatsapp |
 | agendamientos.edicion_horario | Agendamientos | Cambio de horario | mail, whatsapp (WhatsApp nuevo: desactivado) |

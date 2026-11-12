@@ -27,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
         // Alias de middleware (colócalos aquí, SOLO alias – nada que resuelva URL/Route)
         $middleware->alias([
-            'verified'    => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+            'verified'    => \App\Http\Middleware\EnsureAccountIsVerified::class,
             'ensure.role' => \App\Http\Middleware\EnsureRole::class,
             'ensure.active-role' => \App\Http\Middleware\EnsureActiveRole::class,
             // si usas spatie/permission, puedes aliasarlos también:
@@ -57,6 +57,6 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->dontFlash(['whatsapp_code']);
     })
     ->create();

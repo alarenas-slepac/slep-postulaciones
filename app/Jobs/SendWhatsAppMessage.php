@@ -51,6 +51,11 @@ class SendWhatsAppMessage implements ShouldQueue
                 $dispatch->finish('failed', 'invalid_message');
                 return;
             }
+            if ($dispatch->event_key === \App\Services\Auth\WhatsAppAccountVerification::EVENT
+                && ($payload['policy']['scope'] ?? '') !== 'account_verification') {
+                $dispatch->finish('cancelled', 'invalid_policy');
+                return;
+            }
             if (isset($payload['policy'])) {
                 $policy = $payload['policy'];
                 if (isset($policy['user_id']) && !$eventPolicy->recipientAllowed($dispatch->event_key, (int) $policy['user_id'])) {
@@ -59,6 +64,16 @@ class SendWhatsAppMessage implements ShouldQueue
                 }
                 if (($policy['scope'] ?? '') === 'reemplazante_ot') {
                     $error = app(ReemplazanteWhatsAppNotifier::class)->deliveryError($payload);
+                    if ($error) {
+                        $dispatch->finish('cancelled', $error);
+                        return;
+                    }
+                } elseif (($policy['scope'] ?? '') === 'account_verification') {
+                    if ($dispatch->event_key !== \App\Services\Auth\WhatsAppAccountVerification::EVENT) {
+                        $dispatch->finish('cancelled', 'invalid_policy');
+                        return;
+                    }
+                    $error = app(\App\Services\Auth\WhatsAppAccountVerification::class)->deliveryError($payload);
                     if ($error) {
                         $dispatch->finish('cancelled', $error);
                         return;

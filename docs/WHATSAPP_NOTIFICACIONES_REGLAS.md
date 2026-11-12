@@ -20,6 +20,10 @@ Las reglas siguientes conservan la política específica de los avisos internos 
 
 Para ampliar la implementación, documentar la matriz, sumar una política de validación al worker para el nuevo módulo y probar revocaciones, errores, rollback y deduplicación. No reutilizar la política `scope=reemplazos` para otra entidad.
 
+## Validación de cuentas por WhatsApp
+
+La validación de cuenta por WhatsApp es una excepción de acceso expresamente autorizada: `auth.whatsapp_verification`, política `account_verification`. Sólo envía el código al celular ingresado por la propia cuenta autenticada, sin exigir correo confirmado previamente; no admite destinatarios adicionales. Comienza desactivada en el catálogo. Los códigos son personales, de un solo uso, vencen en cinco minutos y se invalidan al reemplazarlos. Los enlaces de verificación de correo y recuperación no se trasladan a WhatsApp. El middleware admite una cuenta confirmada por cualquiera de los dos canales, conservando el estado real del correo y todos los roles y permisos. Detalle e instalación: [VALIDACION_CUENTA_WHATSAPP.md](VALIDACION_CUENTA_WHATSAPP.md).
+
 ## Reemplazos: eventos implementados
 
 Los nombres reales de roles son `coordinador_uatp`, `supervisor_plani`, `coordinador_gdp` y **`funcionario_slep`**, en singular. No se crean roles con los nombres escritos por error `coordinador_uato` o `funcionarios_slep`.

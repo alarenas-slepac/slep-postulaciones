@@ -27,6 +27,7 @@ class PostulantProfileController extends Controller
         $profile = $user->postulantProfile ?: new PostulantProfile([
             'user_id' => $user->id,
             'email_contacto' => $user->email,
+            'telefono1' => $user->verifiedWhatsAppPhone(),
         ]);
 
         // Catálogos frontend

@@ -320,8 +320,8 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     public function test_new_whatsapp_channels_are_available_but_disabled_by_default_and_reset(): void
     {
         $catalog = app(NotificationEventCatalog::class); $policy = app(NotificationEventPolicy::class);
-        $this->assertCount(90, $catalog->all());
-        $this->assertCount(88, array_filter($catalog->all(), fn ($e) => in_array('whatsapp', $e['channels'], true)));
+        $this->assertCount(91, $catalog->all());
+        $this->assertCount(89, array_filter($catalog->all(), fn ($e) => in_array('whatsapp', $e['channels'], true)));
         $this->assertCount(77, array_filter($catalog->all(), fn ($e) => $e['whatsapp_from_mail'] ?? false));
         foreach ($catalog->all() as $key => $event) {
             if (!($event['whatsapp_from_mail'] ?? false)) continue;
