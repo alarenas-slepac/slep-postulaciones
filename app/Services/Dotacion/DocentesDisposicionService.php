@@ -5,6 +5,7 @@ namespace App\Services\Dotacion;
 use App\Models\DotacionDocenteDistribucion;
 use App\Models\Establecimiento;
 use App\Support\DotacionDisposicionDatos;
+use App\Support\DotacionDisposicionCupos;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionLecturaCache;
 use Illuminate\Support\Collection;
@@ -90,13 +91,16 @@ class DocentesDisposicionService
             ?: strcmp($a['nombre'], $b['nombre']) ?: strcmp($a['clave'], $b['clave']))->values();
     }
 
-    public function destinos(int $anio, string $bloque, int $origen, bool $cache = false): Collection
+    public function destinos(int $anio, string $bloque, int $origen, bool $cache = false, ?int $corregirId = null): Collection
     {
-        return DotacionLecturaCache::ejecutar(fn () => self::establecimientos($anio)->whereKeyNot($origen)->get()->map(function ($ee) use ($anio, $bloque, $cache): array {
+        $ocupacion = DotacionDocenteDistribucion::where('anio', $anio)->whereNull('anulada_at')
+            ->when($corregirId, fn ($q) => $q->whereKeyNot($corregirId))->get()->groupBy('destino_id');
+        return DotacionLecturaCache::ejecutar(fn () => self::establecimientos($anio)->whereKeyNot($origen)->get()->map(function ($ee) use ($anio, $bloque, $cache, $ocupacion): array {
             $calcular = fn () => $this->datos->referenciasDestino($ee, $anio);
-            $referencias = $cache ? app(DisposicionLecturaCache::class)->recordar('destino:'.$ee->id.':'.$anio, $calcular) : $calcular();
+            $referencias = $cache ? app(DisposicionLecturaCache::class)->recordar('destino:cupos:'.$ee->id.':'.$anio, $calcular) : $calcular();
             $necesidad = $referencias[$bloque];
-            return ['id' => $ee->id, 'rbd' => $ee->rbd, 'nombre' => $ee->nombre_establecimiento, 'bloques' => $referencias] + $necesidad;
+            return ['id' => $ee->id, 'rbd' => $ee->rbd, 'nombre' => $ee->nombre_establecimiento, 'bloques' => $referencias,
+                'cupos_destino' => DotacionDisposicionCupos::opciones($referencias, $ocupacion->get($ee->id, collect()))->all()] + $necesidad;
         }))->sort(function ($a, $b): int {
             return ($b['horas'] ?? -1) <=> ($a['horas'] ?? -1) ?: strnatcasecmp($a['nombre'], $b['nombre']);
         })->values();
@@ -116,6 +120,7 @@ class DocentesDisposicionService
             if ($repetido) {
                 abort_unless($repetido->created_by === $userId && self::clave($repetido->antecedente) === self::clave($clave)
                     && (int) $repetido->destino_id === (int) $datos['destino_id']
+                    && ($repetido->antecedente['destino_cupo']['clave'] ?? null) === ($datos['destino_cupo'] ?? null)
                     && (int) round((float) $repetido->horas * 100) === (int) round((float) $datos['horas'] * 100)
                     && $repetido->reemplaza_id === $corregirId, 409, 'La solicitud ya fue utilizada con otros datos.');
                 return $repetido;
@@ -139,7 +144,9 @@ class DocentesDisposicionService
             if (! $destino || $destino->id === $ee->id || ! DotacionRevisionService::finalizado((int) $destino->id, $clave['anio'])) {
                 throw ValidationException::withMessages(['destino_id' => 'Seleccione un establecimiento de destino distinto del origen y participante de dotación.']);
             }
-            // La necesidad del destino es informativa y deliberadamente no participa del límite.
+            $cupo = $this->cupoAlGuardar($destino, $clave['anio'], $datos, $anterior);
+            if ($cupo) { $fuente['destino_cupo'] = $cupo; }
+            // Se permite superar la necesidad del cupo; el límite sigue siendo el origen.
             if ($anterior) {
                 $anterior->forceFill(['anulada_at' => now(), 'anulada_by' => $userId, 'motivo_anulacion' => $datos['motivo_correccion']])->save();
             }
@@ -150,6 +157,28 @@ class DocentesDisposicionService
                 'created_by' => $userId, 'reemplaza_id' => $corregirId,
             ]);
         }, 3);
+    }
+
+    private function cupoAlGuardar(Establecimiento $destino, int $anio, array $datos, ?DotacionDocenteDistribucion $anterior): ?array
+    {
+        $clave = $datos['destino_cupo'] ?? null;
+        $previo = $anterior?->antecedente['destino_cupo'] ?? null;
+        $mismoDestino = $anterior && (int) $anterior->destino_id === (int) $destino->id;
+        // Los registros históricos sin cupo se pueden corregir en su destino original.
+        if (! $clave && $mismoDestino && ! $previo) { return null; }
+        $ocupacion = DotacionDocenteDistribucion::where('anio', $anio)->where('destino_id', $destino->id)->whereNull('anulada_at')
+            ->when($anterior, fn ($q) => $q->whereKeyNot($anterior->id))->lockForUpdate()->get();
+        $cupos = DotacionDisposicionCupos::opciones($this->datos->referenciasDestino($destino, $anio), $ocupacion);
+        $cupo = $cupos->firstWhere('clave', $clave);
+        if (! $cupo && $mismoDestino && $previo && $previo['clave'] === $clave) {
+            // Permite regularizar una vinculación histórica si cambió la fuente del cupo.
+            return $previo;
+        }
+        if (! $clave || ! $cupo || $cupo['disponibles'] <= 0) {
+            throw ValidationException::withMessages(['destino_cupo' => 'Seleccione un cupo disponible del destino. Sus horas pueden haber sido destinadas por otro usuario; actualice la selección.']);
+        }
+
+        return array_diff_key($cupo, array_flip(['destinaciones', 'label', 'estado']));
     }
 
     public function anular(int $id, int $anio, string $motivo, int $userId): void

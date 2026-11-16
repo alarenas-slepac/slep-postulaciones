@@ -76,6 +76,7 @@ class DotacionDisposicionDatos
                     $area = trim((string) data_get($asignacion, 'asignatura_nombre', ''));
                     $resultado[$bloque]['detalles'][] = [
                         'persona' => DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? ''),
+                        'nombre' => $docente['nombre'] ?? ($virtual ? 'Cupo #'.$docente['cupo_contrata_id'] : 'Contrata'),
                         'tipo' => $virtual ? 'cupos' : 'contrata', 'horas' => $horas,
                         'titulo' => $docente['titulo'] ?? 'Sin título declarado',
                         'niveles' => self::nivelesDestino($asignacion, $docente, $bloque),

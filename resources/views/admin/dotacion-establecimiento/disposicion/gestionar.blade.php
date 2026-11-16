@@ -45,7 +45,7 @@
                                     $resumenDestino = collect($destino['bloques'])->map(fn ($b) => array_intersect_key($b, array_flip(['cupos', 'contrata', 'personas_cupos', 'personas_contrata'])))->all();
                                     $detalleDestino = collect($destino['bloques'])->flatMap(fn ($b) => $b['detalles'] ?? []);
                                 @endphp
-                                <option value="{{ $destino['id'] }}" data-nombre="{{ $destino['rbd'].' · '.$destino['nombre'] }}" data-resumen="{{ json_encode($resumenDestino) }}" @selected(old('destino_id', $corregir?->destino_id) == $destino['id'])>
+                                <option value="{{ $destino['id'] }}" data-nombre="{{ $destino['rbd'].' · '.$destino['nombre'] }}" data-resumen="{{ json_encode($resumenDestino) }}" data-cupos="{{ json_encode($destino['cupos_destino']) }}" @selected(old('destino_id', $corregir?->destino_id) == $destino['id'])>
                                     {{ $destino['rbd'] }} · {{ $destino['nombre'] }}
                                     · Por contratar: {{ $fmt(collect($destino['bloques'])->sum('cupos')) }} h asignadas
                                     · Contratas: {{ $detalleDestino->where('tipo', 'contrata')->unique('persona')->count() }}
@@ -54,11 +54,27 @@
                             @endforeach
                         </select>
                         @if($destinos->isEmpty())<p class="small text-warning-emphasis mt-2">{{ array_filter($filtrosDestino) ? 'No hay destinos que coincidan con estos filtros. Limpie o cambie la selección.' : 'No hay otros establecimientos revisados y finalizados para '.$anio.'. Registre su revisión en la vista general de dotación.' }}</p>@endif
-                        <p class="form-text" id="dis-destino-ayuda">Seleccione un establecimiento para revisar Planes de Estudio, PIE y Educación Parvularia por separado. Se incluyen sólo horas asignadas a cupos y contratas renovables de {{ $anio }}. Se excluyen Director, Inspector, UTP, Coordinación PIE, Convivencia Educativa y docentes con fuero maternal o gremial. Esta referencia no limita la distribución.</p>
+                        <p class="form-text" id="dis-destino-ayuda">Seleccione un establecimiento y luego su cupo de destino en Planes de Estudio, PIE o Educación Parvularia. Se incluyen sólo horas asignadas a cupos y contratas renovables de {{ $anio }}. Se excluyen Director, Inspector, UTP, Coordinación PIE, Convivencia Educativa y docentes con fuero maternal o gremial.</p>
                         @error('destino_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        @include('admin.dotacion-establecimiento.disposicion._destino-resumen')
                     </div>
                     <div class="col-md-4"><label class="form-label" for="dis-horas">Horas a distribuir *</label><input class="form-control @error('horas') is-invalid @enderror" id="dis-horas" name="horas" type="number" min="0.01" max="{{ $maximo }}" step="0.01" value="{{ old('horas', $corregir?->horas) }}" aria-describedby="dis-horas-ayuda" required><p class="form-text" id="dis-horas-ayuda">Máximo de origen: {{ $fmt($maximo) }} h. Admite hasta 2 decimales.@if($corregir) Incluye las horas de esta distribución que se reemplazará.@endif</p>@error('horas')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                    <div class="col-12">
+                        <label class="form-label" for="dis-cupo">Cupo de destino *</label>
+                        <select class="form-select @error('destino_cupo') is-invalid @enderror" id="dis-cupo" name="destino_cupo" data-slep-select="search" data-disposicion-cupo aria-describedby="dis-cupo-ayuda" @required(!$corregir || !empty($corregir->antecedente['destino_cupo']))>
+                            <option value="">{{ $corregir && empty($corregir->antecedente['destino_cupo']) ? 'Sin cupo vinculado (registro histórico)' : 'Seleccione un cupo disponible' }}</option>
+                            @foreach($destinos as $destino)
+                                <optgroup label="{{ $destino['rbd'].' · '.$destino['nombre'] }}" data-destino-id="{{ $destino['id'] }}">
+                                    @foreach($destino['cupos_destino'] as $cupo)
+                                        <option value="{{ $cupo['clave'] }}" @disabled($cupo['disponibles'] <= 0) @selected(old('destino_cupo', $corregir?->antecedente['destino_cupo']['clave'] ?? '') === $cupo['clave'])>{{ $cupo['label'] }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
+                        </select>
+                        <p class="form-text" id="dis-cupo-ayuda">Puede destinar más horas que las disponibles en el cupo, hasta el saldo del docente de origen. Las horas vinculadas se descuentan para otras destinaciones. Los cupos cubiertos aparecen como «Ya destinado».@if($corregir) Para corregir, la disponibilidad incluye las horas de la versión que se reemplazará.@endif</p>
+                        @error('destino_cupo')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        <p class="slep-record-state slep-record-state--info mt-3 mb-0" data-disposicion-excedente role="status" hidden></p>
+                    </div>
+                    <div class="col-12">@include('admin.dotacion-establecimiento.disposicion._destino-resumen')</div>
                     <div class="col-12"><label class="form-label" for="dis-observacion">Observación</label><textarea class="form-control @error('observacion') is-invalid @enderror" id="dis-observacion" name="observacion" rows="3" maxlength="3000">{{ old('observacion', $corregir?->observacion) }}</textarea>@error('observacion')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     @if($corregir)<div class="col-12"><label class="form-label" for="dis-motivo-correccion">Motivo de la corrección *</label><textarea class="form-control @error('motivo_correccion') is-invalid @enderror" id="dis-motivo-correccion" name="motivo_correccion" rows="2" minlength="10" maxlength="1000" required>{{ old('motivo_correccion') }}</textarea><p class="form-text">La versión anterior quedará anulada y ambas se conservarán en el historial.</p>@error('motivo_correccion')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>@endif
                 </div>
@@ -71,6 +87,11 @@
             <article class="border rounded-4 p-3 mb-3">
                 <div class="d-flex justify-content-between flex-wrap gap-2"><h3>#{{ $registro->id }} · {{ $registro->destino?->rbd }} · {{ $registro->destino?->nombre_establecimiento ?? 'Establecimiento no disponible' }}</h3><span class="slep-status-pill slep-status-pill--{{ $registro->anulada_at ? 'neutral' : 'success' }}">{{ $registro->anulada_at ? 'Anulada' : 'Activa' }} · {{ $fmt($registro->horas) }} h</span></div>
                 <p class="small mb-2">Registrada por {{ $usuario($registro->creador) }} · {{ $registro->created_at?->format('d-m-Y H:i') }}@if($registro->reemplaza_id) · Reemplaza #{{ $registro->reemplaza_id }}@endif</p>
+                @if($cupoRegistrado = $registro->antecedente['destino_cupo'] ?? null)
+                    <p class="mb-2"><strong>Cupo vinculado:</strong> {{ $bloques[$cupoRegistrado['bloque']] ?? $cupoRegistrado['bloque'] }} · {{ $cupoRegistrado['nombre'] }} · {{ $cupoRegistrado['titulo'] }}<br>
+                        <span class="small">Requerimiento: {{ $fmt($cupoRegistrado['horas']) }} h · Disponibles al vincular: {{ $fmt($cupoRegistrado['disponibles']) }} h · Horas destinadas sobre disponibilidad: {{ $fmt(max(0, (float) $registro->horas - $cupoRegistrado['disponibles'])) }} h.</span>
+                    </p>
+                @else<p class="small slep-listing__muted">Registro histórico sin cupo vinculado.</p>@endif
                 @if($registro->observacion)<p class="text-break" style="white-space: pre-line">{{ $registro->observacion }}</p>@endif
                 <details class="mb-2"><summary>Ver antecedente al distribuir</summary><p class="mt-2 mb-0 text-break" style="white-space: pre-line">{{ $registro->antecedente['tipo'] ?? '' }} · {{ $fmt($registro->antecedente['horas'] ?? 0) }} h de origen · {{ $registro->antecedente['situacion'] ?? '' }}<br>{{ $registro->antecedente['justificacion'] ?? 'Sin justificación' }}</p></details>
                 @if($registro->anulada_at)<p class="small mb-0 text-break">Anulada por {{ $usuario($registro->anulador) }} · {{ $registro->anulada_at->format('d-m-Y H:i') }} · {{ $registro->motivo_anulacion }}</p>

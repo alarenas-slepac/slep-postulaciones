@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Dotacion\DocentesDisposicionService;
 use App\Services\Dotacion\DotacionRevisionService;
 use App\Support\DotacionDisposicionDatos;
+use App\Support\DotacionDisposicionCupos;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -48,6 +49,7 @@ class DotacionDisposicionTest extends IsolatedSecurityTestCase
             app(DotacionRevisionService::class)->finalizar($ee->id, 2028, auth()->id());
         }
         $this->fuentes = [$this->fila()];
+        $this->necesidades[$this->destino->id] = $this->referenciasCupo();
         $mock = \Mockery::mock(DotacionDisposicionDatos::class);
         $mock->shouldReceive('datos')->andReturnUsing(function ($ee, $anio): array {
             return ['filas' => collect($this->fuentes)->where('origen_id', $ee->id)->where('anio', $anio)->values(),
@@ -77,7 +79,20 @@ class DotacionDisposicionTest extends IsolatedSecurityTestCase
     private function payload(array $cambios = []): array
     {
         return array_replace(array_intersect_key($this->fila(), array_flip(['anio', 'origen_id', 'rut', 'bloque', 'tipo_horas'])),
-            ['destino_id' => $this->destino->id, 'horas' => '12.25', 'solicitud_uuid' => (string) Str::uuid(), 'observacion' => 'Distribución sintética.'], $cambios);
+            ['destino_id' => $this->destino->id, 'destino_cupo' => $this->claveCupo(), 'horas' => '12.25', 'solicitud_uuid' => (string) Str::uuid(), 'observacion' => 'Distribución sintética.'], $cambios);
+    }
+
+    private function claveCupo(string $bloque = 'plan_estudio', string $persona = 'VACANTE_1'): string
+    {
+        return DotacionDisposicionCupos::clave($bloque, 'cupos', $persona);
+    }
+
+    private function referenciasCupo(float $horas = 44, string $bloque = 'plan_estudio', string $persona = 'VACANTE_1'): array
+    {
+        $refs = array_fill_keys(array_keys(DotacionDisposicionDatos::BLOQUES), ['detalles' => []]);
+        $refs[$bloque]['detalles'][] = ['persona' => $persona, 'nombre' => 'Cupo sintético #1', 'tipo' => 'cupos',
+            'titulo' => 'Pedagogía sintética', 'horas' => $horas, 'niveles' => [$bloque === 'pie' ? 'pie' : 'basica'], 'area' => 'Área sintética'];
+        return DotacionDisposicionDatos::filtrarReferenciasDestino($refs);
     }
 
     private function url(string $accion = 'store', array $params = []): string
@@ -237,7 +252,8 @@ class DotacionDisposicionTest extends IsolatedSecurityTestCase
             ->assertSee('plan_estudio.personas_contrata')->assertSee('parvularia.personas_contrata')->assertSee('pie.personas_contrata');
         $this->necesidades = [];
         $this->get($this->url('gestionar', $this->payload()))->assertOk()->assertSee('Horas renovables: 0 h');
-        $this->guardar(['horas' => 20]);
+        $this->withExceptionHandling();
+        $this->post($this->url(), $this->payload(['horas' => 20]))->assertSessionHasErrors('destino_cupo');
     }
 
     public function test_rollback_de_correccion_conserva_version_activa_ante_fallo_de_insert(): void
@@ -461,7 +477,8 @@ class DotacionDisposicionTest extends IsolatedSecurityTestCase
             $this->assertSame(8.0, $referencias['plan_estudio']['contrata']);
             $antes = DB::table('reemplazos_personal')->get()->toJson(); $asignadas = DB::table('dotacion_docente_asignaciones')->get()->toJson();
             foreach ([$this->origen, $this->destino] as $ee) { app(DotacionRevisionService::class)->finalizar($ee->id, 2026, auth()->id()); }
-            (new DocentesDisposicionService($datos))->guardar($this->payload(['anio' => 2026, 'horas' => 30]), auth()->id());
+            $claveCupo = DotacionDisposicionCupos::opciones($referencias, collect())->firstWhere('tipo', 'cupos')['clave'];
+            (new DocentesDisposicionService($datos))->guardar($this->payload(['anio' => 2026, 'horas' => 30, 'destino_cupo' => $claveCupo]), auth()->id());
             $this->assertSame($antes, DB::table('reemplazos_personal')->get()->toJson());
             $this->assertSame($asignadas, DB::table('dotacion_docente_asignaciones')->get()->toJson());
         } finally {
@@ -510,6 +527,129 @@ class DotacionDisposicionTest extends IsolatedSecurityTestCase
         $m = require database_path('migrations/2026_11_06_170100_create_dotacion_establecimiento_revisiones_table.php');
         $m->up(); $m->down();
         $this->assertSame(4, \App\Models\DotacionEstablecimientoRevision::count());
+    }
+
+    public function test_permite_24_horas_en_cupo_de_19_y_bloquea_otro_docente_con_formulario_antiguo(): void
+    {
+        $this->fuentes = [$this->fila(['horas' => 24]), $this->fila(['rut' => '99000002K'])];
+        $this->necesidades[$this->destino->id] = $this->referenciasCupo(19, 'pie');
+        $this->guardar(['horas' => 24, 'destino_cupo' => $this->claveCupo('pie')]);
+        $registro = DotacionDocenteDistribucion::sole();
+        $this->assertEquals(19, $registro->antecedente['destino_cupo']['horas']);
+        $this->assertEquals(19, $registro->antecedente['destino_cupo']['disponibles']);
+        $this->assertEquals(24, $registro->horas);
+        $response = $this->get($this->url('gestionar', $this->payload(['rut' => '99000002K'])))->assertOk()
+            ->assertSee('Ya destinado')->assertSee('Cupo de destino')->assertSee('data-disposicion-cupos-lista', false);
+        $cupo = $response->viewData('destinos')->sole()['cupos_destino'][0];
+        $this->assertEquals(24, $cupo['destinadas']); $this->assertEquals(0, $cupo['disponibles']);
+        $this->assertSame($registro->id, $cupo['destinaciones'][0]['id']);
+        $this->post($this->url(), $this->payload(['rut' => '99000002K', 'horas' => 1, 'destino_cupo' => $this->claveCupo('pie')]))
+            ->assertSessionHasErrors('destino_cupo');
+        $this->assertSame(1, DotacionDocenteDistribucion::count());
+    }
+
+    public function test_destinacion_parcial_descuenta_solo_horas_vinculadas_y_anular_libera_el_cupo(): void
+    {
+        $this->necesidades[$this->destino->id] = $this->referenciasCupo(19);
+        $this->guardar(['horas' => 12.25]);
+        $service = app(DocentesDisposicionService::class);
+        $cupo = $service->destinos(2028, 'plan_estudio', $this->origen->id)->sole()['cupos_destino'][0];
+        $this->assertSame('Parcialmente destinado', $cupo['estado']); $this->assertEquals(6.75, $cupo['disponibles']);
+        $this->guardar(['horas' => 6.75]);
+        $this->assertEquals(0, $service->destinos(2028, 'plan_estudio', $this->origen->id)->sole()['cupos_destino'][0]['disponibles']);
+        $this->post($this->url(), $this->payload(['horas' => 0.01]))->assertSessionHasErrors('destino_cupo');
+        $this->post($this->url('anular', [1]), ['anio' => 2028, 'motivo' => 'Liberación sintética de horas vinculadas.'])->assertRedirect();
+        $this->assertEquals(12.25, $service->destinos(2028, 'plan_estudio', $this->origen->id)->sole()['cupos_destino'][0]['disponibles']);
+        $this->guardar(['horas' => 12.25]);
+    }
+
+    public function test_correccion_libera_su_version_y_cambia_cupo_conservando_historial(): void
+    {
+        $refs = $this->referenciasCupo(20);
+        $refs['pie'] = $this->referenciasCupo(10, 'pie')['pie'];
+        $this->necesidades[$this->destino->id] = $refs;
+        $this->guardar(['horas' => 20]);
+        $response = $this->get($this->url('gestionar', $this->payload(['corregir' => 1])))->assertOk();
+        $this->assertEquals(20, collect($response->viewData('destinos')->sole()['cupos_destino'])->firstWhere('bloque', 'plan_estudio')['disponibles']);
+        $this->put($this->url('update', [1]), $this->payload(['horas' => 20, 'destino_cupo' => $this->claveCupo('pie'),
+            'motivo_correccion' => 'Cambio sintético al cupo PIE seleccionado.']))->assertSessionHasNoErrors()->assertRedirect();
+        $cupos = collect(app(DocentesDisposicionService::class)->destinos(2028, 'plan_estudio', $this->origen->id)->sole()['cupos_destino']);
+        $this->assertEquals(20, $cupos->firstWhere('bloque', 'plan_estudio')['disponibles']);
+        $this->assertEquals(20, $cupos->firstWhere('bloque', 'pie')['destinadas']);
+        $this->assertEquals(0, $cupos->firstWhere('bloque', 'pie')['disponibles']);
+        $this->assertSame($this->claveCupo(), DotacionDocenteDistribucion::find(1)->antecedente['destino_cupo']['clave']);
+        $this->assertSame($this->claveCupo('pie'), DotacionDocenteDistribucion::find(2)->antecedente['destino_cupo']['clave']);
+    }
+
+    public function test_no_se_puede_omitir_falsificar_o_cambiar_cupo_con_mismo_uuid(): void
+    {
+        foreach ([null, str_repeat('a', 64)] as $clave) {
+            $this->post($this->url(), $this->payload(['destino_cupo' => $clave]))->assertSessionHasErrors('destino_cupo');
+        }
+        $this->post($this->url(), $this->payload(['destino_cupo' => ['alterado']]))->assertSessionHasErrors('destino_cupo');
+        $payload = $this->payload();
+        $this->post($this->url(), $payload)->assertSessionHasNoErrors();
+        $this->post($this->url(), $payload)->assertSessionHasNoErrors();
+        $this->post($this->url(), array_replace($payload, ['destino_cupo' => str_repeat('a', 64)]))->assertStatus(409);
+        $this->assertSame(1, DotacionDocenteDistribucion::count());
+    }
+
+    public function test_ocupacion_actual_no_se_guarda_en_cache_ni_cambia_con_filtros(): void
+    {
+        config(['dotacion_disposicion.cache_seconds' => 120]);
+        $refs = $this->referenciasCupo(10);
+        $refs['plan_estudio']['detalles'][] = array_replace($refs['plan_estudio']['detalles'][0], ['horas' => 9, 'area' => 'Otra área']);
+        $this->necesidades[$this->destino->id] = DotacionDisposicionDatos::filtrarReferenciasDestino($refs);
+        $service = app(DocentesDisposicionService::class);
+        $this->assertEquals(19, $service->destinos(2028, 'plan_estudio', $this->origen->id, true)->sole()['cupos_destino'][0]['disponibles']);
+        $this->guardar(['horas' => 12]);
+        $this->assertEquals(7, $service->destinos(2028, 'plan_estudio', $this->origen->id, true)->sole()['cupos_destino'][0]['disponibles']);
+        $response = $this->get($this->url('gestionar', $this->payload() + ['destino_area' => 'Otra área']))->assertOk();
+        $this->assertEquals(7, $response->viewData('destinos')->sole()['cupos_destino'][0]['disponibles']);
+        $this->assertEquals(19, $response->viewData('destinos')->sole()['cupos_destino'][0]['horas']);
+    }
+
+    public function test_disponibilidad_se_separa_por_destino_y_ano_y_rechaza_cupo_de_otro_destino(): void
+    {
+        $otro = Establecimiento::create(['rbd' => 99993, 'cod_estab' => 'SYNTHETIC-4', 'nombre_establecimiento' => 'Otro destino sintético']);
+        app(DotacionRevisionService::class)->finalizar($otro->id, 2028, auth()->id());
+        $this->necesidades[$otro->id] = $this->referenciasCupo(19, 'pie', 'VACANTE_2');
+        $this->post($this->url(), $this->payload(['destino_id' => $otro->id]))->assertSessionHasErrors('destino_cupo');
+        $this->guardar(['horas' => 10]);
+        $this->guardar(['horas' => 10, 'destino_id' => $otro->id, 'destino_cupo' => $this->claveCupo('pie', 'VACANTE_2')]);
+        foreach ([$this->origen, $this->destino] as $ee) { app(DotacionRevisionService::class)->finalizar($ee->id, 2029, auth()->id()); }
+        $this->assertEquals(44, app(DocentesDisposicionService::class)->destinos(2029, 'plan_estudio', $this->origen->id)->sole()['cupos_destino'][0]['disponibles']);
+    }
+
+    public function test_historico_sin_cupo_se_puede_consultar_corregir_y_anular(): void
+    {
+        $this->guardar();
+        $registro = DotacionDocenteDistribucion::sole();
+        $antecedente = $registro->antecedente; unset($antecedente['destino_cupo']);
+        $registro->forceFill(['antecedente' => $antecedente])->save();
+        $this->get($this->url('gestionar', $this->payload(['corregir' => $registro->id])))->assertOk()->assertSee('Registro histórico sin cupo vinculado.');
+        $this->put($this->url('update', [$registro->id]), $this->payload(['horas' => 5, 'destino_cupo' => null,
+            'motivo_correccion' => 'Corrección sintética de registro histórico.']))->assertSessionHasNoErrors();
+        $nuevo = DotacionDocenteDistribucion::whereNull('anulada_at')->sole();
+        $this->assertArrayNotHasKey('destino_cupo', $nuevo->antecedente);
+        $this->post($this->url('anular', [$nuevo->id]), ['anio' => 2028, 'motivo' => 'Anulación sintética de registro histórico.'])->assertRedirect();
+    }
+
+    public function test_cupo_que_desaparece_rechaza_altas_y_permite_regularizar_vinculacion_existente(): void
+    {
+        $this->guardar();
+        $this->necesidades[$this->destino->id] = $this->referenciasCupo(19, 'pie');
+        $this->get($this->url('gestionar', $this->payload(['corregir' => 1])))->assertOk()->assertSee('Cupo de la distribución actual');
+        $this->put($this->url('update', [1]), $this->payload(['horas' => 5,
+            'motivo_correccion' => 'Regularización sintética de cupo retirado.']))->assertSessionHasNoErrors();
+        $this->post($this->url(), $this->payload(['horas' => 1]))->assertSessionHasErrors('destino_cupo');
+    }
+
+    public function test_exceder_destino_mantiene_limite_del_saldo_de_origen(): void
+    {
+        $this->necesidades[$this->destino->id] = $this->referenciasCupo(19);
+        $this->post($this->url(), $this->payload(['horas' => 21]))->assertSessionHasErrors('horas');
+        $this->assertSame(0, DotacionDocenteDistribucion::count());
     }
 
     public function test_vista_general_presenta_marcas_anuales_y_establecimientos_pendientes(): void

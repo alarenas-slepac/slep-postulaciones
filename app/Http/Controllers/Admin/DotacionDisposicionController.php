@@ -7,6 +7,7 @@ use App\Models\DotacionDocenteDistribucion;
 use App\Models\DotacionSobredotacionJustificacion;
 use App\Services\Dotacion\DocentesDisposicionService;
 use App\Support\DotacionDisposicionDatos;
+use App\Support\DotacionDisposicionCupos;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
@@ -89,14 +90,26 @@ class DotacionDisposicionController extends Controller
         $fila['historial']->load(['destino', 'creador', 'anulador']);
         $maximo = $fila['finalizado'] ? max(0, round($fila['horas'] - $fila['distribuidas'] + (float) ($corregir?->horas ?? 0), 2)) : 0;
         $destinos = $maximo > 0 && (! $fila['exceso'] || $corregir)
-            ? $this->servicio->destinos((int) $datos['anio'], $fila['bloque'], $fila['origen_id'], true) : collect();
+            ? $this->servicio->destinos((int) $datos['anio'], $fila['bloque'], $fila['origen_id'], true, $corregir?->id) : collect();
         $detalles = $destinos->flatMap(fn ($d) => collect($d['bloques'])->flatMap(fn ($b) => $b['detalles'] ?? []));
         $filtrosDestino = array_intersect_key($datos, $this->reglasFiltrosDestino());
         if (array_filter($filtrosDestino, fn ($v) => $v !== null && $v !== '')) {
             $destinos = $destinos->map(function ($destino) use ($filtrosDestino): array {
                 $destino['bloques'] = DotacionDisposicionDatos::filtrarReferenciasDestino($destino['bloques'], $filtrosDestino);
+                $claves = DotacionDisposicionCupos::opciones($destino['bloques'], collect())->pluck('clave');
+                $destino['cupos_destino'] = collect($destino['cupos_destino'])->whereIn('clave', $claves)->values()->all();
                 return $destino;
             })->filter(fn ($d) => collect($d['bloques'])->sum('horas') > 0 || (int) $corregir?->destino_id === (int) $d['id'])->values();
+        }
+        if ($corregir && ($previo = $corregir->antecedente['destino_cupo'] ?? null)) {
+            $destinos = $destinos->map(function ($destino) use ($corregir, $previo): array {
+                if ((int) $destino['id'] === (int) $corregir->destino_id
+                    && ! collect($destino['cupos_destino'])->contains('clave', $previo['clave'])) {
+                    $destino['cupos_destino'][] = $previo + ['label' => 'Cupo de la distribución actual · '.$previo['nombre'],
+                        'estado' => 'Vinculación actual', 'destinaciones' => []];
+                }
+                return $destino;
+            });
         }
         return view('admin.dotacion-establecimiento.disposicion.gestionar', [
             'fila' => $fila, 'anio' => (int) $datos['anio'], 'bloques' => DotacionDisposicionDatos::BLOQUES,
@@ -123,6 +136,7 @@ class DotacionDisposicionController extends Controller
         $this->autorizar($request);
         $datos = $request->validate($this->reglasOrigen() + $this->reglasFiltrosDestino() + [
             'destino_id' => ['required', 'integer'], 'horas' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:999999.99'],
+            'destino_cupo' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/'],
             'solicitud_uuid' => ['required', 'uuid'], 'observacion' => ['nullable', 'string', 'max:3000'],
             'motivo_correccion' => [$id ? 'required' : 'nullable', 'string', 'min:10', 'max:1000'],
         ]);

@@ -1,0 +1,7 @@
+[data-disposicion-resumen] .slep-listing__table { min-width: 0; table-layout: fixed; }
+[data-disposicion-resumen] .slep-listing__table th { width: 33.333%; overflow-wrap: anywhere; }
+[data-disposicion-resumen] .slep-listing__table td:last-child { width: auto; }
+[data-disposicion-cupos-lista] article { scroll-margin-top: 1rem; }
+@media (max-width: 767.98px) {
+    [data-disposicion-resumen] .slep-listing__table th[scope="row"] { display: block; width: 100%; }
+}

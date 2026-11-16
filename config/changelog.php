@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.16.691',
+    'current_version' => '2026.11.16.692',
     'entries' => [
+        [
+            'version' => '2026.11.16.692',
+            'title' => 'Selección y disponibilidad de cupos en destinaciones docentes',
+            'summary' => 'Permite vincular la destinación a un cupo concreto, consultar sus horas ya destinadas y superar su requerimiento sin reutilizar horas ocupadas.',
+            'roles' => ['admin', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani'],
+            'items' => [
+                'Agrega un selector de cupos por establecimiento y bloque con título, requerimiento, horas destinadas y saldo disponible, para cupos por contratar y contratas por renovar.',
+                'Permite destinar más horas que las disponibles en el cupo respetando el saldo de origen. Informa el exceso y conserva el cupo elegido en el historial.',
+                'Descuenta las vinculaciones activas y muestra los cupos cubiertos como Ya destinado. Vuelve a validar su disponibilidad al guardar para evitar reutilización desde formularios antiguos.',
+                'Corregir o anular actualiza la disponibilidad dentro de la misma transacción, conserva las versiones históricas y no modifica contratos ni asignaciones del padrón. No requiere migraciones.',
+            ],
+            'published_at' => '2026-11-16',
+        ],
         [
             'version' => '2026.11.16.691',
             'title' => 'Nómina completa de docentes por bloque y establecimiento',
