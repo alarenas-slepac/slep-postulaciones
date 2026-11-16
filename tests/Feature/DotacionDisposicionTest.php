@@ -30,6 +30,8 @@ class DotacionDisposicionTest extends IsolatedSecurityTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Estas pruebas cambian explícitamente fuentes sintéticas entre lecturas.
+        config(['dotacion_disposicion.cache_seconds' => 0]);
         foreach (['2026_01_23_000001_create_establecimientos_table.php',
             '2026_09_28_140000_create_dotacion_contrata_habilitaciones_table.php',
             '2026_09_29_190000_create_dotacion_sobredotacion_justificaciones_table.php',
@@ -229,10 +231,12 @@ class DotacionDisposicionTest extends IsolatedSecurityTestCase
     {
         $this->withoutExceptionHandling();
         $this->necesidades[$this->destino->id] = array_fill_keys(array_keys(DotacionDisposicionDatos::BLOQUES), ['cupos' => 3, 'contrata' => 7, 'horas' => 10, 'personas' => 2]);
-        $this->get($this->url('gestionar', $this->payload()))->assertOk()->assertSee('10 h en cupos con asignación')
-            ->assertSee('Por contratar: 3 h')->assertSee('Contrata completa: 7 h')->assertSee('fuero maternal o gremial');
+        $this->get($this->url('gestionar', $this->payload()))->assertOk()
+            ->assertSee('Por contratar: 9 h asignadas')->assertSee('Horas renovables: 21 h')->assertSee('fuero maternal o gremial')
+            ->assertSee('Docentes a contrata por renovar')->assertSee('Buscar establecimientos de destino')
+            ->assertSee('plan_estudio.personas_contrata')->assertSee('parvularia.personas_contrata')->assertSee('pie.personas_contrata');
         $this->necesidades = [];
-        $this->get($this->url('gestionar', $this->payload()))->assertOk()->assertSee('0 h en cupos con asignación');
+        $this->get($this->url('gestionar', $this->payload()))->assertOk()->assertSee('Horas renovables: 0 h');
         $this->guardar(['horas' => 20]);
     }
 
@@ -277,6 +281,139 @@ class DotacionDisposicionTest extends IsolatedSecurityTestCase
         $this->assertCount(2, $filas); $this->assertEquals(44, $filas->sum('horas'));
         $this->assertSame(['no_renovacion'], $filas->pluck('fuente')->unique()->values()->all());
         $this->assertEquals(0, $datos->filas($this->origen, 2027, ['bloques' => []])->count());
+    }
+
+    public function test_filtros_separan_supresion_total_parcial_y_conservan_enlaces_historicos(): void
+    {
+        $this->fuentes = [
+            $this->fila(['rut' => '99000001K', 'nombre' => 'Parcial sintética']),
+            $this->fila(['rut' => '99000002K', 'nombre' => 'Total sintética', 'tipo' => 'Supresión total', 'horas' => 44]),
+            $this->fila(['rut' => '99000003K', 'nombre' => 'Contrata sintética', 'tipo_horas' => 'contrata', 'tipo' => 'No renovación']),
+        ];
+        foreach (['supresion_parcial' => 'Parcial sintética', 'supresion_total' => 'Total sintética', 'contrata' => 'Contrata sintética'] as $tipo => $nombre) {
+            $response = $this->get($this->url('index', ['anio' => 2028, 'tipo' => $tipo]))->assertOk();
+            $this->assertSame([$nombre], $response->viewData('items')->pluck('nombre')->all());
+            $response->assertDontSee('Supresión total o parcial');
+        }
+        $this->assertCount(2, $this->get($this->url('index', ['anio' => 2028, 'tipo' => 'titular']))->viewData('items'));
+    }
+
+    public function test_filtros_de_titulo_nivel_y_area_se_combinan_y_no_inventan_antecedentes(): void
+    {
+        $this->fuentes = [
+            $this->fila(['nivel_ensenanza' => 'basica', 'areas_ensenanza' => [['id' => 4, 'nombre' => 'Ciencias sintéticas']]]),
+            $this->fila(['rut' => '99000002K', 'bloque' => 'pie', 'nivel_ensenanza' => 'pie',
+                'areas_ensenanza' => [['id' => 5, 'nombre' => 'Apoyo sintético']]]),
+            $this->fila(['rut' => '99000003K', 'titulo' => 'Título histórico']),
+        ];
+        $response = $this->get($this->url('index', ['anio' => 2028, 'titulo' => 'Pedagogía sintética', 'nivel' => 'basica', 'area' => '4']))->assertOk();
+        $this->assertSame(['99000001K'], $response->viewData('items')->pluck('rut')->all());
+        $response->assertSee('nivel=basica')->assertSee('area=4');
+        $this->assertSame(0, $response->viewData('conteos')->get('pie', 0));
+        $response = $this->get($this->url('index', ['anio' => 2028, 'nivel' => 'sin_informar', 'area' => 'sin_informar']))->assertOk();
+        $this->assertSame(['99000003K'], $response->viewData('items')->pluck('rut')->all());
+        $this->get($this->url('index', ['anio' => 2028, 'nivel' => 'inventado']))->assertSessionHasErrors('nivel');
+    }
+
+    public function test_destinos_filtran_horas_antes_de_contar_contratas_y_separan_tres_bloques(): void
+    {
+        $base = ['persona' => '99000002K', 'tipo' => 'contrata', 'titulo' => 'Pedagogía sintética', 'niveles' => ['basica'], 'area' => 'Ciencias sintéticas'];
+        $referencias = array_fill_keys(array_keys(DotacionDisposicionDatos::BLOQUES), ['detalles' => []]);
+        $referencias['plan_estudio']['detalles'] = [array_replace($base, ['horas' => 4]), array_replace($base, ['horas' => 3]),
+            array_replace($base, ['persona' => 'VACANTE_1', 'tipo' => 'cupos', 'horas' => 6]),
+            array_replace($base, ['persona' => '99000003K', 'horas' => 8, 'area' => 'Matemática sintética'])];
+        $referencias['pie']['detalles'] = [array_replace($base, ['horas' => 5, 'niveles' => ['pie']])];
+        $this->necesidades[$this->destino->id] = DotacionDisposicionDatos::filtrarReferenciasDestino($referencias);
+        $response = $this->get($this->url('gestionar', $this->payload() + ['destino_titulo' => 'Pedagogía sintética',
+            'destino_nivel' => 'basica', 'destino_area' => 'Ciencias sintéticas']))->assertOk();
+        $destino = $response->viewData('destinos')->sole();
+        $this->assertSame(7.0, $destino['bloques']['plan_estudio']['contrata']);
+        $this->assertSame(6.0, $destino['bloques']['plan_estudio']['cupos']);
+        $this->assertSame(1, $destino['bloques']['plan_estudio']['personas_contrata']);
+        $this->assertSame(1, $destino['bloques']['plan_estudio']['personas_cupos']);
+        $this->assertSame(0.0, $destino['bloques']['pie']['contrata']);
+        $response->assertSee('Contratas: 1')->assertSee('Horas renovables: 7 h')->assertSee('Por contratar: 6 h asignadas');
+        $this->assertSame(0, $this->get($this->url('gestionar', $this->payload() + ['destino_area' => 'Sin coincidencias']))->viewData('destinos')->count());
+    }
+
+    public function test_cache_reutiliza_fuentes_al_cambiar_de_pestana_y_abrir_detalle_pero_guardado_es_actual(): void
+    {
+        config(['dotacion_disposicion.cache_seconds' => 120]);
+        $lecturas = 0;
+        $mock = \Mockery::mock(DotacionDisposicionDatos::class);
+        $mock->shouldReceive('datos')->andReturnUsing(function ($ee, $anio) use (&$lecturas): array {
+            $lecturas++;
+            return ['filas' => collect($this->fuentes)->where('origen_id', $ee->id)->where('anio', $anio)->values()];
+        });
+        $this->app->instance(DotacionDisposicionDatos::class, $mock);
+        $service = app(DocentesDisposicionService::class);
+        $service->listado(2028, true);
+        $this->assertSame(2, $lecturas);
+        $service->listado(2028, true);
+        $service->detalle($this->payload(), true);
+        $this->assertSame(2, $lecturas, 'La navegación no debe reconstruir la dotación de todos los establecimientos.');
+        $this->fuentes[0]['horas'] = 5;
+        $this->post($this->url(), $this->payload(['horas' => 10]))->assertSessionHasErrors('horas');
+        $this->assertSame(3, $lecturas, 'Guardar consulta otra vez la fuente dentro de la transacción.');
+        $this->assertSame(0, DotacionDocenteDistribucion::count());
+    }
+
+    public function test_cache_se_invalida_despues_del_commit_y_no_publica_cambios_revertidos(): void
+    {
+        config(['dotacion_disposicion.cache_seconds' => 120]);
+        $cache = app(\App\Services\Dotacion\DisposicionLecturaCache::class);
+        $llamadas = 0;
+        $leer = function () use ($cache, &$llamadas) {
+            return $cache->recordar('prueba-confirmacion', function () use (&$llamadas) { return ++$llamadas; });
+        };
+        $this->assertSame(1, $leer());
+        DB::beginTransaction();
+        DB::table('establecimientos')->where('id', $this->origen->id)->update(['nombre_establecimiento' => 'Cambio que se revierte']);
+        $this->assertSame(1, $leer());
+        DB::rollBack();
+        $this->assertSame(1, $leer());
+        DB::beginTransaction();
+        DB::table('establecimientos')->where('id', $this->origen->id)->update(['nombre_establecimiento' => 'Cambio confirmado']);
+        $this->assertSame(1, $leer());
+        DB::commit();
+        $this->assertSame(2, $leer());
+        $cache->invalidar();
+        $this->assertSame(3, $leer());
+    }
+
+    public function test_periodos_del_padron_se_consultan_una_vez_en_el_calculo_compartido(): void
+    {
+        $this->prepararTablasCalculo();
+        DB::table('reemplazos_personal')->insert(['establecimiento_id' => $this->origen->id, 'rbd' => $this->origen->rbd,
+            'rut' => '99000001K', 'nombre' => 'Dato sintético', 'anio' => 2026, 'mes' => 10, 'row_hash' => 'periodo-sintetico']);
+        $lecturas = 0;
+        DB::listen(function ($event) use (&$lecturas): void {
+            if (str_contains(strtolower($event->sql), 'select distinct') && str_contains($event->sql, 'reemplazos_personal')) { $lecturas++; }
+        });
+        $padron = app(\App\Services\Padron\PadronPeriodoService::class);
+        \App\Support\DotacionLecturaCache::ejecutar(function () use ($padron): void {
+            $this->assertSame(2026, $padron->anioDisponibleParaDotacion(2027));
+            $padron->periodos()->pop();
+            $padron->periodos()->first()->anio = 2000;
+            $this->assertSame(2026, $padron->anioDisponibleParaDotacion(2027));
+        });
+        $this->assertSame(1, $lecturas);
+        $padron->periodos();
+        $this->assertSame(2, $lecturas, 'La memoria de cálculo se descarta al terminar.');
+    }
+
+    public function test_fuentes_conservan_nivel_y_areas_de_la_justificacion_para_filtrar(): void
+    {
+        (require database_path('migrations/2026_11_11_140000_add_ensenanza_to_dotacion_justificaciones.php'))->up();
+        DotacionSobredotacionJustificacion::create(['establecimiento_id' => $this->origen->id, 'anio' => 2028,
+            'docente_rut_normalizado' => '99000001K', 'bloque' => 'plan_estudio', 'tipo_horas' => 'titular',
+            'horas_detectadas' => 5, 'justificacion' => 'Antecedente sintético.', 'nivel_ensenanza' => 'basica',
+            'areas_ensenanza' => [['id' => 4, 'nombre' => 'Área histórica sintética']]]);
+        $informe = ['bloques' => ['plan_estudio' => ['filas' => [['rut' => '99000001K', 'nombre' => 'Docente sintético',
+            'contrato_considerado' => 44, 'horas_titular' => 5, 'horas_contrata' => 0]]]]];
+        $fila = (new DotacionDisposicionDatos)->filas($this->origen, 2028, $informe)->sole();
+        $this->assertSame('basica', $fila['nivel_ensenanza']);
+        $this->assertSame([['id' => 4, 'nombre' => 'Área histórica sintética']], $fila['areas_ensenanza']);
     }
 
     protected function prepararTablasCalculo(): void

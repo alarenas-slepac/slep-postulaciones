@@ -29,6 +29,23 @@ class DotacionDisposicionCuposTest extends IsolatedSecurityTestCase
         $this->assertSame(12.0, $r['plan_estudio']['contrata']); $this->assertSame(7.0, $r['plan_estudio']['cupos']);
         $this->assertSame(19.0, $r['plan_estudio']['horas']); $this->assertSame(16.0, $r['pie']['horas']);
         $this->assertSame(0.0, $r['parvularia']['horas']);
+        $this->assertSame(1, $r['plan_estudio']['personas_cupos']);
+        $this->assertSame(1, $r['plan_estudio']['personas_contrata']);
+        $this->assertSame(2, $r['pie']['personas_contrata']);
+    }
+
+    public function test_filtro_destino_suma_solo_asignaturas_y_niveles_coincidentes_sin_contar_dos_veces_la_contrata(): void
+    {
+        $asignaciones = [
+            $this->asignacion(['id' => 1, 'asignatura_nombre' => 'Ciencias Naturales', 'nivel_educativo' => 'Básica', 'horas_contrato' => 5]),
+            $this->asignacion(['id' => 2, 'asignatura_nombre' => 'Ciencias Naturales', 'nivel_educativo' => 'Básica', 'horas_contrato' => 3]),
+            $this->asignacion(['id' => 3, 'asignatura_nombre' => 'Matemática', 'nivel_educativo' => 'Media', 'horas_contrato' => 6]),
+        ];
+        $referencias = DotacionDisposicionDatos::cuposDestino([$this->docente([], $asignaciones)], 1, 2028);
+        $r = DotacionDisposicionDatos::filtrarReferenciasDestino($referencias, ['destino_nivel' => 'basica', 'destino_area' => 'ciencias naturales']);
+        $this->assertSame(8.0, $r['plan_estudio']['contrata']);
+        $this->assertSame(1, $r['plan_estudio']['personas_contrata']);
+        $this->assertSame(0.0, $r['plan_estudio']['cupos']);
     }
 
     public function test_excluye_planta_mixtos_sin_contrato_asistentes_y_cupos_sin_asignaciones(): void

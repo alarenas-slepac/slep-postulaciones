@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @push('styles')
-    @vite('resources/js/slep-listados.js')
+    @vite('resources/js/dotacion-disposicion.js')
 @endpush
 @section('content')
 @php
@@ -8,7 +8,7 @@
     $origen = array_intersect_key($fila, array_flip(['anio', 'origen_id', 'rut', 'bloque', 'tipo_horas']));
     $usuario = fn ($u) => $u ? trim(implode(' ', [$u->nombres, $u->apellido_paterno, $u->apellido_materno])) : 'Usuario no disponible';
 @endphp
-<div class="slep-listing" data-slep-listing>
+<div class="slep-listing" data-slep-listing data-disposicion>
     <header class="slep-listing__header"><div class="slep-listing__heading"><span class="slep-listing__icon"><i class="bi bi-signpost-split" aria-hidden="true"></i></span><div><p class="slep-listing__eyebrow">{{ $bloques[$fila['bloque']] }} · {{ $anio }}</p><h1>{{ $corregir ? 'Corregir distribución' : 'Asignar establecimiento' }}</h1><p class="mb-0">{{ $fila['nombre'] }} · {{ $fila['rut'] }}</p></div></div><a class="slep-listing__button slep-listing__button--secondary" href="{{ route('admin.dotacion-establecimiento.disposicion.index', ['anio' => $anio, 'bloque' => $fila['bloque']]) }}">Volver a la nómina</a></header>
     @if(session('success'))<div class="alert alert-success rounded-4" role="status">{{ session('success') }}</div>@endif
     @if($errors->any())<div class="slep-listing__notice slep-listing__notice--danger" data-slep-errors tabindex="-1" role="alert"><strong>Revise los datos.</strong><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
@@ -16,26 +16,47 @@
     @if($fila['exceso'] > 0)<div class="alert alert-warning rounded-4" role="alert">El saldo de origen cambió. Hay {{ $fmt($fila['exceso']) }} h distribuidas de más. Corrija o anule las distribuciones antes de incorporar nuevas horas.</div>@endif
     <section class="slep-listing__panel p-4" aria-labelledby="dis-antecedente"><h2 id="dis-antecedente" class="mb-3">Antecedentes de origen</h2><div class="row g-3"><div class="col-md-6"><strong>RBD {{ $fila['rbd'] }} · {{ $fila['establecimiento'] }}</strong><div>{{ $fila['funcion'] }} · {{ $fila['titulo'] }}</div><div>{{ $fila['tipo'] }} · {{ $fila['situacion'] }}</div></div><div class="col-md-6"><div>Horas a justificar: <strong>{{ $fmt($fila['horas']) }} h</strong></div><div>Distribuidas: {{ $fmt($fila['distribuidas']) }} h · Disponibles: <strong>{{ $fmt($fila['saldo']) }} h</strong></div></div></div><h3 class="mt-4">Justificación</h3><span class="slep-status-pill slep-status-pill--{{ $fila['estado_justificacion'] === 'Vigente' ? 'success' : 'warning' }}">{{ $fila['estado_justificacion'] }}</span><p class="mt-2 mb-0 text-break" style="white-space: pre-line">{{ $fila['justificacion'] }}</p></section>
     @if($maximo > 0 && (! $fila['exceso'] || $corregir))
+        <section class="slep-listing__panel" aria-labelledby="dis-filtros-destino">
+            <div class="slep-listing__panel-header"><div><h2 id="dis-filtros-destino">Buscar establecimientos de destino</h2><p class="mb-0 slep-listing__muted">Filtre las horas asignadas y las contratas que se muestran como referencia.</p></div></div>
+            <form method="GET" class="slep-listing__filters" data-slep-filter-form>
+                @foreach($origen as $key => $value)<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endforeach
+                @if($corregir)<input type="hidden" name="corregir" value="{{ $corregir->id }}">@endif
+                <div class="row g-3">
+                    <div class="col-lg-4"><label class="form-label" for="dis-destino-titulo">Título</label><select class="form-select" id="dis-destino-titulo" name="destino_titulo" data-slep-select="search"><option value="">Todos los títulos</option>@foreach($titulosDestino as $titulo)<option value="{{ $titulo }}" @selected(($filtrosDestino['destino_titulo'] ?? '') === $titulo)>{{ $titulo }}</option>@endforeach</select></div>
+                    <div class="col-lg-4"><label class="form-label" for="dis-destino-nivel">Nivel de enseñanza</label><select class="form-select" id="dis-destino-nivel" name="destino_nivel" data-slep-select="search"><option value="">Todos los niveles</option>@foreach($niveles as $key => $label)<option value="{{ $key }}" @selected(($filtrosDestino['destino_nivel'] ?? '') === $key)>{{ $label }}</option>@endforeach<option value="sin_informar" @selected(($filtrosDestino['destino_nivel'] ?? '') === 'sin_informar')>Sin nivel informado</option></select></div>
+                    <div class="col-lg-4"><label class="form-label" for="dis-destino-area">Área de enseñanza</label><select class="form-select" id="dis-destino-area" name="destino_area" data-slep-select="search"><option value="">Todas las áreas</option>@foreach($areasDestino as $area)<option value="{{ $area }}" @selected(($filtrosDestino['destino_area'] ?? '') === $area)>{{ $area }}</option>@endforeach<option value="sin_informar" @selected(($filtrosDestino['destino_area'] ?? '') === 'sin_informar')>Sin área informada</option></select></div>
+                </div>
+                <div class="slep-listing__filter-actions"><p class="mb-0 slep-listing__muted">Nivel según el curso de la asignación o su declaración; área según la asignatura registrada. Los antecedentes no informados permanecen identificados.</p><div class="slep-listing__actions"><a class="slep-listing__button slep-listing__button--secondary" href="{{ route('admin.dotacion-establecimiento.disposicion.gestionar', $origen + ($corregir ? ['corregir' => $corregir->id] : [])) }}">Limpiar</a><button class="slep-listing__button slep-listing__button--primary" data-slep-submit type="submit"><span data-slep-submit-label>Buscar</span></button></div></div>
+            </form>
+        </section>
         <section class="slep-listing__panel" aria-labelledby="dis-formulario"><div class="slep-listing__panel-header"><h2 id="dis-formulario">{{ $corregir ? 'Nueva versión de la distribución #'.$corregir->id : 'Registrar destino' }}</h2></div>
             <form method="POST" action="{{ $corregir ? route('admin.dotacion-establecimiento.disposicion.update', $corregir->id) : route('admin.dotacion-establecimiento.disposicion.store') }}" class="slep-listing__filters">
                 @csrf @if($corregir) @method('PUT') @endif
                 @foreach($origen as $key => $value)<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endforeach
                 <input type="hidden" name="solicitud_uuid" value="{{ old('solicitud_uuid', (string) \Illuminate\Support\Str::uuid()) }}">
+                @foreach($filtrosDestino as $key => $value)<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endforeach
                 <div class="row g-3">
                     <div class="col-md-8">
                         <label class="form-label" for="dis-destino">Establecimiento de destino *</label>
-                        <select class="form-select @error('destino_id') is-invalid @enderror" id="dis-destino" name="destino_id" data-slep-select="search" aria-describedby="dis-destino-ayuda" required>
+                        <select class="form-select @error('destino_id') is-invalid @enderror" id="dis-destino" name="destino_id" data-slep-select="search" data-disposicion-destino aria-describedby="dis-destino-ayuda" required>
                             <option value="">Seleccione un establecimiento</option>
                             @foreach($destinos as $destino)
-                                <option value="{{ $destino['id'] }}" @selected(old('destino_id', $corregir?->destino_id) == $destino['id'])>
-                                    {{ $destino['rbd'] }} · {{ $destino['nombre'] }} · {{ $bloques[$fila['bloque']] }}: {{ $destino['horas'] === null ? 'Sin información' : $fmt($destino['horas']).' h en cupos con asignación' }}
-                                    · Por contratar: {{ $fmt($destino['cupos']) }} h · Contrata completa: {{ $fmt($destino['contrata']) }} h
+                                @php
+                                    $resumenDestino = collect($destino['bloques'])->map(fn ($b) => array_intersect_key($b, array_flip(['cupos', 'contrata', 'personas_cupos', 'personas_contrata'])))->all();
+                                    $detalleDestino = collect($destino['bloques'])->flatMap(fn ($b) => $b['detalles'] ?? []);
+                                @endphp
+                                <option value="{{ $destino['id'] }}" data-nombre="{{ $destino['rbd'].' · '.$destino['nombre'] }}" data-resumen="{{ json_encode($resumenDestino) }}" @selected(old('destino_id', $corregir?->destino_id) == $destino['id'])>
+                                    {{ $destino['rbd'] }} · {{ $destino['nombre'] }}
+                                    · Por contratar: {{ $fmt(collect($destino['bloques'])->sum('cupos')) }} h asignadas
+                                    · Contratas: {{ $detalleDestino->where('tipo', 'contrata')->unique('persona')->count() }}
+                                    · Horas renovables: {{ $fmt(collect($destino['bloques'])->sum('contrata')) }} h
                                 </option>
                             @endforeach
                         </select>
-                        @if($destinos->isEmpty())<p class="small text-warning-emphasis mt-2">No hay otros establecimientos revisados y finalizados para {{ $anio }}. Registre su revisión en la vista general de dotación.</p>@endif
-                        <p class="form-text" id="dis-destino-ayuda">Horas asignadas del bloque y año {{ $anio }} a docentes por contratar o docentes reales con todas sus horas a contrata. Se excluyen Director, Inspector, UTP, Coordinación PIE, Convivencia Educativa y docentes con fuero maternal o gremial. Esta referencia no limita la distribución; puede seleccionar destinos con 0 h.</p>
+                        @if($destinos->isEmpty())<p class="small text-warning-emphasis mt-2">{{ array_filter($filtrosDestino) ? 'No hay destinos que coincidan con estos filtros. Limpie o cambie la selección.' : 'No hay otros establecimientos revisados y finalizados para '.$anio.'. Registre su revisión en la vista general de dotación.' }}</p>@endif
+                        <p class="form-text" id="dis-destino-ayuda">Seleccione un establecimiento para revisar Planes de Estudio, PIE y Educación Parvularia por separado. Se incluyen sólo horas asignadas a cupos y contratas renovables de {{ $anio }}. Se excluyen Director, Inspector, UTP, Coordinación PIE, Convivencia Educativa y docentes con fuero maternal o gremial. Esta referencia no limita la distribución.</p>
                         @error('destino_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        @include('admin.dotacion-establecimiento.disposicion._destino-resumen')
                     </div>
                     <div class="col-md-4"><label class="form-label" for="dis-horas">Horas a distribuir *</label><input class="form-control @error('horas') is-invalid @enderror" id="dis-horas" name="horas" type="number" min="0.01" max="{{ $maximo }}" step="0.01" value="{{ old('horas', $corregir?->horas) }}" aria-describedby="dis-horas-ayuda" required><p class="form-text" id="dis-horas-ayuda">Máximo de origen: {{ $fmt($maximo) }} h. Admite hasta 2 decimales.@if($corregir) Incluye las horas de esta distribución que se reemplazará.@endif</p>@error('horas')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     <div class="col-12"><label class="form-label" for="dis-observacion">Observación</label><textarea class="form-control @error('observacion') is-invalid @enderror" id="dis-observacion" name="observacion" rows="3" maxlength="3000">{{ old('observacion', $corregir?->observacion) }}</textarea>@error('observacion')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>

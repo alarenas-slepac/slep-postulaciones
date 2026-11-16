@@ -6,6 +6,7 @@ use App\Models\DotacionDocenteDistribucion;
 use App\Models\Establecimiento;
 use App\Support\DotacionDisposicionDatos;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionLecturaCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -30,22 +31,35 @@ class DocentesDisposicionService
         return $query;
     }
 
-    public function listado(int $anio): Collection
+    private function fuentes(Establecimiento $ee, int $anio, bool $cache): array
     {
-        $filas = collect();
-        self::establecimientos($anio)->orderBy('id')->chunkById(8, function ($ees) use ($anio, &$filas): void {
-            foreach ($ees as $ee) { $filas = $filas->concat($this->datos->datos($ee, $anio)['filas']); }
+        $calcular = fn () => $this->datos->datos($ee, $anio);
+        return $cache ? app(DisposicionLecturaCache::class)->recordar('fuente:'.$ee->id.':'.$anio, $calcular) : $calcular();
+    }
+
+    public function listado(int $anio, bool $cache = false): Collection
+    {
+        $calcular = fn () => DotacionLecturaCache::ejecutar(function () use ($anio, $cache): Collection {
+            $filas = collect();
+            self::establecimientos($anio)->orderBy('id')->chunkById(50, function ($ees) use ($anio, $cache, &$filas): void {
+                foreach ($ees as $ee) { $filas = $filas->concat($this->fuentes($ee, $anio, $cache)['filas']); }
+            });
+            return $filas;
         });
+        $filas = $cache ? app(DisposicionLecturaCache::class)->recordar('nomina:'.$anio, $calcular) : $calcular();
+        // El cierre anual se verifica de nuevo, incluso con una fuente reutilizada.
+        $vigentes = self::establecimientos($anio)->pluck('id')->all();
+        $filas = collect($filas)->whereIn('origen_id', $vigentes);
         $filas = $filas->keyBy(fn ($f) => self::clave($f));
         $historial = DotacionDocenteDistribucion::query()->where('anio', $anio)->whereIn('origen_id', self::establecimientos($anio)->select('id'))->orderByDesc('id')->get();
         return $this->completar($filas, $historial);
     }
 
-    public function detalle(array $datos): ?array
+    public function detalle(array $datos, bool $cache = false): ?array
     {
         $ee = self::establecimientos()->findOrFail($datos['origen_id']);
         $key = self::clave($datos);
-        $filas = $this->datos->datos($ee, (int) $datos['anio'])['filas']->filter(fn ($f) => self::clave($f) === $key)->keyBy(fn ($f) => self::clave($f));
+        $filas = collect($this->fuentes($ee, (int) $datos['anio'], $cache)['filas'])->filter(fn ($f) => self::clave($f) === $key)->keyBy(fn ($f) => self::clave($f));
         $historial = DotacionDocenteDistribucion::query()->where('anio', $datos['anio'])->where('origen_id', $ee->id)
             ->where('docente_rut_normalizado', DotacionEstablecimientoCalculator::normalizeRut($datos['rut']))
             ->where('bloque', $datos['bloque'])->where('tipo_horas', $datos['tipo_horas'])->orderByDesc('id')->get();
@@ -76,12 +90,14 @@ class DocentesDisposicionService
             ?: strcmp($a['nombre'], $b['nombre']) ?: strcmp($a['clave'], $b['clave']))->values();
     }
 
-    public function destinos(int $anio, string $bloque, int $origen): Collection
+    public function destinos(int $anio, string $bloque, int $origen, bool $cache = false): Collection
     {
-        return self::establecimientos($anio)->whereKeyNot($origen)->get()->map(function ($ee) use ($anio, $bloque): array {
-            $necesidad = $this->datos->referenciasDestino($ee, $anio)[$bloque];
-            return ['id' => $ee->id, 'rbd' => $ee->rbd, 'nombre' => $ee->nombre_establecimiento] + $necesidad;
-        })->sort(function ($a, $b): int {
+        return DotacionLecturaCache::ejecutar(fn () => self::establecimientos($anio)->whereKeyNot($origen)->get()->map(function ($ee) use ($anio, $bloque, $cache): array {
+            $calcular = fn () => $this->datos->referenciasDestino($ee, $anio);
+            $referencias = $cache ? app(DisposicionLecturaCache::class)->recordar('destino:'.$ee->id.':'.$anio, $calcular) : $calcular();
+            $necesidad = $referencias[$bloque];
+            return ['id' => $ee->id, 'rbd' => $ee->rbd, 'nombre' => $ee->nombre_establecimiento, 'bloques' => $referencias] + $necesidad;
+        }))->sort(function ($a, $b): int {
             return ($b['horas'] ?? -1) <=> ($a['horas'] ?? -1) ?: strnatcasecmp($a['nombre'], $b['nombre']);
         })->values();
     }
