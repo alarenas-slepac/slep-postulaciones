@@ -1,5 +1,45 @@
 # Nómina docente por bloques en Excel y PDF
 
+## Nómina completa consolidada · 2026.11.16.691
+
+En **Dotación Establecimiento → Nómina completa por bloque** se consulta el padrón
+base completo por año, bloque, comuna y establecimiento. La búsqueda comprende
+nombre, RUT, título y establecimiento. Incluye docentes ajustados, protegidos,
+justificados y fuera de la proyección por no continuidad o no renovación, sin
+exigir saldo disponible ni establecimiento revisado y finalizado.
+
+**Exportar nómina completa (Excel)** genera un libro con tres hojas:
+
+- **Docentes:** una fila por RUT y establecimiento, con título, tramo, contrato
+  original consolidado, titularidad, contrata, otras calidades y horas por bloque.
+- **Resumen establecimientos:** una fila por establecimiento y totales de los
+  docentes que cumplen los filtros.
+- **Definiciones:** alcance, fuentes, unidades y criterios de consolidación.
+
+La clasificación contractual reutiliza las reglas del SGA con el contrato
+original, antes de las situaciones que reducen su aporte a dotación. Plan de
+estudio + Parvularia + PIE concilia con el contrato original de cada fila. Una
+persona que aporta a varios bloques aparece una sola vez: filtrar un bloque
+selecciona esa persona y conserva visible toda su distribución. Los contratos
+cero mantienen el bloque de su perfil y los títulos ausentes se identifican.
+
+La base corresponde al último padrón vigente disponible para el año solicitado;
+el período efectivo queda en cada fila. Se conservan las exclusiones propias del
+padrón docente: reemplazos, suplencias, asistentes, plazas virtuales y salas cuna
+no integran esta nómina. Las horas consideradas en dotación se muestran sólo como
+referencia; no restringen la consulta ni la exportación.
+
+El Excel aplica los mismos filtros que la vista y descarga todos los resultados,
+incluidas las demás páginas. Sus textos se escriben como cadenas explícitas.
+Los roles autorizados son los mismos de la exportación docente existente; el
+directivo queda limitado a su propio establecimiento en la vista, las opciones
+de filtros y la descarga. Las rutas son
+`admin.dotacion-establecimiento.nomina-completa.index` y
+`admin.dotacion-establecimiento.nomina-completa.export`, ambas de lectura. No
+requiere migraciones. Pruebas: `tests/Feature/DotacionNominaCompletaTest.php`.
+
+## Nómina operativa del establecimiento
+
 En **Dotación Establecimiento → Docentes → Listado docente**, usar **Exportar docentes (Excel)** o **Exportar docentes (PDF)**. Ambos descargan la nómina completa del establecimiento y año seleccionados, independientemente de los filtros de revisión en pantalla.
 
 Acceden los mismos roles de la vista: `admin`, `funcionario_directivo_estab`, `coordinador_uatp`, `coordinador_gdp` y `supervisor_plani`. Se evalúa el rol activo. El directivo sólo puede descargar su establecimiento; tener otro rol asignado no amplía el alcance mientras actúe como directivo. Las salas cuna conservan su exclusión del proceso. La descarga sigue disponible durante los bloqueos de edición.

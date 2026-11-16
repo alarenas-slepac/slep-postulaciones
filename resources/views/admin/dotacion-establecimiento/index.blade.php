@@ -37,6 +37,11 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-start justify-content-xl-end">
+                @if (\App\Exports\DotacionNominaDocentesExport::canExport($activeRole))
+                    <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.nomina-completa.index', ['anio' => $anio, 'comuna' => $comuna]) }}">
+                        <i class="bi bi-people" aria-hidden="true"></i> Nómina completa por bloque
+                    </a>
+                @endif
                 @if (in_array($activeRole, \App\Services\Dotacion\DocentesDisposicionService::ROLES, true))
                     <a class="btn btn-outline-primary rounded-pill px-4" href="{{ route('admin.dotacion-establecimiento.disposicion.index', ['anio' => $anio]) }}">
                         <i class="bi bi-person-workspace" aria-hidden="true"></i> Docentes a disposición

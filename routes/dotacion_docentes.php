@@ -2,7 +2,16 @@
 
 use App\Exports\DotacionNominaDocentesExport;
 use App\Http\Controllers\Admin\DotacionNominaDocentesController;
+use App\Http\Controllers\Admin\DotacionNominaCompletaController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('admin/dotacion-establecimiento/informes/nomina-completa', [DotacionNominaCompletaController::class, 'index'])
+    ->middleware(['auth', 'verified', 'ensure.role:'.implode('|', DotacionNominaDocentesExport::ROLES), 'ensure.module'])
+    ->name('admin.dotacion-establecimiento.nomina-completa.index');
+
+Route::get('admin/dotacion-establecimiento/informes/nomina-completa.xlsx', [DotacionNominaCompletaController::class, 'export'])
+    ->middleware(['auth', 'verified', 'ensure.role:'.implode('|', DotacionNominaDocentesExport::ROLES), 'ensure.module'])
+    ->name('admin.dotacion-establecimiento.nomina-completa.export');
 
 Route::get('admin/dotacion-establecimiento/{establecimiento}/docentes/nomina.xlsx', DotacionNominaDocentesController::class)
     ->middleware(['auth', 'verified', 'ensure.role:'.implode('|', DotacionNominaDocentesExport::ROLES), 'ensure.module'])

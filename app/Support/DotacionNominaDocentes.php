@@ -58,20 +58,7 @@ class DotacionNominaDocentes
         foreach ($docentes as $docente) {
             if (isset($docente['cupo_contrata_id']) || ($docente['estamento_cobertura'] ?? 'docente') === 'asistente') { continue; }
             $rut = DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut'] ?? ''));
-            $contrato = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
-            $pie = $especial ? 0.0 : min($contrato, max(0.0, (float) ($docente['horas_contrato_pie']
-                ?? DotacionAsignacionCalculator::contratoPiePorDocente($docente))));
-            $aula = max(0.0, round($contrato - $pie, 2));
-            $parvularia = min($aula, (float) DotacionEstablecimientoCalculator::contratoParvularia([$docente], $aula, 0)['horas_contrato_docentes_parvularia']);
-            $aportes = ['plan_estudio' => round($aula - $parvularia, 2), 'parvularia' => $parvularia, 'pie' => $pie];
-            foreach ($aportes as $bloque => $horas) {
-                if ($horas > 0.01) { $pertenencia[$bloque][$rut] = true; }
-            }
-            // Conserva docentes con contrato cero o desconocido: no se pierden por agrupar.
-            if (max($aportes) <= 0.01) {
-                $perfil = DotacionProfesionDocenteResolver::perfilTitulo($docente);
-                $bloque = $perfil['es_educacion_parvulos'] ? 'parvularia'
-                    : (!$especial && $perfil['es_educacion_diferencial'] ? 'pie' : 'plan_estudio');
+            foreach ($this->distribucionPorBloque($docente, $especial)['bloques'] as $bloque) {
                 $pertenencia[$bloque][$rut] = true;
             }
         }
@@ -83,6 +70,26 @@ class DotacionNominaDocentes
         }
 
         return $bloques;
+    }
+
+    /** Distribución contractual compartida por las nóminas; no altera las asignaciones. */
+    public function distribucionPorBloque(array $docente, bool $especial = false): array
+    {
+        $contrato = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
+        $pie = $especial ? 0.0 : min($contrato, max(0.0, (float) ($docente['horas_contrato_pie']
+            ?? DotacionAsignacionCalculator::contratoPiePorDocente($docente))));
+        $aula = max(0.0, round($contrato - $pie, 2));
+        $parvularia = min($aula, (float) DotacionEstablecimientoCalculator::contratoParvularia([$docente], $aula, 0)['horas_contrato_docentes_parvularia']);
+        $horas = ['plan_estudio' => round($aula - $parvularia, 2), 'parvularia' => $parvularia, 'pie' => $pie];
+        $bloques = array_keys(array_filter($horas, fn ($valor) => $valor > 0.01));
+        // Los contratos cero o desconocidos conservan el bloque de su perfil.
+        if ($bloques === []) {
+            $perfil = DotacionProfesionDocenteResolver::perfilTitulo($docente);
+            $bloques[] = $perfil['es_educacion_parvulos'] ? 'parvularia'
+                : (!$especial && $perfil['es_educacion_diferencial'] ? 'pie' : 'plan_estudio');
+        }
+
+        return ['horas' => $horas, 'bloques' => $bloques];
     }
 
     /** Una fila por docente y bloque con saldo, conservando ambos tipos de fundamento. */
