@@ -105,6 +105,41 @@ las coincidencias de cualquiera de los bloques; el destino de una distribución
 en corrección se conserva aunque no coincida. **La referencia nunca actúa como
 máximo:** el límite es el saldo disponible del docente de origen.
 
+## Selección y reserva de cupos · 2026.11.16.692
+
+Registrar destino permite elegir un **cupo concreto** del establecimiento, por
+persona y bloque, tanto por contratar como a contrata por renovar. El selector y
+el cuadro muestran requerimiento, horas ya destinadas, saldo disponible y las
+destinaciones activas vinculadas. Los cupos cubiertos siguen visibles como
+**Ya destinado**, deshabilitados para nuevas vinculaciones. Los parcialmente
+destinados admiten usar el saldo restante.
+
+Se permite destinar más horas que las disponibles en el cupo: por ejemplo,
+24 h a un cupo PIE de 19 h, si el origen dispone de 24 h. Las 24 h quedan
+vinculadas y el cupo no puede volver a seleccionarse. El exceso se informa en
+el formulario y queda visible en el historial. El saldo de origen conserva
+su límite acumulado.
+
+La ocupación se calcula sumando distribuciones activas del mismo año,
+establecimiento y cupo; se consulta siempre de nuevo, fuera de la caché de
+fuentes. El guardado valida la selección y su disponibilidad después de bloquear
+origen y destino, rechazando formularios antiguos que intenten reutilizar un
+cupo cubierto. No acepta horas de disponibilidad enviadas desde el navegador.
+Los filtros seleccionan cupos coincidentes, pero conservan su requerimiento
+completo y descuentan todas sus vinculaciones, evitando liberar horas al filtrar.
+
+Una corrección excluye su versión anterior del cómputo y registra la nueva
+vinculación en la misma transacción. Cambiar de cupo libera el anterior; anular
+libera las horas vinculadas. Un fallo conserva la versión y ocupación anteriores.
+La clave del cupo y sus antecedentes quedan en `antecedente.destino_cupo`, sin
+migraciones. Los registros históricos sin cupo siguen visibles y se pueden
+anular o corregir en su destino original; no se les atribuye un cupo automáticamente.
+Una vinculación cuyo cupo dejó de existir se puede regularizar conservando su
+antecedente, sin ofrecerla como cupo para nuevas destinaciones.
+
+Sin JavaScript, el selector nativo agrupa los cupos por establecimiento y el
+cuadro completo se puede consultar bajo **Consultar referencias por bloque**.
+
 ## Rendimiento y vigencia
 
 Las fuentes calculadas se reutilizan durante 120 segundos, por establecimiento y
@@ -137,6 +172,6 @@ Si baja el saldo de origen, la vista marca el exceso y exige corregir o anular
 antes de agregar horas. Si desaparece el origen, permite consultar y anular el
 historial sin recrear disponibilidad.
 
-Esta distribución no cambia el padrón, no mueve contratos ni asignaciones
-existentes, no consume cupos ni asigna cursos automáticamente en el destino.
-No genera notificaciones nuevas.
+Esta distribución reserva las horas del cupo en el registro auxiliar de
+destinaciones. Conserva el padrón, los contratos y las asignaciones existentes;
+no asigna cursos automáticamente ni genera notificaciones nuevas.

@@ -13,6 +13,13 @@
         @endforeach</tbody>
     </table></div>
     <p class="small slep-listing__muted px-3 pb-3 mb-0">Se suman sólo asignaciones activas de {{ $anio }} que coinciden con los filtros. Cada cupo o contrata se cuenta una vez en cada bloque; puede participar en más de uno.</p>
+    <div class="border-top p-3">
+        <h3>Cupos y destinaciones registradas</h3>
+        <p class="small slep-listing__muted">Revise las horas requeridas, ya destinadas y disponibles de cada cupo. Seleccione el cupo en el campo anterior.</p>
+        <div data-disposicion-cupos-lista>
+            @include('admin.dotacion-establecimiento.disposicion._cupos-destino', ['cupos' => $seleccionado['cupos_destino'] ?? []])
+        </div>
+    </div>
 </section>
 <noscript>
     <details class="mt-3"><summary>Consultar referencias por bloque</summary>
@@ -25,5 +32,9 @@
                     <td data-label="Contratas por renovar">{{ $fmt($ref['contrata'] ?? 0) }} h renovables · {{ $ref['personas_contrata'] ?? 0 }} contratas</td></tr>
             @endforeach @endforeach</tbody>
         </table></div>
+        @foreach($destinos as $destino)
+            <h3 class="mt-3">{{ $destino['rbd'] }} · {{ $destino['nombre'] }}</h3>
+            @include('admin.dotacion-establecimiento.disposicion._cupos-destino', ['cupos' => $destino['cupos_destino']])
+        @endforeach
     </details>
 </noscript>

@@ -2404,13 +2404,16 @@
     ]
   },
   "resources/js/dotacion-disposicion.js": {
-    "file": "assets/dotacion-disposicion-B5o1sIlP.js",
+    "file": "assets/dotacion-disposicion-39N7b1j3.js",
     "name": "dotacion-disposicion",
     "src": "resources/js/dotacion-disposicion.js",
     "isEntry": true,
     "imports": [
       "resources/js/slep-listados.js",
       "__commonjsHelpers-92s3wAHG.js"
+    ],
+    "css": [
+      "assets/dotacion-disposicion-D5bHUXj9.css"
     ]
   },
   "resources/js/dotacion-docente-asignaciones.js": {
