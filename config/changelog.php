@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.15.690',
+    'current_version' => '2026.11.16.691',
     'entries' => [
+        [
+            'version' => '2026.11.16.691',
+            'title' => 'Nómina completa de docentes por bloque y establecimiento',
+            'summary' => 'Incorpora una vista y Excel de todos los docentes del padrón base, con título y contrato consolidado por establecimiento, independientemente de su ajuste en dotación.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Añade Nómina completa por bloque al listado de Dotación Establecimiento, con filtros de año, bloque, comuna, establecimiento y búsqueda por docente, RUT o título.',
+                'Incluye docentes ajustados, protegidos, justificados, sin saldo y excluidos por no continuidad o no renovación de la proyección. Conserva el contrato original y distingue las horas consideradas en dotación.',
+                'Consolida las líneas del padrón en una fila por docente y establecimiento e informa título profesional, tramo, tipo de contrato, titularidad, contrata y distribución entre Plan de estudio, Parvularia y PIE.',
+                'El Excel descarga todos los resultados filtrados, con una hoja de docentes, otra de resumen en una fila por establecimiento y definiciones. El directivo sólo consulta y exporta su propio establecimiento.',
+                'Reutiliza la distribución contractual de las nóminas existentes, conserva los datos históricos y no modifica contratos ni asignaciones. No requiere migraciones.',
+            ],
+            'published_at' => '2026-11-16',
+        ],
         [
             'version' => '2026.11.15.690',
             'title' => 'Filtros y consultas optimizadas de Docentes a disposición',
