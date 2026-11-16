@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.12.689',
+    'current_version' => '2026.11.15.690',
     'entries' => [
+        [
+            'version' => '2026.11.15.690',
+            'title' => 'Filtros y consultas optimizadas de Docentes a disposición',
+            'summary' => 'Separa supresiones parciales y totales, incorpora filtros de enseñanza y detalla cupos y contratas renovables por bloque en los destinos.',
+            'roles' => ['admin', 'coordinador_gdp', 'coordinador_uatp', 'supervisor_plani'],
+            'items' => [
+                'Añade filtros independientes de supresión parcial, supresión total, no renovación y supresión sin clasificar, conservando los enlaces históricos.',
+                'Permite filtrar título, nivel y área de enseñanza tanto en la nómina como al consultar establecimientos de destino. Los antecedentes no informados permanecen identificados.',
+                'Muestra por separado las horas ya asignadas a docentes por contratar y las horas renovables de contratas, con cantidades únicas por bloque de Planes de Estudio, PIE y Educación Parvularia.',
+                'Reutiliza fuentes de lectura durante dos minutos para evitar reconstruir toda la dotación al navegar, filtrar o abrir el detalle. Los cambios del SGA invalidan la lectura después del commit; las distribuciones y sus saldos se consultan siempre desde el historial actual.',
+                'Comparte la consulta de períodos del padrón dentro del cálculo de varios establecimientos. Al guardar, mantiene el recálculo sin caché, los bloqueos, las exclusiones y el límite del saldo de origen.',
+            ],
+            'published_at' => '2026-11-15',
+        ],
         [
             'version' => '2026.11.12.689',
             'title' => 'Validación alternativa de cuentas por WhatsApp',

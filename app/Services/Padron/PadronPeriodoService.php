@@ -5,6 +5,7 @@ namespace App\Services\Padron;
 use App\Models\PadronRevision;
 use App\Models\ReemplazoPersonal;
 use App\Models\ReemplazoPersonalHistorico;
+use App\Support\DotacionLecturaCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,8 @@ class PadronPeriodoService
 
     public function instalado(): bool
     {
-        return Schema::hasTable('padron_periodo_versiones') && Schema::hasTable('padron_periodo_personal');
+        return DotacionLecturaCache::recordar('padron:historial-instalado', fn () =>
+            Schema::hasTable('padron_periodo_versiones') && Schema::hasTable('padron_periodo_personal'));
     }
 
     /** Dentro del escritor: base completa anterior y nueva copia del período abierto. */
@@ -129,14 +131,16 @@ class PadronPeriodoService
 
     public function periodos(): Collection
     {
-        $periodos = DB::table('reemplazos_personal')->select('anio', 'mes')->distinct()->get();
-        if ($this->instalado()) {
-            foreach (DB::table('padron_periodo_versiones')->whereNotNull('completada_at')->distinct()->pluck('periodo') as $periodo) {
-                $periodos->push((object) ['anio' => intdiv($periodo, 100), 'mes' => $periodo % 100]);
+        return DotacionLecturaCache::recordar('padron:periodos-disponibles', function (): Collection {
+            $periodos = DB::table('reemplazos_personal')->select('anio', 'mes')->distinct()->get();
+            if ($this->instalado()) {
+                foreach (DB::table('padron_periodo_versiones')->whereNotNull('completada_at')->distinct()->pluck('periodo') as $periodo) {
+                    $periodos->push((object) ['anio' => intdiv($periodo, 100), 'mes' => $periodo % 100]);
+                }
             }
-        }
-        return $periodos->unique(fn ($p) => $p->anio * 100 + $p->mes)
-            ->sortByDesc(fn ($p) => $p->anio * 100 + $p->mes)->values();
+            return $periodos->unique(fn ($p) => $p->anio * 100 + $p->mes)
+                ->sortByDesc(fn ($p) => $p->anio * 100 + $p->mes)->values();
+        })->map(fn ($periodo) => clone $periodo);
     }
 
     /** Último período por establecimiento/año, respetando el piso de cargas completas. */

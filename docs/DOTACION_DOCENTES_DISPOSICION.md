@@ -57,6 +57,25 @@ y destino en orden de ID para coordinar las operaciones y las reaperturas.
   existentes de asignación y no renovación; reintenta hasta tres veces ante deadlock.
 - Una solicitud UUID impide repetir la misma distribución por doble envío.
 
+## Filtros de consulta
+
+Tipo de horas distingue **Supresión parcial**, **Supresión total**, **No renovación**
+y **Supresión sin clasificar**. Los enlaces históricos `tipo=titular` siguen
+consultando todas las supresiones. La clasificación total/parcial mantiene las
+reglas de contrato considerado entre todos los bloques y calidades.
+
+La nómina permite combinar título, nivel y área de enseñanza con los filtros
+existentes. Nivel y área proceden de la justificación registrada; los antecedentes
+históricos sin esos campos se pueden consultar como **Sin información**. El catálogo
+de áreas incluye las copias históricas de las justificaciones. Los filtros se
+conservan al cambiar de pestaña o página.
+
+La asignación de destino incorpora los mismos tres filtros. Allí el título procede
+del docente o cupo, el nivel del curso de la asignación (o su declaración cuando no
+hay curso) y el área de la asignatura registrada. No se infiere una habilitación
+profesional ni se modifica la justificación del origen. La suma se filtra por
+asignación antes de contar cada contrata o cupo una vez por bloque.
+
 ## Referencia de cupos del destino
 
 La referencia del selector suma **horas de contrato efectivamente asignadas**, no
@@ -73,10 +92,39 @@ asistentes, plazas por asumir, años u orígenes distintos y situaciones de fuer
 maternal o gremial (`horas_gremiales`). La lactancia se excluye por fuero sólo
 cuando éste consta expresamente.
 
-Se muestran por separado las horas asignadas a cupos por contratar y a docentes
-reales íntegramente a contrata. Los destinos con más horas detectadas aparecen
-primero; los destinos con cero permanecen seleccionables. **La referencia nunca
-actúa como máximo:** el límite es el saldo disponible del docente de origen.
+Se muestran por separado las horas asignadas a cupos por contratar y las horas
+renovables de docentes reales íntegramente a contrata. No se incluyen las horas
+habilitadas de cupos que aún no tienen asignaciones. La selección presenta una
+tabla con los tres bloques (Planes de Estudio, Educación Parvularia y PIE) y la
+cantidad de cupos y contratas de cada uno. Una persona puede participar en más
+de un bloque; el total del selector no la cuenta dos veces.
+
+Los destinos con más horas detectadas en el bloque de origen aparecen primero.
+Sin filtros se conservan los destinos con cero. Al aplicar filtros se muestran
+las coincidencias de cualquiera de los bloques; el destino de una distribución
+en corrección se conserva aunque no coincida. **La referencia nunca actúa como
+máximo:** el límite es el saldo disponible del docente de origen.
+
+## Rendimiento y vigencia
+
+Las fuentes calculadas se reutilizan durante 120 segundos, por establecimiento y
+año. La nómina y el detalle comparten esa lectura; las referencias de destinos
+incluyen los tres bloques para no reconstruirlas al filtrar. El cálculo de varios
+establecimientos comparte sus consultas de períodos del padrón en una memoria
+que se descarta al terminar.
+
+`DisposicionLecturaServiceProvider` detecta escrituras del SGA, incluidas las de
+Query Builder, en las tablas que alimentan el cálculo. Cambia la generación de
+la caché **después del commit** y no publica una generación por transacciones
+revertidas. Las distribuciones no invalidan la fuente: el historial, sus cantidades,
+los cierres anuales y los permisos se consultan siempre de nuevo. Las alteraciones
+externas al SGA se reflejan como máximo al vencer los 120 segundos o al limpiar
+la caché con el procedimiento habitual de despliegue.
+
+Guardar una distribución nunca utiliza esa caché: vuelve a calcular el origen
+después de tomar sus bloqueos y valida el saldo actual. El cambio no requiere
+migraciones ni genera notificaciones. La caché puede deshabilitarse con
+`dotacion_disposicion.cache_seconds = 0`; no se modifica `.env`.
 
 ## Historial
 

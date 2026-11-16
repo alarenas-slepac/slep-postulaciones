@@ -6,4 +6,5 @@ return [
     App\Providers\AccountVerificationServiceProvider::class,
     App\Providers\FuncionarioConsultaServiceProvider::class,
     App\Providers\DotacionEdicionServiceProvider::class,
+    App\Providers\DisposicionLecturaServiceProvider::class,
 ];

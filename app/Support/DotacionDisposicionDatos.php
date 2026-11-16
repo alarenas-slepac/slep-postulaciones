@@ -22,10 +22,10 @@ class DotacionDisposicionDatos
         return DotacionLecturaCache::ejecutar(function () use ($establecimiento, $anio): array {
             $data = DotacionEstablecimientoCalculator::build($establecimiento, $anio, true, false);
             $proceso = DotacionProceso2027Calculator::resumen($establecimiento, $anio, $data);
-            $informe = app(DotacionSobredotacionInforme::class)->preparar($data, $proceso,
-                DotacionSobredotacionJustificacion::registrosPara((int) $establecimiento->id, $anio));
+            $registros = DotacionSobredotacionJustificacion::registrosPara((int) $establecimiento->id, $anio);
+            $informe = app(DotacionSobredotacionInforme::class)->preparar($data, $proceso, $registros);
 
-            return ['filas' => $this->filas($establecimiento, $anio, $informe)];
+            return ['filas' => $this->filas($establecimiento, $anio, $informe, $registros)];
         });
     }
 
@@ -41,7 +41,7 @@ class DotacionDisposicionDatos
 
     public static function cuposDestino(iterable $docentes, int $establecimientoId, int $anio, array $situaciones = []): array
     {
-        $resultado = array_fill_keys(array_keys(self::BLOQUES), ['cupos' => 0.0, 'contrata' => 0.0, 'horas' => 0.0, 'personas' => 0]);
+        $resultado = array_fill_keys(array_keys(self::BLOQUES), ['detalles' => []]);
         foreach (collect($docentes)->unique(fn ($d) => DotacionEstablecimientoCalculator::normalizeRut($d['rut'] ?? '')) as $docente) {
             $virtual = isset($docente['cupo_contrata_id']);
             $contrato = $docente['horas_contrato'] ?? null;
@@ -70,14 +70,58 @@ class DotacionDisposicionDatos
             });
             foreach ($porBloque as $bloque => $asignadas) {
                 if (! isset($resultado[$bloque])) { continue; }
-                $horas = round((float) $asignadas->sum('horas_contrato'), 2);
-                if ($horas <= 0) { continue; }
-                $resultado[$bloque][$virtual ? 'cupos' : 'contrata'] += $horas;
-                $resultado[$bloque]['personas']++;
-                $resultado[$bloque]['horas'] = round($resultado[$bloque]['cupos'] + $resultado[$bloque]['contrata'], 2);
+                foreach ($asignadas as $asignacion) {
+                    $horas = round((float) data_get($asignacion, 'horas_contrato', 0), 2);
+                    if ($horas <= 0) { continue; }
+                    $area = trim((string) data_get($asignacion, 'asignatura_nombre', ''));
+                    $resultado[$bloque]['detalles'][] = [
+                        'persona' => DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? ''),
+                        'tipo' => $virtual ? 'cupos' : 'contrata', 'horas' => $horas,
+                        'titulo' => $docente['titulo'] ?? 'Sin título declarado',
+                        'niveles' => self::nivelesDestino($asignacion, $docente, $bloque),
+                        'area' => $area,
+                    ];
+                }
             }
         }
-        return $resultado;
+        return self::filtrarReferenciasDestino($resultado);
+    }
+
+    public static function filtrarReferenciasDestino(array $referencias, array $filtros = []): array
+    {
+        $normalizar = fn ($texto) => Str::lower(Str::ascii(trim((string) $texto)));
+        foreach ($referencias as &$bloque) {
+            $detalles = collect($bloque['detalles'] ?? [])->filter(function ($fila) use ($filtros, $normalizar): bool {
+                return (empty($filtros['destino_titulo']) || $normalizar($fila['titulo']) === $normalizar($filtros['destino_titulo']))
+                    && (empty($filtros['destino_nivel']) || ($filtros['destino_nivel'] === 'sin_informar'
+                        ? empty($fila['niveles']) : in_array($filtros['destino_nivel'], $fila['niveles'], true)))
+                    && (empty($filtros['destino_area']) || ($filtros['destino_area'] === 'sin_informar'
+                        ? $fila['area'] === '' : $normalizar($fila['area']) === $normalizar($filtros['destino_area'])));
+            });
+            $bloque['detalles'] = $detalles->values()->all();
+            $bloque['cupos'] = round((float) $detalles->where('tipo', 'cupos')->sum('horas'), 2);
+            $bloque['contrata'] = round((float) $detalles->where('tipo', 'contrata')->sum('horas'), 2);
+            $bloque['personas_cupos'] = $detalles->where('tipo', 'cupos')->unique('persona')->count();
+            $bloque['personas_contrata'] = $detalles->where('tipo', 'contrata')->unique('persona')->count();
+            $bloque['personas'] = $detalles->unique('persona')->count();
+            $bloque['horas'] = round($bloque['cupos'] + $bloque['contrata'], 2);
+        }
+        unset($bloque);
+        return $referencias;
+    }
+
+    private static function nivelesDestino(object|array $asignacion, array $docente, string $bloque): array
+    {
+        $nivelCurso = (string) data_get($asignacion, 'establecimientoCurso.curso.nivel_educativo', data_get($asignacion, 'nivel_educativo', ''));
+        $texto = Str::lower(Str::ascii($nivelCurso ?: ($docente['niveles_declarados'] ?? '')));
+        $niveles = [];
+        foreach (['basica' => 'basic', 'media' => 'media', 'parvularia' => 'parvul', 'epja' => 'adult', 'especial' => 'especial'] as $key => $fragmento) {
+            if (str_contains($texto, $fragmento)) { $niveles[] = $key; }
+        }
+        if (str_contains($texto, 'epja')) { $niveles[] = 'epja'; }
+        if ($bloque === 'parvularia') { $niveles[] = 'parvularia'; }
+        if ($bloque === 'pie') { $niveles[] = 'pie'; }
+        return array_values(array_unique($niveles));
     }
 
     private static function funcionExcluida(string $funcion): bool
@@ -86,7 +130,7 @@ class DotacionDisposicionDatos
         return (bool) preg_match('/\b(DIRECTOR[A]?|INSPECTOR[A]?|UTP)\b|\bU T P\b|UNIDAD TECNIC[AO] PEDAGOGIC|CONVIVENCIA|COORD.*\bPIE\b|\bPIE\b.*COORD/', $texto);
     }
 
-    public function filas(Establecimiento $ee, int $anio, array $informe): Collection
+    public function filas(Establecimiento $ee, int $anio, array $informe, ?Collection $registros = null): Collection
     {
         $retirados = Schema::hasTable('dotacion_no_renovaciones')
             ? DotacionNoRenovacion::query()->where('establecimiento_id', $ee->id)->where('anio', $anio)->whereNull('anulada_at')->get()
@@ -94,7 +138,7 @@ class DotacionDisposicionDatos
         $rutsRetirados = $retirados->keyBy(fn ($r) => DotacionEstablecimientoCalculator::normalizeRut($r->docente_rut_normalizado));
         $antecedentesRetirados = $retirados->isNotEmpty() && Schema::hasTable('reemplazos_personal')
             ? DotacionEstablecimientoCalculator::docentes($ee, $anio, false, true)->keyBy('rut_normalizado') : collect();
-        $registros = DotacionSobredotacionJustificacion::registrosPara((int) $ee->id, $anio)
+        $registros = ($registros ?? DotacionSobredotacionJustificacion::registrosPara((int) $ee->id, $anio))
             ->keyBy(fn ($r) => DotacionSobredotacionJustificacion::clave($r->bloque, $r->docente_rut_normalizado, $r->tipo_horas));
         $totalPorRut = collect($informe['bloques'] ?? [])->flatMap(fn ($b) => $b['filas'] ?? [])
             ->groupBy(fn ($f) => DotacionEstablecimientoCalculator::normalizeRut($f['rut']))
@@ -119,6 +163,8 @@ class DotacionDisposicionDatos
                         'situacion' => 'Propuesta en revisión', 'fuente' => 'sobredotacion', 'fuente_id' => $registro?->id,
                         'justificacion' => $registro?->fundamentoCompleto() ?: 'Sin justificación',
                         'estado_justificacion' => $fila['estado_'.$tipo] ?? 'Sin justificación',
+                        'nivel_ensenanza' => $registro?->getAttribute('nivel_ensenanza'),
+                        'areas_ensenanza' => $registro?->getAttribute('areas_ensenanza') ?? [],
                     ]);
                 }
             }
@@ -139,12 +185,15 @@ class DotacionDisposicionDatos
                 $centavos = min($restante, max(0, (int) round($cantidad * 100)));
                 if ($centavos <= 0) { continue; }
                 $restante -= $centavos;
+                $registro = $registros->get(DotacionSobredotacionJustificacion::clave($bloque, $r->docente_rut_normalizado, 'contrata'));
                 $filas->push($this->base($ee, $anio, $r->docente_rut_normalizado, $bloque, 'contrata') + [
                     'nombre' => $r->docente_nombre, 'titulo' => $r->titulo, 'funcion' => $persona['funcion'] ?? 'Sin información',
                     'prelacion' => $prelacion['prioridad_2027_label'], 'prioridad' => $prelacion['prioridad_2027'],
                     'tramo' => $persona['tramo'] ?? '', 'fecha_antiguedad' => $persona['fecha_antiguedad'] ?? null, 'contrato' => (float) $r->horas_contrata,
                     'horas' => $centavos / 100, 'tipo' => 'No renovación', 'situacion' => 'No renovación registrada',
                     'fuente' => 'no_renovacion', 'fuente_id' => $r->id, 'justificacion' => $r->justificacion, 'estado_justificacion' => 'Vigente',
+                    'nivel_ensenanza' => $registro?->getAttribute('nivel_ensenanza'),
+                    'areas_ensenanza' => $registro?->getAttribute('areas_ensenanza') ?? [],
                 ]);
             }
         }

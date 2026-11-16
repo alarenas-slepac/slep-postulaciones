@@ -15,6 +15,7 @@ export default defineConfig({
                 'resources/scss/app.scss',
                 'resources/js/app.js',
                 'resources/js/account-verification.js',
+                'resources/js/dotacion-disposicion.js',
                 'resources/js/slep-listados.js',
                 'resources/js/maternidad.js',
                 'resources/js/reemplazo-modificacion-termino.js',
