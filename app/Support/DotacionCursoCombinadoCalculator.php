@@ -280,11 +280,19 @@ class DotacionCursoCombinadoCalculator
                 fn ($asignacion) => (float) data_get($asignacion, 'horas_contrato', 0)
             ), 2);
             $representante = $itemsGrupo->first();
+            // El selector de cupos clasifica por el curso real, no por el nombre del grupo.
+            // PIE sólo conserva el ID en sus filas originales; reutilizar la relación ya cargada.
+            $miembroRepresentante = collect(data_get($grupo, 'miembros', []))->first(fn ($miembro) =>
+                (int) (data_get($miembro, 'establecimiento_curso_id') ?? data_get($miembro, 'id', 0))
+                    === (int) data_get($representante, 'establecimiento_curso_id', 0));
+            $cursoRepresentante = data_get($miembroRepresentante, 'curso');
 
             $resultado->push(array_merge($representante, [
                 'key' => $key,
                 'titulo' => 'Trabajo colaborativo PIE',
                 'curso_label' => (string) data_get($grupo, 'nombre', 'Curso combinado'),
+                'curso' => $cursoRepresentante instanceof EstablecimientoCurso
+                    ? $cursoRepresentante : ($representante['curso'] ?? null),
                 'establecimiento_curso_id' => (int) data_get($representante, 'establecimiento_curso_id', 0),
                 'dotacion_curso_combinado_id' => $grupoId,
                 'horas_contrato_requeridas' => $horasRequeridas,
