@@ -6457,8 +6457,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.16.692',
+    'current_version' => '2026.11.17.693',
     'entries' => [
+        [
+            'version' => '2026.11.17.693',
+            'title' => 'Cupos de Párvulos en trabajo colaborativo PIE de cursos combinados',
+            'summary' => 'Corrige la exclusión del docente por contratar de Educación Parvularia en el selector de trabajo colaborativo PIE de NT1 + NT2 combinados.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Conserva en la necesidad consolidada el curso representante y su nivel educativo, reutilizando las relaciones ya cargadas del grupo.',
+                'El selector reconoce NT1/NT2 y ofrece los cupos disponibles del bloque de Educación Parvularia; las combinaciones de Básica conservan Plan General.',
+                'Cubre grupos con y sin JEC, estudiantes NEE sólo en NT2 y datos históricos. Conserva las tres horas por grupo y las validaciones de perfil, saldo contractual y bloque al guardar.',
+                'No modifica contratos ni asignaciones existentes y no requiere migraciones ni compilación de recursos.',
+            ],
+            'published_at' => '2026-11-17',
+        ],
         [
             'version' => '2026.11.16.692',
             'title' => 'Selección y disponibilidad de cupos en destinaciones docentes',
