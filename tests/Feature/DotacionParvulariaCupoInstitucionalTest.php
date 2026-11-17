@@ -214,6 +214,116 @@ class DotacionParvulariaCupoInstitucionalTest extends IsolatedSecurityTestCase
         $this->assertSame(116.0, $this->process()['bloques']['bloque_2']['asignadas_para_maximo']);
     }
 
+    public function test_la_quinta_educadora_puede_asignar_44_de_contrato_a_aula_sin_reservar_pie(): void
+    {
+        $necesidades = $this->prepararQuintaEducadora();
+        $this->asignarAulaQuinta($necesidades, [10, 10, 10]);
+        $filas = DotacionDocenteAsignacion::where('docente_rut_normalizado', '99000005K')->get();
+        $this->assertSame(44.0, (float) $filas->sum('horas_contrato'));
+        $this->assertSame(['plan_estudio'], $filas->pluck('tipo_asignacion')->unique()->all());
+        $this->assertSame(12.0, (float) DotacionDocenteAsignacion::where('tipo_asignacion', 'pie_colaborativo')->sum('horas_contrato'));
+        $this->assertSame(0.0, collect($this->process()['docentes'])->firstWhere('rut_normalizado', '99000005K')['horas_disponibles']);
+        $this->assertSame(232.0, (float) DotacionProceso2027Configuracion::first()->max_horas_bloque_2);
+        // Editar con toda la jornada utilizada restituye la asignación actual.
+        $fila = $filas->last();
+        app(DotacionAsignacionController::class)->update($this->request(['docente_rut' => '99000005-K',
+            'estamento_cobertura' => 'docente', 'horas_plan_pedagogicas' => 10, 'observacion' => 'Edición sintética sin reserva PIE.']), $this->ee, $fila);
+        $this->assertSame('Edición sintética sin reserva PIE.', $fila->fresh()->observacion);
+        $this->assertSame(44.0, (float) DotacionDocenteAsignacion::where('docente_rut_normalizado', '99000005K')->sum('horas_contrato'));
+    }
+
+    public function test_44_de_aula_no_permiten_agregar_mas_aula_ni_pie_al_mismo_contrato(): void
+    {
+        $necesidades = $this->prepararQuintaEducadora();
+        $this->asignarAulaQuinta($necesidades, [10, 10, 10]);
+        $antes = DotacionDocenteAsignacion::count();
+        try {
+            $this->asignarAulaQuinta([$necesidades[3]], [1]);
+            $this->fail('No se debe superar la jornada de 44 h.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('docente_rut', $e->errors());
+            $this->assertStringContainsString('disponible', $e->errors()['docente_rut'][0]);
+        }
+        $pie = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027), 'asignacion.necesidades.pie_colaborativo'))->first();
+        try {
+            app(DotacionAsignacionController::class)->store($this->request(['anio' => 2027, 'docente_rut' => '99000005-K',
+                'estamento_cobertura' => 'docente', 'tipo_asignacion' => 'pie_colaborativo', 'horas_contrato' => 1,
+                'necesidad_key' => $pie['key'], 'establecimiento_curso_id' => $pie['establecimiento_curso_id']]), $this->ee);
+            $this->fail('PIE también debe descontar el contrato disponible.');
+        } catch (ValidationException $e) { $this->assertArrayHasKey('horas_contrato', $e->errors()); }
+        $this->assertSame($antes, DotacionDocenteAsignacion::count());
+    }
+
+    public function test_pie_ya_asignado_descuenta_sus_horas_sin_reserva_automatica(): void
+    {
+        $necesidades = $this->prepararQuintaEducadora();
+        DotacionDocenteAsignacion::where('docente_rut_normalizado', '99000004K')->where('tipo_asignacion', 'pie_colaborativo')
+            ->update(['docente_rut' => '99000005-K', 'docente_rut_normalizado' => '99000005K',
+                'docente_nombre' => 'Educadora sintética 5', 'declaracion_sostenedor_id' => 5]);
+        $this->asignarAulaQuinta($necesidades, [10, 10, 8]);
+        $filas = DotacionDocenteAsignacion::where('docente_rut_normalizado', '99000005K')->get();
+        $this->assertSame(41.0, (float) $filas->where('tipo_asignacion', 'plan_estudio')->sum('horas_contrato'));
+        $this->assertSame(44.0, (float) $filas->sum('horas_contrato'));
+        $this->expectException(ValidationException::class);
+        $this->asignarAulaQuinta([$necesidades[3]], [1]);
+    }
+
+    private function prepararQuintaEducadora(): array
+    {
+        // Sustituye sólo el escenario sintético de esta prueba, en SQLite en memoria.
+        DotacionDocenteAsignacion::query()->delete();
+        EstablecimientoCurso::query()->update(['activo' => false]);
+        DB::table('reemplazos_personal')->where('rut', '99000001-K')->update(['jornada' => 44, 'jornada_basica' => 44]);
+        DB::table('declaracion_sostenedores')->where('id', 1)->update(['horas_contratadas' => 44]);
+        $this->person(5, 44);
+        $original = EstablecimientoCurso::where('nombre_seccion', 'NT1 A')->firstOrFail();
+        DB::table('planes_estudio_asignaturas')->where('plan_estudio_id', $original->plan_estudio_id)->delete();
+        DB::table('planes_estudio_asignaturas')->insert(['plan_estudio_id' => $original->plan_estudio_id,
+            'asignatura' => 'Núcleo aula', 'tipo_bloque' => 'plan_comun_formacion_general', 'horas_semanales' => 38]);
+        foreach (['B', 'C', 'D', 'E'] as $letra) {
+            $curso = $original->replicate(); $curso->letra = $letra; $curso->nombre_seccion = 'NT1 '.$letra; $curso->activo = true; $curso->save();
+            DB::table('establecimiento_curso_pie')->insert(['establecimiento_id' => $this->ee->id, 'anio' => 2027,
+                'establecimiento_curso_id' => $curso->id, 'curso_id' => $curso->curso_id, 'necesidades_transitorias' => 1, 'total_pie' => 1]);
+        }
+        DotacionProceso2027Configuracion::first()->update(['max_horas_bloque_2' => 232]);
+        $datos = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $necesidades = collect(data_get($datos, 'asignacion.necesidades.plan_estudio'))->values();
+        $this->assertCount(4, $necesidades);
+        foreach ($necesidades as $i => $need) {
+            $fila = DotacionContratoParvulariaCalculator::consolidar(collect([$this->assignment(0, $i + 1, $need, 28)]))->sole();
+            DotacionDocenteAsignacion::create($fila);
+        }
+        foreach (collect(data_get($datos, 'asignacion.necesidades.pie_colaborativo'))->values() as $i => $pie) {
+            DotacionDocenteAsignacion::create(array_replace($this->assignment(0, $i + 1, $pie, 0), [
+                'tipo_asignacion' => 'pie_colaborativo', 'horas_contrato' => 3,
+                'proporcion_aplicada' => null, 'fuente_calculo' => 'PIE sintético',
+            ]));
+        }
+        foreach ($this->process()['docentes_subsector']['asignaturas'] as $asignatura) {
+            foreach (range(1, 5) as $id) {
+                DB::table('dotacion_docente_subsectores')->updateOrInsert(['establecimiento_id' => $this->ee->id, 'anio' => 2027,
+                    'asignatura_key' => $asignatura['key'], 'docente_rut_normalizado' => '9900000'.$id.'K'],
+                    ['nivel' => 'parvularia', 'asignatura_nombre' => $asignatura['nombre']]);
+            }
+        }
+        $this->assertTrue($this->process()['asignacion_habilitada']);
+        foreach (range(1, 4) as $id) {
+            $this->assertSame(44.0, (float) DotacionDocenteAsignacion::where('docente_rut_normalizado', '9900000'.$id.'K')->sum('horas_contrato'));
+        }
+
+        return $necesidades->all();
+    }
+
+    private function asignarAulaQuinta(array $necesidades, array $horas): void
+    {
+        foreach ($horas as $i => $aula) {
+            $need = $necesidades[$i];
+            $this->store(['docente_rut' => '99000005-K', 'horas_plan_pedagogicas' => $aula,
+                'necesidad_key' => $need['key'], 'establecimiento_curso_id' => $need['establecimiento_curso_id'],
+                'subtipo_asignacion' => $need['subtipo_asignacion']]);
+        }
+    }
+
     private function course(string $code, array $subjects): EstablecimientoCurso
     {
         $catalog = Curso::where('codigo', $code)->firstOrFail();

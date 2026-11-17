@@ -189,8 +189,12 @@
         <details class="border rounded-4 p-3 mb-3">
             <summary class="fw-semibold text-primary">Reglas de cálculo y antecedentes NT1/NT2</summary>
             <div class="small text-muted mt-2">
-            <strong>Regla NT1/NT2:</strong> la necesidad contractual del plan se distribuye proporcionalmente por asignatura. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. En nuevas asignaciones individuales de una Educadora con JEC, el contrato de aula se obtiene de la tabla CPEIP 65/35. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición impartida por otro docente con JEC se contabiliza en Plan General, una vez por grupo combinado.
-            <span class="d-block mt-1">Para asignaciones nuevas de una Educadora en NT1/NT2 con JEC se aplica la tabla CPEIP 65/35: como máximo 35 h pedagógicas de aula (26 h 15 min cronológicas) equivalen a 41 h de contrato de aula. En una jornada de 44 h, las otras 3 h corresponden a trabajo colaborativo PIE. La necesidad contractual del curso o grupo permanece en 55 h más 3 h PIE cuando corresponda.</span>
+            <strong>Regla NT1/NT2:</strong> la necesidad contractual del plan se distribuye proporcionalmente por asignatura. Con JEC: 55 h por curso o grupo; sin JEC: NT1 35 h, NT2 31 h y NT1 + NT2 combinados 35 h. PIE se asigna aparte (3 h cuando corresponda). Sin JEC solo se admite cobertura por Educadoras de Párvulos. La libre disposición impartida por otro docente con JEC se contabiliza en Plan General, una vez por grupo combinado.
+            @if (\App\Support\DotacionProceso2027Calculator::aplica((int) $anio))
+                <span class="d-block mt-1">En 2027, una Educadora de Párvulos puede destinar hasta 44 h de contrato al aula si dispone de esa jornada. El contrato individual usa la base especial del curso y el redondeo acumulado por educadora. El trabajo colaborativo PIE descuenta horas sólo cuando está asignado; el saldo completo puede cubrir aula, respetando el plan pendiente y el máximo autorizado del bloque.</span>
+            @else
+                <span class="d-block mt-1">Para asignaciones nuevas de una Educadora en NT1/NT2 con JEC se aplica la tabla CPEIP 65/35: como máximo 35 h pedagógicas de aula (26 h 15 min cronológicas) equivalen a 41 h de contrato de aula. En una jornada de 44 h, las otras 3 h corresponden a trabajo colaborativo PIE. La necesidad contractual del curso o grupo permanece en 55 h más 3 h PIE cuando corresponda.</span>
+            @endif
             <span class="d-block mt-1">Las asignaciones históricas conservan sus valores guardados hasta que se revisen y actualicen o se ejecute un recálculo explícito. La nueva necesidad no modifica contratos del padrón.</span>
             </div>
         </details>

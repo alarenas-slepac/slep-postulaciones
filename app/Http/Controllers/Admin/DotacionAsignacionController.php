@@ -1045,7 +1045,8 @@ class DotacionAsignacionController extends Controller
             $habituales = round((float) DotacionContratoPlanCalculator::consolidar($anteriores->concat([$candidata]), $otra)->sum('horas_contrato') - $usadas, 2);
             $aulaJec = $anteriores->filter(fn ($row) => str_starts_with((string) data_get($row, 'proporcion_aplicada'), 'NT Con JEC')
                 || data_get($row, 'proporcion_aplicada') === self::PARVULARIA_CPEIP_LABEL);
-            $limiteJec = \App\Support\DotacionParvulariaCalculator::conJec($need['curso'], $need['proporcion_key'] ?? null)
+            $limiteJec = ! DotacionProceso2027Calculator::aplica((int) $payload['anio'])
+                && \App\Support\DotacionParvulariaCalculator::conJec($need['curso'], $need['proporcion_key'] ?? null)
                 && ((float) $aulaJec->sum('horas_plan_pedagogicas') + $aula > 35.01
                     || (float) $aulaJec->sum('horas_contrato') + $habituales > 41.01);
             if ($saldo >= 1 && $habituales <= $saldo + 0.01 && ! $limiteJec) {
@@ -1210,6 +1211,11 @@ class DotacionAsignacionController extends Controller
         array $payload,
         ?DotacionDocenteAsignacion $current = null
     ): void {
+        // En 2027 el contrato completo, PIE ya asignado y máximo institucional se
+        // validan en validateProceso2027Assignment; no se reservan 3 h PIE por persona.
+        if (DotacionProceso2027Calculator::aplica((int) ($payload['anio'] ?? 0))) {
+            return;
+        }
         if ((($payload['proporcion_aplicada'] ?? '') !== self::PARVULARIA_CPEIP_LABEL
                 && ! str_starts_with((string) ($payload['proporcion_aplicada'] ?? ''), 'NT Con JEC'))
             || ! Schema::hasTable('dotacion_docente_asignaciones')) {
