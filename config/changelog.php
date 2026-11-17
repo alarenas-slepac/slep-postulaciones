@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.17.693',
+    'current_version' => '2026.11.17.694',
     'entries' => [
+        [
+            'version' => '2026.11.17.694',
+            'title' => 'Jornada completa de Educación Parvularia para aula en Dotación 2027',
+            'summary' => 'Permite destinar el contrato disponible de una Educadora de Párvulos al aula, retirando el tope fijo de 41 h y la reserva implícita de 3 h para trabajo colaborativo PIE en 2027.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Una educadora con jornada y saldo de 44 h puede utilizarlos en aula aunque otras educadoras ya cubran el trabajo colaborativo PIE. Se aplica al crear y editar asignaciones de 2027.',
+                'PIE y las demás asignaciones ya registradas siguen descontando el contrato. Se conservan las horas pendientes del plan, asociaciones, prelación y máximo autorizado del bloque.',
+                'El cierre residual reconoce a otras educadoras con saldo contractual aunque su aula supere 41 h; la conversión de contrato y el redondeo acumulado se conservan.',
+                'Actualiza la ayuda NT1/NT2 y cubre el caso de cinco educadoras, edición con jornada completa y rechazo de sobreasignaciones. Conserva el comportamiento de otros años y no reescribe datos históricos.',
+                'No requiere migraciones ni compilación de CSS o JavaScript.',
+            ],
+            'published_at' => '2026-11-17',
+        ],
         [
             'version' => '2026.11.17.693',
             'title' => 'Cupos de Párvulos en trabajo colaborativo PIE de cursos combinados',

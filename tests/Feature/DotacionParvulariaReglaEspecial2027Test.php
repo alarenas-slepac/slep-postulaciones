@@ -220,16 +220,13 @@ class DotacionParvulariaReglaEspecial2027Test extends IsolatedSecurityTestCase
         $this->assertSame('NT Sin JEC · base contractual 31 h', $payload['proporcion_aplicada']);
     }
 
-    public function test_limite_de_aula_valida_el_contrato_especial_y_no_la_tabla_general(): void
+    public function test_2027_permite_44_de_contrato_de_aula_sin_reservar_tres_para_pie(): void
     {
         $metodo = new ReflectionMethod(DotacionAsignacionController::class, 'validateLimiteAulaParvularia');
         $metodo->invoke(new DotacionAsignacionController, Establecimiento::findOrFail(1), $this->payload(27.63));
-        try {
-            $metodo->invoke(new DotacionAsignacionController, Establecimiento::findOrFail(1), $this->payload(30));
-            $this->fail('El aula equivalente a 44 h de contrato supera el límite de 41 h de aula contractual.');
-        } catch (ValidationException $exception) {
-            $this->assertStringContainsString('base especial', $exception->errors()['horas_plan_pedagogicas'][0]);
-        }
+        $payload = $this->payload(30);
+        $metodo->invoke(new DotacionAsignacionController, Establecimiento::findOrFail(1), $payload);
+        $this->assertSame(44.0, $payload['horas_contrato']);
     }
 
     public function test_recalculo_fallido_no_deja_metadatos_o_importes_actualizados_parcialmente(): void

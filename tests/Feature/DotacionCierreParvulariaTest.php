@@ -196,6 +196,28 @@ class DotacionCierreParvulariaTest extends IsolatedSecurityTestCase
         $this->assertFalse(DotacionCierreParvularia::es($row)); $this->assertSame(3.0, (float) $row->horas_contrato);
     }
 
+    public function test_una_educadora_con_41_de_aula_y_tres_disponibles_puede_cubrir_el_residuo_normal(): void
+    {
+        $this->contrato(3, 44);
+        $otroCurso = $this->curso->replicate(); $otroCurso->letra = 'B'; $otroCurso->nombre_seccion = 'NT1 B'; $otroCurso->save();
+        DotacionProceso2027Configuracion::first()->update(['max_horas_bloque_2' => 110]);
+        $need = $this->necesidades()->first(fn ($row) => $row['titulo'] === 'Otros núcleos'
+            && (int) $row['establecimiento_curso_id'] === (int) $otroCurso->id);
+        DotacionDocenteAsignacion::create(['anio' => 2027, 'establecimiento_id' => $this->ee->id,
+            'docente_rut' => '99000003-K', 'docente_rut_normalizado' => '99000003K', 'docente_nombre' => 'Educadora sintética 3',
+            'declaracion_sostenedor_id' => 3, 'estamento_cobertura' => 'docente', 'tipo_asignacion' => 'plan_estudio',
+            'subtipo_asignacion' => $need['subtipo_asignacion'], 'necesidad_key' => $need['key'],
+            'establecimiento_curso_id' => $otroCurso->id, 'asignatura_nombre' => $need['titulo'],
+            'horas_plan_pedagogicas' => 28, 'horas_contrato' => 41, 'estado' => 'activa',
+            'proporcion_aplicada' => 'NT Con JEC · base contractual 55 h',
+            'fuente_calculo' => 'Regla especial Parvularia · Reparto proporcional: 28 / 38 h de plan × 55 h de contrato.']);
+        // Existe una educadora con saldo para la conversión normal: no corresponde
+        // convertir el residuo en 2 h de contrato para el cupo de sólo 2 h.
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('superan el cupo');
+        $this->guardar('VACANTE-1');
+    }
+
     public function test_no_aplica_si_quedan_mas_de_dos_aula_en_el_plan_de_parvularia(): void
     {
         DotacionDocenteAsignacion::first()->update(['horas_plan_pedagogicas' => 17]);
