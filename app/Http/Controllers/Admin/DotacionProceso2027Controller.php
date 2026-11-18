@@ -47,7 +47,7 @@ class DotacionProceso2027Controller extends Controller
             throw ValidationException::withMessages(['asignatura_key' => 'La asignatura ya no forma parte del plan vigente. Actualice la página.']);
         }
         $vigentes = collect($subsectores['docentes'])
-            ->filter(fn (array $docente) => DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel']))
+            ->filter(fn (array $docente) => DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel'], $asignatura))
             ->mapWithKeys(fn (array $docente) => [
                 DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? '')) => true,
             ]);

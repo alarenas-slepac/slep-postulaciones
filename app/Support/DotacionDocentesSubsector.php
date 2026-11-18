@@ -55,7 +55,7 @@ class DotacionDocentesSubsector
         };
     }
 
-    public static function docenteAdmisible(array $docente, string $nivel): bool
+    public static function docenteAdmisible(array $docente, string $nivel, array $asignatura = []): bool
     {
         if (($docente['estamento_cobertura'] ?? 'docente') === 'asistente') {
             return $nivel === 'epja';
@@ -65,7 +65,9 @@ class DotacionDocentesSubsector
         }
 
         return ($docente['cupo_bloque'] ?? null) === 'plan_estudio'
-            || ($nivel === 'parvularia' && ($docente['cupo_bloque'] ?? null) === 'parvularia');
+            || ($nivel === 'parvularia' && ($docente['cupo_bloque'] ?? null) === 'parvularia')
+            || DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($docente,
+                [...$asignatura, 'tipo_asignacion' => 'plan_estudio', 'nivel' => $nivel]);
     }
 
     public static function admiteAsistentes(int $anio, array $necesidad): bool
@@ -139,13 +141,14 @@ class DotacionDocentesSubsector
                 $primera = $items->first();
                 $seleccionados = self::rutsSeleccionados(collect($guardados->get($key, [])), $items, $anio)
                     ->filter(fn ($rut) => $rut !== '' && $conocidos->has($rut)
-                        && self::docenteAdmisible($conocidos->get($rut), self::nivel($primera)))
+                        && self::docenteAdmisible($conocidos->get($rut), self::nivel($primera), $primera))
                     ->unique()->values()->all();
 
                 return [
                     'key' => $key,
                     'nivel' => self::nivel($primera),
                     'nombre' => (string) ($primera['asignatura_nombre'] ?? $primera['titulo']),
+                    'asignatura_oficial' => $primera['asignatura_oficial'] ?? null,
                     'cursos' => $items->pluck('curso_label')->filter()->unique()->values()->all(),
                     'horas_aula' => round((float) $items->sum(fn ($item) => (float) ($item['horas_plan_requeridas'] ?? 0)), 2),
                     'docentes' => $seleccionados,

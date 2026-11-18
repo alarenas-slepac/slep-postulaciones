@@ -91,4 +91,22 @@ class DotacionAsignacionElegibilidad2027Test extends TestCase
         $this->assertTrue(DotacionAsignacionElegibilidad2027::esTrabajoColaborativoSinPrelacion(['tipo_asignacion' => 'pie_colaborativo']));
         $this->assertFalse(DotacionAsignacionElegibilidad2027::esTrabajoColaborativoSinPrelacion(['tipo_asignacion' => 'pie_educadora_diferencial']));
     }
+
+    public function test_cupo_diferencial_cubre_solo_orientacion_del_plan_segun_su_titulo(): void
+    {
+        $cupo = ['cupo_contrata_id' => 7, 'cupo_bloque' => 'pie', 'titulo' => 'Pedagogía en Educación Diferencial'];
+        $need = ['tipo_asignacion' => 'plan_estudio', 'titulo' => 'Orientación'];
+        foreach (['Orientación', ' ORIENTACION ', 'orientación'] as $nombre) {
+            $this->assertTrue(DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($cupo, array_replace($need, ['titulo' => $nombre])));
+        }
+        foreach ([['titulo' => 'Matemática'], ['titulo' => 'Orientación laboral'], ['asignatura_oficial' => 'Matemática'],
+            ['tipo_asignacion' => 'funcion_tecnico_pedagogica'], ['nivel' => 'parvularia']] as $cambio) {
+            $this->assertFalse(DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($cupo, array_replace($need, $cambio)));
+        }
+        foreach ([['cupo_bloque' => 'parvularia'], ['cupo_bloque' => 'plan_estudio'], ['cupo_contrata_id' => null],
+            ['titulo' => ''], ['titulo' => 'Pedagogía en Inglés'],
+            ['declaracion' => new DeclaracionSostenedor(['nombre_titulo' => 'Pedagogía en Inglés'])]] as $cambio) {
+            $this->assertFalse(DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion(array_replace($cupo, $cambio), $need));
+        }
+    }
 }

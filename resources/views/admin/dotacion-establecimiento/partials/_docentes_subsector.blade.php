@@ -70,7 +70,7 @@
                                         <label class="form-label fw-semibold" for="subsector-docentes-{{ $asignatura['key'] }}">{{ $asignatura['nivel'] === 'epja' ? 'Docentes y asistentes habilitados' : 'Docentes habilitados' }} para {{ $asignatura['nombre'] }} <span class="text-danger">*</span></label>
                                         <select id="subsector-docentes-{{ $asignatura['key'] }}" name="docentes[]" class="form-select js-subsector-docentes {{ $errorAsignatura ? 'is-invalid' : '' }}" aria-describedby="subsector-ayuda-{{ $asignatura['key'] }}" @if ($errorAsignatura) aria-invalid="true" @endif multiple required>
                                             @foreach ($docentesSubsector as $docente)
-                                                @continue(! \App\Support\DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel']))
+                                                @continue(! \App\Support\DotacionDocentesSubsector::docenteAdmisible($docente, $asignatura['nivel'], $asignatura))
                                                 @php
                                                     $rutDocente = \App\Support\DotacionEstablecimientoCalculator::normalizeRut((string) ($docente['rut_normalizado'] ?? $docente['rut'] ?? ''));
                                                     $esAsistente = ($docente['estamento_cobertura'] ?? 'docente') === 'asistente';

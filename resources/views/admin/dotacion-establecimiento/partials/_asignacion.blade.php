@@ -47,6 +47,7 @@
                 'label' => $persona['nombre'].' · '.$persona['rut'].($virtual ? ' · Cupo provisional' : $detallePrioridad.$detalleAntiguedad).$detalleTitulo
                     .($estamento === 'asistente' ? ' · Asistente de la Educación · Contrato AAEE disponible: '.$fmt(max(0, $saldo)).' h' : ' · Disponible: '.$fmt($titularDisponible).' titular + '.$fmt($contrataDisponible).' contrata'),
                 'virtual' => $virtual,
+                'cupo_contrata_id' => $persona['cupo_contrata_id'] ?? null,
                 'cupo_bloque' => $persona['cupo_bloque'] ?? null,
                 'titulo' => $titulo,
                 'es_parvularia' => \App\Support\DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos'],
@@ -494,7 +495,8 @@
                                                                 ($docentesPermitidosSubsector === null || in_array($doc['rut_normalizado'], $docentesPermitidosSubsector, true))
                                                                 && (!$seleccionLibrePlan || $doc['saldo'] >= 1)
                                                                 && ($fasePlan === null || in_array($doc['rut_normalizado'], $rutsFasePlan, true))
-                                                                && (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'tipo_asignacion' => 'plan_estudio', 'establecimientoCurso' => $cursoNt], $doc))
+                                                                && (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'tipo_asignacion' => 'plan_estudio', 'establecimientoCurso' => $cursoNt], $doc)
+                                                                    || \App\Support\DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($doc, $item))
                                                                 && (!$soloParvularia || $doc['es_parvularia'])
                                                             ),
                                                             'grupoPersonal' => match ($fasePlan) {

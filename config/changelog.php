@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.17.694',
+    'current_version' => '2026.11.17.695',
     'entries' => [
+        [
+            'version' => '2026.11.17.695',
+            'title' => 'Orientación del plan para docentes por contratar de Educación Diferencial',
+            'summary' => 'Permite asociar y asignar la asignatura Orientación a un cupo por contratar del bloque PIE con título de Educación Diferencial.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'El cupo se ofrece en Docentes por asignatura para Orientación y en el selector de sus horas del plan de estudio, una vez asociado.',
+                'La excepción usa la asignatura vigente y el título del cupo. No habilita otras materias, niveles NT1/NT2 ni la función Orientador(a).',
+                'Orientación y las asignaciones PIE consumen el mismo saldo contractual. Se conservan la prelación, las horas pendientes y el máximo autorizado de Plan General.',
+                'Permite crear, editar y eliminar las horas sin duplicar cupos, modificar su bloque contractual ni reescribir asignaciones históricas.',
+                'Incluye pruebas de asociación, selectores y guardado, horas PIE existentes, jornada completa, límites y nombres de asignatura manipulados. No requiere migraciones ni compilación de recursos.',
+            ],
+            'published_at' => '2026-11-17',
+        ],
         [
             'version' => '2026.11.17.694',
             'title' => 'Jornada completa de Educación Parvularia para aula en Dotación 2027',
