@@ -23,6 +23,27 @@ final class DotacionAsignacionElegibilidad2027
         return ($asignacion['tipo_asignacion'] ?? '') === 'pie_colaborativo';
     }
 
+    /** Excepción específica para la asignatura del plan; no para Orientador(a). */
+    public static function cupoDiferencialPuedeImpartirOrientacion(array $persona, array $necesidad): bool
+    {
+        if (empty($persona['cupo_contrata_id']) || ($persona['cupo_bloque'] ?? '') !== 'pie'
+            || ! DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_diferencial']
+            || ($necesidad['tipo_asignacion'] ?? '') !== 'plan_estudio') {
+            return false;
+        }
+        $curso = $necesidad['curso'] ?? $necesidad['establecimientoCurso'] ?? null;
+        if (($necesidad['nivel'] ?? '') === 'parvularia'
+            || ($curso instanceof \App\Models\EstablecimientoCurso && DotacionProfesionDocenteResolver::esCursoNt($curso))) {
+            return false;
+        }
+        $nombre = trim((string) ($necesidad['asignatura_oficial'] ?? ''));
+        if ($nombre === '') {
+            $nombre = (string) ($necesidad['asignatura_nombre'] ?? $necesidad['titulo'] ?? $necesidad['nombre'] ?? '');
+        }
+
+        return Str::of($nombre)->ascii()->upper()->squish()->toString() === 'ORIENTACION';
+    }
+
     public static function esFuncionSinPrelacion(array $asignacion): bool
     {
         return in_array($asignacion['tipo_asignacion'] ?? '', [
