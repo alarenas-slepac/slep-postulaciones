@@ -1,13 +1,36 @@
 # Vacantes por no renovación de contrata
 
+## Nómina y justificación de horas · 2026.11.18.697
+
+La no renovación conserva al docente en la nómina del establecimiento y en
+Sobredotación. Su contrato se suma al de los cupos reemplazantes: 44 h de la
+persona más 44 h de su cupo representan 88 h en los totales. Esta regla se
+aplica también a las no renovaciones ya registradas, sin reescribir el padrón.
+
+Las horas que quedan sin asignación se justifican en Sobredotación, con nivel,
+áreas de enseñanza y fundamento propios. El motivo del Historial de no
+renovaciones y reemplazos no justifica automáticamente ese saldo. Anular la
+no renovación conserva la justificación de horas que se haya registrado.
+
+La marca de no renovación impide una nueva asignación o un segundo reemplazo
+del mismo docente mientras siga activa. No afecta las otras anualidades ni
+establecimientos. El formato PAL conserva su catálogo específico de exclusiones.
+
+Validación del parche: 292 pruebas relacionadas aprobadas, con 2893 aserciones,
+incluidos los tres bloques, la justificación independiente, anulación y regresiones
+de nómina, contratos, exportación y asignación a cupos. PHP 8.3 sin errores de
+sintaxis, `optimize:clear` y `git diff --check` correctos. La nómina y el formulario
+de justificación se revisaron en Chrome a 1440 y 390 px, con teclado y sin errores
+de JavaScript ni desborde horizontal de la página.
+
 ## Operación
 
 1. Ingresar a Dotación establecimiento y elegir el establecimiento y año 2027 o posterior.
 2. En Resumen, desplazarse al panel **Docentes por contratar**. Se muestran Plan general, Educación Parvularia y PIE especializado, aun cuando no exista brecha de contratación.
 3. En el bloque correspondiente, seleccionar un docente en **Reemplazar contrato a contrata**. La lista permite buscar por nombre, RUT y título.
-4. Revisar el título y las horas que se copiarán. Se reemplaza el contrato completo, sin aumentar sus horas. Si había asignaciones en varios bloques, se crean cupos vacíos en esos bloques según el contrato consolidado asignado; el saldo sin asignar permanece en el bloque principal. La suma de los cupos coincide con el contrato reemplazado.
+4. Revisar el título y las horas que se copiarán. Los cupos conservan el contrato completo y se suman al contrato del docente que permanece en la nómina. Si había asignaciones en varios bloques, se crean cupos vacíos en esos bloques según el contrato consolidado asignado; el saldo sin asignar permanece en el bloque principal. La suma de los cupos coincide con el contrato reemplazado.
 5. Escribir la **Justificación de no renovación** (10 a 3000 caracteres), presionar **Reemplazar por Docente por contratar** y confirmar.
-6. Revisar el cupo creado y el historial. El docente sale de esa dotación; el cupo conserva su título, función y horas, pero no recibe asignaciones ni asociaciones a asignaturas. Las reservas del docente también quedan inactivas.
+6. Revisar el cupo creado y el historial. El docente permanece en la nómina y sus horas sin asignación deben justificarse en Sobredotación. El cupo conserva título, función y horas, pero no recibe asignaciones ni asociaciones a asignaturas. Las reservas del docente también quedan inactivas.
 7. Asociar expresamente el cupo a las asignaturas del plan cuando corresponda y luego distribuir las horas. Continúan aplicándose los controles de perfil, prelación, saldo y máximo autorizado.
 
 ## Alcance y permisos
@@ -16,7 +39,7 @@ La acción mantiene los mismos roles autorizados para habilitar contrataciones: 
 
 Sólo admite docentes íntegramente a contrata. No admite contratos mixtos, titulares, cupos virtuales ni contratos protegidos por fuero maternal u horas gremiales. La lactancia con fuero maternal expresamente registrado también conserva la protección existente. No permite reemplazar parcialmente el contrato.
 
-El retiro afecta únicamente el establecimiento y año seleccionados. No elimina ni cambia el padrón de personal, los documentos, las declaraciones ni otras anualidades.
+La no renovación afecta únicamente el establecimiento y año seleccionados. No elimina ni cambia el padrón de personal, los documentos, las declaraciones ni otras anualidades.
 
 ## Persistencia y concurrencia
 
@@ -29,7 +52,7 @@ El retiro afecta únicamente el establecimiento y año seleccionados. No elimina
 
 ## Anulación
 
-**Anular reemplazo** sólo se permite si el cupo no tiene asignaciones activas. Conserva la justificación y marca la anulación con usuario y fecha. El docente vuelve a la nómina del año y las asignaciones anteriores permanecen inactivas: deben revisarse y registrarse expresamente para evitar duplicar cobertura ya reasignada.
+**Anular reemplazo** o **Anular no renovación** sólo se permite si los cupos no tienen asignaciones activas. Conserva el fundamento del historial y marca la anulación con usuario y fecha. El docente permanece en la nómina; se descuentan sólo los cupos retirados. Las asignaciones anteriores siguen inactivas y la justificación de Sobredotación se conserva.
 
 ## Instalación y validación
 
@@ -47,4 +70,6 @@ Pruebas específicas: `tests/Feature/DotacionNoRenovacionTest.php`, sobre SQLite
 - Revisión en navegador de una vista con datos sintéticos: escritorio y móvil de 390 px, selección por teclado, búsqueda por título, detalle de contrato y desplegable sin recorte ni desplazamiento horizontal.
 - No se modificaron assets compilados; el estilo y código nuevos se incluyen en Blade. No corresponde reconstruir Vite para este parche.
 
-Pendientes al instalar: aplicar la migración y comprobar contención simultánea en MySQL, cuyo bloqueo de filas no se reproduce con SQLite. Los cambios permanecen en la rama `feat/dotacion-vacantes-no-renovacion`.
+La migración indicada corresponde a la instalación original del módulo. El
+parche `2026.11.18.697` no incorpora migraciones. La contención simultánea de
+`FOR UPDATE` requiere MySQL y no se reproduce con SQLite.

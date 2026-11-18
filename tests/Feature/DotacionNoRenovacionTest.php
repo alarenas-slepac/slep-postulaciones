@@ -40,6 +40,8 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
             '2026_05_18_140000_create_planes_estudio_tables.php',
             '2026_05_18_160000_create_planes_estudio_bloques_table.php',
             '2026_05_18_190000_create_establecimiento_cursos_table.php',
+            '2026_05_25_160000_create_establecimiento_curso_pie_table.php',
+            '2026_05_25_183000_create_docente_horas_proporciones_table.php',
             '2026_05_26_190000_create_dotacion_funciones_tables.php',
             '2026_05_28_210000_create_dotacion_docente_asignaciones_table.php',
             '2026_09_28_140000_create_dotacion_contrata_habilitaciones_table.php',
@@ -84,6 +86,134 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
     }
 
     #[DataProvider('bloques')]
+    public function test_no_renovado_permanece_en_nomina_y_sobredotacion_sumado_al_cupo(string $bloque, string $titulo): void
+    {
+        $this->personal($titulo);
+        $this->asignacion();
+        $registro = $this->reemplazar($bloque);
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $this->assertCount(1, $data['docentes']);
+        $this->assertTrue($data['docentes']->sole()['no_renovacion_activa']);
+        $this->assertSame(88.0, $data['resumen']['horas_contrato_docentes']);
+        $this->assertSame(44.0, $data['resumen']['horas_contrato_docentes_padron']);
+        $this->assertSame(44.0, $data['resumen']['horas_contrato_docentes_por_contratar']);
+        $sobredotacion = \App\Support\DotacionSobredotacionCalculator::build(
+            $data['docentes'], $data['resumen'], data_get($data, 'asignacion.necesidades.funciones', [])
+        );
+        $this->assertSame(44.0, \App\Models\DotacionSobredotacionJustificacion::horasVacantes(
+            $sobredotacion, $bloque, '99000001K', 'contrata'
+        ));
+        $this->assertCount(0, \App\Models\DotacionSobredotacionJustificacion::registrosPara($this->ee->id, 2027));
+        $this->assertSame('No renovación sintética debidamente fundada.', $registro->fresh()->justificacion);
+        $this->assertTrue(app(NoRenovacionService::class)->candidatos($this->ee, 2027)->isEmpty());
+    }
+
+    #[DataProvider('bloques')]
+    public function test_justificacion_de_sobredotacion_es_independiente_del_reemplazo(string $bloque, string $titulo): void
+    {
+        $this->personal($titulo);
+        $registro = $this->reemplazar($bloque);
+        foreach (['2026_09_29_190000_create_dotacion_sobredotacion_justificaciones_table.php',
+            '2026_11_11_140000_add_ensenanza_to_dotacion_justificaciones.php',
+            '2026_01_30_173934_create_areas_desempeno_tables.php'] as $file) {
+            (require database_path('migrations/'.$file))->up();
+        }
+        DB::table('areas_desempeno')->insert(['id' => 9901, 'nombre' => 'Área docente sintética', 'estamento' => 'docente', 'activo' => true]);
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $sobredotacion = \App\Support\DotacionSobredotacionCalculator::build($data['docentes'], $data['resumen']);
+        $avance = \App\Support\DotacionJustificacionesAvanceCalculator::resumen($this->ee->id, 2027, $sobredotacion);
+        $this->assertSame(44.0, $avance['horas_pendientes']);
+        $request = Request::create('/justificacion-sintetica', 'POST', ['anio' => 2027, 'bloque' => $bloque,
+            'tipo_horas' => 'contrata', 'docente_rut' => '99000001-K',
+            'justificacion' => 'Fundamento independiente de horas sin asignación.',
+            'nivel_ensenanza' => ['plan_estudio' => 'basica', 'parvularia' => 'parvularia', 'pie' => 'pie'][$bloque],
+            'areas_desempeno_ids' => [9901]]);
+        $request->setUserResolver(fn () => auth()->user());
+        app(\App\Http\Controllers\Admin\DotacionSobredotacionJustificacionController::class)->store($request, $this->ee);
+        $justificacion = \App\Models\DotacionSobredotacionJustificacion::sole();
+        $this->assertSame('Fundamento independiente de horas sin asignación.', $justificacion->justificacion);
+        $this->assertEquals(44, $justificacion->horas_detectadas);
+        $this->assertSame('No renovación sintética debidamente fundada.', $registro->fresh()->justificacion);
+        $avance = \App\Support\DotacionJustificacionesAvanceCalculator::resumen($this->ee->id, 2027, $sobredotacion);
+        $this->assertSame(0.0, $avance['horas_pendientes']);
+        $this->assertSame(88.0, DotacionEstablecimientoCalculator::build($this->ee, 2027)['resumen']['horas_contrato_docentes']);
+        app(NoRenovacionService::class)->anular($this->ee, 2027, $registro->id, auth()->id());
+        $this->assertSame('Fundamento independiente de horas sin asignación.', $justificacion->fresh()->justificacion);
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $this->assertSame(44.0, $data['resumen']['horas_contrato_docentes']);
+        $this->assertFalse($data['docentes']->sole()['no_renovacion_activa']);
+    }
+
+    public function test_nomina_y_detalle_muestran_al_no_renovado_con_formulario_independiente(): void
+    {
+        $vars = $this->vistaNoRenovados();
+        $html = Blade::render("@include('admin.dotacion-establecimiento.partials._docentes') @include('admin.dotacion-establecimiento.partials._sobredotacion') @include('admin.dotacion-establecimiento.partials._contrata_habilitaciones')", $vars);
+        $dom = new \DOMDocument; @$dom->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $xpath = new \DOMXPath($dom);
+        $nomina = $xpath->query('//tr[@data-revision-row="'.sha1('99000001-K').'"]');
+        $detalle = $xpath->query('//tr[@data-revision-row="'.sha1('plan_estudio99000001K').'"]');
+        $this->assertSame(1, $nomina->length);
+        $this->assertSame(1, $detalle->length);
+        $this->assertStringContainsString('No renovación registrada', $nomina->item(0)->textContent);
+        $this->assertStringContainsString('No renovación registrada', $detalle->item(0)->textContent);
+        $this->assertStringContainsString('Justificar', $detalle->item(0)->textContent);
+        $this->assertSame(1, $xpath->query('//form[input[@name="docente_rut" and @value="99000001-K"] and input[@name="bloque" and @value="plan_estudio"]]//textarea[@name="justificacion"]')->length);
+        $this->assertStringNotContainsString('El docente saldrá de esta dotación', $html);
+        $this->assertSame(0.0, collect($vars['proceso2027']['docentes'])->firstWhere('rut_normalizado', '99000001K')['horas_disponibles']);
+        $this->assertFalse(\App\Support\DotacionDocentesSubsector::docenteAdmisible($vars['docentes']->sole(), 'basica'));
+        $this->assertCount(1, \App\Support\DotacionAsignacionElegibilidad2027::candidatosParaPrelacion(
+            collect($vars['proceso2027']['docentes']), ['tipo_asignacion' => 'plan_estudio']
+        ));
+    }
+
+    public function test_pal_conserva_su_exclusion_sin_ocultar_al_docente_en_dotacion(): void
+    {
+        $this->personal();
+        $this->reemplazar();
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $pal = app(\App\Support\DotacionPal2027::class)->construir($this->ee, $data,
+            app(\App\Exports\DotacionPal2027Export::class)->tablas());
+        $this->assertSame(0, $pal['personas']);
+        $this->assertSame(1, $pal['cupos_por_contratar']);
+        $this->assertCount(1, $data['docentes']);
+        $this->assertSame(88.0, $data['resumen']['horas_contrato_docentes']);
+        $this->assertSame('No renovación 2027', collect($pal['excluidos'])->firstWhere('rut', '99000001-K')['motivo']);
+    }
+
+    private function vistaNoRenovados(): array
+    {
+        $this->withoutVite();
+        $this->app['request']->setLaravelSession($this->app['session.store']);
+        $this->personal();
+        $this->asignacion();
+        $registro = $this->reemplazar();
+        foreach (['2026_09_29_190000_create_dotacion_sobredotacion_justificaciones_table.php',
+            '2026_11_11_140000_add_ensenanza_to_dotacion_justificaciones.php',
+            '2026_01_30_173934_create_areas_desempeno_tables.php'] as $file) {
+            (require database_path('migrations/'.$file))->up();
+        }
+        DB::table('areas_desempeno')->insert(['id' => 9901, 'nombre' => 'Área docente sintética', 'estamento' => 'docente', 'activo' => true]);
+        $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
+        $proceso = \App\Support\DotacionProceso2027Calculator::resumen($this->ee, 2027, $data);
+        $data['docentes'] = collect($proceso['docentes'])->reject(fn ($d) => isset($d['cupo_contrata_id']))->values();
+        $data['asignacion']['docentes'] = $proceso['docentes'];
+        return array_replace($data, [
+            'establecimiento' => $this->ee, 'anio' => 2027, 'activeRole' => 'admin', 'proceso2027' => $proceso,
+            'fmt' => fn ($horas) => DotacionEstablecimientoCalculator::formatHoras($horas),
+            'sobredotacion' => \App\Support\DotacionSobredotacionCalculator::build($data['docentes'], $data['resumen']),
+            'justificacionesSobredotacionTableReady' => true, 'ensenanzaJustificacionDisponible' => true,
+            'canManageJustificacionesSobredotacion' => true, 'justificacionesSobredotacion' => collect(),
+            'areasDocentesJustificacion' => \App\Models\DotacionSobredotacionJustificacion::areasDocentesActivas(),
+            'noRenovacionesDisponible' => true, 'noRenovaciones' => collect([$registro]),
+            'contrataHabilitacionesTableReady' => true, 'canManageContrataHabilitaciones' => true,
+            'contrataHabilitaciones' => DB::table('dotacion_contrata_habilitaciones')->get()->groupBy('bloque'),
+            'docentesVirtualesPorCupo' => collect($data['asignacion']['docentes'])->whereNotNull('cupo_contrata_id')->keyBy('cupo_contrata_id'),
+            'candidatosNoRenovacion' => app(NoRenovacionService::class)->candidatos($this->ee, 2027),
+            'errors' => new ViewErrorBag,
+        ]);
+    }
+
+    #[DataProvider('bloques')]
     public function test_reemplaza_contrato_sin_brecha_en_cada_bloque_y_deja_cupo_vacio(string $bloque, string $titulo): void
     {
         $this->personal($titulo);
@@ -112,7 +242,7 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
         $this->assertEmpty($virtual['asignaciones']);
         $this->assertSame(1, DB::table('dotacion_docente_subsectores')->count());
         $this->assertFalse(DB::table('dotacion_docente_subsectores')->where('docente_rut_normalizado', 'VACANTE_'.$cupo->id)->exists());
-        $this->assertCount(0, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+        $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
         $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2026));
         $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2028));
         $this->assertSame($antes, DB::table('reemplazos_personal')->get()->map(fn ($row) => (array) $row)->all());
@@ -261,7 +391,7 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
         $this->asignacion(['docente_rut' => 'VACANTE-'.$cupo->id, 'docente_rut_normalizado' => 'VACANTE_'.$cupo->id]);
         $this->assertInvalid(fn () => app(ContratacionHabilitacionService::class)->revocar($this->ee, 2027, $cupo->id), 'habilitacion');
         $this->assertNull($registro->fresh()->anulada_at);
-        $this->assertCount(0, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+        $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
     }
 
     public function test_cupo_general_se_puede_asociar_a_asignatura_y_valida_bloque(): void
@@ -433,7 +563,7 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
         $this->assertNull($registro->fresh()->anulada_at);
         $this->assertSame(2, DB::table('dotacion_contrata_habilitaciones')->count());
         $this->assertSame('activa', $ocupada->fresh()->estado);
-        $this->assertCount(0, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+        $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
         $ocupada->update(['estado' => 'inactiva']);
         $this->post(route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $this->ee), [
             'accion' => 'anular_retiro', 'anio' => 2027, 'no_renovacion_id' => $registro->id,
@@ -457,7 +587,7 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
         }
         $this->assertNull($registro->fresh()->anulada_at);
         $this->assertTrue(DB::table('dotacion_contrata_habilitaciones')->where('id', $cupo->id)->exists());
-        $this->assertCount(0, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
+        $this->assertCount(1, DotacionEstablecimientoCalculator::docentes($this->ee, 2027));
         DotacionNoRenovacion::flushEventListeners();
         DB::table('dotacion_contrata_habilitaciones')->where('id', $cupo->id)->delete();
         $this->assertTrue(app(NoRenovacionService::class)->anular($this->ee, 2027, $registro->id, auth()->id()));
@@ -478,10 +608,10 @@ class DotacionNoRenovacionTest extends IsolatedSecurityTestCase
         ];
         $render = fn (array $datos) => view('admin.dotacion-establecimiento.partials._contrata_habilitaciones', $datos)->render();
         $html = $render($vars);
-        $this->assertStringContainsString('Eliminar retiro', $html);
+        $this->assertStringContainsString('Anular no renovación', $html);
         $this->assertStringContainsString('name="accion" value="anular_retiro"', $html);
         $this->assertStringContainsString('name="no_renovacion_id" value="'.$registro->id.'"', $html);
-        $this->assertStringContainsString('¿Anular este retiro?', $html);
+        $this->assertStringContainsString('¿Anular esta no renovación?', $html);
         $soloConsulta = $render([...$vars, 'canManageContrataHabilitaciones' => false]);
         $this->assertStringNotContainsString('anular_retiro', $soloConsulta);
         $ocupado = $render([...$vars, 'docentesVirtualesPorCupo' => collect([

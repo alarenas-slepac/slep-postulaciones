@@ -129,6 +129,7 @@ class DotacionNominaCompletaTest extends IsolatedSecurityTestCase
         $this->assertSame(40.0, $filas->firstWhere('rut', '99000003-K')['pie']);
         $this->assertStringContainsString('no continúa', $filas->firstWhere('rut', '99000003-K')['estado_dotacion']);
         $this->assertStringContainsString('no renovación', $filas->firstWhere('rut', '99000004-K')['estado_dotacion']);
+        $this->assertSame($filas->firstWhere('rut', '99000004-K')['contrato_original'], $filas->firstWhere('rut', '99000004-K')['contrato_considerado']);
         $this->assertTrue($filas->firstWhere('rut', '99000005-K')['justificada']);
         $this->assertSame('Sin título declarado', $filas->firstWhere('rut', '99000006-K')['titulo']);
         foreach ($filas as $fila) { $this->assertEquals($fila['contrato_original'], $fila['plan_estudio'] + $fila['parvularia'] + $fila['pie']); }

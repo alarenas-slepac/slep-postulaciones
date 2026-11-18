@@ -5,8 +5,13 @@
 En **Dotación Establecimiento → Nómina completa por bloque** se consulta el padrón
 base completo por año, bloque, comuna y establecimiento. La búsqueda comprende
 nombre, RUT, título y establecimiento. Incluye docentes ajustados, protegidos,
-justificados y fuera de la proyección por no continuidad o no renovación, sin
+justificados y fuera de la proyección por no continuidad, sin
 exigir saldo disponible ni establecimiento revisado y finalizado.
+
+Desde `2026.11.18.697`, una no renovación conserva al docente y su contrato
+considerado en la nómina y en Sobredotación. Sus horas se suman además de los
+cupos reemplazantes en los totales del establecimiento; el fundamento de la
+no renovación es independiente de la justificación de esas horas.
 
 **Exportar nómina completa (Excel)** genera un libro con tres hojas:
 
@@ -50,7 +55,7 @@ El archivo incluye RUT, nombre completo, título, grupo de prelación, tramo, fe
 
 Se reutiliza `DotacionProceso2027Calculator::docentesPriorizados`: protección por fuero maternal/horas gremiales, No Regido Ley 20903, titulares de tramos preferentes, otros titulares y contrata; después antigüedad y nombre. Las fechas sin informar quedan al final de su grupo. Este orden de presentación no modifica los cálculos históricos del año seleccionado.
 
-La fuente es la misma de la pestaña Docentes, usando `DotacionEstablecimientoCalculator` y el proceso 2027 cuando corresponde. Los cupos virtuales por contratar y las coberturas de asistentes no son personas docentes y no se incluyen. Los retiros que ya dejaron de formar parte de esa nómina tampoco se reincorporan.
+La fuente es la misma de la pestaña Docentes, usando `DotacionEstablecimientoCalculator` y el proceso 2027 cuando corresponde. Los cupos virtuales por contratar y las coberturas de asistentes no son personas docentes y no se incluyen. Los docentes con no renovación registrada permanecen en esta nómina, con sus horas y justificaciones de Sobredotación independientes del historial del reemplazo.
 
 ## Separación en bloques
 

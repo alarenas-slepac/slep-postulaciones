@@ -6457,8 +6457,23 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.18.696',
+    'current_version' => '2026.11.18.697',
     'entries' => [
+        [
+            'version' => '2026.11.18.697',
+            'title' => 'Docentes no renovados visibles en nómina y Sobredotación',
+            'summary' => 'Conserva al docente con no renovación en la nómina y en el detalle de Sobredotación, sumando su contrato además del cupo reemplazante y exigiendo una justificación de horas independiente.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Los registros activos del Historial de no renovaciones y reemplazos ya no eliminan al docente de la nómina del establecimiento y año. Sus horas sin asignación aparecen en el bloque correspondiente de Sobredotación.',
+                'El contrato del docente y las horas de sus cupos reemplazantes se suman en los totales: un docente de 44 h y su cupo de 44 h representan 88 h consideradas.',
+                'La justificación del historial no acredita las horas de Sobredotación. Se conserva el registro independiente de enseñanza, áreas y fundamento, incluso al anular la no renovación.',
+                'Se identifican las no renovaciones en ambas nóminas. El docente no vuelve a ofrecerse para asignación ni admite un segundo reemplazo mientras su no renovación permanezca activa.',
+                'Anular retira sólo los cupos vacíos y conserva al docente y el historial, sin reactivar asignaciones archivadas. La nómina completa refleja el contrato considerado; el formato PAL mantiene sus exclusiones propias.',
+                'No requiere migraciones ni compilación de CSS o JavaScript. Incluye pruebas con los tres bloques y datos sintéticos.',
+            ],
+            'published_at' => '2026-11-18',
+        ],
         [
             'version' => '2026.11.18.696',
             'title' => 'Cupos de Plan General asociados a asignaturas de Educación Parvularia',

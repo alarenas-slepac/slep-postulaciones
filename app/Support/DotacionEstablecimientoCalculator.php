@@ -228,7 +228,8 @@ class DotacionEstablecimientoCalculator
         $asignacion['resumen']['horas_contrato_docente_pie'] = $horasContratoDocentePie;
         $asignacion['resumen']['horas_contrato_docente_pie_educadoras_diferenciales'] = $horasContratoDocentePieEducadoras;
         $asignacion['resumen']['docentes_disponibles'] = $docentesContrato
-            ->filter(fn ($docente) => (float) ($docente['diferencia'] ?? 0) > 0.01)->count();
+            ->filter(fn ($docente) => empty($docente['no_renovacion_activa'])
+                && (float) ($docente['diferencia'] ?? 0) > 0.01)->count();
         $horasContratoDocentesAula = max(0.0, round($horasContratoDocentes - $horasContratoDocentePie, 2));
         $contratoParvularia = [
             'horas_contrato_docentes_parvularia' => $contratosPorBloque['contrato_vigente_bloque_2'],
@@ -956,11 +957,8 @@ class DotacionEstablecimientoCalculator
         $personalConsolidado = self::consolidarPersonalUltimoPeriodo($personal);
         $retirados = DotacionLecturaCache::recordar('no-renovaciones:'.$establecimiento->id.':'.$anio,
             fn () => DotacionNoRenovacion::rutsRetirados((int) $establecimiento->id, $anio));
-        if (! $incluirExcluidosProyeccion) {
-            $personalConsolidado = $personalConsolidado->reject(fn (array $grupo) =>
-                in_array(self::normalizeRut($grupo['representante']->rut), $retirados, true)
-            )->values();
-        }
+        // Una no renovación conserva a la persona y su contrato en la nómina:
+        // sus horas se justifican en Sobredotación por separado del reemplazo.
         // Mientras 2027 use el padrón vigente de 2026, una situación marcada
         // como "no continúa" no puede reincorporar a la persona en la nómina
         // del año proyectado. Al existir padrón propio del año, éste es la fuente
@@ -970,11 +968,12 @@ class DotacionEstablecimientoCalculator
                 (int) $establecimiento->id,
                 $anioPadron
             );
-            $personalConsolidado = $personalConsolidado->reject(function (array $grupo) use ($continuidadPorRut): bool {
+            $personalConsolidado = $personalConsolidado->reject(function (array $grupo) use ($continuidadPorRut, $retirados): bool {
                 /** @var ReemplazoPersonal $row */
                 $row = $grupo['representante'];
 
-                return ($continuidadPorRut[self::normalizeRut($row->rut)] ?? true) === false;
+                return ! in_array(self::normalizeRut($row->rut), $retirados, true)
+                    && ($continuidadPorRut[self::normalizeRut($row->rut)] ?? true) === false;
             })->values();
         }
         $exclusionesPorRut = self::exclusionesDocentesPorRut($establecimiento, $anio);
@@ -1003,7 +1002,7 @@ class DotacionEstablecimientoCalculator
             ? DotacionAsignacionCalculator::assignmentsByRut($establecimiento, $anio)
             : [];
 
-        return $personalConsolidado->map(function (array $grupo) use ($declaraciones, $asignacionesPorRut, $exclusionesPorRut) {
+        return $personalConsolidado->map(function (array $grupo) use ($declaraciones, $asignacionesPorRut, $exclusionesPorRut, $retirados) {
             /** @var ReemplazoPersonal $row */
             $row = $grupo['representante'];
             $rut = self::normalizeRut($row->rut);
@@ -1111,6 +1110,7 @@ class DotacionEstablecimientoCalculator
                 'mes' => (int) ($grupo['mes'] ?? $row->mes ?? 0),
                 'anio' => (int) ($grupo['anio'] ?? $row->anio ?? 0),
                 'fuente_contrato' => 'reemplazos_personal',
+                'no_renovacion_activa' => in_array($rut, $retirados, true),
                 'registros_contrato' => (int) ($grupo['registros'] ?? 1),
                 'horas_contrato_componentes' => collect($grupo['componentes_jornada'] ?? [])->values()->all(),
                 'horas_contrato_detalle' => self::detalleComposicionContrato($grupo['componentes_jornada'] ?? [], $horasContratoBase),

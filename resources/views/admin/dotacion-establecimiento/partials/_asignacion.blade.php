@@ -7,6 +7,7 @@
     $asignacionesHuerfanas = collect($asignacion['asignaciones_huerfanas'] ?? []);
     $subvenciones = $asignacion['subvenciones'] ?? collect();
     $docentesAsignacion = $asignacion['docentes'] ?? $docentes;
+    $docentesAsignacion = collect($docentesAsignacion)->reject(fn ($persona) => !empty($persona['no_renovacion_activa']));
     $proceso2027Asignacion = $proceso2027 ?? ['aplica' => false];
     if ($proceso2027Asignacion['aplica'] ?? false) {
         $docentesAsignacion = \App\Support\DotacionAsignacionElegibilidad2027::candidatosParaPrelacion(

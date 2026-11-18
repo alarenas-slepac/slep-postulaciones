@@ -36,7 +36,8 @@ class DotacionPal2027
         $filasCursos = $cursosPal['filas'];
         $filasDocentes = [];
         // La fuente ya consulta las situaciones exclusivamente del año 2027.
-        $docentes = collect($data['docentes'] ?? [])->reject(fn ($d) => isset($d['cupo_contrata_id']) || ! empty($d['es_plaza_por_asumir']));
+        $docentes = collect($data['docentes'] ?? [])->reject(fn ($d) => isset($d['cupo_contrata_id'])
+            || ! empty($d['es_plaza_por_asumir']) || ! empty($d['no_renovacion_activa']));
         $cupos = $this->cuposPorContratar($data);
         $plazas = $this->plazasPorAsumir($ee, $data);
         $catalogo = new DotacionPalExclusiones2027;

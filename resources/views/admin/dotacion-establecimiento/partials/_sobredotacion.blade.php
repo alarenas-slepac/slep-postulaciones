@@ -162,7 +162,7 @@
                                 @endphp
                                 <tr data-revision-row="{{ sha1($claveBloque.$rutNormalizado) }}" data-revision-search="{{ $docente['nombre'] }} {{ $docente['rut'] }} {{ $docente['funcion'] }} {{ $antecedentesPrelacion['titulo'] ?? '' }}" data-revision-block="{{ $claveBloque }}" data-revision-state="saldo {{ $pendientes && ($justificacionesSobredotacionTableReady ?? false) ? 'justificacion' : '' }}" data-revision-error="{{ $mostrarErrores && $errors->any() ? '1' : '0' }}">
                                     <td data-label="RUT" class="text-nowrap fw-semibold">{{ $docente['rut'] }}</td>
-                                    <td data-label="Docente"><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div></td>
+                                    <td data-label="Docente"><div class="fw-bold">{{ $docente['nombre'] }}</div><div class="small text-muted">{{ $docente['tipo_contrato'] }}</div>@if ($antecedentesPrelacion['no_renovacion_activa'] ?? false)<span class="badge rounded-pill text-bg-warning mt-1">No renovación registrada</span><div class="small text-muted mt-1">La justificación del reemplazo es independiente de la justificación de estas horas.</div>@endif</td>
                                     <td data-label="Grupo de prelación">{{ $antecedentesPrelacion['prioridad_2027_label'] ?? 'Sin información' }}</td>
                                     <td data-label="Tramo">{{ ($antecedentesPrelacion['tramo'] ?? null) ?: 'Sin tramo' }}</td>
                                     <td data-label="Fecha de antigüedad" class="text-nowrap">{{ $fechaAntiguedadVacante($antecedentesPrelacion['fecha_antiguedad'] ?? null) }}</td>

@@ -86,7 +86,8 @@ final class DotacionAsignacionElegibilidad2027
 
     public static function excluidoDeAsignacion(array $docente, array $asignacion): bool
     {
-        return self::excluidoDeOtrasFunciones($docente, $asignacion)
+        return (bool) ($docente['no_renovacion_activa'] ?? false)
+            || self::excluidoDeOtrasFunciones($docente, $asignacion)
             || ((bool) ($docente['sobredotacion_justificada'] ?? false)
                 && in_array($asignacion['tipo_asignacion'] ?? '', [
                     'plan_estudio', 'acompanamiento_parvularia', 'pie_colaborativo', 'pie_educadora_diferencial',
