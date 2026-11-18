@@ -184,14 +184,14 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $proyeccion = $service->fila($this->ee, 2027);
         $this->assertSame(3, $actual['docentes_total']);
         $this->assertSame(94.0, $actual['contrato_total']);
-        $this->assertSame(1, $proyeccion['docentes_total']);
-        $this->assertSame(44.0, $proyeccion['contrato_original']);
+        $this->assertSame(2, $proyeccion['docentes_total']);
+        $this->assertSame(74.0, $proyeccion['contrato_original']);
         $this->assertSame(10.0, $proyeccion['horas_excluidas']);
-        $this->assertSame(44.0, $proyeccion['contrato_total']);
-        $this->assertSame(34.0, $proyeccion['contrato_considerado']);
+        $this->assertSame(74.0, $proyeccion['contrato_total']);
+        $this->assertSame(64.0, $proyeccion['contrato_considerado']);
         $this->assertSame(20.0, $proyeccion['asignadas']);
         $this->assertSame(5.0, $proyeccion['reservadas']);
-        $this->assertSame(9.0, $proyeccion['sin_asignar']);
+        $this->assertSame(39.0, $proyeccion['sin_asignar']);
         $this->assertEquals($proyeccion['contrato_total'], $proyeccion['asignadas'] + $proyeccion['reservadas'] + $proyeccion['sin_asignar'] + $proyeccion['horas_excluidas'] - $proyeccion['sobreasignadas']);
         $this->assertSame(44.0, $proyeccion['sep']); // Fuente contractual complementaria, no otra asignación.
     }

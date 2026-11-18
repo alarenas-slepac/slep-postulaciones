@@ -355,7 +355,9 @@ La base **Contrato docente** corresponde al padrón. Los motivos restantes de
 **Cupo por contratar**, **Plaza por asumir** y **Asignación excedente** tienen
 otra base y no se descuentan nuevamente del padrón nominal. El redondeo de aula
 se concilia aparte de las exclusiones usando el ajuste informado en S. No se
-reincorporan las personas retiradas a la nómina ni se modifican situaciones,
+incluyen las personas con no renovación activa en la nómina del PAL, aunque
+desde `2026.11.18.697` permanezcan en la nómina y los totales de Dotación. La
+exportación no modifica situaciones,
 asignaciones o justificaciones. El consolidado escribe por establecimiento,
 sin acumular todos los excluidos en memoria; supera 100.000 filas sólo mediante
 un error explícito que cancela la descarga completa.

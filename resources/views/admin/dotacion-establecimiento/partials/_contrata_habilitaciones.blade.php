@@ -83,7 +83,7 @@
                                                         @if ($tieneAsignacionesVirtual)
                                                             <span class="badge rounded-pill text-bg-info">Con asignaciones</span>
                                                         @else
-                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.destroy', [$establecimiento, $habilitacion->id]) }}" data-confirm="{{ !empty($habilitacion->no_renovacion_id) ? '¿Anular la no renovación? Se retirará el cupo sin asignaciones y el docente volverá a la dotación del año. Las asignaciones anteriores no se reactivan automáticamente.' : '¿Retirar este cupo sin asignaciones?' }}" onsubmit="return confirm(this.dataset.confirm);">
+                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.destroy', [$establecimiento, $habilitacion->id]) }}" data-confirm="{{ !empty($habilitacion->no_renovacion_id) ? '¿Anular la no renovación? Se retirará el cupo sin asignaciones. El docente permanece en la nómina y sus asignaciones anteriores no se reactivan automáticamente.' : '¿Retirar este cupo sin asignaciones?' }}" onsubmit="return confirm(this.dataset.confirm);">
                                                                 @csrf
                                                                 @method('DELETE')
                                                                 <input type="hidden" name="anio" value="{{ $anio }}">
@@ -106,13 +106,13 @@
                                         @endphp
                                         <div class="border-top pt-3 mb-3">
                                             <h4 class="h6 fw-bold">Reemplazar contrato a contrata</h4>
-                                            <p class="small text-muted">Disponible aunque no haya brecha de contratación. Reemplaza el contrato completo por cupos sin asignaciones ni asociaciones a asignaturas; retira al docente sólo de este establecimiento y año. Si tenía horas en distintos bloques, los cupos conservan esa distribución sin aumentar el total. Las asignaciones anteriores quedan inactivas y se conservan en el historial.</p>
+                                            <p class="small text-muted">Disponible aunque no haya brecha de contratación. Crea cupos sin asignaciones ni asociaciones a asignaturas y conserva al docente en la nómina y en Sobredotación. El contrato del docente y las horas de sus cupos se suman en los totales. Si tenía horas en distintos bloques, los cupos conservan esa distribución. Las asignaciones anteriores quedan inactivas; la justificación de la no renovación es independiente de la justificación de horas en Sobredotación.</p>
                                             @if (!($noRenovacionesDisponible ?? false))
                                                 <p class="small text-muted mb-0">Aplique la migración de no renovaciones para habilitar esta acción.</p>
                                             @elseif ($candidatos->isEmpty())
                                                 <p class="small text-muted mb-0">No hay docentes íntegramente a contrata sin contrato protegido para reemplazar en este bloque.</p>
                                             @else
-                                                <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $establecimiento) }}" class="js-no-renovacion-form" data-confirm="¿Registrar la no renovación y reemplazar el contrato completo por Docente por contratar? El docente saldrá de esta dotación, sus asignaciones quedarán inactivas y el cupo no tendrá asignaciones ni asociaciones a asignaturas." onsubmit="return confirm(this.dataset.confirm);">
+                                                <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $establecimiento) }}" class="js-no-renovacion-form" data-confirm="¿Registrar la no renovación y crear el reemplazo por Docente por contratar? El docente permanecerá en la nómina y sus horas se sumarán a las del cupo. Sus asignaciones quedarán inactivas y deberá justificar sus horas sin asignación en Sobredotación." onsubmit="return confirm(this.dataset.confirm);">
                                                     @csrf
                                                     <input type="hidden" name="accion" value="reemplazar">
                                                     <input type="hidden" name="anio" value="{{ $anio }}">
@@ -175,11 +175,11 @@
                         <section class="border-top pt-3 mt-3" aria-labelledby="no-renovaciones-historial">
                             <h3 id="no-renovaciones-historial" class="h6 fw-bold">Historial de no renovaciones y reemplazos</h3>
                             @if ($canManageContrataHabilitaciones ?? false)
-                                <p class="small text-muted">Eliminar retiro anula la no renovación y reincorpora al docente a la dotación de {{ $anio }}. Retira sus cupos vacíos y conserva este historial; las asignaciones anteriores permanecen inactivas.</p>
+                                <p class="small text-muted">Anular la no renovación retira sus cupos vacíos y conserva este historial. El docente permanece en la nómina de {{ $anio }}; las asignaciones anteriores continúan inactivas. La justificación de este historial no sustituye la justificación de horas en Sobredotación.</p>
                             @endif
                             <div class="table-responsive">
                                 <table class="table align-middle mb-0">
-                                    <thead class="table-light"><tr><th scope="col">Docente retirado</th><th scope="col">Bloque / horas</th><th scope="col">Justificación de no renovación</th><th scope="col">Estado</th>@if ($canManageContrataHabilitaciones ?? false)<th scope="col" class="text-end">Acción</th>@endif</tr></thead>
+                                    <thead class="table-light"><tr><th scope="col">Docente con no renovación</th><th scope="col">Bloque / horas</th><th scope="col">Justificación de no renovación</th><th scope="col">Estado</th>@if ($canManageContrataHabilitaciones ?? false)<th scope="col" class="text-end">Acción</th>@endif</tr></thead>
                                     <tbody>
                                         @foreach ($noRenovaciones as $registro)
                                             <tr><td><strong>{{ $registro->docente_nombre }}</strong><div class="small text-muted">{{ $registro->docente_rut_normalizado }} · {{ $registro->titulo }}</div></td>
@@ -196,12 +196,12 @@
                                                                         || (float) ($virtualRetiro['horas_asignadas_total'] ?? 0) > 0.01;
                                                                 });
                                                             @endphp
-                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $establecimiento) }}" data-confirm="¿Anular este retiro? El docente volverá a la dotación de {{ $anio }} y se retirarán todos sus cupos de reemplazo vacíos. Se conserva el historial y no se reactivan las asignaciones anteriores." onsubmit="return confirm(this.dataset.confirm);">
+                                                            <form method="POST" action="{{ route('admin.dotacion-establecimiento.contrata-habilitaciones.store', $establecimiento) }}" data-confirm="¿Anular esta no renovación? Se retirarán todos sus cupos de reemplazo vacíos. El docente permanecerá en la nómina de {{ $anio }}; se conserva el historial y no se reactivan las asignaciones anteriores." onsubmit="return confirm(this.dataset.confirm);">
                                                                 @csrf
                                                                 <input type="hidden" name="accion" value="anular_retiro">
                                                                 <input type="hidden" name="anio" value="{{ $anio }}">
                                                                 <input type="hidden" name="no_renovacion_id" value="{{ $registro->id }}">
-                                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill text-nowrap" aria-label="Eliminar retiro de {{ $registro->docente_nombre }}" @disabled($retiroConAsignaciones) @if ($retiroConAsignaciones) aria-describedby="retiro-ayuda-{{ $registro->id }}" @endif><i class="bi bi-trash" aria-hidden="true"></i> Eliminar retiro</button>
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill text-nowrap" aria-label="Anular no renovación de {{ $registro->docente_nombre }}" @disabled($retiroConAsignaciones) @if ($retiroConAsignaciones) aria-describedby="retiro-ayuda-{{ $registro->id }}" @endif><i class="bi bi-trash" aria-hidden="true"></i> Anular no renovación</button>
                                                             </form>
                                                             @if ($retiroConAsignaciones)
                                                                 <div id="retiro-ayuda-{{ $registro->id }}" class="small text-muted mt-2">Retire primero las asignaciones de todos los cupos de este reemplazo.</div>

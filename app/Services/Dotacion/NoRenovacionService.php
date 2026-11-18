@@ -30,6 +30,7 @@ class NoRenovacionService
     public static function elegible(array $docente): bool
     {
         return empty($docente['cupo_contrata_id'])
+            && empty($docente['no_renovacion_activa'])
             && (float) ($docente['horas_planta'] ?? 0) <= 0
             && (float) ($docente['horas_contrata'] ?? 0) > 0
             && abs((float) ($docente['horas_contrato'] ?? 0) - (float) $docente['horas_contrata']) < 0.005
@@ -59,7 +60,7 @@ class NoRenovacionService
 
         return DB::transaction(function () use ($establecimiento, $anio, $bloque, $rut, $justificacion, $userId): DotacionNoRenovacion {
             // Todas las escrituras de asignación y reemplazo toman primero este
-            // bloqueo: una selección anterior al retiro no puede crear horas nuevas.
+            // bloqueo: una selección anterior a la no renovación no puede crear horas nuevas.
             Establecimiento::query()->whereKey($establecimiento->id)->lockForUpdate()->firstOrFail();
             $normalizado = DotacionEstablecimientoCalculator::normalizeRut($rut);
             $docente = DotacionEstablecimientoCalculator::docentes($establecimiento, $anio)
@@ -142,7 +143,7 @@ class NoRenovacionService
             }
             DB::table('dotacion_contrata_habilitaciones')->whereIn('id', $cupos->pluck('id'))->delete();
             // Conserva la justificación y las asignaciones archivadas. Liberar
-            // la clave activa reincorpora al docente sin reactivar esas horas.
+            // la clave activa habilita al docente sin reactivar esas horas.
             $registro->forceFill(['anulada_at' => now(), 'anulada_by' => $userId, 'clave_activa' => null])->save();
 
             return true;

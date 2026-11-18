@@ -535,6 +535,11 @@ class DotacionProceso2027Calculator
             $docente['horas_disponibles'] = max(0.0, round((float) ($docente['horas_contrato'] ?? 0) - $asignadas, 2));
             $docente['horas_titulares_disponibles'] = max(0.0, round($planta - min($planta, $asignadas), 2));
             $docente['horas_contrata_disponibles'] = max(0.0, round($contrata - max(0.0, $asignadas - $planta), 2));
+            if ($docente['no_renovacion_activa'] ?? false) {
+                $docente['horas_disponibles'] = 0.0;
+                $docente['horas_titulares_disponibles'] = 0.0;
+                $docente['horas_contrata_disponibles'] = 0.0;
+            }
 
             return $docente;
         })->sort(fn (array $a, array $b) => ($a['prioridad_2027'] <=> $b['prioridad_2027'])

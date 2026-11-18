@@ -57,6 +57,9 @@ class DotacionDocentesSubsector
 
     public static function docenteAdmisible(array $docente, string $nivel, array $asignatura = []): bool
     {
+        if ($docente['no_renovacion_activa'] ?? false) {
+            return false;
+        }
         if (($docente['estamento_cobertura'] ?? 'docente') === 'asistente') {
             return $nivel === 'epja';
         }

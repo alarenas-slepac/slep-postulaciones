@@ -51,9 +51,9 @@ class DotacionNominaCompleta
                 $distribucion = $nomina->distribucionPorBloque($base, (bool) $ee->especial);
                 $retirado = in_array($rut, $contexto['retirados'] ?? [], true);
                 $noContinua = ($contexto['continuidad'][$rut] ?? true) === false;
-                $considerado = $retirado || $noContinua ? 0.0 : max(0.0, (float) ($d['horas_contrato'] ?? 0));
+                $considerado = $noContinua && ! $retirado ? 0.0 : max(0.0, (float) ($d['horas_contrato'] ?? 0));
                 $estado = match (true) {
-                    $retirado => 'Fuera de proyección: no renovación',
+                    $retirado => 'Con no renovación registrada; contrato considerado en dotación',
                     $noContinua => 'Fuera de proyección: no continúa',
                     $considerado < $contrato - 0.01 => 'Con ajuste de horas en dotación',
                     default => 'Sin reducción de contrato en dotación',

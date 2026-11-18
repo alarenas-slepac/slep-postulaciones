@@ -62,7 +62,7 @@ class DotacionContrataHabilitacionController extends Controller
             ]);
             abort_unless(app(NoRenovacionService::class)->anular($establecimiento, (int) $data['anio'],
                 (int) $data['no_renovacion_id'], $request->user()?->id), 404);
-            $mensaje = 'Retiro anulado. El docente vuelve a la dotación de '.$data['anio'].'. Se retiraron sus cupos de reemplazo sin reactivar las asignaciones anteriores.';
+            $mensaje = 'No renovación anulada. El docente permanece en la nómina de '.$data['anio'].'. Se retiraron sus cupos de reemplazo sin reactivar las asignaciones anteriores.';
 
             return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
                 ->withFragment('no-renovaciones-historial')
@@ -77,7 +77,7 @@ class DotacionContrataHabilitacionController extends Controller
             ]);
             app(NoRenovacionService::class)->reemplazar($establecimiento, (int) $data['anio'],
                 $data['bloque'], $data['docente_rut'], $data['justificacion'], $request->user()?->id);
-            $mensaje = 'No renovación registrada. Se crearon los cupos Docente por contratar sin asignaciones ni asociaciones a asignaturas; conservan el título y el total de horas del contrato reemplazado.';
+            $mensaje = 'No renovación registrada. Se crearon los cupos Docente por contratar sin asignaciones ni asociaciones a asignaturas. El docente permanece en la nómina; su contrato y las horas de los cupos se suman en los totales. Justifique por separado sus horas sin asignación en Sobredotación.';
 
             return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
                 ->withFragment('habilitaciones-contrata')
@@ -103,7 +103,7 @@ class DotacionContrataHabilitacionController extends Controller
         $this->authorizeRequest($request, $establecimiento);
         $data = $request->validate(['anio' => ['required', 'integer', 'min:2020', 'max:2100']]);
         abort_unless($service->revocar($establecimiento, (int) $data['anio'], $habilitacion), 404);
-        $mensaje = 'Cupo retirado. Si correspondía a un reemplazo, la no renovación quedó anulada y el docente vuelve a la dotación sin reactivar las asignaciones anteriores.';
+        $mensaje = 'Cupo retirado. Si correspondía a un reemplazo, la no renovación quedó anulada. El docente permanece en la nómina sin reactivar las asignaciones anteriores.';
 
         return redirect()->route('admin.dotacion-establecimiento.show', [$establecimiento, 'anio' => $data['anio']])
             ->withFragment('habilitaciones-contrata')

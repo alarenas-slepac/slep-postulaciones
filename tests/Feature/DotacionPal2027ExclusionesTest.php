@@ -42,7 +42,7 @@ class DotacionPal2027ExclusionesTest extends IsolatedSecurityTestCase
         });
     }
 
-    public function test_detalla_no_continuidad_de_2026_y_no_renovacion_sin_reincorporarlas_ni_duplicarlas(): void
+    public function test_pal_detalla_exclusiones_y_la_nomina_conserva_la_no_renovacion(): void
     {
         $this->personal('99000001K', 30); $this->personal('99000002K', 20); $this->personal('99000003K', 10);
         $this->situacion('99000001K'); $this->situacion('99000002K');
@@ -56,7 +56,8 @@ class DotacionPal2027ExclusionesTest extends IsolatedSecurityTestCase
         $this->personal('99000007K', 44, ['establecimiento_id' => 999]); $this->situacion('99000007K');
         $antes = DB::table('dotacion_docente_exclusiones')->get()->toJson();
         $nomina = DotacionEstablecimientoCalculator::docentes($this->ee, 2027, false);
-        $this->assertSame(['99000003K'], $nomina->pluck('rut')->all());
+        $this->assertSame(['99000002K', '99000003K'], $nomina->pluck('rut')->all());
+        $this->assertTrue($nomina->firstWhere('rut', '99000002K')['no_renovacion_activa']);
         $filas = app(DotacionPalExclusiones2027::class)->proyeccion($this->ee);
         $this->assertCount(2, $filas); $this->assertEquals(50, array_sum(array_column($filas, 'horas')));
         $porRut = collect($filas)->keyBy('rut');

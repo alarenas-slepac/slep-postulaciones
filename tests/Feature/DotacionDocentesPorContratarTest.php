@@ -229,7 +229,7 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         $this->assertSame(52.0, $data['resumen']['diferencia_contrato_calculado']);
     }
 
-    public function test_reemplazo_y_anulacion_conservan_el_total_sin_duplicar_el_contrato_retirado(): void
+    public function test_reemplazo_suma_docente_y_cupo_y_anular_retira_solo_el_cupo(): void
     {
         $service = app(ContratacionHabilitacionService::class);
         $service->habilitar($this->ee, 2027, 'parvularia', 1, 12, null);
@@ -237,9 +237,9 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         $registro = app(NoRenovacionService::class)->reemplazar($this->ee, 2027, 'plan_estudio', '99000001-K', 'No renovación sintética debidamente fundada.', null);
         $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
         $this->assertSame(56.0, (float) $antes);
-        $this->assertSame($antes, $data['resumen']['horas_contrato_docentes']);
-        $this->assertCount(0, $data['docentes']);
-        $this->assertSame(44.0, $data['resumen']['horas_contrato_docentes_aula_general']);
+        $this->assertSame($antes + 44.0, $data['resumen']['horas_contrato_docentes']);
+        $this->assertCount(1, $data['docentes']);
+        $this->assertSame(88.0, $data['resumen']['horas_contrato_docentes_aula_general']);
         $cupo = DB::table('dotacion_contrata_habilitaciones')->where('no_renovacion_id', $registro->id)->sole();
         $service->revocar($this->ee, 2027, $cupo->id);
         $this->assertSame($antes, DotacionEstablecimientoCalculator::build($this->ee, 2027)['resumen']['horas_contrato_docentes']);
