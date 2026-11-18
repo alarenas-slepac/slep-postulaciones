@@ -23,6 +23,22 @@ final class DotacionAsignacionElegibilidad2027
         return ($asignacion['tipo_asignacion'] ?? '') === 'pie_colaborativo';
     }
 
+    /** La asociación se comprueba por separado, tanto en el selector como al guardar. */
+    public static function cupoGeneralPuedeImpartirParvularia(array $persona, array $necesidad, int $anio): bool
+    {
+        $curso = $necesidad['curso'] ?? null;
+
+        return DotacionProceso2027Calculator::aplica($anio)
+            && ! empty($persona['cupo_contrata_id'])
+            && ($persona['estamento_cobertura'] ?? 'docente') === 'docente'
+            && ($persona['cupo_bloque'] ?? '') === 'plan_estudio'
+            && ($necesidad['tipo_asignacion'] ?? '') === 'plan_estudio'
+            && $curso instanceof \App\Models\EstablecimientoCurso
+            && DotacionProfesionDocenteResolver::esCursoNt($curso)
+            && (DotacionParvulariaCalculator::conJec($curso, $necesidad['proporcion_key'] ?? null)
+                || DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_parvulos']);
+    }
+
     /** Excepción específica para la asignatura del plan; no para Orientador(a). */
     public static function cupoDiferencialPuedeImpartirOrientacion(array $persona, array $necesidad): bool
     {

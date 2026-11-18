@@ -1645,18 +1645,19 @@ class DotacionAsignacionController extends Controller
             ? EstablecimientoCurso::query()->with('curso')->find((int) $payload['establecimiento_curso_id'])
             : null;
         $bloqueAsignacion = NoRenovacionService::bloqueAsignacion([...$payload, 'establecimientoCurso' => $curso], $persona);
-        // La excepción usa la necesidad vigente. El nombre enviado por el formulario
-        // o guardado históricamente no puede habilitar otro ramo como Orientación.
-        $orientacionDiferencial = false;
-        if ($cupo->bloque === 'pie' && ($payload['tipo_asignacion'] ?? '') === 'plan_estudio') {
+        // Las excepciones usan la necesidad y el curso vigentes; los datos del
+        // formulario no pueden habilitar otra asignatura ni otro establecimiento.
+        $excepcionPlan = false;
+        if ($bloqueAsignacion !== $cupo->bloque && ($payload['tipo_asignacion'] ?? '') === 'plan_estudio') {
             $necesidad = DotacionAsignacionCalculator::planNeedForKey(
                 $establecimiento, (int) $payload['anio'], (string) ($payload['necesidad_key'] ?? '')
             );
-            $orientacionDiferencial = $necesidad !== null
+            $excepcionPlan = $necesidad !== null
                 && (int) $necesidad['establecimiento_curso_id'] === (int) ($payload['establecimiento_curso_id'] ?? 0)
-                && DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($persona, $necesidad);
+                && (DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($persona, $necesidad)
+                    || DotacionAsignacionElegibilidad2027::cupoGeneralPuedeImpartirParvularia($persona, $necesidad, (int) $payload['anio']));
         }
-        if ($bloqueAsignacion !== $cupo->bloque && ! $orientacionDiferencial) {
+        if ($bloqueAsignacion !== $cupo->bloque && ! $excepcionPlan) {
             throw ValidationException::withMessages([
                 'docente_rut' => 'El docente por contratar solo puede cubrir necesidades de su bloque '.(NoRenovacionService::BLOQUES[$cupo->bloque] ?? $cupo->bloque).'.',
             ]);
