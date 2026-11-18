@@ -6457,8 +6457,22 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.17.695',
+    'current_version' => '2026.11.18.696',
     'entries' => [
+        [
+            'version' => '2026.11.18.696',
+            'title' => 'Cupos de Plan General asociados a asignaturas de Educación Parvularia',
+            'summary' => 'Permite asignar horas del plan NT1/NT2 en 2027 a un docente por contratar de Plan General previamente asociado a la asignatura.',
+            'roles' => ['admin', 'funcionario_directivo_estab', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'El selector y el guardado reconocen al cupo de Plan General asociado a una asignatura de Educación Parvularia, incluidos los cursos NT1 + NT2 combinados.',
+                'Conserva la conversión según el título del cupo: regla especial para Educación de Párvulos y 65/35 para otros perfiles con JEC. Sin JEC mantiene el requisito de título de Párvulos.',
+                'Mantiene asociación previa, prelación, contrato disponible, horas pendientes del plan y máximo del bloque Parvularia. No modifica el bloque contractual original del cupo ni duplica sus horas.',
+                'Cubre creación, edición con jornada completa, eliminación, límites, prioridad titular y rechazo de un curso manipulado. Los otros años y las coberturas PIE conservan sus reglas.',
+                'No requiere migraciones ni compilación de CSS o JavaScript.',
+            ],
+            'published_at' => '2026-11-18',
+        ],
         [
             'version' => '2026.11.17.695',
             'title' => 'Orientación del plan para docentes por contratar de Educación Diferencial',

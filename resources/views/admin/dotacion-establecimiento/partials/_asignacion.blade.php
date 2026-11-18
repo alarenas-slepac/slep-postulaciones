@@ -496,7 +496,8 @@
                                                                 && (!$seleccionLibrePlan || $doc['saldo'] >= 1)
                                                                 && ($fasePlan === null || in_array($doc['rut_normalizado'], $rutsFasePlan, true))
                                                                 && (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'tipo_asignacion' => 'plan_estudio', 'establecimientoCurso' => $cursoNt], $doc)
-                                                                    || \App\Support\DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($doc, $item))
+                                                                    || \App\Support\DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($doc, $item)
+                                                                    || \App\Support\DotacionAsignacionElegibilidad2027::cupoGeneralPuedeImpartirParvularia($doc, $item, (int) $anio))
                                                                 && (!$soloParvularia || $doc['es_parvularia'])
                                                             ),
                                                             'grupoPersonal' => match ($fasePlan) {
