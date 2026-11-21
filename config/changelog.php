@@ -1,6 +1,13 @@
 <?php
 
 return [
+    '2026.11.21.600' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Hoja Dotación docente glosa 2027',
+        'summary' => 'Agrega la proyección de 1.199 horas en otras funciones técnico-pedagógicas, en jornadas de 44 horas y una fracción. Usa la brecha frente al máximo autorizado y descuenta las horas justificadas vigentes antes de distribuirlas.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.599' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',

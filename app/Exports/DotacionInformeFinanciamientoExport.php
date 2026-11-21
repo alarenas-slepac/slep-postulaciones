@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\DotacionDocenteGlosa;
 use App\Support\DotacionDocenteProporcional;
 use App\Support\DotacionInformeFinanciamiento;
 use App\Support\DotacionInformePlanesNiveles;
@@ -28,11 +29,14 @@ class DotacionInformeFinanciamientoExport
         @set_time_limit(240);
         $book = DotacionLecturaCache::ejecutar(function () use ($establecimientos, $anio): Spreadsheet {
             $periodo = $this->calculador->periodoAsistentes();
-            $dotacion = $this->dotacionDocente->resumir($anio);
+            $informe = $this->dotacionDocente->paraInforme($anio);
             $filas = [];
             foreach ((clone $establecimientos)->lazy(10) as $ee) {
                 try {
-                    $filas[] = $this->calculador->fila($ee, $anio, $periodo) + ['dotacion_docente' => $dotacion[$ee->id] ?? []];
+                    $filas[] = $this->calculador->fila($ee, $anio, $periodo) + [
+                        'establecimiento_id' => $ee->id,
+                        'dotacion_docente' => $informe['dotacion'][$ee->id] ?? [],
+                    ];
                 } catch (\Throwable $exception) {
                     report($exception);
                     throw ValidationException::withMessages([
@@ -41,7 +45,7 @@ class DotacionInformeFinanciamientoExport
                 }
             }
 
-            return $this->workbook($filas, $anio, $periodo);
+            return $this->workbook($filas, $anio, $periodo, $informe['glosa']);
         });
 
         return response()->streamDownload(function () use ($book): void {
@@ -56,7 +60,7 @@ class DotacionInformeFinanciamientoExport
         ]);
     }
 
-    public function workbook(array $filas, int $anio, ?array $periodo): Spreadsheet
+    public function workbook(array $filas, int $anio, ?array $periodo, ?array $glosa = null): Spreadsheet
     {
         $book = new Spreadsheet;
         $book->getProperties()->setCreator('SGA SLEP Andalién Costa')->setTitle('Horas por financiamiento y RBD '.$anio);
@@ -87,6 +91,9 @@ class DotacionInformeFinanciamientoExport
         $this->escribirNivelesModalidades($book->createSheet(), $filas, $anio);
         $this->escribirDetalleOfertaEducativa($book->createSheet(), $filas, $anio);
         $this->escribirDotacionDocente($book->createSheet(), $filas, $anio);
+        if ($glosa !== null) {
+            $this->escribirDotacionDocente($book->createSheet(), $filas, $anio, $glosa);
+        }
         $book->setActiveSheetIndex(0);
 
         return $book;
@@ -216,16 +223,32 @@ class DotacionInformeFinanciamientoExport
         $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
     }
 
-    private function escribirDotacionDocente(Worksheet $sheet, array $filas, int $anio): void
+    private function escribirDotacionDocente(Worksheet $sheet, array $filas, int $anio, ?array $glosa = null): void
     {
+        $nombre = $glosa !== null ? 'Dotación docente glosa' : 'Dotación docente';
+        $titulo = $glosa !== null ? $nombre : 'Resumen de dotación docente por establecimiento';
         $nota = $anio === 2027
             ? 'Horas de contrato de Info Funcionario (DOCENTE) del PAL 2027, clasificadas por función y RBD.'
             : 'Incluye Dirección ADP por cubrir, horas de AAEE, cupos por contratar y saldos de contrato sin asignar. Excluye docentes justificados.';
-        $this->prepararHoja($sheet, 'Dotación docente', 'Resumen de dotación docente por establecimiento · '.$anio, $nota,
-            'J', ['RBD', 'Establecimiento', 'N.º Docentes Función Directiva', 'Horas Función Directiva',
-                'N.º Docentes Función Técnico-Pedagógica', 'Horas Función Técnico-Pedagógica', 'N.º Docentes Aula',
-                'Horas Aula', 'N.º Total Docentes', 'Total de Horas de Dotación']);
-        $sheet->getStyle('A4:J4')->getAlignment()->setWrapText(true)->setVertical('center');
+        $columnas = ['RBD', 'Establecimiento', 'N.º Docentes Función Directiva', 'Horas Función Directiva',
+            'N.º Docentes Función Técnico-Pedagógica', 'Horas Función Técnico-Pedagógica', 'N.º Docentes Aula',
+            'Horas Aula', 'N.º Total Docentes', 'Total de Horas de Dotación'];
+        $ultimaCol = 'J';
+        $decimalesDocentes = ['C', 'E', 'G', 'I'];
+        if ($glosa !== null) {
+            $nota = sprintf('Glosa SLEP de %s h para otras funciones, en jornadas de %d h. La brecha compara el máximo autorizado con la dotación base.',
+                number_format(DotacionDocenteGlosa::HORAS, 0, ',', '.'), DotacionDocenteGlosa::JORNADA);
+            $sinDistribuir = DotacionDocenteGlosa::HORAS - $glosa['horas_distribuidas'];
+            if ($sinDistribuir > 0) {
+                $nota .= ' Horas sin distribuir en el SLEP por saldo insuficiente: '.number_format($sinDistribuir, 0, ',', '.').'.';
+            }
+            array_push($columnas, 'Máximo autorizado 2027', 'Brecha antes de glosa', 'Horas justificadas en Sobredotación',
+                'Saldo después de justificar', 'Horas de glosa en otras funciones', 'Docentes equivalentes por glosa');
+            $ultimaCol = 'P';
+            $decimalesDocentes[] = 'P';
+        }
+        $this->prepararHoja($sheet, $nombre, $titulo.' · '.$anio, $nota, $ultimaCol, $columnas);
+        $sheet->getStyle('A4:'.$ultimaCol.'4')->getAlignment()->setWrapText(true)->setVertical('center');
         $sheet->getRowDimension(4)->setRowHeight(46);
         $row = 5;
         foreach ($filas as $fila) {
@@ -237,15 +260,30 @@ class DotacionInformeFinanciamientoExport
                 $valores[] = $datos['docentes'];
                 $valores[] = $datos['horas'];
             }
+            if ($glosa !== null) {
+                $criterio = $glosa['establecimientos'][$fila['establecimiento_id']] ?? [];
+                $horas = $criterio['horas_glosa'] ?? 0;
+                $docentes = $horas / DotacionDocenteGlosa::JORNADA;
+                $valores[2] += $docentes;
+                $valores[3] += $horas;
+                $sheet->fromArray([
+                    $criterio['maximo'] ?? null, $criterio['brecha'] ?? null, $criterio['justificadas'] ?? null,
+                    $criterio['saldo'] ?? null, $horas, $docentes,
+                ], null, 'K'.$row, true);
+            }
             $sheet->fromArray([...$valores,
                 $valores[0] + $valores[2] + $valores[4], $valores[1] + $valores[3] + $valores[5],
             ], null, 'C'.$row, true);
             $row++;
         }
-        $this->cerrarTabla($sheet, $row, 'J', range('C', 'J'), ['A' => 12, 'B' => 52] + array_fill_keys(range('C', 'J'), 21),
+        $this->cerrarTabla($sheet, $row, $ultimaCol, range('C', $ultimaCol), ['A' => 12, 'B' => 52] + array_fill_keys(range('C', $ultimaCol), 21),
             'Sin establecimientos para los filtros aplicados.');
-        foreach (['C', 'E', 'G', 'I'] as $columna) {
+        foreach ($decimalesDocentes as $columna) {
             $sheet->getStyle($columna.'5:'.$columna.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.00');
+        }
+        if ($glosa !== null) {
+            $sheet->getStyle('K5:O'.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.##');
+            $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
         }
     }
 

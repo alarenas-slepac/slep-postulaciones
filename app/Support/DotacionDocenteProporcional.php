@@ -16,6 +16,16 @@ class DotacionDocenteProporcional
 
     public function resumir(int $anio): array
     {
+        return $this->calcular($anio)['dotacion'];
+    }
+
+    public function paraInforme(int $anio): array
+    {
+        return $this->calcular($anio, incluirGlosa: $anio === DotacionProceso2027Calculator::ANIO);
+    }
+
+    private function calcular(int $anio, bool $incluirGlosa = false): array
+    {
         $totalPorDocente = [];
         $horasPorEstablecimiento = [];
         $filas = [];
@@ -38,13 +48,20 @@ class DotacionDocenteProporcional
         $contrataciones = app(ContratacionHabilitacionService::class);
         $informeFunciones = app(DotacionInformeFunciones::class);
         $tablasPal = $anio === 2027 ? app(DotacionPal2027Export::class)->tablas() : [];
+        $glosa = $incluirGlosa ? new DotacionDocenteGlosa : null;
+        $criterios = [];
         foreach ($establecimientos as $establecimiento) {
             $id = (int) $establecimiento->id;
             if ($anio === 2027) {
-                foreach ($this->horasPal2027($establecimiento, $tablasPal, $reglas) as $rut => $grupos) {
+                $datos = app(DotacionPal2027::class)->datos($establecimiento);
+                foreach ($this->horasPal2027($establecimiento, $datos, $tablasPal, $reglas) as $rut => $grupos) {
                     foreach ($grupos as $grupo => $horas) {
                         $acumular($id, $grupo, (string) $rut, $horas, true);
                     }
+                }
+                if ($glosa !== null) {
+                    $horasDotacion = array_sum(array_column($filas[$id] ?? [], 'horas'));
+                    $criterios[$id] = $glosa->criterio($establecimiento, $datos, $horasDotacion);
                 }
                 continue;
             }
@@ -108,13 +125,12 @@ class DotacionDocenteProporcional
             }
         }
 
-        return $filas;
+        return ['dotacion' => $filas, 'glosa' => $glosa?->distribuir($criterios)];
     }
 
-    private function horasPal2027(Establecimiento $establecimiento, array $tablas, array $reglas): array
+    private function horasPal2027(Establecimiento $establecimiento, array $datos, array $tablas, array $reglas): array
     {
         $pal = app(DotacionPal2027::class);
-        $datos = $pal->datos($establecimiento);
         $hayDirectorAdp = collect(data_get($datos, 'asignacion.plazas_por_asumir'))->isNotEmpty()
             || collect($datos['docentes'] ?? [])->contains(fn ($docente) =>
                 empty($docente['no_renovacion_activa'])
