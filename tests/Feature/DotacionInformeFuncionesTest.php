@@ -274,7 +274,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $libro = IOFactory::load($disk->path('financiamiento.xlsx'));
         try {
             $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa',
-                'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente'], $libro->getSheetNames());
+                'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente', 'Dotación docente glosa'], $libro->getSheetNames());
             $niveles = $libro->getSheetByName('Niveles y modalidades');
             $this->assertSame(['99999', '=Escuela de prueba', 'No', 'Sí', 'Sí', 'Sí', 'No', 'No', 'Sí'], $niveles->rangeToArray('A5:I5')[0]);
             $this->assertSame(DataType::TYPE_STRING, $niveles->getCell('B5')->getDataType());
@@ -494,6 +494,50 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         } finally {
             $libro->disconnectWorksheets();
         }
+    }
+
+    public function test_glosa_completa_1199_horas_en_jornadas_de_44_y_conserva_la_distribucion_al_filtrar(): void
+    {
+        (require database_path('migrations/2026_09_22_180000_create_dotacion_proceso_2027_configuraciones_table.php'))->up();
+        $otro = $this->establecimiento(99998);
+        $sinBrecha = $this->establecimiento(99997);
+        foreach ([[$this->ee, 44, 744], [$otro, 20, 720], [$sinBrecha, 10, 10]] as [$ee, $horas, $maximo]) {
+            $this->cupo($ee, 'plan_estudio', $horas);
+            DB::table('dotacion_proceso_2027_configuraciones')->insert([
+                'establecimiento_id' => $ee->id, 'anio' => 2027,
+                'max_horas_bloque_1' => $maximo, 'max_horas_bloque_2' => 0, 'max_horas_bloque_3' => 0,
+            ]);
+        }
+        $disk = Storage::disk('local');
+        foreach ([[], ['q' => '99999']] as $filtros) {
+            $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1] + $filtros))->assertOk()->assertDownload();
+            $disk->put('dotacion-glosa.xlsx', $respuesta->streamedContent());
+            $libro = IOFactory::load($disk->path('dotacion-glosa.xlsx'));
+            try {
+                $base = $libro->getSheetByName('Dotación docente');
+                $glosa = $libro->getSheetByName('Dotación docente glosa');
+                $fila = $filtros === [] ? 7 : 5;
+                $this->assertSame('99999', $glosa->getCell('A'.$fila)->getValue());
+                $this->assertEquals(700, $glosa->getCell('N'.$fila)->getValue());
+                $this->assertEquals(583, $glosa->getCell('O'.$fila)->getValue());
+                $this->assertEquals(13.25, $glosa->getCell('P'.$fila)->getValue());
+                $this->assertEquals(44, $base->getCell('J'.$fila)->getValue());
+                $this->assertEquals(627, $glosa->getCell('J'.$fila)->getValue());
+                $this->assertEquals(627, $glosa->getCell('F'.$fila)->getValue());
+                $this->assertEquals(14.25, $glosa->getCell('E'.$fila)->getValue());
+                if ($filtros === []) {
+                    $this->assertEquals(0, $glosa->getCell('O5')->getValue());
+                    $this->assertEquals(616, $glosa->getCell('O6')->getValue());
+                    $this->assertEquals(1199, $glosa->getCell('O8')->getCalculatedValue());
+                    $this->assertEquals(27.25, $glosa->getCell('P8')->getCalculatedValue());
+                    $this->assertEquals(1273, $glosa->getCell('J8')->getCalculatedValue());
+                }
+            } finally {
+                $libro->disconnectWorksheets();
+            }
+        }
+        $this->assertSame(3, DB::table('dotacion_contrata_habilitaciones')->count());
+        $this->assertSame(0, DotacionDocenteAsignacion::query()->count());
     }
 
     public function test_respeta_situaciones_continuidad_y_retiros_del_anio_sin_alterar_el_anterior(): void
