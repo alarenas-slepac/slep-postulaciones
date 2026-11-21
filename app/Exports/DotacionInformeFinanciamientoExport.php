@@ -219,10 +219,10 @@ class DotacionInformeFinanciamientoExport
     private function escribirDotacionDocente(Worksheet $sheet, array $filas, int $anio): void
     {
         $this->prepararHoja($sheet, 'Dotación docente', 'Resumen de dotación docente por establecimiento · '.$anio,
-            'Fracciones sobre las horas asignadas de cada docente o cupo en todos los establecimientos del año. Los filtros solo acotan las filas visibles.',
+            'Incluye Dirección ADP por cubrir, horas de AAEE y horas por situaciones docentes elegibles.',
             'J', ['RBD', 'Establecimiento', 'N.º Docentes Función Directiva', 'Horas Función Directiva',
                 'N.º Docentes Función Técnico-Pedagógica', 'Horas Función Técnico-Pedagógica', 'N.º Docentes Aula',
-                'Horas Docentes Aula', 'N.º Total Docentes', 'Total de Horas Docentes']);
+                'Horas Aula', 'N.º Total Docentes', 'Total de Horas Asignadas']);
         $sheet->getStyle('A4:J4')->getAlignment()->setWrapText(true)->setVertical('center');
         $sheet->getRowDimension(4)->setRowHeight(46);
         $row = 5;

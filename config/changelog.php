@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.11.21.597' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Dirección ADP por cubrir en la dotación docente',
+        'summary' => 'Incluye la plaza provisional en Directiva con su jornada configurada hasta registrar la asignación efectiva.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
+    '2026.11.21.596' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Horas por situaciones en el resumen de dotación docente',
+        'summary' => 'Reintegra horas excluidas por situaciones, primero en Aula hasta su requerimiento y luego en Técnico-Pedagógica. Excluye BIR y docentes con Sobredotación justificada.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
+    '2026.11.21.595' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Horas de AAEE y Subdirección no normativa en el Excel',
+        'summary' => 'Suma las horas asignadas a asistentes en el total por función de Dotación docente y reconoce Subdirector y Subdirectora en Otras funciones no normativas como Directiva.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.594' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',
