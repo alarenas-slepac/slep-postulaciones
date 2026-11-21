@@ -1,6 +1,13 @@
 <?php
 
 return [
+    '2026.11.21.598' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Saldos sin asignar en el resumen de dotación docente',
+        'summary' => 'Proyecta las horas pendientes de docentes y cupos por contratar en Aula hasta completar su requerimiento y deja el saldo en Técnico-Pedagógica. Excluye las horas descontadas por situaciones y a docentes con Sobredotación justificada.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.597' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',

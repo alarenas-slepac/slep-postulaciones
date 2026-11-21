@@ -316,7 +316,7 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         ]);
         $real = DotacionEstablecimientoCalculator::build($this->ee, $anio);
         $this->assertEmpty($real['asignacion']['plazas_por_asumir']);
-        $this->assertSame(['docentes' => 1.0, 'horas' => $horas], $informe->resumir($anio)[$this->ee->id]['directiva']);
+        $this->assertSame(['docentes' => $horas / 44.0, 'horas' => $horas], $informe->resumir($anio)[$this->ee->id]['directiva']);
         $this->assertSame(74.0, $real['resumen']['horas_contrato_docentes']);
         $this->assertSame(30.0, $real['resumen']['horas_contrato_docentes_por_contratar']);
         $this->assertSame($horas, $real['resumen']['horas_contrato_calculado']);
@@ -332,7 +332,7 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         ]);
         $dotacion = $informe->resumir($anio)[$this->ee->id];
         $this->assertSame(['docentes' => 1.0, 'horas' => $horas], $dotacion['directiva']);
-        $this->assertSame(['docentes' => 1.0, 'horas' => 8.0], $dotacion['tecnico_pedagogica']);
+        $this->assertSame(['docentes' => 4.0, 'horas' => 74.0], $dotacion['tecnico_pedagogica']);
     }
 
     public static function jornadasAdp(): array
