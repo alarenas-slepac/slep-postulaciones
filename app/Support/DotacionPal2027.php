@@ -29,7 +29,7 @@ class DotacionPal2027
         return DotacionLecturaCache::ejecutar(fn () => DotacionEstablecimientoCalculator::build($ee, 2027, false, false));
     }
 
-    public function construir(Establecimiento $ee, array $data, array $tablas): array
+    public function construir(Establecimiento $ee, array $data, array $tablas, ?callable $clasificarAsignacion = null): array
     {
         $cursosPal = (new DotacionPalCursos2027)->construir($ee, $data);
         $advertencias = $cursosPal['advertencias'];
@@ -57,7 +57,7 @@ class DotacionPal2027
             $sintetico = isset($docente['cupo_contrata_id']) || ! empty($docente['es_plaza_por_asumir']);
             $docente['pal_titulares_justificadas'] = $sintetico ? 0.0 : ($justificadas[self::identidad($docente['rut'] ?? null)] ?? 0.0);
             $docente['pal_detalle_justificaciones'] = $sintetico ? '' : ($detalleJustificaciones[self::identidad($docente['rut'] ?? null)] ?? '');
-            $filas = $this->docente($ee, $docente, $tablas);
+            $filas = $this->docente($ee, $docente, $tablas, $clasificarAsignacion);
             $this->registrarExclusiones($ee, $filas, [$docente], $excluidos, $catalogo);
             array_push($filasDocentes, ...$filas);
         }
@@ -147,12 +147,12 @@ class DotacionPal2027
         unset($fila);
     }
 
-    private function docente(Establecimiento $ee, array $docente, array $tablas): array
+    private function docente(Establecimiento $ee, array $docente, array $tablas, ?callable $clasificarAsignacion): array
     {
         $docente['pal_nivel'] = $this->nivelDocente($ee, $docente);
         $base = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
         $capacidades = $this->capacidadesContrato($base, $docente);
-        $grupos = $this->grupos($docente);
+        $grupos = $this->grupos($docente, $clasificarAsignacion);
         // Una reserva con origen explícito conserva su calidad aun si fue
         // creada antes o después de las asignaciones de aula.
         foreach ($capacidades as &$capacidad) {
@@ -192,7 +192,7 @@ class DotacionPal2027
             max(0.0, round(($titular['horas'] ?? 0) - ($titular['usadas'] ?? 0), 2)));
         [$filas, $reservasExcluidas] = $this->incorporarReservas($filas,
             (float) $docente['pal_titulares_justificadas'] - $docente['pal_sobredotacion_excluida']);
-        array_push($filas, ...$this->filasOtrasHoras($ee, $docente, $capacidades, $pendientes, $tablas));
+        array_push($filas, ...$this->filasOtrasHoras($ee, $docente, $capacidades, $pendientes, $tablas, $clasificarAsignacion !== null));
         if ($filas === []) { $filas[] = $this->fila($ee, $docente, null, 0, $capacidades[0], $pendientes, $tablas); }
         foreach ($capacidades as $capacidad) {
             $saldo = max(0.0, round($capacidad['horas'] - $capacidad['usadas'], 2));
@@ -232,6 +232,9 @@ class DotacionPal2027
             $descuento = min($reserva, max(0.0, round($justificadas - $excluidas, 2)));
             $incorporadas = round($reserva - $descuento, 2);
             if ($incorporadas > 0) { $fila['R'] = $incorporadas; }
+            if (isset($fila['_pal_dotacion']['R'])) {
+                $fila['_pal_dotacion']['R'] = array_map(fn ($horas) => $horas * $incorporadas / $reserva, $fila['_pal_dotacion']['R']);
+            }
             $fila['S'] .= ' Clasificación para el informe PAL: '.$incorporadas.' h de reserva titular en FUNCIÓN '.self::FUNCION_OTROS.' y columna R.';
             if ($descuento > 0) { $fila['S'] .= ' De esta reserva se excluyen '.$descuento.' h titulares justificadas en Sobredotación 2027.'; }
             $excluidas = round($excluidas + $descuento, 2);
@@ -270,7 +273,7 @@ class DotacionPal2027
     }
 
     /** Completa sólo el informe: conserva por separado situación y saldo sin asignar. */
-    private function filasOtrasHoras(Establecimiento $ee, array $docente, array $capacidades, float $pendientes, array $tablas): array
+    private function filasOtrasHoras(Establecimiento $ee, array $docente, array $capacidades, float $pendientes, array $tablas, bool $detalleDotacion): array
     {
         $base = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
         $situacion = $docente['exclusion_docente'] ?? null;
@@ -294,6 +297,9 @@ class DotacionPal2027
             $fila = $this->fila($ee, $docente, null, 0, $capacidad, $pendientes, $tablas);
             $fila['G'] = self::FUNCION_OTROS;
             $fila['R'] = $total;
+            if ($detalleDotacion) {
+                $fila['_pal_dotacion']['R'] = ['tecnico_pedagogica' => $porSituacion, 'pendiente' => $sinAsignar];
+            }
             $detalle = [];
             if ($porSituacion > 0) { $detalle[] = $porSituacion.' h por situación 2027: '.$motivo; }
             if ($sinAsignar > 0) { $detalle[] = $sinAsignar.($capacidad['calidad'] === 'Titular'
@@ -305,7 +311,7 @@ class DotacionPal2027
         return $filas;
     }
 
-    private function grupos(array $docente): array
+    private function grupos(array $docente, ?callable $clasificarAsignacion): array
     {
         $grupos = [];
         $esParvulos = DotacionProfesionDocenteResolver::perfilTitulo($docente)['es_educacion_parvulos'];
@@ -340,7 +346,12 @@ class DotacionPal2027
                 'proporcion' => $proporcion, 'contrato' => 0.0, 'pedagogicas' => 0.0, 'detalle' => [],
                 'convertir_parvularia' => $convertir, 'reglas_originales' => [], 'reserva_origen' => $reservaOrigen];
             $grupos[$key]['reglas_originales'][] = $proporcion;
-            $grupos[$key]['contrato'] += max(0, (float) data_get($a, 'horas_contrato', 0));
+            $contrato = max(0, (float) data_get($a, 'horas_contrato', 0));
+            $grupos[$key]['contrato'] += $contrato;
+            if ($clasificarAsignacion !== null && $contrato > 0) {
+                $grupoDotacion = $clasificarAsignacion($a);
+                $grupos[$key]['dotacion'][$grupoDotacion] = ($grupos[$key]['dotacion'][$grupoDotacion] ?? 0.0) + $contrato;
+            }
             $grupos[$key]['pedagogicas'] += max(0, (float) data_get($a, 'horas_plan_pedagogicas', 0));
             $grupos[$key]['detalle'][] = (string) (data_get($a, 'asignatura_nombre') ?: data_get($a, 'observacion') ?: (\App\Models\DotacionDocenteAsignacion::TIPOS[$tipo] ?? $tipo));
         }
@@ -471,6 +482,11 @@ class DotacionPal2027
             } elseif ($grupo['columna'] === 'incompatible') {
                 $problemas[] = 'financiamiento sin equivalencia en el formato';
             } elseif (! $exceso) { $fila[$grupo['columna']] = $parte; }
+            if (isset($grupo['dotacion']) && ! $exceso && $problemas === []) {
+                $columna = $grupo['columna'] === 'reserva' ? 'R' : $grupo['columna'];
+                $totalGrupo = array_sum($grupo['dotacion']);
+                $fila['_pal_dotacion'][$columna] = array_map(fn ($horas) => $horas * $parte / $totalGrupo, $grupo['dotacion']);
+            }
             $notas[] = 'Asignación SGA: '.$parte.' h cronológicas. '.implode('; ', array_unique($grupo['detalle'])).'.';
         }
         if ($fila['D'] === '') { $notas[] = 'Nivel pendiente de identificar en las categorías del formato PAL.'; }

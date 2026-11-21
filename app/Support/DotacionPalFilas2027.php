@@ -48,6 +48,18 @@ class DotacionPalFilas2027
         return $finales;
     }
 
+    /** Componentes de las horas cronológicas de contrato (columna J). */
+    public function horasPorComponente(array $fila, array $tablas): array
+    {
+        $aula = $this->calcular($fila, $tablas);
+        if ($aula === null) {
+            throw new \UnexpectedValueException('La fila docente del PAL no tiene equivalencia en la tabla de proporciones.');
+        }
+
+        return ['aula' => array_sum($aula), 'P' => (float) ($fila['P'] ?? 0),
+            'Q' => (float) ($fila['Q'] ?? 0), 'R' => (float) ($fila['R'] ?? 0)];
+    }
+
     private function combinar(array $filas, array $tablas): ?array
     {
         $fila = $filas[0]; $niveles = []; $proporciones = []; $lectivas = 0.0; $noLectivas = 0.0;
@@ -87,6 +99,17 @@ class DotacionPalFilas2027
             $fila['_pal_contrato_aula'] = round($contratoAula, 4);
             $aula = (float) ($fila['K'] ?? 0) + (float) ($fila['L'] ?? 0);
             $fila['S'] .= ' Docencia validada en conjunto: '.$aula.' h pedagógicas / '.$fila['_pal_contrato_aula'].' h de contrato SGA ('.$fila['M'].').';
+        }
+        $dotacion = [];
+        foreach ($filas as $origen) {
+            foreach ($origen['_pal_dotacion'] ?? [] as $componente => $gruposDotacion) {
+                foreach ($gruposDotacion as $grupoDotacion => $horas) {
+                    $dotacion[$componente][$grupoDotacion] = ($dotacion[$componente][$grupoDotacion] ?? 0.0) + $horas;
+                }
+            }
+        }
+        if ($dotacion !== []) {
+            $fila['_pal_dotacion'] = $dotacion;
         }
         return $fila;
     }
@@ -135,7 +158,10 @@ class DotacionPalFilas2027
                     $media = (float) ($fila['L'] ?? 0);
                     $parte['K'] = $basica > 0 ? round($bloque['aula'] * $basica / $aula, 4) : null;
                     $parte['L'] = $media > 0 ? round($bloque['aula'] - (float) $parte['K'], 4) : null;
-                    if ($i > 0) { $parte['P'] = $parte['Q'] = $parte['R'] = null; unset($parte['_pal_exclusiones']); }
+                    if ($i > 0) {
+                        $parte['P'] = $parte['Q'] = $parte['R'] = null;
+                        unset($parte['_pal_exclusiones'], $parte['_pal_dotacion']['P'], $parte['_pal_dotacion']['Q'], $parte['_pal_dotacion']['R']);
+                    }
                     $parte['S'] .= ' Conversión PAL de aula a '.$fila['M'].': '.$bloque['aula'].' h aula equivalentes = '.$bloque['contrato'].' h contrato.'
                         .' Referencia SGA del tramo: '.$aula.' h pedagógicas reales (K: '.$basica.'; L: '.$media.') y '.$original.' h contrato.'
                         .' Parte '.($i + 1).' de '.count($bloques).'. Se conservan las fórmulas originales N/O/J; las horas aula equivalentes no son el aula real del SGA.';

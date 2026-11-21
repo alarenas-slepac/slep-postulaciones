@@ -1,6 +1,13 @@
 <?php
 
 return [
+    '2026.11.21.599' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Dotación docente 2027 conciliada con el PAL',
+        'summary' => 'Usa las mismas horas de contrato docente que el PAL 2027 por RBD y mantiene su clasificación en Directiva, Aula y Técnico-Pedagógica. Aplica el descuento de las horas justificadas según el PAL.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.598' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',
