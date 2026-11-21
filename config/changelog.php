@@ -1,6 +1,17 @@
 <?php
 
 return [
+    '2026.11.21.585' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Informe por funciones con cupos y destinaciones',
+        'summary' => 'El informe y su Excel cuentan los cupos pendientes y las horas destinadas vigentes en el establecimiento de destino. Se excluyen los docentes justificados en Sobredotación para ese establecimiento y año.',
+        'changes' => [
+            'Imputa las horas destinadas al docente real y descuenta del cupo vinculado la parte cubierta. El saldo de un cupo parcialmente cubierto continúa disponible.',
+            'Incorpora los movimientos al cálculo de la conciliación contractual del informe.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.584' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\DotacionDocenteAsignacion;
+use App\Models\DotacionDocenteDistribucion;
 use App\Models\Establecimiento;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
@@ -13,6 +14,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
 use Tests\Support\IsolatedSecurityTestCase;
@@ -35,6 +37,9 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             '2026_05_25_183000_create_docente_horas_proporciones_table.php',
             '2026_05_28_210000_create_dotacion_docente_asignaciones_table.php',
             '2026_07_22_150000_add_estamento_cobertura_to_dotacion_docente_asignaciones_table.php',
+            '2026_09_28_140000_create_dotacion_contrata_habilitaciones_table.php',
+            '2026_09_29_190000_create_dotacion_sobredotacion_justificaciones_table.php',
+            '2026_11_06_170000_create_dotacion_docente_distribuciones_table.php',
         ] as $migration) {
             (require database_path('migrations/'.$migration))->up();
         }
@@ -110,7 +115,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $this->get($this->url($year))->assertOk()->assertSee('Horas SEP '.$year)->assertSee('Ver conciliación')->assertViewHas('errores', 0);
     }
 
-    public function test_un_exceso_no_compensa_saldo_de_otro_docente_y_excluye_asistentes_y_cupos(): void
+    public function test_un_exceso_no_compensa_saldo_de_otro_docente_y_excluye_asistentes_y_cupos_inexistentes(): void
     {
         $this->personal('99000001-K', 10);
         $this->personal('99000002-K', 20);
@@ -126,6 +131,67 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $this->assertSame(20.0, $fila['sin_asignar']);
         $this->assertSame(5.0, $fila['sobreasignadas']);
         $this->assertEquals($fila['contrato_total'], $fila['asignadas'] + $fila['reservadas'] + $fila['sin_asignar'] - $fila['sobreasignadas']);
+    }
+
+    public function test_excluye_justificados_del_anio_e_incluye_cupos_incluso_sin_asignaciones(): void
+    {
+        $this->personal('99000001-K', 20, ['financiamiento' => 'SEP']);
+        $this->personal('99000002-K', 10);
+        $this->asignacion(2027, '99000001-K', 'plan_estudio', 'Aula', 20);
+        $this->asignacion(2027, '99000002-K', 'funcion_directiva', 'Dirección', 10);
+        $this->justificar('99000001K', 2027);
+        $this->justificar('99000002K', 2026);
+        $this->cupo($this->ee, 'pie', 6);
+        $rutCupo = $this->cupo($this->ee, 'plan_estudio', 8);
+        $this->asignacion(2027, $rutCupo, 'plan_estudio', 'Aula del cupo', 5);
+
+        $fila = app(DotacionInformeFunciones::class)->fila($this->ee, 2027);
+
+        $this->assertSame(3, $fila['docentes_total']);
+        $this->assertSame(24.0, $fila['contrato_total']);
+        $this->assertSame(0.0, $fila['sep']);
+        $this->assertSame(9.0, $fila['sin_asignar']);
+        $this->assertSame(['docentes' => 1, 'horas' => 5.0], $fila['grupos']['aula']);
+        $this->assertSame(['docentes' => 1, 'horas' => 10.0], $fila['grupos']['directiva']);
+        $this->get($this->url(2027))->assertOk()->assertViewHas('establecimientos',
+            fn ($establecimientos) => $establecimientos->first()['contrato_total'] === 24.0);
+    }
+
+    public function test_destinaciones_vigentes_reemplazan_el_cupo_y_conservan_solo_su_saldo(): void
+    {
+        $destino = $this->establecimiento(99998);
+        $this->personal('99000001-K', 26);
+        $this->personal('99000002-K', 8);
+        $this->personal('99000001-K', 4, ['establecimiento_id' => $destino->id, 'rbd' => $destino->rbd]);
+        $pie = $this->cupo($destino, 'pie', 10);
+        $general = $this->cupo($destino, 'plan_estudio', 12);
+        $this->asignacion(2027, $pie, 'pie_educadora_diferencial', 'Bolsa PIE', 10, ['establecimiento_id' => $destino->id]);
+        $this->asignacion(2027, $general, 'plan_estudio', 'Aula', 12, ['establecimiento_id' => $destino->id]);
+        $completa = $this->destinar($destino, '99000001K', 'pie', 10, $pie);
+        $this->destinar($destino, '99000001K', 'plan_estudio', 5, $general);
+        $this->destinar($destino, '99000002K', 'plan_estudio', 3);
+        $this->destinar($destino, '99000002K', 'plan_estudio', 7, $general)->update(['anulada_at' => now()]);
+        $this->destinar($destino, '99000002K', 'plan_estudio', 50)->update(['anio' => 2026]);
+        $this->justificar('99000002K', 2027);
+
+        $informe = app(DotacionInformeFunciones::class);
+        $origen = $informe->fila($this->ee, 2027);
+        $fila = $informe->fila($destino, 2027);
+
+        $this->assertSame(1, $origen['docentes_total']);
+        $this->assertSame(11.0, $origen['contrato_total']);
+        $this->assertSame(3, $fila['docentes_total']);
+        $this->assertSame(29.0, $fila['contrato_total']);
+        $this->assertSame(4.0, $fila['sin_asignar']);
+        $this->assertSame(['docentes' => 1, 'horas' => 10.0], $fila['grupos']['pie']);
+        $this->assertSame(['docentes' => 3, 'horas' => 15.0], $fila['grupos']['aula']);
+        $this->assertSame(22.0, (float) DotacionDocenteAsignacion::sum('horas_contrato'));
+
+        $completa->update(['anulada_at' => now()]);
+        $recalculada = $informe->fila($destino, 2027);
+        $this->assertSame(4, $recalculada['docentes_total']);
+        $this->assertSame(29.0, $recalculada['contrato_total']);
+        $this->assertSame(21.0, $informe->fila($this->ee, 2027)['contrato_total']);
     }
 
     public function test_respeta_padron_del_anio_y_ultimo_mes_incluso_con_sep_mixto(): void
@@ -297,6 +363,34 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         DotacionDocenteAsignacion::create($extra + ['establecimiento_id' => $this->ee->id, 'anio' => $year, 'docente_rut' => $rut,
             'docente_rut_normalizado' => DotacionEstablecimientoCalculator::normalizeRut($rut), 'tipo_asignacion' => $tipo,
             'asignatura_nombre' => $name, 'horas_contrato' => $hours, 'estamento_cobertura' => 'docente']);
+    }
+
+    private function justificar(string $rut, int $anio): void
+    {
+        DB::table('dotacion_sobredotacion_justificaciones')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => $anio, 'docente_rut_normalizado' => $rut,
+            'bloque' => 'plan_estudio', 'tipo_horas' => 'titular', 'horas_detectadas' => 5,
+            'justificacion' => 'Justificación sintética de prueba.',
+        ]);
+    }
+
+    private function cupo(Establecimiento $ee, string $bloque, float $horas): string
+    {
+        $id = DB::table('dotacion_contrata_habilitaciones')->insertGetId([
+            'establecimiento_id' => $ee->id, 'anio' => 2027, 'bloque' => $bloque, 'horas' => $horas,
+        ]);
+
+        return 'VACANTE_'.$id;
+    }
+
+    private function destinar(Establecimiento $destino, string $rut, string $bloque, float $horas, ?string $cupo = null): DotacionDocenteDistribucion
+    {
+        return DotacionDocenteDistribucion::create([
+            'solicitud_uuid' => (string) Str::uuid(), 'anio' => 2027, 'origen_id' => $this->ee->id,
+            'destino_id' => $destino->id, 'docente_rut_normalizado' => $rut, 'bloque' => $bloque,
+            'tipo_horas' => 'titular', 'horas' => $horas,
+            'antecedente' => $cupo ? ['destino_cupo' => ['bloque' => $bloque, 'tipo' => 'cupos', 'persona' => $cupo]] : [],
+        ]);
     }
 
     private function resetCalculators(): void

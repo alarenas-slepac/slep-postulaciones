@@ -55,19 +55,7 @@ class DotacionDisposicionDatos
                     || abs($contrato - (float) ($docente['horas_contrata'] ?? 0)) >= 0.005))) {
                 continue;
             }
-            $asignaciones = collect($docente['asignaciones'] ?? [])->filter(fn ($a) =>
-                (int) data_get($a, 'establecimiento_id') === $establecimientoId && (int) data_get($a, 'anio') === $anio
-                && data_get($a, 'estado', 'activa') === 'activa'
-                && DotacionAsignacionCalculator::coverageEstamento($a) === 'docente'
-                && ! in_array(data_get($a, 'tipo_asignacion'), ['funcion_directiva', 'reserva_no_normativa'], true)
-                && ! DotacionAsignacionCalculator::esAsignacionCoordinacionPie($a)
-                && ! self::funcionExcluida(implode(' ', [data_get($a, 'subtipo_asignacion', ''), data_get($a, 'asignatura_nombre', '')])));
-            $porBloque = DotacionContratoPlanCalculator::consolidar($asignaciones)->groupBy(function ($a) use ($docente): string {
-                $bloque = DotacionProceso2027Calculator::bloqueFuncionPorDocente($a, $docente)
-                    ?? DotacionProceso2027Calculator::bloqueLibreDisposicionNtOtroDocente($a, null, $docente)
-                    ?? DotacionProceso2027Calculator::bloqueParaAsignacion($a);
-                return ['bloque_1' => 'plan_estudio', 'bloque_2' => 'parvularia', 'bloque_3' => 'pie'][$bloque] ?? '';
-            });
+            $porBloque = self::asignacionesDestinoPorBloque($docente, $establecimientoId, $anio);
             foreach ($porBloque as $bloque => $asignadas) {
                 if (! isset($resultado[$bloque])) { continue; }
                 foreach ($asignadas as $asignacion) {
@@ -86,6 +74,24 @@ class DotacionDisposicionDatos
             }
         }
         return self::filtrarReferenciasDestino($resultado);
+    }
+
+    public static function asignacionesDestinoPorBloque(array $docente, int $establecimientoId, int $anio): Collection
+    {
+        $asignaciones = collect($docente['asignaciones'] ?? [])->filter(fn ($a) =>
+            (int) data_get($a, 'establecimiento_id') === $establecimientoId && (int) data_get($a, 'anio') === $anio
+            && data_get($a, 'estado', 'activa') === 'activa'
+            && DotacionAsignacionCalculator::coverageEstamento($a) === 'docente'
+            && ! in_array(data_get($a, 'tipo_asignacion'), ['funcion_directiva', 'reserva_no_normativa'], true)
+            && ! DotacionAsignacionCalculator::esAsignacionCoordinacionPie($a)
+            && ! self::funcionExcluida(implode(' ', [data_get($a, 'subtipo_asignacion', ''), data_get($a, 'asignatura_nombre', '')])));
+
+        return DotacionContratoPlanCalculator::consolidar($asignaciones)->groupBy(function ($a) use ($docente): string {
+            $bloque = DotacionProceso2027Calculator::bloqueFuncionPorDocente($a, $docente)
+                ?? DotacionProceso2027Calculator::bloqueLibreDisposicionNtOtroDocente($a, null, $docente)
+                ?? DotacionProceso2027Calculator::bloqueParaAsignacion($a);
+            return ['bloque_1' => 'plan_estudio', 'bloque_2' => 'parvularia', 'bloque_3' => 'pie'][$bloque] ?? '';
+        });
     }
 
     public static function filtrarReferenciasDestino(array $referencias, array $filtros = []): array

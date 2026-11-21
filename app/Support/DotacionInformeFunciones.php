@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\DotacionDocenteDistribucion;
+use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
 use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Services\Padron\PadronPeriodoService;
@@ -28,9 +30,7 @@ class DotacionInformeFunciones
 
     public function fila(Establecimiento $establecimiento, int $anio): array
     {
-        // Reutiliza la nómina consolidada de dotación, sus situaciones y su año
-        // de respaldo, sin construir planes, necesidades ni el proceso guiado.
-        $docentes = DotacionEstablecimientoCalculator::docentes($establecimiento, $anio);
+        $docentes = $this->nomina($establecimiento, $anio);
 
         return $this->resumir($docentes) + $this->horasSep($establecimiento, $anio, $docentes) + [
             'establecimiento_id' => (int) $establecimiento->id,
@@ -41,7 +41,107 @@ class DotacionInformeFunciones
         ];
     }
 
-    /** Recibe la nómina ya consolidada por RUT que utiliza dotación. */
+    private function nomina(Establecimiento $establecimiento, int $anio): Collection
+    {
+        $id = (int) $establecimiento->id;
+        $justificados = DotacionSobredotacionJustificacion::rutsJustificados($id, $anio);
+        $nomina = DotacionEstablecimientoCalculator::docentes($establecimiento, $anio)
+            ->concat(app(ContratacionHabilitacionService::class)->docentesVirtuales($establecimiento, $anio))
+            ->keyBy(fn (array $docente) => $this->rut($docente));
+        $movimientos = Schema::hasTable('dotacion_docente_distribuciones')
+            ? DotacionDocenteDistribucion::query()->where('anio', $anio)->whereNull('anulada_at')
+                ->where('horas', '>', 0)->where(fn ($q) => $q->where('origen_id', $id)->orWhere('destino_id', $id))
+                ->orderBy('id')->get()
+            : collect();
+        $salidas = $movimientos->where('origen_id', $id)
+            ->groupBy(fn ($movimiento) => DotacionEstablecimientoCalculator::normalizeRut($movimiento->docente_rut_normalizado));
+        foreach ($salidas as $rut => $registros) {
+            if ($docente = $nomina->get($rut)) {
+                $restante = $this->descontarSalida($docente, (float) $registros->sum('horas'));
+                if ($restante['horas_contrato_base'] > 0) {
+                    $nomina->put($rut, $restante);
+                } else {
+                    $nomina->forget($rut);
+                }
+            }
+        }
+
+        $saldosCupos = [];
+        foreach ($movimientos->where('destino_id', $id) as $movimiento) {
+            $vinculo = $movimiento->antecedente['destino_cupo'] ?? [];
+            $bloque = $vinculo['bloque'] ?? $movimiento->bloque;
+            $horas = (float) $movimiento->horas;
+            $porFuncion = [];
+            $rutCupo = DotacionEstablecimientoCalculator::normalizeRut($vinculo['persona'] ?? null);
+            $cupo = ($vinculo['tipo'] ?? '') === 'cupos' ? $nomina->get($rutCupo) : null;
+            if ($cupo && ! empty($cupo['cupo_contrata_id'])) {
+                $saldosCupos[$rutCupo][$bloque] ??= $this->saldoCupo($cupo, $vinculo, $bloque, $id, $anio);
+                [$cupo, $porFuncion] = $this->cubrirCupo($cupo, $saldosCupos[$rutCupo][$bloque], $horas);
+                if ($cupo['horas_contrato'] > 0) {
+                    $nomina->put($rutCupo, $cupo);
+                } else {
+                    $nomina->forget($rutCupo);
+                }
+            }
+            $rut = DotacionEstablecimientoCalculator::normalizeRut($movimiento->docente_rut_normalizado);
+            $docente = $nomina->get($rut, ['rut_normalizado' => $rut, 'horas_contrato' => 0.0, 'horas_contrato_base' => 0.0]);
+            $grupo = match ($bloque) {
+                'plan_estudio', 'parvularia' => 'aula',
+                'pie' => 'pie',
+                default => 'otras',
+            };
+            $porFuncion[$grupo] = ($porFuncion[$grupo] ?? 0.0) + max(0.0, round($horas - array_sum($porFuncion), 2));
+            $docente['horas_contrato'] += $horas;
+            $docente['horas_contrato_base'] += $horas;
+            foreach ($porFuncion as $funcion => $cantidad) {
+                $docente['horas_movimientos'][$funcion] = ($docente['horas_movimientos'][$funcion] ?? 0.0) + $cantidad;
+            }
+            $nomina->put($rut, $docente);
+        }
+
+        return $nomina->except($justificados)->values();
+    }
+
+    private function descontarSalida(array $docente, float $horas): array
+    {
+        // Si el traslado ya figura como situación del padrón, descontar sólo el
+        // saldo que aún estaba considerado en el establecimiento de origen.
+        $traslado = ($docente['exclusion_docente']['motivo'] ?? '') === 'traslado'
+            ? (float) ($docente['horas_excluidas'] ?? 0) : 0.0;
+        $docente['horas_contrato_base'] = max(0.0, round($docente['horas_contrato_base'] - $horas, 2));
+        $docente['horas_contrato'] = max(0.0, round($docente['horas_contrato'] - max(0.0, $horas - $traslado), 2));
+
+        return $docente;
+    }
+
+    private function saldoCupo(array $cupo, array $vinculo, string $bloque, int $id, int $anio): array
+    {
+        $asignaciones = DotacionDisposicionDatos::asignacionesDestinoPorBloque($cupo, $id, $anio)->get($bloque, collect());
+        $grupos = $asignaciones->groupBy(fn ($a) => $this->grupo($a))->map(fn (Collection $filas) => (float) $filas->sum('horas_contrato'))->all();
+
+        return ['horas' => $grupos ? array_sum($grupos) : (float) ($vinculo['horas'] ?? $cupo['horas_contrato']), 'grupos' => $grupos];
+    }
+
+    private function cubrirCupo(array $cupo, array &$saldo, float $horas): array
+    {
+        $cubiertas = max(0.0, min($horas, $cupo['horas_contrato'], $saldo['horas']));
+        $cupo['horas_contrato'] = round($cupo['horas_contrato'] - $cubiertas, 2);
+        $cupo['horas_contrato_base'] = $cupo['horas_contrato'];
+        $saldo['horas'] = round($saldo['horas'] - $cubiertas, 2);
+        $porFuncion = [];
+        foreach ($saldo['grupos'] as $funcion => $disponibles) {
+            $cantidad = min($cubiertas, $disponibles);
+            $cubiertas = round($cubiertas - $cantidad, 2);
+            $saldo['grupos'][$funcion] = round($disponibles - $cantidad, 2);
+            $cupo['horas_asignadas_total'] -= $cantidad;
+            $cupo['horas_movimientos'][$funcion] = ($cupo['horas_movimientos'][$funcion] ?? 0.0) - $cantidad;
+            $porFuncion[$funcion] = $cantidad;
+        }
+
+        return [$cupo, $porFuncion];
+    }
+
+    /** Recibe la nómina consolidada por RUT, incluidos los cupos aún disponibles. */
     public function resumir(Collection $docentes): array
     {
         $grupos = collect(self::GRUPOS)->map(fn () => ['docentes' => 0, 'horas' => 0.0])->all();
@@ -51,8 +151,8 @@ class DotacionInformeFunciones
         ], 0);
         $periodos = collect();
         $docentes = $docentes->filter(fn (array $d) => ($d['estamento_cobertura'] ?? 'docente') === 'docente'
-            && empty($d['cupo_contrata_id']) && $this->rut($d) !== ''
-            && ! ContratacionHabilitacionService::esRutVirtual($this->rut($d)))
+            && $this->rut($d) !== ''
+            && (! empty($d['cupo_contrata_id']) || ! ContratacionHabilitacionService::esRutVirtual($this->rut($d))))
             ->unique(fn (array $d) => $this->rut($d));
 
         foreach ($docentes as $docente) {
@@ -66,6 +166,9 @@ class DotacionInformeFunciones
                 ->unique(fn ($a, $key) => data_get($a, 'id') ? 'id:'.data_get($a, 'id') : 'fila:'.$key);
             foreach ($asignaciones as $asignacion) {
                 $horas[$this->grupo($asignacion)] += max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
+            }
+            foreach ($docente['horas_movimientos'] ?? [] as $grupo => $cantidad) {
+                $horas[$grupo] = max(0.0, round($horas[$grupo] + $cantidad, 2));
             }
             $contrato = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
             $original = max(0.0, (float) ($docente['horas_contrato_base'] ?? $contrato));
@@ -141,7 +244,7 @@ class DotacionInformeFunciones
             ->sinReemplazoSuplencia()->get()
             ->filter(function ($linea) use ($nomina): bool {
                 $docente = $nomina->get(DotacionEstablecimientoCalculator::normalizeRut((string) $linea->rut));
-                return $docente && (int) $linea->anio === (int) $docente['anio'] && (int) $linea->mes === (int) $docente['mes'];
+                return $docente && (int) $linea->anio === (int) ($docente['anio'] ?? 0) && (int) $linea->mes === (int) ($docente['mes'] ?? 0);
             })
             ->unique(fn ($l) => $l->row_hash ?: implode('|', [
                 $l->rut, $l->anio, $l->mes, $l->fecha_ingreso, $l->fecha_termino,
