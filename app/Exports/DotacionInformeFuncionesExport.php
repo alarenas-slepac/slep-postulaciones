@@ -87,7 +87,7 @@ class DotacionInformeFuncionesExport
         $headers = self::HEADERS;
         $headers[12] = 'Horas SEP '.$anio.' (complementarias)';
         $this->prepararHoja($resumen, $headers, 'DOTACIÓN POR FUNCIONES '.$anio,
-            'Docentes únicos por establecimiento. Una persona puede cumplir varias funciones; SEP no se suma nuevamente al contrato.');
+            'Docentes únicos y cupos pendientes por establecimiento. Las destinaciones reemplazan las horas cubiertas del cupo vinculado. Se excluyen los docentes justificados en Sobredotación.');
         $this->prepararHoja($conciliacion, self::CONCILIACION_HEADERS, 'CONCILIACIÓN DEL CONTRATO DOCENTE '.$anio,
             'Contrato completo = asignadas + reservadas + sin asignar + excluidas por situaciones − sobreasignadas. El redondeo ya está incluido en Aula.');
         $resumen->mergeCells('A5:B5')->setCellValue('A5', 'Establecimiento');
@@ -112,7 +112,7 @@ class DotacionInformeFuncionesExport
                 $this->escribirFila($resumen, $linea, $row, 2);
                 $this->escribirFila($conciliacion, $linea, [
                     (string) $fila['rbd'], (string) $fila['nombre'], (string) $fila['comuna'],
-                    implode(', ', $fila['periodos']) ?: 'Sin contratos vigentes',
+                    implode(', ', $fila['periodos']) ?: 'Sin período de padrón informado',
                     (float) $fila['contrato_total'], (float) $fila['contrato_considerado'], (float) $fila['horas_excluidas'],
                     round((float) $fila['asignadas'] - (float) $fila['otras'], 2), (float) $fila['otras'],
                     '=ROUND(H'.$linea.'+I'.$linea.',2)', (float) $fila['reservadas'], (float) $fila['sin_asignar'],

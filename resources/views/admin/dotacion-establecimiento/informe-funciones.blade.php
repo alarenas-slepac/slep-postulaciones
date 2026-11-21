@@ -93,7 +93,7 @@
                     @forelse ($establecimientos as $fila)
                         <tr data-informe-rbd="{{ $fila['rbd'] }}">
                             <th scope="row">{{ $fila['rbd'] }}</th>
-                            <td><a class="fw-semibold" href="{{ route('admin.dotacion-establecimiento.show', [$fila['establecimiento_id'], 'anio' => $anio]) }}">{{ $fila['nombre'] }}</a><div class="text-muted">{{ $fila['comuna'] ?: 'Sin comuna' }}</div>@unless ($fila['error'])<div class="text-muted mt-1">Base contractual: {{ $fila['periodos'] ? implode(', ', $fila['periodos']) : 'Sin contratos vigentes' }}</div>@endunless</td>
+                            <td><a class="fw-semibold" href="{{ route('admin.dotacion-establecimiento.show', [$fila['establecimiento_id'], 'anio' => $anio]) }}">{{ $fila['nombre'] }}</a><div class="text-muted">{{ $fila['comuna'] ?: 'Sin comuna' }}</div>@unless ($fila['error'])<div class="text-muted mt-1">Padrón de respaldo: {{ $fila['periodos'] ? implode(', ', $fila['periodos']) : 'Sin período informado' }}</div>@endunless</td>
                             @if ($fila['error'])
                                 <td colspan="11"><span class="badge text-bg-danger">Cálculo no disponible</span> Revise la dotación del establecimiento y vuelva a consultar.</td>
                             @else
@@ -113,7 +113,7 @@
                                             @endforeach
                                         </div>
                                         <p class="mb-2"><strong>Contrato completo:</strong> {{ $fmt($fila['asignadas']) }} asignadas + {{ $fmt($fila['reservadas']) }} reservadas + {{ $fmt($fila['sin_asignar']) }} sin asignar + {{ $fmt($fila['horas_excluidas']) }} excluidas por situaciones − {{ $fmt($fila['sobreasignadas']) }} sobreasignadas = <strong>{{ $fmt($fila['contrato_total']) }} h</strong>.</p>
-                                        <p class="small text-muted mb-0">Base contractual: {{ $fila['periodos'] ? implode(', ', $fila['periodos']) : 'Sin contratos docentes vigentes' }}. @if (collect($fila['periodos'])->contains(fn ($periodo) => !str_ends_with($periodo, '/'.$anio))) Para {{ $anio }} se utiliza el padrón disponible indicado como respaldo; las asignaciones corresponden a {{ $anio }}. @endif Contrato original: {{ $fmt($fila['contrato_original']) }} h; horas excluidas por situaciones del año: {{ $fmt($fila['horas_excluidas']) }} h.</p>
+                                        <p class="small text-muted mb-0">Padrón de respaldo: {{ $fila['periodos'] ? implode(', ', $fila['periodos']) : 'Sin período informado' }}. @if (collect($fila['periodos'])->contains(fn ($periodo) => !str_ends_with($periodo, '/'.$anio))) Para {{ $anio }} se utiliza el padrón disponible indicado como respaldo; las asignaciones corresponden a {{ $anio }}. @endif Contrato original: {{ $fmt($fila['contrato_original']) }} h; horas excluidas por situaciones del año: {{ $fmt($fila['horas_excluidas']) }} h.</p>
                                     </div>
                                 </details>
                             </td></tr>
@@ -134,7 +134,8 @@
         <h2 id="informe-criterios-titulo" class="h5 fw-bold mb-3"><i class="bi bi-info-circle me-1 text-primary" aria-hidden="true"></i> Cómo leer el informe</h2>
         <ul class="small mb-0">
             <li class="mb-2">Cada docente se cuenta una vez en el total del establecimiento. Puede aparecer en varias funciones; sus cantidades por función no se suman para obtener personas únicas. Los totales de página suman las nóminas de los establecimientos y pueden repetir docentes que trabajan en más de uno.</li>
-            <li class="mb-2">Se utilizan las asignaciones del año consultado y la nómina de dotación, respetando su continuidad y retiros. El total mantiene el contrato original completo de esa nómina; las horas excluidas por situaciones se identifican aparte y no se presentan como disponibles para asignar. Los asistentes, cupos por contratar y asignaciones sin docente vigente quedan fuera de este informe docente.</li>
+            <li class="mb-2">Se utilizan la nómina y las asignaciones del año consultado, con las reglas de continuidad y retiro. El informe excluye a los asistentes y a los docentes con justificación de Sobredotación en el establecimiento y año consultados.</li>
+            <li class="mb-2">El total incorpora los cupos por contratar y los movimientos vigentes. Las horas destinadas se cuentan en el establecimiento de destino y reemplazan las horas del cupo vinculado. Si el cupo se cubre parcialmente, solo queda pendiente su saldo.</li>
             <li class="mb-2">Inspectoría General, jefaturas UTP y Convivencia Educativa se presentan en función técnico-pedagógica. Aula incluye Educación Parvularia, acompañamiento, trabajo colaborativo PIE y planes normativos (CRA, PISE, Formación Ciudadana y otros). Coordinación PIE y la bolsa de Educación Diferencial se muestran en otras funciones PIE.</li>
             <li class="mb-2">Las horas de aula se muestran convertidas a contrato con las reglas de consolidación vigentes. El redondeo de Parvularia se incluye una sola vez en Aula y se identifica en la conciliación. Las reservas no se cuentan como asignaciones a funciones ni como saldo libre.</li>
             <li>SEP es información complementaria del padrón de respaldo de cada establecimiento: ya forma parte del contrato y no se suma nuevamente. Sólo se cuantifican líneas con financiamiento SEP explícito; los financiamientos mixtos sin desglose se señalan para revisión.</li>
