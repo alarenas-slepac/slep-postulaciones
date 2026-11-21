@@ -127,6 +127,45 @@ class DotacionOrientacionCupoDiferencialTest extends IsolatedSecurityTestCase
         }
     }
 
+    public function test_cupo_diferencial_puede_cubrir_y_editar_trabajo_colaborativo_pie_sin_superar_su_jornada(): void
+    {
+        $curso = EstablecimientoCurso::sole();
+        DB::table('establecimiento_curso_pie')->insert([
+            'establecimiento_id' => $this->ee->id, 'establecimiento_curso_id' => $curso->id,
+            'curso_id' => $curso->curso_id, 'anio' => 2027, 'total_pie' => 6,
+        ]);
+        $need = collect(data_get(DotacionEstablecimientoCalculator::build($this->ee, 2027),
+            'asignacion.necesidades.pie_colaborativo'))->sole();
+        $this->assertContains($this->cupo['rut'], $this->opcionesParaNecesidad($need['key']));
+        DotacionDocenteAsignacion::create(['establecimiento_id' => $this->ee->id, 'anio' => 2027,
+            'docente_rut' => $this->cupo['rut'], 'docente_rut_normalizado' => $this->cupo['rut_normalizado'],
+            'tipo_asignacion' => 'pie_educadora_diferencial', 'horas_contrato' => 10, 'estado' => 'activa']);
+
+        $controller = app(DotacionAsignacionController::class);
+        $controller->store($this->request([
+            'anio' => 2027, 'docente_rut' => $this->cupo['rut'], 'estamento_cobertura' => 'docente',
+            'tipo_asignacion' => $need['tipo_asignacion'], 'subtipo_asignacion' => $need['subtipo_asignacion'],
+            'necesidad_key' => $need['key'], 'establecimiento_curso_id' => $curso->id,
+            'asignatura_nombre' => $need['titulo'], 'horas_contrato' => 1,
+        ]), $this->ee);
+        $fila = DotacionDocenteAsignacion::where('tipo_asignacion', 'pie_colaborativo')->sole();
+        $this->assertSame(1.0, (float) $fila->horas_contrato);
+
+        $controller->update($this->request(['docente_rut' => $this->cupo['rut'], 'horas_contrato' => 2]), $this->ee, $fila);
+        $this->assertSame(2.0, (float) $fila->fresh()->horas_contrato);
+        $this->assertSame(0.0, app(ContratacionHabilitacionService::class)
+            ->docenteVirtual($this->ee, 2027, $this->cupo['rut'])['diferencia']);
+        $this->assertSame(2.0, $this->proceso()['bloques']['bloque_1']['asignadas']);
+
+        try {
+            $controller->update($this->request(['docente_rut' => $this->cupo['rut'], 'horas_contrato' => 3]), $this->ee, $fila->fresh());
+            $this->fail('Las horas de trabajo colaborativo PIE superan el saldo del cupo.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('horas_contrato', $e->errors());
+        }
+        $this->assertSame(2.0, (float) $fila->fresh()->horas_contrato);
+    }
+
     public function test_no_permite_asignar_sin_asociacion_previa(): void
     {
         $this->expectException(ValidationException::class);
@@ -243,12 +282,16 @@ class DotacionOrientacionCupoDiferencialTest extends IsolatedSecurityTestCase
 
     private function opcionesAsignacion(string $nombre): array
     {
+        return $this->opcionesParaNecesidad($this->necesidades[$nombre]['key']);
+    }
+
+    private function opcionesParaNecesidad(string $key): array
+    {
         $data = DotacionEstablecimientoCalculator::build($this->ee, 2027);
         $html = view('admin.dotacion-establecimiento.partials._asignacion', ['establecimiento' => $this->ee,
             'anio' => 2027, 'docentes' => $data['docentes'], 'asignacion' => $data['asignacion'],
             'proceso2027' => $this->proceso(), 'activeRole' => 'admin', 'errors' => new ViewErrorBag])->render();
         $xpath = $this->xpath($html);
-        $key = $this->necesidades[$nombre]['key'];
         $selector = $xpath->query('//form[input[@name="necesidad_key" and @value="'.$key.'"]]//select[@name="docente_rut"]/optgroup[@data-personal-catalogo]')->item(0);
         $this->assertNotNull($selector);
         $id = $selector->getAttribute('data-personal-catalogo');

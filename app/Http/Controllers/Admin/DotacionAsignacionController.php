@@ -85,7 +85,7 @@ class DotacionAsignacionController extends Controller
             return back()->withInput()->withErrors(['docente_rut' => 'La persona seleccionada no corresponde a un '.$label.' vigente del establecimiento.']);
         }
 
-        if (($data['tipo_asignacion'] ?? null) === 'pie_colaborativo' && $this->isEducadoraDiferencialOrCoordinadorPie($persona)) {
+        if ($this->bloqueaTrabajoColaborativo($persona, $data)) {
             return back()->withInput()->withErrors(['docente_rut' => 'Las horas de trabajo colaborativo PIE no pueden asignarse a Educadora Diferencial ni a Coordinador/a PIE.']);
         }
 
@@ -131,7 +131,7 @@ class DotacionAsignacionController extends Controller
             $label = $estamentoCobertura === 'asistente' ? 'asistente de la educación' : 'docente';
             return back()->withInput()->withErrors(['docente_rut' => 'La persona seleccionada no corresponde a un '.$label.' vigente del establecimiento.']);
         }
-        if ($asignacion->tipo_asignacion === 'pie_colaborativo' && $this->isEducadoraDiferencialOrCoordinadorPie($persona)) {
+        if ($this->bloqueaTrabajoColaborativo($persona, ['tipo_asignacion' => $asignacion->tipo_asignacion])) {
             return back()->withInput()->withErrors(['docente_rut' => 'Las horas de trabajo colaborativo PIE no pueden asignarse a Educadora Diferencial ni a Coordinador/a PIE.']);
         }
 
@@ -1657,7 +1657,8 @@ class DotacionAsignacionController extends Controller
                 && (DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeImpartirOrientacion($persona, $necesidad)
                     || DotacionAsignacionElegibilidad2027::cupoGeneralPuedeImpartirParvularia($persona, $necesidad, (int) $payload['anio']));
         }
-        if ($bloqueAsignacion !== $cupo->bloque && ! $excepcionPlan) {
+        if ($bloqueAsignacion !== $cupo->bloque && ! $excepcionPlan
+            && ! DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeCubrirTrabajoColaborativo($persona, $payload)) {
             throw ValidationException::withMessages([
                 'docente_rut' => 'El docente por contratar solo puede cubrir necesidades de su bloque '.(NoRenovacionService::BLOQUES[$cupo->bloque] ?? $cupo->bloque).'.',
             ]);
@@ -1678,8 +1679,13 @@ class DotacionAsignacionController extends Controller
         }
     }
 
-    private function isEducadoraDiferencialOrCoordinadorPie(array $docente): bool
+    private function bloqueaTrabajoColaborativo(array $docente, array $asignacion): bool
     {
+        if (! DotacionAsignacionElegibilidad2027::esTrabajoColaborativoSinPrelacion($asignacion)
+            || DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeCubrirTrabajoColaborativo($docente, $asignacion)) {
+            return false;
+        }
+
         $texto = Str::of(($docente['funcion'] ?? '').' '.($docente['titulo'] ?? '').' '.($docente['estamento'] ?? ''))
             ->ascii()
             ->upper()
@@ -1687,8 +1693,7 @@ class DotacionAsignacionController extends Controller
 
         return str_contains($texto, 'EDUCADOR DIFERENCIAL')
             || str_contains($texto, 'EDUCADORA DIFERENCIAL')
-            || (str_contains($texto, 'COORDINADOR') && str_contains($texto, 'PIE'))
-            || (str_contains($texto, 'COORDINADORA') && str_contains($texto, 'PIE'));
+            || (str_contains($texto, 'COORDINADOR') && str_contains($texto, 'PIE'));
     }
 
     private function authorizeScope(Request $request, Establecimiento $establecimiento): void

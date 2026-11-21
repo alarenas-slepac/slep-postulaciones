@@ -23,6 +23,20 @@ final class DotacionAsignacionElegibilidad2027
         return ($asignacion['tipo_asignacion'] ?? '') === 'pie_colaborativo';
     }
 
+    public static function cupoDiferencialPuedeCubrirTrabajoColaborativo(array $persona, array $asignacion): bool
+    {
+        if (! self::esTrabajoColaborativoSinPrelacion($asignacion)
+            || empty($persona['cupo_contrata_id'])
+            || ($persona['cupo_bloque'] ?? '') !== 'pie'
+            || ! DotacionProfesionDocenteResolver::perfilTitulo($persona)['es_educacion_diferencial']) {
+            return false;
+        }
+
+        $perfil = Str::upper(Str::ascii(($persona['funcion'] ?? '').' '.($persona['titulo'] ?? '').' '.($persona['estamento'] ?? '')));
+
+        return ! (str_contains($perfil, 'COORDINADOR') && str_contains($perfil, 'PIE'));
+    }
+
     /** La asociación se comprueba por separado, tanto en el selector como al guardar. */
     public static function cupoGeneralPuedeImpartirParvularia(array $persona, array $necesidad, int $anio): bool
     {

@@ -1,6 +1,16 @@
 <?php
 
 return [
+    '2026.11.21.584' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Trabajo colaborativo PIE para cupos de Educación Diferencial',
+        'summary' => 'Permite seleccionar cupos por contratar de Educación Diferencial para cubrir trabajo colaborativo PIE. Las horas se descuentan del saldo contractual del cupo.',
+        'changes' => [
+            'Habilita la creación y edición de estas asignaciones y aplica las reglas del curso y los límites de horas vigentes.',
+        ],
+        'roles' => ['Administrador', 'Funcionario directivo de establecimiento', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.10.9.583' => [
         'date' => '2026-10-09',
         'module' => 'Carga masiva de personal',

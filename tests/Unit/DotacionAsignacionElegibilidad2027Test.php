@@ -92,6 +92,23 @@ class DotacionAsignacionElegibilidad2027Test extends TestCase
         $this->assertFalse(DotacionAsignacionElegibilidad2027::esTrabajoColaborativoSinPrelacion(['tipo_asignacion' => 'pie_educadora_diferencial']));
     }
 
+    public function test_trabajo_colaborativo_admite_el_cupo_diferencial_sin_coordinacion_pie(): void
+    {
+        $cupo = ['cupo_contrata_id' => 7, 'cupo_bloque' => 'pie', 'titulo' => 'Educación Diferencial'];
+        $trabajoColaborativo = ['tipo_asignacion' => 'pie_colaborativo'];
+
+        $this->assertTrue(DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeCubrirTrabajoColaborativo($cupo, $trabajoColaborativo));
+        foreach ([
+            ['cupo_contrata_id' => null],
+            ['cupo_bloque' => 'plan_estudio'],
+            ['titulo' => 'Pedagogía en Inglés'],
+            ['funcion' => 'Coordinadora PIE'],
+        ] as $cambio) {
+            $this->assertFalse(DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeCubrirTrabajoColaborativo(array_replace($cupo, $cambio), $trabajoColaborativo));
+        }
+        $this->assertFalse(DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeCubrirTrabajoColaborativo($cupo, ['tipo_asignacion' => 'plan_estudio']));
+    }
+
     public function test_cupo_diferencial_cubre_solo_orientacion_del_plan_segun_su_titulo(): void
     {
         $cupo = ['cupo_contrata_id' => 7, 'cupo_bloque' => 'pie', 'titulo' => 'Pedagogía en Educación Diferencial'];
