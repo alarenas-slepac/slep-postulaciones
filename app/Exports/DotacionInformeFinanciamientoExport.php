@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\DotacionDocenteProporcional;
 use App\Support\DotacionInformeFinanciamiento;
 use App\Support\DotacionInformePlanesNiveles;
 use App\Support\DotacionLecturaCache;
@@ -17,17 +18,21 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DotacionInformeFinanciamientoExport
 {
-    public function __construct(private readonly DotacionInformeFinanciamiento $calculador) {}
+    public function __construct(
+        private readonly DotacionInformeFinanciamiento $calculador,
+        private readonly DotacionDocenteProporcional $dotacionDocente,
+    ) {}
 
     public function download(Builder $establecimientos, int $anio): StreamedResponse
     {
         @set_time_limit(240);
         $book = DotacionLecturaCache::ejecutar(function () use ($establecimientos, $anio): Spreadsheet {
             $periodo = $this->calculador->periodoAsistentes();
+            $dotacion = $this->dotacionDocente->resumir($anio);
             $filas = [];
             foreach ((clone $establecimientos)->lazy(10) as $ee) {
                 try {
-                    $filas[] = $this->calculador->fila($ee, $anio, $periodo);
+                    $filas[] = $this->calculador->fila($ee, $anio, $periodo) + ['dotacion_docente' => $dotacion[$ee->id] ?? []];
                 } catch (\Throwable $exception) {
                     report($exception);
                     throw ValidationException::withMessages([
@@ -81,6 +86,7 @@ class DotacionInformeFinanciamientoExport
         $this->escribirOfertaEducativa($book->createSheet(), $filas, $anio);
         $this->escribirNivelesModalidades($book->createSheet(), $filas, $anio);
         $this->escribirDetalleOfertaEducativa($book->createSheet(), $filas, $anio);
+        $this->escribirDotacionDocente($book->createSheet(), $filas, $anio);
         $book->setActiveSheetIndex(0);
 
         return $book;
@@ -208,6 +214,37 @@ class DotacionInformeFinanciamientoExport
         $sheet->getStyle('L5:L'.max(5, $row - 1))->getAlignment()->setWrapText(true);
         $sheet->getStyle('H5:K'.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.##');
         $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
+    }
+
+    private function escribirDotacionDocente(Worksheet $sheet, array $filas, int $anio): void
+    {
+        $this->prepararHoja($sheet, 'Dotación docente', 'Resumen de dotación docente por establecimiento · '.$anio,
+            'Cada fracción se calcula sobre las horas del RUT en todos los establecimientos; los filtros solo acotan las filas visibles.',
+            'J', ['RBD', 'Establecimiento', 'N.º Docentes Función Directiva', 'Horas Función Directiva',
+                'N.º Docentes Función Técnico-Pedagógica', 'Horas Función Técnico-Pedagógica', 'N.º Docentes Aula',
+                'Horas Docentes Aula', 'N.º Total Docentes', 'Total de Horas Docentes']);
+        $sheet->getStyle('A4:J4')->getAlignment()->setWrapText(true)->setVertical('center');
+        $sheet->getRowDimension(4)->setRowHeight(46);
+        $row = 5;
+        foreach ($filas as $fila) {
+            $sheet->setCellValueExplicit('A'.$row, $fila['rbd'], DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('B'.$row, $fila['nombre'], DataType::TYPE_STRING);
+            $valores = [];
+            foreach (DotacionDocenteProporcional::GRUPOS as $grupo) {
+                $datos = $fila['dotacion_docente'][$grupo] ?? ['docentes' => 0, 'horas' => 0];
+                $valores[] = $datos['docentes'];
+                $valores[] = $datos['horas'];
+            }
+            $sheet->fromArray([...$valores,
+                $valores[0] + $valores[2] + $valores[4], $valores[1] + $valores[3] + $valores[5],
+            ], null, 'C'.$row, true);
+            $row++;
+        }
+        $this->cerrarTabla($sheet, $row, 'J', range('C', 'J'), ['A' => 12, 'B' => 52] + array_fill_keys(range('C', 'J'), 21),
+            'Sin establecimientos para los filtros aplicados.');
+        foreach (['C', 'E', 'G', 'I'] as $columna) {
+            $sheet->getStyle($columna.'5:'.$columna.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.00');
+        }
     }
 
     private function prepararHoja(Worksheet $sheet, string $nombre, string $titulo, string $nota, string $ultimaCol, array $encabezados): void

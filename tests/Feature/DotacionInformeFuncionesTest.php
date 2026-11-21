@@ -271,7 +271,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $libro = IOFactory::load($disk->path('financiamiento.xlsx'));
         try {
             $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa',
-                'Niveles y modalidades', 'Detalle oferta educativa'], $libro->getSheetNames());
+                'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente'], $libro->getSheetNames());
             $niveles = $libro->getSheetByName('Niveles y modalidades');
             $this->assertSame(['99999', '=Escuela de prueba', 'No', 'Sí', 'Sí', 'Sí', 'No', 'No', 'Sí'], $niveles->rangeToArray('A5:I5')[0]);
             $this->assertSame(DataType::TYPE_STRING, $niveles->getCell('B5')->getDataType());
@@ -347,6 +347,36 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             $this->assertSame([4, 8, 1, 29, 9], array_map(fn ($col) => (int) $hoja->getCell($col.'5')->getValue(), range('D', 'H')));
             $this->assertSame('Total', $hoja->getCell('A6')->getValue());
             $this->assertSame(9, (int) $hoja->getCell('H6')->getCalculatedValue());
+        } finally {
+            $libro->disconnectWorksheets();
+        }
+    }
+
+    public function test_dotacion_docente_prorratea_por_rut_entre_funciones_y_rbd_aunque_el_excel_este_filtrado(): void
+    {
+        $otro = $this->establecimiento(99998);
+        foreach ([
+            ['plan_estudio', 8], ['acompanamiento_parvularia', 4], ['pie_colaborativo', 3],
+            ['pie_educadora_diferencial', 5], ['plan_normativo', 3], ['otra_funcion', 2],
+            ['funcion_tecnico_pedagogica', 5], ['reserva_no_normativa', 30],
+        ] as [$tipo, $horas]) {
+            $this->asignacion(2027, '99000001-K', $tipo, $tipo, $horas);
+        }
+        $this->asignacion(2027, '99000001-K', 'funcion_directiva', 'Dirección', 10, ['establecimiento_id' => $otro->id]);
+        $this->asignacion(2027, '99000002-K', 'funcion_directiva', 'Dirección', 18);
+        $this->asignacion(2026, '99000001-K', 'plan_estudio', 'Otro año', 50);
+        $this->asignacion(2027, '99000001-K', 'plan_estudio', 'Asistente', 50, ['estamento_cobertura' => 'asistente']);
+
+        $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1, 'q' => '99999']))->assertOk()->assertDownload();
+        $disk = Storage::disk('local');
+        $disk->put('dotacion-proporcional.xlsx', $respuesta->streamedContent());
+        $libro = IOFactory::load($disk->path('dotacion-proporcional.xlsx'));
+        try {
+            $hoja = $libro->getSheetByName('Dotación docente');
+            $this->assertSame('99999', $hoja->getCell('A5')->getValue());
+            $this->assertSame([1.0, 18.0, 0.25, 10.0, 0.5, 20.0, 1.75, 48.0],
+                array_map(fn ($col) => (float) $hoja->getCell($col.'5')->getValue(), range('C', 'J')));
+            $this->assertSame('Total', $hoja->getCell('A6')->getValue());
         } finally {
             $libro->disconnectWorksheets();
         }

@@ -1,6 +1,13 @@
 <?php
 
 return [
+    '2026.11.21.591' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Dotación docente proporcional por funciones',
+        'summary' => 'Agrega una hoja con horas y fracciones docentes por RBD, calculadas sobre las asignaciones de cada RUT de todos los establecimientos.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.590' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',
