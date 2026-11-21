@@ -277,6 +277,8 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         $this->assertCount(1, $data['docentes']);
         $this->assertCount(4, $data['asignacion']['docentes']); // No ofrece la plaza automática como persona.
         $this->assertCount(1, $data['asignacion']['plazas_por_asumir']);
+        $informe = app(\App\Support\DotacionDocenteProporcional::class);
+        $this->assertSame(['docentes' => 1.0, 'horas' => $horas], $informe->resumir($anio)[$this->ee->id]['directiva']);
         $this->assertSame($data['resumen'], DotacionEstablecimientoCalculator::build($this->ee, $anio, false)['resumen']);
         $this->assertSame(74.0 + $horas, DotacionEstablecimientoCalculator::resumenListado($this->ee, $anio)['resumen']['horas_contrato_docentes']);
         $referencia = (new DotacionContratoVigentePorBloque)->paraEstablecimiento($this->ee, $anio);
@@ -314,6 +316,7 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         ]);
         $real = DotacionEstablecimientoCalculator::build($this->ee, $anio);
         $this->assertEmpty($real['asignacion']['plazas_por_asumir']);
+        $this->assertSame(['docentes' => 1.0, 'horas' => $horas], $informe->resumir($anio)[$this->ee->id]['directiva']);
         $this->assertSame(74.0, $real['resumen']['horas_contrato_docentes']);
         $this->assertSame(30.0, $real['resumen']['horas_contrato_docentes_por_contratar']);
         $this->assertSame($horas, $real['resumen']['horas_contrato_calculado']);
@@ -321,6 +324,15 @@ class DotacionDocentesPorContratarTest extends IsolatedSecurityTestCase
         $this->assertFalse($real['asignacion']['necesidades']['funciones']->firstWhere('codigo', 'director_adp')['asignacion_automatica']);
         $asignacion->update(['estado' => 'inactiva']);
         $this->assertSame(74.0 + $horas, DotacionEstablecimientoCalculator::build($this->ee, $anio)['resumen']['horas_contrato_docentes']);
+        DotacionDocenteAsignacion::create([
+            'establecimiento_id' => $this->ee->id, 'anio' => $anio, 'docente_rut' => '99000001-K',
+            'docente_rut_normalizado' => '99000001K', 'docente_nombre' => 'Docente sintético',
+            'tipo_asignacion' => 'funcion_directiva', 'asignatura_nombre' => 'Director',
+            'horas_contrato' => 8, 'estado' => 'activa',
+        ]);
+        $dotacion = $informe->resumir($anio)[$this->ee->id];
+        $this->assertSame(['docentes' => 1.0, 'horas' => $horas], $dotacion['directiva']);
+        $this->assertSame(['docentes' => 1.0, 'horas' => 8.0], $dotacion['tecnico_pedagogica']);
     }
 
     public static function jornadasAdp(): array
