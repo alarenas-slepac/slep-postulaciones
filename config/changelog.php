@@ -1,6 +1,27 @@
 <?php
 
 return [
+    '2026.11.21.594' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Subdirección y prelación de Dirección ADP en el Excel',
+        'summary' => 'Incluye Subdirección en Directiva y clasifica Dirección regular en Técnico-Pedagógica cuando el mismo establecimiento tiene Dirección ADP asignada para el año.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
+    '2026.11.21.593' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Cupos por contratar en la dotación docente proporcional',
+        'summary' => 'Incluye las horas asignadas de cada cupo por contratar vigente y reparte su fracción docente entre las funciones que cubre.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
+    '2026.11.21.592' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Solo Dirección y Dirección ADP en el grupo Directiva',
+        'summary' => 'La hoja Dotación docente incluye solo Dirección y Dirección ADP en Directiva. Los demás cargos directivos se informan en Técnico-Pedagógica.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.591' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',
