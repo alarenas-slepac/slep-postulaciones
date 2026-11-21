@@ -224,7 +224,14 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
 
     public function test_excel_financiamiento_imputa_bloques_docentes_y_suma_aaee_del_ultimo_padron(): void
     {
-        $this->ee->update(['nombre_establecimiento' => '=Escuela de prueba']);
+        $this->ee->update(['nombre_establecimiento' => '=Escuela de prueba', 'basica' => true, 'especial' => true]);
+        foreach ([['3M-HC', 2027, true, 12], ['3M-TP', 2027, false, 15], ['4M-TP', 2026, true, 13]] as [$codigo, $anio, $activo, $matricula]) {
+            EstablecimientoCurso::create([
+                'establecimiento_id' => $this->ee->id, 'curso_id' => Curso::where('codigo', $codigo)->value('id'),
+                'anio' => $anio, 'letra' => 'A', 'nombre_seccion' => $codigo.' A', 'regimen_jec' => 'Con JEC',
+                'activo' => $activo, 'matricula' => $matricula,
+            ]);
+        }
         $this->personal('99000001-K', 60, ['mes' => 11, 'financiamiento' => 'SEP']);
         foreach ([
             ['plan_estudio', 'Lenguaje', 22, 'Otra'],
@@ -263,7 +270,10 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $disk->put('financiamiento.xlsx', $respuesta->streamedContent());
         $libro = IOFactory::load($disk->path('financiamiento.xlsx'));
         try {
-            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa'], $libro->getSheetNames());
+            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa', 'Niveles y modalidades'], $libro->getSheetNames());
+            $niveles = $libro->getSheetByName('Niveles y modalidades');
+            $this->assertSame(['99999', '=Escuela de prueba', 'No', 'Sí', 'Sí', 'Sí', 'No', 'No', 'Sí'], $niveles->rangeToArray('A5:I5')[0]);
+            $this->assertSame(DataType::TYPE_STRING, $niveles->getCell('B5')->getDataType());
             foreach (['Sub. General' => 51, 'PIE' => 22, 'SEP' => 15, 'Pro-Retención' => 5] as $nombre => $total) {
                 $hoja = $libro->getSheetByName($nombre);
                 $this->assertSame('99999', $hoja->getCell('B5')->getValue());

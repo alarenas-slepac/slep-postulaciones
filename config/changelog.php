@@ -1,6 +1,13 @@
 <?php
 
 return [
+    '2026.11.21.589' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Niveles y modalidades educativas por RBD',
+        'summary' => 'Agrega al Excel de financiamiento una hoja con los niveles y modalidades de cada establecimiento, a partir de su ficha y de los cursos activos con matrícula.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.588' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',
