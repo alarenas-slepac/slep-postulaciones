@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
 use Tests\Support\IsolatedSecurityTestCase;
@@ -210,6 +212,68 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $this->assertSame(22.0, $proximo['contrato_total']);
         $this->assertSame(22.0, $proximo['sep']);
         $this->assertSame(['03/2027'], $proximo['periodos']);
+    }
+
+    public function test_excel_financiamiento_imputa_bloques_docentes_y_suma_aaee_del_ultimo_padron(): void
+    {
+        $this->ee->update(['nombre_establecimiento' => '=Escuela de prueba']);
+        $this->personal('99000001-K', 60, ['mes' => 11, 'financiamiento' => 'SEP']);
+        foreach ([
+            ['plan_estudio', 'Lenguaje', 22, 'Otra'],
+            ['plan_normativo', 'CRA', 4, 'Sin clasificar'],
+            ['otra_funcion', 'Apoyo', 5, 'General'],
+            ['pie_colaborativo', 'Colaboración PIE', 3, 'Otra'],
+            ['pie_educadora_diferencial', 'Bolsa diferencial', 8, 'General'],
+            ['funcion_tecnico_pedagogica', 'Coordinadora PIE', 2, 'General'],
+            ['otra_funcion', 'Apoyo SEP', 7, 'Subvención Escolar Preferencial'],
+            ['otra_funcion', 'Apoyo Pro-Retención', 2, 'PRO-RETENCION'],
+            ['reserva_no_normativa', 'Reserva', 10, 'SEP'],
+        ] as [$tipo, $funcion, $horas, $fuente]) {
+            $this->asignacion(2027, '99000001-K', $tipo, $funcion, $horas, ['subvencion' => $fuente]);
+        }
+        $this->asignacion(2027, '99000001-K', 'otra_funcion', 'Inactiva', 100, ['estado' => 'inactiva', 'subvencion' => 'SEP']);
+        $this->asignacion(2026, '99000001-K', 'otra_funcion', 'Otro año', 100, ['subvencion' => 'SEP']);
+        $this->asignacion(2027, '99000005-K', 'otra_funcion', 'AAEE', 100, ['subvencion' => 'SEP', 'estamento_cobertura' => 'asistente']);
+
+        $aaee = ['mes' => 11, 'estatuto' => 'AAEE', 'escalafon' => 'ASISTENTE'];
+        foreach (['SUB GRAL' => 20, 'SEP' => 8, 'PIE' => 9, 'Pro Retención' => 3, 'Municipal' => 4,
+            'PIE / SEP' => 5, 'JUNJI' => 18, 'Sin financiamiento' => 60, '' => 100] as $fuente => $horas) {
+            $this->personal('99000005-K', $horas, ['financiamiento' => $fuente] + $aaee);
+        }
+        $this->personal('99000006-K', 30, ['mes' => 10, 'financiamiento' => 'SEP'] + $aaee);
+        $this->personal('99000007-K', 30, ['estatuto' => 'JUNJI', 'financiamiento' => 'SEP'] + $aaee);
+        $jardin = $this->establecimiento(99998, ['nombre_establecimiento' => 'Jardín Infantil de prueba']);
+        $sala = $this->establecimiento(99997, ['sala_cuna' => true]);
+        foreach ([$jardin, $sala] as $ee) {
+            $this->personal('99000008-K', 80, ['establecimiento_id' => $ee->id, 'rbd' => $ee->rbd, 'financiamiento' => 'SEP'] + $aaee);
+        }
+
+        $this->get($this->url(2027))->assertOk()->assertSee('Excel por financiamiento');
+        $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1, 'page' => 2]));
+        $respuesta->assertOk()->assertDownload();
+        $disk = Storage::disk('local');
+        $disk->put('financiamiento.xlsx', $respuesta->streamedContent());
+        $libro = IOFactory::load($disk->path('financiamiento.xlsx'));
+        try {
+            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE'], $libro->getSheetNames());
+            foreach (['Sub. General' => 51, 'PIE' => 22, 'SEP' => 15, 'Pro-Retención' => 5] as $nombre => $total) {
+                $hoja = $libro->getSheetByName($nombre);
+                $this->assertSame('99999', $hoja->getCell('B5')->getValue());
+                $this->assertSame('=Escuela de prueba', $hoja->getCell('C5')->getValue());
+                $this->assertSame(DataType::TYPE_STRING, $hoja->getCell('C5')->getDataType());
+                $this->assertSame((float) $total, (float) $hoja->getCell('D5')->getValue());
+                $this->assertSame('99998', $hoja->getCell('B6')->getValue());
+                $this->assertSame(0.0, (float) $hoja->getCell('D6')->getValue());
+                $this->assertSame((float) $total, (float) $hoja->getCell('D7')->getCalculatedValue());
+                $this->assertStringContainsString('11/2026', $hoja->getCell('A2')->getValue());
+            }
+            $otras = $libro->getSheetByName('Otras fuentes AAEE');
+            $this->assertSame('Municipal', $otras->getCell('D5')->getValue());
+            $this->assertSame('PIE / SEP', $otras->getCell('D6')->getValue());
+            $this->assertSame(9.0, (float) $otras->getCell('E7')->getCalculatedValue());
+        } finally {
+            $libro->disconnectWorksheets();
+        }
     }
 
     public function test_conversion_de_aula_es_consolidada_y_no_reescribe_las_asignaciones(): void
