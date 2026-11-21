@@ -18,6 +18,19 @@ class DotacionInformePlanes
         ];
     }
 
+    public function ofertaEducativa(Establecimiento $establecimiento, int $anio): array
+    {
+        $cursos = $this->datos($establecimiento, $anio)['cursos'];
+        $resumen = $cursos['resumen_cursos_planes'];
+        $gruposCombinados = collect($resumen['combinados'])->where('cursos', '>', 0)->count();
+
+        return $this->resumir($cursos, noAplicaComoSinJec: true) + [
+            'comuna' => (string) $establecimiento->comuna,
+            'grupos_combinados' => $gruposCombinados,
+            'cursos_despues_de_combinar' => (int) $resumen['totales_independientes']['cursos'] + $gruposCombinados,
+        ];
+    }
+
     protected function datos(Establecimiento $establecimiento, int $anio): array
     {
         if (DotacionCursoCombinadoCalculator::tablesReady()
@@ -36,16 +49,16 @@ class DotacionInformePlanes
         return ['cursos' => $cursos, 'grupos' => []];
     }
 
-    public function resumir(array $cursos): array
+    public function resumir(array $cursos, bool $noAplicaComoSinJec = false): array
     {
         // Es la misma fuente que utiliza Total establecimiento en el resumen.
         $totales = $cursos['resumen_cursos_planes']['totales'];
         $detalles = collect($cursos['rows'] ?? [])->flatMap(fn ($row) => $row['detalles'] ?? []);
-        $modalidades = $detalles->map(function ($detalle): string {
+        $modalidades = $detalles->map(function ($detalle) use ($noAplicaComoSinJec): string {
             $regimen = Str::of((string) ($detalle['regimen_jec'] ?? ''))->ascii()->upper()->squish()->toString();
 
             return match (true) {
-                $regimen === 'NO APLICA' => 'No aplica',
+                $regimen === 'NO APLICA' => $noAplicaComoSinJec ? 'Sin JEC' : 'No aplica',
                 str_contains($regimen, 'SIN JEC') => 'Sin JEC',
                 str_contains($regimen, 'JEC') => 'Con JEC',
                 default => 'Sin información',

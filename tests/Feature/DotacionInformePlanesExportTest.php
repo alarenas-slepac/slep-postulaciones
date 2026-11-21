@@ -220,6 +220,27 @@ class DotacionInformePlanesExportTest extends IsolatedSecurityTestCase
         $source = DotacionLecturaCache::ejecutar(fn () => DotacionEstablecimientoCalculator::build($this->ee, $year, false, false));
         $this->assertEquals(data_get($source, 'cursos.resumen_cursos_planes.totales.contrato_mas_trabajo_colaborativo_pie'), $after['contrato_mas_pie']);
         $this->assertSame(5, EstablecimientoCurso::count());
+
+        EstablecimientoCurso::where('anio', $year)->where('letra', 'B')->update(['regimen_jec' => 'No aplica']);
+        $respuesta = $this->get(route('admin.dotacion-establecimiento.index', [
+            'informe_funciones' => 1, 'anio' => $year, 'export_financiamiento' => 1,
+        ]))->assertOk()->assertDownload();
+        $disk = Storage::disk('local');
+        $disk->put('oferta-educativa.xlsx', $respuesta->streamedContent());
+        $libro = IOFactory::load($disk->path('oferta-educativa.xlsx'));
+        try {
+            $hoja = $libro->getSheetByName('Oferta educativa');
+            $this->assertSame('99999', $hoja->getCell('A5')->getValue());
+            $this->assertSame('Con JEC / Sin JEC', $hoja->getCell('D5')->getValue());
+            $this->assertSame([30, 2, 1, 1], array_map(fn ($col) => (int) $hoja->getCell($col.'5')->getValue(), range('E', 'H')));
+            $this->assertSame(38.0, (float) $hoja->getCell('I5')->getValue());
+            $this->assertSame(1, (int) $hoja->getCell('H6')->getCalculatedValue());
+        } finally {
+            $libro->disconnectWorksheets();
+        }
+
+        $first->update(['regimen_jec' => 'No aplica']);
+        $this->assertSame('Sin JEC', $service->ofertaEducativa($this->ee, $year)['modalidad_jec']);
     }
 
     public function test_total_de_referencia_incluye_refuerzo_una_vez_y_detecta_modalidades_faltantes(): void
