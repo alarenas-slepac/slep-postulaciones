@@ -2,13 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Curso;
 use App\Models\DotacionDocenteAsignacion;
 use App\Models\DotacionDocenteDistribucion;
 use App\Models\Establecimiento;
+use App\Models\EstablecimientoCurso;
+use App\Models\EstablecimientoCursoPie;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionInformeFunciones;
+use App\Support\PieHorasCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +40,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         foreach ([
             '2026_01_23_000001_create_establecimientos_table.php',
             '2026_01_29_000001_create_reemplazos_personal_table.php',
+            '2026_02_03_144224_create_modules_table.php',
             '2026_05_25_183000_create_docente_horas_proporciones_table.php',
             '2026_05_28_210000_create_dotacion_docente_asignaciones_table.php',
             '2026_07_22_150000_add_estamento_cobertura_to_dotacion_docente_asignaciones_table.php',
@@ -45,7 +50,6 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         ] as $migration) {
             (require database_path('migrations/'.$migration))->up();
         }
-        Schema::create('modules', fn (Blueprint $t) => [$t->id(), $t->string('key')]);
         Schema::table('users', fn (Blueprint $t) => $t->unsignedBigInteger('establecimiento_id')->nullable());
         $this->ee = $this->establecimiento(99999);
         $this->actingAs($this->testUser(role: 3))->withSession(['active_role' => 'admin']);
@@ -255,7 +259,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $disk->put('financiamiento.xlsx', $respuesta->streamedContent());
         $libro = IOFactory::load($disk->path('financiamiento.xlsx'));
         try {
-            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE'], $libro->getSheetNames());
+            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE'], $libro->getSheetNames());
             foreach (['Sub. General' => 51, 'PIE' => 22, 'SEP' => 15, 'Pro-Retención' => 5] as $nombre => $total) {
                 $hoja = $libro->getSheetByName($nombre);
                 $this->assertSame('99999', $hoja->getCell('B5')->getValue());
@@ -271,6 +275,57 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             $this->assertSame('Municipal', $otras->getCell('D5')->getValue());
             $this->assertSame('PIE / SEP', $otras->getCell('D6')->getValue());
             $this->assertSame(9.0, (float) $otras->getCell('E7')->getCalculatedValue());
+        } finally {
+            $libro->disconnectWorksheets();
+        }
+    }
+
+    public function test_excel_incluye_proyeccion_pie_con_conversion_por_curso_y_paec_redondeado_por_rbd(): void
+    {
+        foreach ([
+            '2026_05_18_110000_create_alumnos_prioritarios_porcentajes_table.php',
+            '2026_05_18_130000_create_cursos_table.php',
+            '2026_05_18_140000_create_planes_estudio_tables.php',
+            '2026_05_18_190000_create_establecimiento_cursos_table.php',
+            '2026_05_25_160000_create_establecimiento_curso_pie_table.php',
+            '2026_05_25_171000_add_calculo_horas_to_establecimiento_curso_pie_table.php',
+        ] as $migration) {
+            (require database_path('migrations/'.$migration))->up();
+        }
+        DB::table('alumnos_prioritarios_porcentajes')->insert([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'porcentaje' => 80,
+        ]);
+        $this->establecimiento(99998);
+        foreach ([
+            ['1B', 'A', 'Con JEC', 2, 0, 2027, true],
+            ['5B', 'A', 'Sin JEC', 3, 0, 2027, true],
+            ['5B', 'B', 'Sin JEC', 3, 0, 2027, true],
+            ['5B', 'C', 'Con JEC', 0, 1, 2027, true],
+            ['5B', 'D', 'Con JEC', 0, 0, 2027, true],
+            ['5B', 'E', 'Con JEC', 5, 0, 2027, false],
+            ['5B', 'A', 'Con JEC', 5, 0, 2026, true],
+        ] as [$codigo, $letra, $jec, $neet, $neep, $anio, $activo]) {
+            $curso = EstablecimientoCurso::create([
+                'establecimiento_id' => $this->ee->id, 'curso_id' => Curso::where('codigo', $codigo)->value('id'),
+                'anio' => $anio, 'letra' => $letra, 'nombre_seccion' => $codigo.' '.$letra, 'regimen_jec' => $jec, 'activo' => $activo,
+            ]);
+            EstablecimientoCursoPie::create([
+                'establecimiento_id' => $this->ee->id, 'establecimiento_curso_id' => $curso->id,
+                'curso_id' => $curso->curso_id, 'anio' => $anio,
+                'necesidades_transitorias' => $neet, 'necesidades_permanentes' => $neep, 'total_pie' => $neet + $neep,
+            ] + PieHorasCalculator::calculate($curso, $neet, $neep));
+        }
+
+        $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1]))->assertOk()->assertDownload();
+        $disk = Storage::disk('local');
+        $disk->put('proyeccion-pie.xlsx', $respuesta->streamedContent());
+        $libro = IOFactory::load($disk->path('proyeccion-pie.xlsx'));
+        try {
+            $hoja = $libro->getSheetByName('Proyección PIE');
+            $this->assertSame('99999', $hoja->getCell('B5')->getValue());
+            $this->assertSame([4, 8, 1, 29, 9], array_map(fn ($col) => (int) $hoja->getCell($col.'5')->getValue(), range('D', 'H')));
+            $this->assertSame('Total', $hoja->getCell('A6')->getValue());
+            $this->assertSame(9, (int) $hoja->getCell('H6')->getCalculatedValue());
         } finally {
             $libro->disconnectWorksheets();
         }

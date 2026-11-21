@@ -88,6 +88,7 @@ class DotacionInformeFinanciamiento
             'nombre' => (string) $establecimiento->nombre_establecimiento,
             'horas' => array_map(fn ($cantidad) => round($cantidad, 2), $horas),
             'otras_aaee' => array_values($otras),
+            'pie_proyectado' => DotacionEstablecimientoCalculator::horasContratoPieEstablecimiento($establecimiento, $anio, soloCursosActivos: true),
         ];
     }
 

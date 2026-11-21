@@ -1,6 +1,17 @@
 <?php
 
 return [
+    '2026.11.21.587' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Matrícula y horas de apoyo PIE proyectadas por RBD',
+        'summary' => 'Agrega la hoja Proyección PIE al Excel por financiamiento con cursos, matrícula NEET y NEEP, horas de apoyo docente y horas PAEC.',
+        'changes' => [
+            'Convierte los minutos de Prof. Educ. Dif. de cada curso a horas de contrato y redondea el total de cada RBD hacia arriba.',
+            'Suma los minutos PAEC de los cursos activos y redondea hacia arriba una vez por RBD.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.586' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',
