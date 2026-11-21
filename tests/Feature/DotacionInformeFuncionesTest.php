@@ -228,7 +228,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         foreach ([['3M-HC', 2027, true, 12], ['3M-TP', 2027, false, 15], ['4M-TP', 2026, true, 13]] as [$codigo, $anio, $activo, $matricula]) {
             EstablecimientoCurso::create([
                 'establecimiento_id' => $this->ee->id, 'curso_id' => Curso::where('codigo', $codigo)->value('id'),
-                'anio' => $anio, 'letra' => 'A', 'nombre_seccion' => $codigo.' A', 'regimen_jec' => 'Con JEC',
+                'anio' => $anio, 'letra' => 'A', 'nombre_seccion' => $codigo.' A', 'regimen_jec' => 'No aplica',
                 'activo' => $activo, 'matricula' => $matricula,
             ]);
         }
@@ -270,10 +270,20 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $disk->put('financiamiento.xlsx', $respuesta->streamedContent());
         $libro = IOFactory::load($disk->path('financiamiento.xlsx'));
         try {
-            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa', 'Niveles y modalidades'], $libro->getSheetNames());
+            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa',
+                'Niveles y modalidades', 'Detalle oferta educativa'], $libro->getSheetNames());
             $niveles = $libro->getSheetByName('Niveles y modalidades');
             $this->assertSame(['99999', '=Escuela de prueba', 'No', 'Sí', 'Sí', 'Sí', 'No', 'No', 'Sí'], $niveles->rangeToArray('A5:I5')[0]);
             $this->assertSame(DataType::TYPE_STRING, $niveles->getCell('B5')->getDataType());
+            $detalle = $libro->getSheetByName('Detalle oferta educativa');
+            $this->assertSame('99999', $detalle->getCell('A5')->getValue());
+            $this->assertSame(DataType::TYPE_STRING, $detalle->getCell('B5')->getDataType());
+            $this->assertSame('Media HC', $detalle->getCell('D5')->getValue());
+            $this->assertSame('Sin JEC', $detalle->getCell('E5')->getValue());
+            $this->assertSame(12, (int) $detalle->getCell('F5')->getValue());
+            $this->assertSame(1, (int) $detalle->getCell('G5')->getValue());
+            $this->assertSame('Total', $detalle->getCell('A6')->getValue());
+            $this->assertSame(12, (int) $detalle->getCell('F6')->getCalculatedValue());
             foreach (['Sub. General' => 51, 'PIE' => 22, 'SEP' => 15, 'Pro-Retención' => 5] as $nombre => $total) {
                 $hoja = $libro->getSheetByName($nombre);
                 $this->assertSame('99999', $hoja->getCell('B5')->getValue());

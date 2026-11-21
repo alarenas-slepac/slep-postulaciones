@@ -95,6 +95,7 @@ class DotacionInformeFinanciamiento
             'pie_proyectado' => DotacionEstablecimientoCalculator::horasContratoPieEstablecimiento($establecimiento, $anio, soloCursosActivos: true),
             'oferta_educativa' => $this->planes->ofertaEducativa($establecimiento, $anio),
             'niveles_modalidades' => $this->niveles->presenciaPorEstablecimiento($establecimiento, $anio),
+            'detalle_oferta_educativa' => $this->niveles->fila($establecimiento, $anio, noAplicaComoSinJec: true)['niveles'],
         ];
     }
 

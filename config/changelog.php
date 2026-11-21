@@ -1,6 +1,13 @@
 <?php
 
 return [
+    '2026.11.21.590' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Detalle de oferta educativa por RBD y nivel',
+        'summary' => 'Agrega al Excel de financiamiento el detalle de matrícula, cursos, modalidad JEC, horas proyectadas y observaciones por RBD y nivel o modalidad educativa.',
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.589' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',
