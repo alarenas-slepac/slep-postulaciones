@@ -19,7 +19,7 @@ class DotacionInformeFinanciamiento
         'pro_retencion' => 'Pro-Retención',
     ];
 
-    public function __construct(private readonly PadronPeriodoService $padron) {}
+    public function __construct(private readonly PadronPeriodoService $padron, private readonly DotacionInformePlanes $planes) {}
 
     /** @return array{anio: int, mes: int}|null */
     public function periodoAsistentes(): ?array
@@ -89,6 +89,7 @@ class DotacionInformeFinanciamiento
             'horas' => array_map(fn ($cantidad) => round($cantidad, 2), $horas),
             'otras_aaee' => array_values($otras),
             'pie_proyectado' => DotacionEstablecimientoCalculator::horasContratoPieEstablecimiento($establecimiento, $anio, soloCursosActivos: true),
+            'oferta_educativa' => $this->planes->ofertaEducativa($establecimiento, $anio),
         ];
     }
 

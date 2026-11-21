@@ -41,6 +41,10 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             '2026_01_23_000001_create_establecimientos_table.php',
             '2026_01_29_000001_create_reemplazos_personal_table.php',
             '2026_02_03_144224_create_modules_table.php',
+            '2026_05_18_130000_create_cursos_table.php',
+            '2026_05_18_140000_create_planes_estudio_tables.php',
+            '2026_05_18_160000_create_planes_estudio_bloques_table.php',
+            '2026_05_18_190000_create_establecimiento_cursos_table.php',
             '2026_05_25_183000_create_docente_horas_proporciones_table.php',
             '2026_05_28_210000_create_dotacion_docente_asignaciones_table.php',
             '2026_07_22_150000_add_estamento_cobertura_to_dotacion_docente_asignaciones_table.php',
@@ -259,7 +263,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $disk->put('financiamiento.xlsx', $respuesta->streamedContent());
         $libro = IOFactory::load($disk->path('financiamiento.xlsx'));
         try {
-            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE'], $libro->getSheetNames());
+            $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa'], $libro->getSheetNames());
             foreach (['Sub. General' => 51, 'PIE' => 22, 'SEP' => 15, 'Pro-Retención' => 5] as $nombre => $total) {
                 $hoja = $libro->getSheetByName($nombre);
                 $this->assertSame('99999', $hoja->getCell('B5')->getValue());
@@ -284,9 +288,6 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
     {
         foreach ([
             '2026_05_18_110000_create_alumnos_prioritarios_porcentajes_table.php',
-            '2026_05_18_130000_create_cursos_table.php',
-            '2026_05_18_140000_create_planes_estudio_tables.php',
-            '2026_05_18_190000_create_establecimiento_cursos_table.php',
             '2026_05_25_160000_create_establecimiento_curso_pie_table.php',
             '2026_05_25_171000_add_calculo_horas_to_establecimiento_curso_pie_table.php',
         ] as $migration) {

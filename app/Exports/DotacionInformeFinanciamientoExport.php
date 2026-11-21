@@ -77,6 +77,7 @@ class DotacionInformeFinanciamientoExport
             $this->escribirHoja($book->createSheet(), 'Otras fuentes AAEE', $anio, $detallePadron.' Incluye fuentes mixtas sin desglose.', $otras, true);
         }
         $this->escribirProyeccionPie($book->createSheet(), $filas, $anio);
+        $this->escribirOfertaEducativa($book->createSheet(), $filas, $anio);
         $book->setActiveSheetIndex(0);
 
         return $book;
@@ -126,6 +127,35 @@ class DotacionInformeFinanciamientoExport
             'Sin cursos activos con estudiantes PIE para los filtros aplicados.');
     }
 
+    private function escribirOfertaEducativa(Worksheet $sheet, array $filas, int $anio): void
+    {
+        $this->prepararHoja($sheet, 'Oferta educativa', 'Oferta educativa y horas de contratación docente proyectadas por RBD · '.$anio,
+            'Cursos activos con matrícula. Cada grupo combinado cuenta como un curso en el total después de combinar.',
+            'L', ['RBD', 'Nombre del establecimiento', 'Comuna', 'Modalidad JEC', 'Matrícula', 'Cursos totales',
+                'Cursos combinados (grupos)', 'Total cursos después de combinar', 'Horas plan de estudio', 'Contrato equivalente del plan',
+                'Trabajo colaborativo PIE (contrato)', 'Contrato plan + trabajo colaborativo PIE']);
+        $sheet->getStyle('A4:L4')->getAlignment()->setWrapText(true)->setVertical('center');
+        $sheet->getRowDimension(4)->setRowHeight(45);
+        $row = 5;
+        foreach ($filas as $fila) {
+            $oferta = $fila['oferta_educativa'];
+            $sheet->setCellValueExplicit('A'.$row, $fila['rbd'], DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('B'.$row, $fila['nombre'], DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('C'.$row, $oferta['comuna'], DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('D'.$row, $oferta['modalidad_jec'], DataType::TYPE_STRING);
+            $sheet->fromArray([
+                $oferta['matricula'], $oferta['cursos'], $oferta['grupos_combinados'], $oferta['cursos_despues_de_combinar'],
+                $oferta['horas_plan'], $oferta['contrato_equivalente'], $oferta['trabajo_colaborativo_pie'], $oferta['contrato_mas_pie'],
+            ], null, 'E'.$row, true);
+            $row++;
+        }
+        $this->cerrarTabla($sheet, $row, 'L', range('E', 'L'), ['A' => 11, 'B' => 52, 'C' => 22, 'D' => 24,
+            'E' => 13, 'F' => 14, 'G' => 16, 'H' => 19, 'I' => 16, 'J' => 19, 'K' => 19, 'L' => 24],
+            'Sin establecimientos para los filtros aplicados.');
+        $sheet->getStyle('I5:L'.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.##');
+        $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
+    }
+
     private function prepararHoja(Worksheet $sheet, string $nombre, string $titulo, string $nota, string $ultimaCol, array $encabezados): void
     {
         $sheet->setTitle($nombre)->setShowGridlines(false);
@@ -164,7 +194,7 @@ class DotacionInformeFinanciamientoExport
             $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6D3E8');
             $style->getFont()->setBold(true);
         }
-        foreach (['A' => 8, 'B' => 13, 'C' => 61] + $anchos as $col => $ancho) {
+        foreach ($anchos + ['A' => 8, 'B' => 13, 'C' => 61] as $col => $ancho) {
             $sheet->getColumnDimension($col)->setWidth($ancho);
         }
         $sheet->setAutoFilter('A4:'.$ultimaCol.$ultimaFila);

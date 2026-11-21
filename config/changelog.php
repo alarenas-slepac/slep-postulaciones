@@ -1,6 +1,16 @@
 <?php
 
 return [
+    '2026.11.21.588' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Oferta educativa por RBD en el Excel de financiamiento',
+        'summary' => 'Agrega la hoja Oferta educativa con matrícula, modalidad JEC y horas proyectadas de contratación docente.',
+        'changes' => [
+            'Presenta No aplica como Sin JEC y muestra los cursos totales, los grupos combinados y el total después de combinar.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.587' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',
