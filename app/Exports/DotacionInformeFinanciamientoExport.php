@@ -219,7 +219,7 @@ class DotacionInformeFinanciamientoExport
     private function escribirDotacionDocente(Worksheet $sheet, array $filas, int $anio): void
     {
         $this->prepararHoja($sheet, 'Dotación docente', 'Resumen de dotación docente por establecimiento · '.$anio,
-            'Cada fracción se calcula sobre las horas del RUT en todos los establecimientos; los filtros solo acotan las filas visibles.',
+            'Fracciones sobre las horas asignadas de cada docente o cupo en todos los establecimientos del año. Los filtros solo acotan las filas visibles.',
             'J', ['RBD', 'Establecimiento', 'N.º Docentes Función Directiva', 'Horas Función Directiva',
                 'N.º Docentes Función Técnico-Pedagógica', 'Horas Función Técnico-Pedagógica', 'N.º Docentes Aula',
                 'Horas Docentes Aula', 'N.º Total Docentes', 'Total de Horas Docentes']);

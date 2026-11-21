@@ -354,6 +354,8 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
 
     public function test_dotacion_docente_prorratea_por_rut_entre_funciones_y_rbd_aunque_el_excel_este_filtrado(): void
     {
+        (require database_path('migrations/2026_05_26_190000_create_dotacion_funciones_tables.php'))->up();
+        $reglas = DB::table('dotacion_funciones_reglas')->pluck('id', 'codigo');
         $otro = $this->establecimiento(99998);
         foreach ([
             ['plan_estudio', 8], ['acompanamiento_parvularia', 4], ['pie_colaborativo', 3],
@@ -363,7 +365,16 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             $this->asignacion(2027, '99000001-K', $tipo, $tipo, $horas);
         }
         $this->asignacion(2027, '99000001-K', 'funcion_directiva', 'Dirección', 10, ['establecimiento_id' => $otro->id]);
-        $this->asignacion(2027, '99000002-K', 'funcion_directiva', 'Dirección', 18);
+        $this->asignacion(2027, '99000002-K', 'funcion_directiva', 'Cargo de dirección', 18, ['dotacion_funcion_regla_id' => $reglas['director']]);
+        $this->asignacion(2027, '99000003-K', 'funcion_directiva', 'Director(a) ADP', 22);
+        $this->asignacion(2027, '99000004-K', 'funcion_directiva', 'Inspector(a) General', 7, ['dotacion_funcion_regla_id' => $reglas['inspector_general']]);
+        $this->asignacion(2027, '99000005-K', 'funcion_directiva', 'Subdirector/a', 5);
+        $cupo = $this->cupo($this->ee, 'pie', 20);
+        $this->cupo($this->ee, 'plan_estudio', 10);
+        $this->asignacion(2027, $cupo, 'otra_funcion', 'Apoyo', 3);
+        $this->asignacion(2027, str_replace('_', '-', $cupo), 'pie_educadora_diferencial', 'Bolsa diferencial', 9);
+        $this->asignacion(2027, $cupo, 'plan_estudio', 'Asignación fuera del establecimiento del cupo', 100, ['establecimiento_id' => $otro->id]);
+        $this->asignacion(2027, 'VACANTE_99999', 'plan_estudio', 'Cupo inexistente', 100);
         $this->asignacion(2026, '99000001-K', 'plan_estudio', 'Otro año', 50);
         $this->asignacion(2027, '99000001-K', 'plan_estudio', 'Asistente', 50, ['estamento_cobertura' => 'asistente']);
 
@@ -374,12 +385,14 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         try {
             $hoja = $libro->getSheetByName('Dotación docente');
             $this->assertSame('99999', $hoja->getCell('A5')->getValue());
-            $this->assertSame([1.0, 18.0, 0.25, 10.0, 0.5, 20.0, 1.75, 48.0],
+            $this->assertSame([2.0, 27.0, 2.5, 38.0, 1.25, 29.0, 5.75, 94.0],
                 array_map(fn ($col) => (float) $hoja->getCell($col.'5')->getValue(), range('C', 'J')));
             $this->assertSame('Total', $hoja->getCell('A6')->getValue());
         } finally {
             $libro->disconnectWorksheets();
         }
+        $dotacion = app(\App\Support\DotacionDocenteProporcional::class)->resumir(2027);
+        $this->assertSame(['docentes' => 0.25, 'horas' => 10.0], $dotacion[$otro->id]['directiva']);
     }
 
     public function test_conversion_de_aula_es_consolidada_y_no_reescribe_las_asignaciones(): void
