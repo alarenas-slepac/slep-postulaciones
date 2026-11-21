@@ -1,6 +1,17 @@
 <?php
 
 return [
+    '2026.11.21.586' => [
+        'date' => '2026-11-21',
+        'module' => 'Dotación establecimiento',
+        'title' => 'Excel de horas proyectadas por financiamiento y RBD',
+        'summary' => 'Incorpora las hojas Sub. General, PIE, SEP y Pro-Retención al nuevo Excel por financiamiento, con una fila por RBD.',
+        'changes' => [
+            'Imputa las asignaciones docentes PIE al bloque correspondiente y consolida las demás horas por fuente reconocida o por bloque.',
+            'Suma las jornadas AAEE con fuente informada del último padrón vigente y excluye jardines, salas cuna y JUNJI. Identifica las otras fuentes AAEE en una hoja adicional.',
+        ],
+        'roles' => ['Administrador', 'Coordinador UATP', 'Coordinador GDP', 'Supervisor de planificación'],
+    ],
     '2026.11.21.585' => [
         'date' => '2026-11-21',
         'module' => 'Dotación establecimiento',

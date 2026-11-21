@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exports\DotacionInformeFuncionesExport;
+use App\Exports\DotacionInformeFinanciamientoExport;
 use App\Exports\DotacionInformePlanesExport;
 use App\Exports\DotacionInformePlanesNivelesExport;
 use App\Http\Controllers\Controller;
@@ -25,6 +26,7 @@ class DotacionInformeFuncionesController extends Controller
             'export_excel' => ['sometimes', 'boolean'],
             'export_planes' => ['sometimes', 'boolean'],
             'export_planes_niveles' => ['sometimes', 'boolean'],
+            'export_financiamiento' => ['sometimes', 'boolean'],
         ]);
         $anio = (int) ($data['anio'] ?? (now()->year === 2026 ? 2026 : 2027));
         $q = trim((string) ($data['q'] ?? ''));
@@ -37,6 +39,9 @@ class DotacionInformeFuncionesController extends Controller
                 ->orWhere('comuna', 'like', "%{$q}%")))
             ->when($comuna !== '', fn ($query) => $query->where('comuna', $comuna))
             ->orderBy('comuna')->orderBy('nombre_establecimiento')->orderBy('id');
+        if ($request->boolean('export_financiamiento')) {
+            return app(DotacionInformeFinanciamientoExport::class)->download($filtrados, $anio);
+        }
         if ($request->boolean('export_planes_niveles')) {
             return app(DotacionInformePlanesNivelesExport::class)->download($filtrados, $anio, ['q' => $q, 'comuna' => $comuna]);
         }

@@ -1339,7 +1339,7 @@ class DotacionEstablecimientoCalculator
         return null;
     }
 
-    private static function claveLineaContractual(ReemplazoPersonal $row): string
+    public static function claveLineaContractual(ReemplazoPersonal $row): string
     {
         if (filled($row->row_hash)) {
             return (string) $row->row_hash;
