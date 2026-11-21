@@ -80,6 +80,7 @@ class DotacionInformeFinanciamientoExport
         $this->escribirProyeccionPie($book->createSheet(), $filas, $anio);
         $this->escribirOfertaEducativa($book->createSheet(), $filas, $anio);
         $this->escribirNivelesModalidades($book->createSheet(), $filas, $anio);
+        $this->escribirDetalleOfertaEducativa($book->createSheet(), $filas, $anio);
         $book->setActiveSheetIndex(0);
 
         return $book;
@@ -174,6 +175,39 @@ class DotacionInformeFinanciamientoExport
         }
         $this->cerrarTabla($sheet, $row, 'I', [], ['A' => 12, 'B' => 55] + array_fill_keys(range('C', 'I'), 14),
             'Sin establecimientos para los filtros aplicados.');
+    }
+
+    private function escribirDetalleOfertaEducativa(Worksheet $sheet, array $filas, int $anio): void
+    {
+        $this->prepararHoja($sheet, 'Detalle oferta educativa', 'Detalle de oferta educativa por RBD, nivel y modalidad · '.$anio,
+            'Fuente: Cursos y planes de Dotación. Las horas compartidas entre niveles se consignan en Sin desglose.',
+            'L', ['RBD', 'Nombre del establecimiento', 'Comuna', 'Nivel', 'Modalidad JEC', 'Matrícula', 'Cursos',
+                'Horas plan de estudio', 'Contrato equivalente del plan', 'Trabajo colaborativo PIE (contrato)',
+                'Contrato plan + trabajo colaborativo PIE', 'Observaciones']);
+        $sheet->getStyle('A4:L4')->getAlignment()->setWrapText(true)->setVertical('center');
+        $sheet->getRowDimension(4)->setRowHeight(45);
+        $niveles = DotacionInformePlanesNiveles::NIVELES + ['sin_desglose' => 'Sin desglose'];
+        $row = 5;
+        foreach ($filas as $fila) {
+            foreach ($fila['detalle_oferta_educativa'] as $clave => $nivel) {
+                foreach (['A' => $nivel['rbd'], 'B' => $nivel['nombre'], 'C' => $nivel['comuna'],
+                    'D' => $niveles[$clave], 'E' => $nivel['modalidad_jec'], 'L' => $nivel['observaciones']] as $columna => $valor) {
+                    $sheet->setCellValueExplicit($columna.$row, $valor, DataType::TYPE_STRING);
+                }
+                $sheet->fromArray([$nivel['matricula'], $nivel['cursos'], $nivel['horas_plan'], $nivel['contrato_equivalente'],
+                    $nivel['trabajo_colaborativo_pie'], $nivel['contrato_mas_pie']], null, 'F'.$row, true);
+                $lineas = max(1, ceil(mb_strlen($nivel['observaciones']) / 42), ceil(mb_strlen($nivel['nombre']) / 37));
+                $sheet->getRowDimension($row)->setRowHeight(min(409, $lineas * 18));
+                $row++;
+            }
+        }
+        $this->cerrarTabla($sheet, $row, 'L', range('F', 'K'), ['A' => 11, 'B' => 42, 'C' => 20, 'D' => 17, 'E' => 24,
+            'F' => 13, 'G' => 10, 'H' => 16, 'I' => 19, 'J' => 19, 'K' => 24, 'L' => 48],
+            'Sin niveles con oferta educativa para los filtros aplicados.');
+        $sheet->getStyle('B5:B'.max(5, $row - 1))->getAlignment()->setWrapText(true);
+        $sheet->getStyle('L5:L'.max(5, $row - 1))->getAlignment()->setWrapText(true);
+        $sheet->getStyle('H5:K'.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.##');
+        $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
     }
 
     private function prepararHoja(Worksheet $sheet, string $nombre, string $titulo, string $nota, string $ultimaCol, array $encabezados): void

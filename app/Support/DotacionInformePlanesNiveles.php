@@ -33,7 +33,7 @@ class DotacionInformePlanesNiveles extends DotacionInformePlanes
         ];
     }
 
-    public function fila(Establecimiento $establecimiento, int $anio): array
+    public function fila(Establecimiento $establecimiento, int $anio, bool $noAplicaComoSinJec = false): array
     {
         $datos = $this->datos($establecimiento, $anio);
         $ids = collect($datos['cursos']['rows'])->flatMap(fn ($row) => $row['detalles'] ?? [])
@@ -43,7 +43,7 @@ class DotacionInformePlanesNiveles extends DotacionInformePlanes
         $categorias = EstablecimientoCurso::with('curso')->where('establecimiento_id', $establecimiento->id)
             ->where('anio', $anio)->whereIn('id', $ids)->get()
             ->mapWithKeys(fn ($curso) => [(int) $curso->id => $this->clasificar($curso)])->all();
-        $filas = $this->segregar($datos['cursos'], $categorias, $datos['grupos']);
+        $filas = $this->segregar($datos['cursos'], $categorias, $datos['grupos'], $noAplicaComoSinJec);
         $identidad = ['rbd' => (string) $establecimiento->rbd, 'nombre' => (string) $establecimiento->nombre_establecimiento,
             'comuna' => (string) $establecimiento->comuna];
         $filas['global'] += $identidad;
@@ -73,7 +73,7 @@ class DotacionInformePlanesNiveles extends DotacionInformePlanes
     }
 
     /** Distribuye unidades ya consolidadas; nunca vuelve a convertir horas por nivel. */
-    public function segregar(array $cursos, array $categorias, Collection|array $grupos = []): array
+    public function segregar(array $cursos, array $categorias, Collection|array $grupos = [], bool $noAplicaComoSinJec = false): array
     {
         $resumen = $cursos['resumen_cursos_planes'];
         $detalles = collect($cursos['rows'] ?? [])->flatMap(fn ($row) => $row['detalles'] ?? [])
@@ -137,7 +137,7 @@ class DotacionInformePlanesNiveles extends DotacionInformePlanes
         foreach ($buckets as $key => $bucket) {
             if (! array_sum($bucket['totales']) && $bucket['notas'] === []) { continue; }
             $row = $this->resumir(['rows' => [['detalles' => array_values($bucket['detalles'])]],
-                'resumen_cursos_planes' => ['totales' => $bucket['totales']]]);
+                'resumen_cursos_planes' => ['totales' => $bucket['totales']]], $noAplicaComoSinJec);
             if ($key === 'sin_desglose' && (int) $bucket['totales']['cursos'] === 0) {
                 $row['observaciones'] = str_replace('Sin cursos activos con matrícula en el año consultado.', '', $row['observaciones']);
             }
@@ -150,7 +150,7 @@ class DotacionInformePlanesNiveles extends DotacionInformePlanes
                 throw new \RuntimeException('El desglose por niveles no concilia con el total del establecimiento.');
             }
         }
-        $global = $this->resumir($cursos);
+        $global = $this->resumir($cursos, $noAplicaComoSinJec);
         if (isset($filas['sin_desglose'])) {
             $global['observaciones'] = trim($global['observaciones'].' Revise la hoja Sin desglose: contiene cursos sin clasificación u horas compartidas entre niveles.');
         }
