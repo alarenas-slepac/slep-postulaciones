@@ -45,7 +45,10 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             '2026_05_18_140000_create_planes_estudio_tables.php',
             '2026_05_18_160000_create_planes_estudio_bloques_table.php',
             '2026_05_18_190000_create_establecimiento_cursos_table.php',
+            '2026_05_25_160000_create_establecimiento_curso_pie_table.php',
+            '2026_05_25_171000_add_calculo_horas_to_establecimiento_curso_pie_table.php',
             '2026_05_25_183000_create_docente_horas_proporciones_table.php',
+            '2026_05_26_190000_create_dotacion_funciones_tables.php',
             '2026_05_28_210000_create_dotacion_docente_asignaciones_table.php',
             '2026_07_22_150000_add_estamento_cobertura_to_dotacion_docente_asignaciones_table.php',
             '2026_09_28_140000_create_dotacion_contrata_habilitaciones_table.php',
@@ -306,13 +309,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
 
     public function test_excel_incluye_proyeccion_pie_con_conversion_por_curso_y_paec_redondeado_por_rbd(): void
     {
-        foreach ([
-            '2026_05_18_110000_create_alumnos_prioritarios_porcentajes_table.php',
-            '2026_05_25_160000_create_establecimiento_curso_pie_table.php',
-            '2026_05_25_171000_add_calculo_horas_to_establecimiento_curso_pie_table.php',
-        ] as $migration) {
-            (require database_path('migrations/'.$migration))->up();
-        }
+        (require database_path('migrations/2026_05_18_110000_create_alumnos_prioritarios_porcentajes_table.php'))->up();
         DB::table('alumnos_prioritarios_porcentajes')->insert([
             'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'porcentaje' => 80,
         ]);
@@ -354,7 +351,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
 
     public function test_dotacion_docente_prorratea_por_rut_entre_funciones_y_rbd_aunque_el_excel_este_filtrado(): void
     {
-        (require database_path('migrations/2026_05_26_190000_create_dotacion_funciones_tables.php'))->up();
+        $anio = 2026;
         $reglas = DB::table('dotacion_funciones_reglas')->pluck('id', 'codigo');
         $otro = $this->establecimiento(99998);
         foreach ([
@@ -362,27 +359,27 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             ['pie_educadora_diferencial', 5], ['plan_normativo', 3], ['otra_funcion', 2],
             ['funcion_tecnico_pedagogica', 5], ['reserva_no_normativa', 30],
         ] as [$tipo, $horas]) {
-            $this->asignacion(2027, '99000001-K', $tipo, $tipo, $horas);
+            $this->asignacion($anio, '99000001-K', $tipo, $tipo, $horas);
         }
-        $this->asignacion(2027, '99000001-K', 'funcion_directiva', 'Dirección', 10, ['establecimiento_id' => $otro->id]);
-        $this->asignacion(2027, '99000002-K', 'funcion_directiva', 'Cargo de dirección', 18, ['dotacion_funcion_regla_id' => $reglas['director']]);
-        $this->asignacion(2027, '99000003-K', 'funcion_directiva', 'Director(a) ADP', 22);
-        $this->asignacion(2027, '99000004-K', 'funcion_directiva', 'Inspector(a) General', 7, ['dotacion_funcion_regla_id' => $reglas['inspector_general']]);
-        $this->asignacion(2027, '99000005-K', 'otra_funcion', 'Subdirector', 5, ['subtipo_asignacion' => 'otras_funciones_docentes']);
-        $this->asignacion(2027, '99000005-K', 'otra_funcion', 'Subdirectora', 4, [
+        $this->asignacion($anio, '99000001-K', 'funcion_directiva', 'Dirección', 10, ['establecimiento_id' => $otro->id]);
+        $this->asignacion($anio, '99000002-K', 'funcion_directiva', 'Cargo de dirección', 18, ['dotacion_funcion_regla_id' => $reglas['director']]);
+        $this->asignacion($anio, '99000003-K', 'funcion_directiva', 'Director(a) ADP', 22);
+        $this->asignacion($anio, '99000004-K', 'funcion_directiva', 'Inspector(a) General', 7, ['dotacion_funcion_regla_id' => $reglas['inspector_general']]);
+        $this->asignacion($anio, '99000005-K', 'otra_funcion', 'Subdirector', 5, ['subtipo_asignacion' => 'otras_funciones_docentes']);
+        $this->asignacion($anio, '99000005-K', 'otra_funcion', 'Subdirectora', 4, [
             'subtipo_asignacion' => 'otras_funciones_docentes', 'dotacion_funcion_regla_id' => $reglas['inspector_general'],
         ]);
-        $cupo = $this->cupo($this->ee, 'pie', 20);
-        $this->cupo($this->ee, 'plan_estudio', 10);
-        $this->asignacion(2027, $cupo, 'otra_funcion', 'Apoyo', 3);
-        $this->asignacion(2027, str_replace('_', '-', $cupo), 'pie_educadora_diferencial', 'Bolsa diferencial', 9);
-        $this->asignacion(2027, $cupo, 'plan_estudio', 'Asignación fuera del establecimiento del cupo', 100, ['establecimiento_id' => $otro->id]);
-        $this->asignacion(2027, 'VACANTE_99999', 'plan_estudio', 'Cupo inexistente', 100);
-        $this->asignacion(2026, '99000001-K', 'plan_estudio', 'Otro año', 50);
-        $this->asignacion(2027, '99000001-K', 'plan_estudio', 'Asistente', 50, ['estamento_cobertura' => 'asistente']);
-        $this->asignacion(2027, '99000006-K', 'otra_funcion', 'Apoyo de asistente', 6, ['estamento_cobertura' => 'asistente']);
+        $cupo = $this->cupo($this->ee, 'pie', 20, $anio);
+        $this->cupo($this->ee, 'plan_estudio', 10, $anio);
+        $this->asignacion($anio, $cupo, 'otra_funcion', 'Apoyo', 3);
+        $this->asignacion($anio, str_replace('_', '-', $cupo), 'pie_educadora_diferencial', 'Bolsa diferencial', 9);
+        $this->asignacion($anio, $cupo, 'plan_estudio', 'Asignación fuera del establecimiento del cupo', 100, ['establecimiento_id' => $otro->id]);
+        $this->asignacion($anio, 'VACANTE_99999', 'plan_estudio', 'Cupo inexistente', 100);
+        $this->asignacion(2027, '99000001-K', 'plan_estudio', 'Otro año', 50);
+        $this->asignacion($anio, '99000001-K', 'plan_estudio', 'Asistente', 50, ['estamento_cobertura' => 'asistente']);
+        $this->asignacion($anio, '99000006-K', 'otra_funcion', 'Apoyo de asistente', 6, ['estamento_cobertura' => 'asistente']);
 
-        $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1, 'q' => '99999']))->assertOk()->assertDownload();
+        $respuesta = $this->get($this->url($anio, ['export_financiamiento' => 1, 'q' => '99999']))->assertOk()->assertDownload();
         $disk = Storage::disk('local');
         $disk->put('dotacion-proporcional.xlsx', $respuesta->streamedContent());
         $libro = IOFactory::load($disk->path('dotacion-proporcional.xlsx'));
@@ -395,12 +392,13 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         } finally {
             $libro->disconnectWorksheets();
         }
-        $dotacion = app(\App\Support\DotacionDocenteProporcional::class)->resumir(2027);
+        $dotacion = app(\App\Support\DotacionDocenteProporcional::class)->resumir($anio);
         $this->assertSame(['docentes' => 0.25, 'horas' => 10.0], $dotacion[$otro->id]['directiva']);
     }
 
     public function test_dotacion_proyecta_saldos_pendientes_y_excluye_justificados_bir_y_horas_descontadas(): void
     {
+        $anio = 2026;
         (require database_path('migrations/2026_08_24_090000_create_dotacion_docente_exclusiones_table.php'))->up();
         foreach ([
             ['99000001K', 'horas_lactancia', 12],
@@ -410,23 +408,23 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         ] as [$rut, $motivo, $horas]) {
             $this->personal($rut, 20);
             DB::table('dotacion_docente_exclusiones')->insert([
-                'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'docente_rut' => $rut,
+                'establecimiento_id' => $this->ee->id, 'anio' => $anio, 'docente_rut' => $rut,
                 'docente_rut_normalizado' => $rut, 'docente_nombre' => 'Docente de prueba',
                 'motivo' => $motivo, 'horas' => $horas,
             ]);
         }
         $this->personal('99000005K', 20);
-        $this->justificar('99000004K', 2027);
-        $this->asignacion(2027, '99000001K', 'plan_estudio', 'Aula', 6);
-        $this->asignacion(2027, '99000001K', 'otra_funcion', 'Apoyo', 1);
-        $this->asignacion(2027, '99000004K', 'plan_estudio', 'Asignación justificada', 4);
-        $this->asignacion(2027, '99000005K', 'plan_estudio', 'Aula', 4);
-        $this->asignacion(2027, '99000005K', 'reserva_no_normativa', 'Reserva', 5);
+        $this->justificar('99000004K', $anio);
+        $this->asignacion($anio, '99000001K', 'plan_estudio', 'Aula', 6);
+        $this->asignacion($anio, '99000001K', 'otra_funcion', 'Apoyo', 1);
+        $this->asignacion($anio, '99000004K', 'plan_estudio', 'Asignación justificada', 4);
+        $this->asignacion($anio, '99000005K', 'plan_estudio', 'Aula', 4);
+        $this->asignacion($anio, '99000005K', 'reserva_no_normativa', 'Reserva', 5);
         $this->mock(\App\Support\DotacionInformePlanes::class)->shouldReceive('ofertaEducativa')->once()
-            ->withArgs(fn ($establecimiento, $anio) => $establecimiento->id === $this->ee->id && $anio === 2027)
+            ->withArgs(fn ($establecimiento, $year) => $establecimiento->id === $this->ee->id && $year === $anio)
             ->andReturn(['contrato_mas_pie' => 16.0]);
 
-        $fila = app(\App\Support\DotacionDocenteProporcional::class)->resumir(2027)[$this->ee->id];
+        $fila = app(\App\Support\DotacionDocenteProporcional::class)->resumir($anio)[$this->ee->id];
         $this->assertSame(16.0, $fila['aula']['horas']);
         $this->assertSame(19.0, $fila['tecnico_pedagogica']['horas']);
         $this->assertEqualsWithDelta(3.0, array_sum(array_column($fila, 'docentes')), 0.00001);
@@ -443,6 +441,59 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $this->assertSame(35.0, $fila['grupos']['aula']['horas']);
         $this->assertSame(9.0, $fila['sin_asignar']);
         $this->assertEquals(34, DotacionDocenteAsignacion::sum('horas_contrato'));
+    }
+
+    public function test_dotacion_2027_concilia_horas_del_pal_y_prorratea_personas_aunque_se_filtre_por_rbd(): void
+    {
+        (require database_path('migrations/2026_08_24_090000_create_dotacion_docente_exclusiones_table.php'))->up();
+        $otro = $this->establecimiento(99998);
+        $curso = EstablecimientoCurso::create([
+            'establecimiento_id' => $this->ee->id, 'curso_id' => Curso::where('codigo', '1B')->value('id'),
+            'anio' => 2027, 'letra' => 'A', 'nombre_seccion' => '1B A', 'regimen_jec' => 'Con JEC',
+            'activo' => true, 'matricula' => 20,
+        ]);
+        $rut = '99000001-K';
+        $this->personal($rut, 36);
+        $this->personal($rut, 10, ['establecimiento_id' => $otro->id, 'rbd' => $otro->rbd]);
+        $this->justificar('99000001K', 2027);
+        $this->asignacion(2027, $rut, 'funcion_directiva', 'Dirección', 4);
+        $this->asignacion(2027, $rut, 'funcion_directiva', 'Inspector General', 6);
+        $this->asignacion(2027, $rut, 'otra_funcion', 'Subdirectora', 3);
+        $this->asignacion(2027, $rut, 'otra_funcion', 'Libre disposición', 3, ['subtipo_asignacion' => 'libre_disposicion']);
+        $this->asignacion(2027, $rut, 'reserva_no_normativa', 'Reserva', 2, ['subtipo_asignacion' => 'titular']);
+        $this->asignacion(2027, $rut, 'plan_estudio', 'Lenguaje', 12, [
+            'establecimiento_curso_id' => $curso->id, 'horas_plan_pedagogicas' => 10, 'proporcion_aplicada' => '65/35',
+        ]);
+        $this->asignacion(2027, $rut, 'funcion_directiva', 'Dirección', 10, ['establecimiento_id' => $otro->id]);
+
+        foreach (['99000002K' => ['proceso_bir', 0], '99000003K' => ['horas_gremiales', 8]] as $persona => [$motivo, $horas]) {
+            $this->personal($persona, 20);
+            DB::table('dotacion_docente_exclusiones')->insert([
+                'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'docente_rut' => $persona,
+                'docente_rut_normalizado' => $persona, 'docente_nombre' => 'Docente de prueba',
+                'motivo' => $motivo, 'horas' => $horas,
+            ]);
+        }
+        $this->asignacion(2027, '99000002K', 'otra_funcion', 'Asignación BIR', 5);
+        $this->personal('99000004K', 20, ['estatuto' => 'AAEE', 'escalafon' => 'ASISTENTE']);
+        $this->asignacion(2027, '99000004K', 'otra_funcion', 'Apoyo AAEE', 10, ['estamento_cobertura' => 'asistente']);
+        $this->cupo($this->ee, 'pie', 8);
+
+        $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1, 'q' => '99999']))->assertOk()->assertDownload();
+        $disk = Storage::disk('local');
+        $disk->put('dotacion-pal.xlsx', $respuesta->streamedContent());
+        $libro = IOFactory::load($disk->path('dotacion-pal.xlsx'));
+        try {
+            $hoja = $libro->getSheetByName('Dotación docente');
+            $this->assertSame('99999', $hoja->getCell('A5')->getValue());
+            $this->assertEquals(7, $hoja->getCell('D5')->getValue());
+            $this->assertEquals(37, $hoja->getCell('F5')->getValue());
+            $this->assertEquals(15, $hoja->getCell('H5')->getValue());
+            $this->assertEqualsWithDelta(2 + 31 / 41, $hoja->getCell('I5')->getValue(), 0.00001);
+            $this->assertEquals(59, $hoja->getCell('J6')->getCalculatedValue());
+        } finally {
+            $libro->disconnectWorksheets();
+        }
     }
 
     public function test_respeta_situaciones_continuidad_y_retiros_del_anio_sin_alterar_el_anterior(): void
@@ -595,10 +646,10 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         ]);
     }
 
-    private function cupo(Establecimiento $ee, string $bloque, float $horas): string
+    private function cupo(Establecimiento $ee, string $bloque, float $horas, int $anio = 2027): string
     {
         $id = DB::table('dotacion_contrata_habilitaciones')->insertGetId([
-            'establecimiento_id' => $ee->id, 'anio' => 2027, 'bloque' => $bloque, 'horas' => $horas,
+            'establecimiento_id' => $ee->id, 'anio' => $anio, 'bloque' => $bloque, 'horas' => $horas,
         ]);
 
         return 'VACANTE_'.$id;
