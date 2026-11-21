@@ -841,11 +841,14 @@ class DotacionEstablecimientoCalculator
         });
     }
 
-    private static function horasContratoPieEstablecimiento(Establecimiento $establecimiento, int $anio): array
+    public static function horasContratoPieEstablecimiento(Establecimiento $establecimiento, int $anio, bool $soloCursosActivos = false): array
     {
         if (! self::schemaHasTable('establecimiento_curso_pie')) {
             return [
                 'cursos_nee' => 0,
+                'neet' => 0,
+                'neep' => 0,
+                'pae_minutos' => 0,
                 'prof_educ_dif_minutos' => 0,
                 'prof_educ_dif_label' => '00:00',
                 'educadoras_diferenciales_horas' => 0.0,
@@ -860,7 +863,9 @@ class DotacionEstablecimientoCalculator
         $recordsQuery = EstablecimientoCursoPie::query()
             ->with(['establecimientoCurso.curso', 'establecimientoCurso.planEstudio'])
             ->where('establecimiento_id', $establecimiento->id)
-            ->where('anio', $anio);
+            ->where('anio', $anio)
+            ->when($soloCursosActivos, fn ($query) => $query->whereHas('establecimientoCurso', fn ($curso) => $curso
+                ->where('establecimiento_id', $establecimiento->id)->where('anio', $anio)->where('activo', true)));
 
         self::applyCursosNeeCondition($recordsQuery);
         $records = $recordsQuery->get();
@@ -922,6 +927,9 @@ class DotacionEstablecimientoCalculator
 
         return [
             'cursos_nee' => $cursosNee,
+            'neet' => (int) $records->sum('necesidades_transitorias'),
+            'neep' => (int) $records->sum('necesidades_permanentes'),
+            'pae_minutos' => (int) $records->sum('pae_minutos'),
             'prof_educ_dif_minutos' => $profEducDifMinutos,
             'prof_educ_dif_label' => DocenteHorasNoLectivasCalculator::formatMinutes($profEducDifMinutos),
             'educadoras_diferenciales_horas' => $educDifHorasBolsa,
