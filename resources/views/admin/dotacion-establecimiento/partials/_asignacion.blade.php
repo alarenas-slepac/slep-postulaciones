@@ -3,6 +3,8 @@
     $asignacion = $asignacion ?? [];
     $resumenAsignacion = $asignacion['resumen'] ?? [];
     $necesidades = $asignacion['necesidades'] ?? [];
+    $cursosDelPlan = collect($necesidades['plan_estudio'] ?? [])->filter(fn ($item) => isset($item['curso']))
+        ->pluck('curso', 'establecimiento_curso_id');
     $asignaciones = $asignacion['asignaciones'] ?? collect();
     $asignacionesHuerfanas = collect($asignacion['asignaciones_huerfanas'] ?? []);
     $subvenciones = $asignacion['subvenciones'] ?? collect();
@@ -252,7 +254,7 @@
 @php
     $groups = [
         'plan_estudio' => ['title' => 'Plan de estudios y libre disposición', 'help' => 'Asignación individual por asignatura, agrupada por curso y por bloque del plan. Permite dividir una misma asignatura entre varios docentes.', 'icon' => 'bi-journal-text'],
-        'pie_colaborativo' => ['title' => 'Trabajo colaborativo PIE por curso o grupo combinado', 'help' => '3 horas por curso independiente o por grupo combinado con estudiantes NEE. No permite asignar a Educadora Diferencial ni Coordinador/a PIE.', 'icon' => 'bi-people'],
+        'pie_colaborativo' => ['title' => 'Trabajo colaborativo PIE por curso o grupo combinado', 'help' => '3 horas por curso independiente o por grupo combinado con estudiantes NEE. Admite cupos por contratar de Educación Diferencial con saldo disponible, según las reglas del curso.', 'icon' => 'bi-people'],
         'pie_educadora_diferencial' => ['title' => 'Bolsa Educadoras Diferenciales PIE', 'help' => 'Horas de contrato calculadas desde PROF EDUC. DIF según la proporción 65/35 o 60/40 de cada curso; el total exacto se redondea una sola vez hacia arriba.', 'icon' => 'bi-universal-access'],
         'funciones' => ['title' => 'Funciones directivas, técnico-pedagógicas, planes y otras funciones', 'help' => 'Horas de contrato provenientes de Dotación funciones y planes.', 'icon' => 'bi-diagram-3'],
     ];
@@ -665,6 +667,12 @@
                                 $esNormativa2027 = ($proceso2027Asignacion['aplica'] ?? false)
                                     && ($item['necesidad_condicionada_por_asignacion_docente'] ?? false);
                                 $cursoItem = $item['curso'] ?? null;
+                                $cursoColaborativo = $groupKey === 'pie_colaborativo'
+                                    ? ($cursosDelPlan[$item['establecimiento_curso_id'] ?? 0] ?? $cursoItem)
+                                    : null;
+                                $soloParvulariaColaborativo = $cursoColaborativo instanceof \App\Models\EstablecimientoCurso
+                                    && \App\Support\DotacionProfesionDocenteResolver::esCursoNt($cursoColaborativo)
+                                    && ! \App\Support\DotacionParvulariaCalculator::conJec($cursoColaborativo);
                             @endphp
                             <tr role="row" data-dotacion-need="{{ sha1($item['key']) }}" data-section="{{ $groupKey }}" data-course="{{ $item['curso_label'] ?? 'Establecimiento' }}" data-search="{{ $item['curso_label'] ?? 'Establecimiento' }} {{ $item['titulo'] ?? '' }} {{ collect($item['asignaciones'] ?? [])->map(fn ($fila) => data_get($fila, 'docente_nombre').' '.data_get($fila, 'docente_rut'))->implode(' ') }}" data-pending="{{ (float) $pendingContrato > 0.01 || $asignacionAutomatica ? '1' : '0' }}">
                                 <td role="cell" data-label="Necesidad">
@@ -779,7 +787,8 @@
                                             <option value="">Seleccione persona...</option>
                                             @include('admin.dotacion-establecimiento.partials._personal_select_referencia', [
                                                 'opcionesPersonal' => $docenteOptions->reject(fn ($doc) => \App\Support\DotacionAsignacionElegibilidad2027::excluidoDeOtrasFunciones($doc, $item))->filter(fn ($doc) =>
-                                                    (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'establecimientoCurso' => $cursoItem, 'asignatura_nombre' => $item['asignatura_nombre'] ?? $item['titulo'] ?? ''], $doc))
+                                                    (!$doc['virtual'] || $doc['cupo_bloque'] === \App\Services\Dotacion\NoRenovacionService::bloqueAsignacion([...$item, 'establecimientoCurso' => $cursoItem, 'asignatura_nombre' => $item['asignatura_nombre'] ?? $item['titulo'] ?? ''], $doc)
+                                                        || (!$soloParvulariaColaborativo && \App\Support\DotacionAsignacionElegibilidad2027::cupoDiferencialPuedeCubrirTrabajoColaborativo($doc, $item)))
                                                     && (!(($proceso2027Asignacion['aplica'] ?? false) && $groupKey === 'pie_educadora_diferencial') || $doc['elegible_bolsa_diferencial'])
                                                 ),
                                                 'grupoPersonal' => 'Docentes vigentes y por contratar', 'fasePersonal' => null, 'seleccionPersonal' => $valorFormulario($item, 'docente_rut', ''),
