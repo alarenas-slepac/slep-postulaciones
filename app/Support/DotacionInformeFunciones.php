@@ -41,6 +41,25 @@ class DotacionInformeFunciones
         ];
     }
 
+    /** @return array<string, float> Saldos de contrato elegible por RUT. */
+    public function saldosSinAsignar(Establecimiento $establecimiento, int $anio): array
+    {
+        $saldos = [];
+        foreach ($this->docentesComputables($this->nomina($establecimiento, $anio)) as $docente) {
+            if (($docente['exclusion_docente']['motivo'] ?? null) === 'proceso_bir') {
+                continue;
+            }
+            [$horas] = $this->horasDocente($docente);
+            $saldo = round((float) $docente['horas_contrato'] - array_sum($horas), 2);
+            if ($saldo > 0) {
+                $saldos[$this->rut($docente)] = $saldo;
+            }
+        }
+        ksort($saldos);
+
+        return $saldos;
+    }
+
     private function nomina(Establecimiento $establecimiento, int $anio): Collection
     {
         $id = (int) $establecimiento->id;
@@ -150,30 +169,10 @@ class DotacionInformeFunciones
             'asignadas', 'otras', 'reservadas', 'sin_asignar', 'sobreasignadas', 'redondeo',
         ], 0);
         $periodos = collect();
-        $docentes = $docentes->filter(fn (array $d) => ($d['estamento_cobertura'] ?? 'docente') === 'docente'
-            && $this->rut($d) !== ''
-            && (! empty($d['cupo_contrata_id']) || ! ContratacionHabilitacionService::esRutVirtual($this->rut($d))))
-            ->unique(fn (array $d) => $this->rut($d));
-
-        foreach ($docentes as $docente) {
-            $rut = $this->rut($docente);
-            $horas = array_fill_keys(array_keys(self::GRUPOS), 0.0);
-            $horas += ['otras' => 0.0, 'reservadas' => 0.0];
-            $asignaciones = collect($docente['asignaciones'] ?? [])
-                ->filter(fn ($a) => (data_get($a, 'estado') ?? 'activa') === 'activa'
-                    && DotacionAsignacionCalculator::coverageEstamento($a) === 'docente'
-                    && DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($a, 'docente_rut_normalizado') ?: data_get($a, 'docente_rut', $rut))) === $rut)
-                ->unique(fn ($a, $key) => data_get($a, 'id') ? 'id:'.data_get($a, 'id') : 'fila:'.$key);
-            foreach ($asignaciones as $asignacion) {
-                $horas[$this->grupo($asignacion)] += max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
-            }
-            foreach ($docente['horas_movimientos'] ?? [] as $grupo => $cantidad) {
-                $horas[$grupo] = max(0.0, round($horas[$grupo] + $cantidad, 2));
-            }
+        foreach ($this->docentesComputables($docentes) as $docente) {
+            [$horas, $redondeo] = $this->horasDocente($docente);
             $contrato = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
             $original = max(0.0, (float) ($docente['horas_contrato_base'] ?? $contrato));
-            $redondeo = DotacionSobredotacionCalculator::redondeoParvulariaDocente($docente);
-            $horas['aula'] += $redondeo;
             $asignadas = array_sum($horas) - $horas['reservadas'];
             $ocupadas = $asignadas + $horas['reservadas'];
             $resumen['docentes_total']++;
@@ -205,6 +204,35 @@ class DotacionInformeFunciones
         unset($grupo);
 
         return $resumen + ['grupos' => $grupos, 'periodos' => $periodos->unique()->values()->all()];
+    }
+
+    private function docentesComputables(Collection $docentes): Collection
+    {
+        return $docentes->filter(fn (array $d) => ($d['estamento_cobertura'] ?? 'docente') === 'docente'
+            && $this->rut($d) !== ''
+            && (! empty($d['cupo_contrata_id']) || ! ContratacionHabilitacionService::esRutVirtual($this->rut($d))))
+            ->unique(fn (array $d) => $this->rut($d));
+    }
+
+    private function horasDocente(array $docente): array
+    {
+        $rut = $this->rut($docente);
+        $horas = array_fill_keys(array_keys(self::GRUPOS), 0.0) + ['otras' => 0.0, 'reservadas' => 0.0];
+        $asignaciones = collect($docente['asignaciones'] ?? [])
+            ->filter(fn ($a) => (data_get($a, 'estado') ?? 'activa') === 'activa'
+                && DotacionAsignacionCalculator::coverageEstamento($a) === 'docente'
+                && DotacionEstablecimientoCalculator::normalizeRut((string) (data_get($a, 'docente_rut_normalizado') ?: data_get($a, 'docente_rut', $rut))) === $rut)
+            ->unique(fn ($a, $key) => data_get($a, 'id') ? 'id:'.data_get($a, 'id') : 'fila:'.$key);
+        foreach ($asignaciones as $asignacion) {
+            $horas[$this->grupo($asignacion)] += max(0.0, (float) data_get($asignacion, 'horas_contrato', 0));
+        }
+        foreach ($docente['horas_movimientos'] ?? [] as $grupo => $cantidad) {
+            $horas[$grupo] = max(0.0, round($horas[$grupo] + $cantidad, 2));
+        }
+        $redondeo = DotacionSobredotacionCalculator::redondeoParvulariaDocente($docente);
+        $horas['aula'] += $redondeo;
+
+        return [$horas, $redondeo];
     }
 
     private function grupo(object|array $asignacion): string

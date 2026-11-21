@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\DotacionSobredotacionJustificacion;
-use App\Models\DotacionDocenteExclusion;
 use App\Models\DotacionFuncionRegla;
 use App\Models\Establecimiento;
 use App\Services\Dotacion\ContratacionHabilitacionService;
@@ -33,6 +32,7 @@ class DotacionDocenteProporcional
         $establecimientos = Establecimiento::query()
             ->where(fn ($q) => $q->whereNull('sala_cuna')->orWhere('sala_cuna', false))->lazyById();
         $contrataciones = app(ContratacionHabilitacionService::class);
+        $informeFunciones = app(DotacionInformeFunciones::class);
         foreach ($establecimientos as $establecimiento) {
             $id = (int) $establecimiento->id;
             $justificados = array_flip(DotacionSobredotacionJustificacion::rutsJustificados($id, $anio));
@@ -79,13 +79,13 @@ class DotacionDocenteProporcional
                 $acumular($id, $grupo, $rut, $horas, $esDocente);
             }
 
-            $reintegrables = $this->horasReintegrables($establecimiento, $anio, $justificados, $horasPorEstablecimiento[$id] ?? []);
-            if ($reintegrables !== []) {
+            $pendientes = $informeFunciones->saldosSinAsignar($establecimiento, $anio);
+            if ($pendientes !== []) {
                 $oferta = app(DotacionInformePlanes::class)->ofertaEducativa($establecimiento, $anio);
                 $bolsa = DotacionEstablecimientoCalculator::horasContratoPieEstablecimiento($establecimiento, $anio, soloCursosActivos: true);
                 $saldoAula = max(0.0, round($oferta['contrato_mas_pie'] + $bolsa['educadoras_diferenciales_horas']
                     - ($filas[$id]['aula']['horas'] ?? 0), 2));
-                foreach ($reintegrables as $rut => $horas) {
+                foreach ($pendientes as $rut => $horas) {
                     $aula = min($horas, $saldoAula);
                     $saldoAula = round($saldoAula - $aula, 2);
                     if ($aula > 0) {
@@ -109,30 +109,6 @@ class DotacionDocenteProporcional
         }
 
         return $filas;
-    }
-
-    private function horasReintegrables(Establecimiento $establecimiento, int $anio, array $justificados, array $asignadas): array
-    {
-        $situaciones = DotacionDocenteExclusion::situacionesPorRut((int) $establecimiento->id, $anio);
-        if ($situaciones === []) {
-            return [];
-        }
-
-        $horas = [];
-        foreach (DotacionEstablecimientoCalculator::docentes($establecimiento, $anio, false, true)->sortBy('rut_normalizado') as $docente) {
-            $rut = $docente['rut_normalizado'];
-            $excluidas = (float) $docente['horas_excluidas'];
-            if ($rut === '' || isset($justificados[$rut]) || $excluidas <= 0 || ($situaciones[$rut]->motivo ?? null) === 'proceso_bir') {
-                continue;
-            }
-            $ocupadas = array_sum(array_map(fn (array $grupo) => $grupo[$rut] ?? 0.0, $asignadas));
-            $saldo = round((float) $docente['horas_contrato_base'] - $ocupadas, 2);
-            if ($saldo > 0) {
-                $horas[$rut] = min($excluidas, $saldo);
-            }
-        }
-
-        return $horas;
     }
 
     private function cargoDirectivo(?string $codigo, ?string $nombre): ?string

@@ -389,7 +389,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         try {
             $hoja = $libro->getSheetByName('Dotación docente');
             $this->assertSame('99999', $hoja->getCell('A5')->getValue());
-            $this->assertSame([2.0, 31.0, 2.5, 44.0, 1.25, 79.0, 5.75, 154.0],
+            $this->assertSame([2.0, 31.0, 3.8, 62.0, 0.95, 79.0, 6.75, 172.0],
                 array_map(fn ($col) => (float) $hoja->getCell($col.'5')->getValue(), range('C', 'J')));
             $this->assertSame('Total', $hoja->getCell('A6')->getValue());
         } finally {
@@ -399,7 +399,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $this->assertSame(['docentes' => 0.25, 'horas' => 10.0], $dotacion[$otro->id]['directiva']);
     }
 
-    public function test_dotacion_reintegra_situaciones_hasta_el_saldo_de_aula_y_envia_el_resto_a_tecnico_pedagogica(): void
+    public function test_dotacion_proyecta_saldos_pendientes_y_excluye_justificados_bir_y_horas_descontadas(): void
     {
         (require database_path('migrations/2026_08_24_090000_create_dotacion_docente_exclusiones_table.php'))->up();
         foreach ([
@@ -415,17 +415,22 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
                 'motivo' => $motivo, 'horas' => $horas,
             ]);
         }
+        $this->personal('99000005K', 20);
         $this->justificar('99000004K', 2027);
-        $this->asignacion(2027, '99000001K', 'plan_estudio', 'Aula', 10);
+        $this->asignacion(2027, '99000001K', 'plan_estudio', 'Aula', 6);
         $this->asignacion(2027, '99000001K', 'otra_funcion', 'Apoyo', 1);
+        $this->asignacion(2027, '99000004K', 'plan_estudio', 'Asignación justificada', 4);
+        $this->asignacion(2027, '99000005K', 'plan_estudio', 'Aula', 4);
+        $this->asignacion(2027, '99000005K', 'reserva_no_normativa', 'Reserva', 5);
         $this->mock(\App\Support\DotacionInformePlanes::class)->shouldReceive('ofertaEducativa')->once()
             ->withArgs(fn ($establecimiento, $anio) => $establecimiento->id === $this->ee->id && $anio === 2027)
             ->andReturn(['contrato_mas_pie' => 16.0]);
 
         $fila = app(\App\Support\DotacionDocenteProporcional::class)->resumir(2027)[$this->ee->id];
-        $this->assertSame(['docentes' => 0.8, 'horas' => 16.0], $fila['aula']);
-        $this->assertSame(['docentes' => 1.2, 'horas' => 12.0], $fila['tecnico_pedagogica']);
-        $this->assertSame(11.0, (float) DotacionDocenteAsignacion::sum('horas_contrato'));
+        $this->assertSame(16.0, $fila['aula']['horas']);
+        $this->assertSame(19.0, $fila['tecnico_pedagogica']['horas']);
+        $this->assertEqualsWithDelta(3.0, array_sum(array_column($fila, 'docentes')), 0.00001);
+        $this->assertSame(20.0, (float) DotacionDocenteAsignacion::sum('horas_contrato'));
     }
 
     public function test_conversion_de_aula_es_consolidada_y_no_reescribe_las_asignaciones(): void
