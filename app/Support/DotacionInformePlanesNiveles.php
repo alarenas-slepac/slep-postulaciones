@@ -14,6 +14,25 @@ class DotacionInformePlanesNiveles extends DotacionInformePlanes
         'media_hc' => 'Media HC', 'media_tp' => 'Media TP', 'epja' => 'EPJA', 'especial' => 'Especial',
     ];
 
+    public function presenciaPorEstablecimiento(Establecimiento $establecimiento, int $anio): array
+    {
+        $niveles = EstablecimientoCurso::with('curso')->where('establecimiento_id', $establecimiento->id)
+            ->where('anio', $anio)->where('activo', true)->where('matricula', '>', 0)
+            ->get()->map(fn (EstablecimientoCurso $curso) => $this->clasificar($curso));
+        $mediaHc = $niveles->contains('media_hc');
+        $mediaTp = (bool) $establecimiento->tecnico_profesional || $niveles->contains('media_tp');
+
+        return [
+            'parvularia' => (bool) $establecimiento->pre_escolar || $niveles->contains('parvularia'),
+            'basica' => (bool) $establecimiento->basica || $niveles->contains('basica'),
+            'media' => (bool) $establecimiento->media || $niveles->contains('media') || $mediaHc || $mediaTp,
+            'media_hc' => $mediaHc,
+            'media_tp' => $mediaTp,
+            'epja' => (bool) $establecimiento->adultos || $niveles->contains('epja'),
+            'especial' => (bool) $establecimiento->especial || $niveles->contains('especial'),
+        ];
+    }
+
     public function fila(Establecimiento $establecimiento, int $anio): array
     {
         $datos = $this->datos($establecimiento, $anio);

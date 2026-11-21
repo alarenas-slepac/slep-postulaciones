@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Support\DotacionInformeFinanciamiento;
+use App\Support\DotacionInformePlanesNiveles;
 use App\Support\DotacionLecturaCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
@@ -78,6 +79,7 @@ class DotacionInformeFinanciamientoExport
         }
         $this->escribirProyeccionPie($book->createSheet(), $filas, $anio);
         $this->escribirOfertaEducativa($book->createSheet(), $filas, $anio);
+        $this->escribirNivelesModalidades($book->createSheet(), $filas, $anio);
         $book->setActiveSheetIndex(0);
 
         return $book;
@@ -156,6 +158,24 @@ class DotacionInformeFinanciamientoExport
         $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
     }
 
+    private function escribirNivelesModalidades(Worksheet $sheet, array $filas, int $anio): void
+    {
+        $niveles = DotacionInformePlanesNiveles::NIVELES;
+        $this->prepararHoja($sheet, 'Niveles y modalidades', 'Establecimientos educacionales por nivel educativo · '.$anio,
+            'Fuente: ficha del establecimiento y cursos activos con matrícula del año consultado.',
+            'I', ['RBD', 'Nombre del establecimiento', ...array_values($niveles)]);
+        $row = 5;
+        foreach ($filas as $fila) {
+            $sheet->setCellValueExplicit('A'.$row, $fila['rbd'], DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('B'.$row, $fila['nombre'], DataType::TYPE_STRING);
+            $sheet->fromArray(array_map(fn ($nivel) => $fila['niveles_modalidades'][$nivel] ? 'Sí' : 'No',
+                array_keys($niveles)), null, 'C'.$row);
+            $row++;
+        }
+        $this->cerrarTabla($sheet, $row, 'I', [], ['A' => 12, 'B' => 55] + array_fill_keys(range('C', 'I'), 14),
+            'Sin establecimientos para los filtros aplicados.');
+    }
+
     private function prepararHoja(Worksheet $sheet, string $nombre, string $titulo, string $nota, string $ultimaCol, array $encabezados): void
     {
         $sheet->setTitle($nombre)->setShowGridlines(false);
@@ -182,14 +202,16 @@ class DotacionInformeFinanciamientoExport
             $row++;
         }
         $ultimaFila = $row - 1;
-        $sheet->mergeCells('A'.$row.':'.chr(ord($columnasTotales[0]) - 1).$row)->setCellValue('A'.$row, 'Total');
-        foreach ($columnasTotales as $columna) {
-            $sheet->setCellValue($columna.$row, '=SUM('.$columna.'5:'.$columna.$ultimaFila.')');
+        if ($columnasTotales) {
+            $sheet->mergeCells('A'.$row.':'.chr(ord($columnasTotales[0]) - 1).$row)->setCellValue('A'.$row, 'Total');
+            foreach ($columnasTotales as $columna) {
+                $sheet->setCellValue($columna.$row, '=SUM('.$columna.'5:'.$columna.$ultimaFila.')');
+            }
         }
-        $tabla = $sheet->getStyle('A4:'.$ultimaCol.$row);
+        $tabla = $sheet->getStyle('A4:'.$ultimaCol.($columnasTotales ? $row : $ultimaFila));
         $tabla->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DEE6F4');
         $tabla->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('424C61');
-        foreach ([4, $row] as $filaDestacada) {
+        foreach ($columnasTotales ? [4, $row] : [4] as $filaDestacada) {
             $style = $sheet->getStyle('A'.$filaDestacada.':'.$ultimaCol.$filaDestacada);
             $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('C6D3E8');
             $style->getFont()->setBold(true);
