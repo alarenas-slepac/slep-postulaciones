@@ -15,16 +15,21 @@ class DotacionDocenteGlosa
         $proceso = DotacionProceso2027Calculator::resumen($establecimiento, DotacionProceso2027Calculator::ANIO, $datos);
         $maximos = array_column($proceso['bloques'], 'maximo');
         $maximo = in_array(null, $maximos, true) ? null : round(array_sum($maximos), 2);
-        $brecha = $maximo === null ? null : round($maximo - $horasDotacion, 2);
-        $justificadas = (float) $proceso['justificaciones']['horas_justificadas'];
 
-        return [
+        return $this->recalcularBrecha([
             'rbd' => (string) $establecimiento->rbd,
             'maximo' => $maximo,
-            'brecha' => $brecha,
-            'justificadas' => $justificadas,
-            'saldo' => $brecha === null ? null : round($brecha - $justificadas, 2),
-        ];
+            'justificadas' => (float) $proceso['justificaciones']['horas_justificadas'],
+        ], $horasDotacion);
+    }
+
+    public function recalcularBrecha(array $criterio, float $horasDotacion): array
+    {
+        $brecha = $criterio['maximo'] === null ? null : round($criterio['maximo'] - $horasDotacion, 2);
+        $criterio['brecha'] = $brecha;
+        $criterio['saldo'] = $brecha === null ? null : round($brecha - $criterio['justificadas'], 2);
+
+        return $criterio;
     }
 
     public function distribuir(array $establecimientos): array

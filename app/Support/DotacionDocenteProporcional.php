@@ -14,6 +14,8 @@ class DotacionDocenteProporcional
 {
     public const GRUPOS = ['directiva', 'tecnico_pedagogica', 'aula'];
 
+    public const SUBVENCIONES = ['general' => 'Subv. General', 'sep' => 'SEP', 'pie' => 'PIE'];
+
     public function resumir(int $anio): array
     {
         return $this->calcular($anio)['dotacion'];
@@ -21,25 +23,13 @@ class DotacionDocenteProporcional
 
     public function paraInforme(int $anio): array
     {
-        return $this->calcular($anio, incluirGlosa: $anio === DotacionProceso2027Calculator::ANIO);
+        return $this->calcular($anio, incluirSubvenciones: true);
     }
 
-    private function calcular(int $anio, bool $incluirGlosa = false): array
+    private function calcular(int $anio, bool $incluirSubvenciones = false): array
     {
-        $totalPorDocente = [];
-        $horasPorEstablecimiento = [];
-        $filas = [];
-        $acumular = function (int $id, string $grupo, string $rut, float $horas, bool $esDocente) use (&$filas, &$horasPorEstablecimiento, &$totalPorDocente): void {
-            if ($horas <= 0) {
-                return;
-            }
-            $filas[$id][$grupo] ??= ['docentes' => 0.0, 'horas' => 0.0];
-            $filas[$id][$grupo]['horas'] += $horas;
-            if ($esDocente) {
-                $horasPorEstablecimiento[$id][$grupo][$rut] = ($horasPorEstablecimiento[$id][$grupo][$rut] ?? 0.0) + $horas;
-                $totalPorDocente[$rut] = ($totalPorDocente[$rut] ?? 0.0) + $horas;
-            }
-        };
+        $dotacion = new DotacionDocenteAcumulado;
+        $subvenciones = $incluirSubvenciones ? new DotacionDocenteAcumulado : null;
         $reglas = Schema::hasTable('dotacion_funciones_reglas')
             ? DotacionFuncionRegla::query()->pluck('codigo', 'id')->all()
             : [];
@@ -48,24 +38,32 @@ class DotacionDocenteProporcional
         $contrataciones = app(ContratacionHabilitacionService::class);
         $informeFunciones = app(DotacionInformeFunciones::class);
         $tablasPal = $anio === 2027 ? app(DotacionPal2027Export::class)->tablas() : [];
-        $glosa = $incluirGlosa ? new DotacionDocenteGlosa : null;
+        $glosa = $incluirSubvenciones && $anio === DotacionProceso2027Calculator::ANIO ? new DotacionDocenteGlosa : null;
         $criterios = [];
+        $criteriosSubvencion = [];
         foreach ($establecimientos as $establecimiento) {
             // Conservar sólo los acumulados territoriales al cambiar de establecimiento.
             DotacionLecturaCache::ejecutar(function () use (
-                $establecimiento, $anio, $acumular, $reglas, $contrataciones, $informeFunciones, $tablasPal, $glosa, &$filas, &$criterios
+                $establecimiento, $anio, $dotacion, $subvenciones, $reglas, $contrataciones, $informeFunciones,
+                $tablasPal, $glosa, &$criterios, &$criteriosSubvencion
             ): void {
                 $id = (int) $establecimiento->id;
                 if ($anio === 2027) {
                     $datos = app(DotacionPal2027::class)->datos($establecimiento);
-                    foreach ($this->horasPal2027($establecimiento, $datos, $tablasPal, $reglas) as $rut => $grupos) {
+                    [$horasFuncion, $horasSubvencion] = $this->horasPal2027($establecimiento, $datos, $tablasPal, $reglas);
+                    foreach ($horasFuncion as $rut => $grupos) {
                         foreach ($grupos as $grupo => $horas) {
-                            $acumular($id, $grupo, (string) $rut, $horas, true);
+                            $dotacion->agregar($id, $grupo, (string) $rut, $horas);
+                        }
+                    }
+                    foreach ($horasSubvencion as $rut => $fuentes) {
+                        foreach ($fuentes as $fuente => $horas) {
+                            $subvenciones?->agregar($id, $fuente, (string) $rut, $horas);
                         }
                     }
                     if ($glosa !== null) {
-                        $horasDotacion = array_sum(array_column($filas[$id] ?? [], 'horas'));
-                        $criterios[$id] = $glosa->criterio($establecimiento, $datos, $horasDotacion);
+                        $criterios[$id] = $glosa->criterio($establecimiento, $datos, $dotacion->horas($id));
+                        $criteriosSubvencion[$id] = $glosa->recalcularBrecha($criterios[$id], $subvenciones->horas($id));
                     }
                     return;
                 }
@@ -93,44 +91,41 @@ class DotacionDocenteProporcional
 
                 if (! $hayDirectorAdp) {
                     foreach (DotacionAsignacionCalculator::plazasPorAsumir($establecimiento, $anio) as $plaza) {
-                        $acumular($id, 'directiva', 'DIRECTOR_ADP_POR_ASUMIR_'.$id, (float) $plaza['horas_contrato'], true);
+                        $rut = 'DIRECTOR_ADP_POR_ASUMIR_'.$id;
+                        $horas = (float) $plaza['horas_contrato'];
+                        $dotacion->agregar($id, 'directiva', $rut, $horas);
+                        $subvenciones?->agregar($id, 'general', $rut, $horas);
                         $hayDirectorAdp = true;
                     }
                 }
 
                 foreach ($asignaciones as [$asignacion, $rut, $horas, $cargo, $esDocente]) {
                     $grupo = $this->grupoAsignacion($asignacion, $cargo, $hayDirectorAdp);
-                    $acumular($id, $grupo, $rut, $horas, $esDocente);
+                    $dotacion->agregar($id, $grupo, $rut, $horas, $esDocente);
+                    $subvenciones?->agregar($id, $this->subvencionHistorica($asignacion), $rut, $horas, $esDocente);
                 }
 
                 $pendientes = $informeFunciones->saldosSinAsignar($establecimiento, $anio);
                 if ($pendientes !== []) {
-                    $saldoAula = $this->saldoAula($establecimiento, $anio, $filas[$id]['aula']['horas'] ?? 0);
+                    $saldoAula = $this->saldoAula($establecimiento, $anio, $dotacion->horas($id, 'aula'));
                     foreach ($pendientes as $rut => $horas) {
                         $aula = min($horas, $saldoAula);
                         $saldoAula = round($saldoAula - $aula, 2);
-                        if ($aula > 0) {
-                            $acumular($id, 'aula', $rut, $aula, true);
-                        }
-                        if ($horas > $aula) {
-                            $acumular($id, 'tecnico_pedagogica', $rut, round($horas - $aula, 2), true);
-                        }
+                        $otras = round($horas - $aula, 2);
+                        $dotacion->agregar($id, 'aula', $rut, $aula);
+                        $dotacion->agregar($id, 'tecnico_pedagogica', $rut, $otras);
+                        $subvenciones?->agregar($id, 'general', $rut, $aula + $otras);
                     }
                 }
             });
         }
 
-        foreach ($horasPorEstablecimiento as $id => $grupos) {
-            foreach ($grupos as $grupo => $horasPorRut) {
-                $fracciones = 0.0;
-                foreach ($horasPorRut as $rut => $horas) {
-                    $fracciones += $horas / $totalPorDocente[$rut];
-                }
-                $filas[$id][$grupo]['docentes'] = $fracciones;
-            }
-        }
-
-        return ['dotacion' => $filas, 'glosa' => $glosa?->distribuir($criterios)];
+        return [
+            'dotacion' => $dotacion->resumir(),
+            'glosa' => $glosa?->distribuir($criterios),
+            'subvenciones' => $subvenciones?->resumir() ?? [],
+            'glosa_subvencion' => $glosa?->distribuir($criteriosSubvencion),
+        ];
     }
 
     private function horasPal2027(Establecimiento $establecimiento, array $datos, array $tablas, array $reglas): array
@@ -149,13 +144,21 @@ class DotacionDocenteProporcional
             $this->grupoAsignacion($a, $this->cargoAsignacion($a, $reglas), $hayDirectorAdp));
 
         $porRut = [];
+        $porSubvencion = [];
+        $fuentes = ['aula' => 'general', 'P' => 'pie', 'Q' => 'sep', 'R' => 'general'];
         $filasPal = new DotacionPalFilas2027;
         foreach ($reporte['docentes'] as $fila) {
             $rut = DotacionPal2027::identidad($fila['A']);
+            $sepEquivalente = $fila['_pal_sep_equivalente'] ?? 0.0;
+            if ($sepEquivalente > 0) {
+                $porSubvencion[$rut]['sep'] = ($porSubvencion[$rut]['sep'] ?? 0.0) + $sepEquivalente;
+            }
             foreach ($filasPal->horasPorComponente($fila, $tablas) as $componente => $horas) {
                 if ($horas <= 0) {
                     continue;
                 }
+                $fuente = $fuentes[$componente];
+                $porSubvencion[$rut][$fuente] = ($porSubvencion[$rut][$fuente] ?? 0.0) + $horas;
                 $pesos = array_filter($fila['_pal_dotacion'][$componente] ?? [], fn ($peso) => $peso > 0);
                 $totalPesos = array_sum($pesos);
                 if ($totalPesos <= 0) {
@@ -172,7 +175,7 @@ class DotacionDocenteProporcional
         }
 
         if (array_column($porRut, 'pendiente') === []) {
-            return $porRut;
+            return [$porRut, $porSubvencion];
         }
         $saldoAula = $this->saldoAula($establecimiento, 2027, array_sum(array_column($porRut, 'aula')));
         ksort($porRut);
@@ -188,7 +191,17 @@ class DotacionDocenteProporcional
         }
         unset($grupos);
 
-        return $porRut;
+        return [$porRut, $porSubvencion];
+    }
+
+    private function subvencionHistorica(object $asignacion): string
+    {
+        $fuente = DotacionInformeFinanciamiento::fuenteSubvencion($asignacion->subvencion);
+        if ($fuente === 'pro_retencion') {
+            return 'sep';
+        }
+
+        return DotacionAsignacionCalculator::esAsignacionPie($asignacion) ? 'pie' : ($fuente ?? 'general');
     }
 
     private function saldoAula(Establecimiento $establecimiento, int $anio, float $asignadas): float

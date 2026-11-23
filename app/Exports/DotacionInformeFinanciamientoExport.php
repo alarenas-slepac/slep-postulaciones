@@ -34,6 +34,7 @@ class DotacionInformeFinanciamientoExport
                 $filas[] = $fila + [
                     'establecimiento_id' => $ee->id,
                     'dotacion_docente' => $informe['dotacion'][$ee->id] ?? [],
+                    'docentes_por_subvencion' => $informe['subvenciones'][$ee->id] ?? [],
                 ];
             } catch (\Throwable $exception) {
                 report($exception);
@@ -43,7 +44,7 @@ class DotacionInformeFinanciamientoExport
             }
         }
 
-        $book = $this->workbook($filas, $anio, $periodo, $informe['glosa']);
+        $book = $this->workbook($filas, $anio, $periodo, $informe['glosa'], $informe['glosa_subvencion']);
         try {
             (new Xlsx($book))->save($ruta);
         } finally {
@@ -51,7 +52,7 @@ class DotacionInformeFinanciamientoExport
         }
     }
 
-    public function workbook(array $filas, int $anio, ?array $periodo, ?array $glosa = null): Spreadsheet
+    public function workbook(array $filas, int $anio, ?array $periodo, ?array $glosa = null, ?array $glosaSubvencion = null): Spreadsheet
     {
         $book = new Spreadsheet;
         $book->getProperties()->setCreator('SGA SLEP Andalién Costa')->setTitle('Horas por financiamiento y RBD '.$anio);
@@ -84,6 +85,10 @@ class DotacionInformeFinanciamientoExport
         $this->escribirDotacionDocente($book->createSheet(), $filas, $anio);
         if ($glosa !== null) {
             $this->escribirDotacionDocente($book->createSheet(), $filas, $anio, $glosa);
+        }
+        $this->escribirDocentesPorSubvencion($book->createSheet(), $filas, $anio);
+        if ($glosaSubvencion !== null) {
+            $this->escribirDocentesPorSubvencion($book->createSheet(), $filas, $anio, $glosaSubvencion);
         }
         $book->setActiveSheetIndex(0);
 
@@ -227,12 +232,7 @@ class DotacionInformeFinanciamientoExport
         $ultimaCol = 'J';
         $decimalesDocentes = ['C', 'E', 'G', 'I'];
         if ($glosa !== null) {
-            $nota = sprintf('Glosa SLEP de %s h para otras funciones, en jornadas de %d h. La brecha compara el máximo autorizado con la dotación base.',
-                number_format(DotacionDocenteGlosa::HORAS, 0, ',', '.'), DotacionDocenteGlosa::JORNADA);
-            $sinDistribuir = DotacionDocenteGlosa::HORAS - $glosa['horas_distribuidas'];
-            if ($sinDistribuir > 0) {
-                $nota .= ' Horas sin distribuir en el SLEP por saldo insuficiente: '.number_format($sinDistribuir, 0, ',', '.').'.';
-            }
+            $nota = $this->notaGlosa($glosa);
             array_push($columnas, 'Máximo autorizado 2027', 'Brecha antes de glosa', 'Horas justificadas en Sobredotación',
                 'Saldo después de justificar', 'Horas de glosa en otras funciones', 'Docentes equivalentes por glosa');
             $ultimaCol = 'P';
@@ -276,6 +276,93 @@ class DotacionInformeFinanciamientoExport
             $sheet->getStyle('K5:O'.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.##');
             $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
         }
+    }
+
+    private function escribirDocentesPorSubvencion(Worksheet $sheet, array $filas, int $anio, ?array $glosa = null): void
+    {
+        $nombre = 'Docentes por Subvención';
+        $titulo = 'Dotación docente por subvención';
+        $nota = 'SEP incluye ProRetención. Los docentes se prorratean por horas en todo el territorio.';
+        $nota .= $anio === 2027
+            ? ' Base contractual del PAL 2027.'
+            : ' Las horas asignadas a AAEE sólo se suman a las horas de dotación.';
+        $columnas = ['Establecimiento'];
+        foreach (DotacionDocenteProporcional::SUBVENCIONES as $subvencion) {
+            $columnas[] = "N.º docentes\n".$subvencion;
+            $columnas[] = "N.º horas\n".$subvencion;
+        }
+        array_push($columnas, "N.º total\nde docentes", "Total de\nhoras docentes");
+        $ultimaCol = 'I';
+        $anchos = ['A' => 47] + array_fill_keys(range('B', 'I'), 15);
+        $decimalesDocentes = ['B', 'D', 'F', 'H'];
+        if ($glosa !== null) {
+            $nombre .= ' glosa';
+            $titulo .= ' con glosa';
+            $nota .= ' La glosa se suma a Subv. General. '.$this->notaGlosa($glosa);
+            array_push($columnas, 'Máximo autorizado 2027', 'Brecha antes de glosa', 'Horas justificadas en Sobredotación',
+                'Saldo después de justificar', 'Horas de glosa en otras funciones', 'Docentes equivalentes por glosa');
+            $ultimaCol = 'O';
+            $anchos += array_fill_keys(range('J', 'O'), 18);
+        }
+
+        $this->prepararHoja($sheet, $nombre, $titulo.' · '.$anio, $nota, $ultimaCol, $columnas);
+        $sheet->getStyle('A2')->getAlignment()->setWrapText(true)->setVertical('center');
+        $sheet->getRowDimension(2)->setRowHeight($glosa === null ? 30 : 42);
+        $sheet->getRowDimension(4)->setRowHeight(48);
+
+        $row = 5;
+        foreach ($filas as $fila) {
+            $sheet->setCellValueExplicit('A'.$row, $fila['nombre'], DataType::TYPE_STRING);
+            $valores = [];
+            foreach (array_keys(DotacionDocenteProporcional::SUBVENCIONES) as $fuente) {
+                $datos = $fila['docentes_por_subvencion'][$fuente] ?? ['docentes' => 0, 'horas' => 0];
+                $valores[] = $datos['docentes'];
+                $valores[] = $datos['horas'];
+            }
+            if ($glosa !== null) {
+                $criterio = $glosa['establecimientos'][$fila['establecimiento_id']] ?? [];
+                $horas = $criterio['horas_glosa'] ?? 0;
+                $docentes = $horas / DotacionDocenteGlosa::JORNADA;
+                $valores[0] += $docentes;
+                $valores[1] += $horas;
+                $sheet->fromArray([
+                    $criterio['maximo'] ?? null, $criterio['brecha'] ?? null, $criterio['justificadas'] ?? null,
+                    $criterio['saldo'] ?? null, $horas, $docentes,
+                ], null, 'J'.$row, true);
+            }
+            $sheet->fromArray([...$valores,
+                $valores[0] + $valores[2] + $valores[4], $valores[1] + $valores[3] + $valores[5],
+            ], null, 'B'.$row, true);
+            $row++;
+        }
+
+        $this->cerrarTabla($sheet, $row, $ultimaCol, range('B', $ultimaCol), $anchos,
+            'Sin establecimientos para los filtros aplicados.');
+        $cabecera = $sheet->getStyle('A4:'.$ultimaCol.'4');
+        $cabecera->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('10293D');
+        $cabecera->getFont()->getColor()->setRGB('FFFFFF');
+        $cabecera->getAlignment()->setHorizontal('center')->setVertical('center')->setWrapText(true);
+        $sheet->getStyle('B5:'.$ultimaCol.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.00');
+        foreach ($decimalesDocentes as $columna) {
+            $sheet->getStyle($columna.'5:'.$columna.max(6, $row))->getNumberFormat()->setFormatCode('#,##0.0');
+        }
+        if ($glosa !== null) {
+            $sheet->getStyle('J4:O4')->getFill()->getStartColor()->setRGB('00667E');
+        }
+        $sheet->freezePane('B5');
+        $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
+    }
+
+    private function notaGlosa(array $glosa): string
+    {
+        $nota = sprintf('Glosa SLEP de %s h para otras funciones, en jornadas de %d h. La brecha compara el máximo autorizado con la dotación base.',
+            number_format(DotacionDocenteGlosa::HORAS, 0, ',', '.'), DotacionDocenteGlosa::JORNADA);
+        $sinDistribuir = DotacionDocenteGlosa::HORAS - $glosa['horas_distribuidas'];
+        if ($sinDistribuir > 0) {
+            $nota .= ' Horas sin distribuir en el SLEP por saldo insuficiente: '.number_format($sinDistribuir, 0, ',', '.').'.';
+        }
+
+        return $nota;
     }
 
     private function prepararHoja(Worksheet $sheet, string $nombre, string $titulo, string $nota, string $ultimaCol, array $encabezados): void

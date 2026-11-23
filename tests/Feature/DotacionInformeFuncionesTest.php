@@ -275,7 +275,8 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $libro = $this->abrirExcelFinanciamiento(2027, ['page' => 2]);
         try {
             $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa',
-                'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente', 'Dotación docente glosa'], $libro->getSheetNames());
+                'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente', 'Dotación docente glosa',
+                'Docentes por Subvención', 'Docentes por Subvención glosa'], $libro->getSheetNames());
             $niveles = $libro->getSheetByName('Niveles y modalidades');
             $this->assertSame(['99999', '=Escuela de prueba', 'No', 'Sí', 'Sí', 'Sí', 'No', 'No', 'Sí'], $niveles->rangeToArray('A5:I5')[0]);
             $this->assertSame(DataType::TYPE_STRING, $niveles->getCell('B5')->getDataType());
@@ -488,6 +489,54 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         }
     }
 
+    #[DataProvider('years')]
+    public function test_excel_prorratea_docentes_por_subvencion_e_incorpora_proretencion_a_sep(int $anio): void
+    {
+        $otro = $this->establecimiento(99998);
+        $rut = '99000001K';
+        $this->personal($rut, 30);
+        $this->personal($rut, 14, ['establecimiento_id' => $otro->id, 'rbd' => $otro->rbd]);
+        foreach (['General' => 12, 'SEP' => 6, 'Pro Retención' => 4, 'PIE' => 8] as $fuente => $horas) {
+            $this->asignacion($anio, $rut, 'otra_funcion', 'Apoyo '.$fuente, $horas, ['subvencion' => $fuente]);
+        }
+        $this->asignacion($anio, $rut, 'otra_funcion', 'Apoyo', 14, ['establecimiento_id' => $otro->id]);
+
+        if ($anio === 2027) {
+            (require database_path('migrations/2026_09_22_180000_create_dotacion_proceso_2027_configuraciones_table.php'))->up();
+            DB::table('dotacion_proceso_2027_configuraciones')->insert([
+                'establecimiento_id' => $this->ee->id, 'anio' => $anio,
+                'max_horas_bloque_1' => 71, 'max_horas_bloque_2' => 0, 'max_horas_bloque_3' => 0,
+            ]);
+        }
+
+        $libro = $this->abrirExcelFinanciamiento($anio, ['q' => '99999']);
+        try {
+            $hoja = $libro->getSheetByName('Docentes por Subvención');
+            $this->assertSame('Establecimiento', $hoja->getCell('A4')->getValue());
+            $this->assertStringContainsString('ProRetención', $hoja->getCell('A2')->getValue());
+            $this->assertSame($this->ee->nombre_establecimiento, $hoja->getCell('A5')->getValue());
+            $this->assertSame('Total', $hoja->getCell('A6')->getValue());
+            foreach (['B' => 12 / 44, 'C' => 12, 'D' => 10 / 44, 'E' => 10,
+                'F' => 8 / 44, 'G' => 8, 'H' => 30 / 44, 'I' => 30] as $col => $valor) {
+                $this->assertEqualsWithDelta($valor, $hoja->getCell($col.'5')->getValue(), 0.00001);
+                $this->assertEqualsWithDelta($valor, $hoja->getCell($col.'6')->getCalculatedValue(), 0.00001);
+            }
+            $glosa = $libro->getSheetByName('Docentes por Subvención glosa');
+            if ($anio === 2027) {
+                $this->assertEquals(26, $libro->getSheetByName('Dotación docente')->getCell('J5')->getValue());
+                $this->assertEquals(44, $libro->getSheetByName('Dotación docente glosa')->getCell('O5')->getValue());
+                foreach (['B' => 23 / 44, 'C' => 23, 'E' => 10, 'G' => 8, 'H' => 41 / 44, 'I' => 41,
+                    'J' => 71, 'K' => 41, 'L' => 0, 'M' => 41, 'N' => 11, 'O' => 11 / 44] as $col => $valor) {
+                    $this->assertEqualsWithDelta($valor, $glosa->getCell($col.'5')->getValue(), 0.00001);
+                }
+            } else {
+                $this->assertNull($glosa);
+            }
+        } finally {
+            $libro->disconnectWorksheets();
+        }
+    }
+
     public function test_excel_libera_las_asignaciones_al_pasar_al_siguiente_establecimiento(): void
     {
         $otro = $this->establecimiento(99998);
@@ -546,6 +595,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             try {
                 $base = $libro->getSheetByName('Dotación docente');
                 $glosa = $libro->getSheetByName('Dotación docente glosa');
+                $glosaSubvencion = $libro->getSheetByName('Docentes por Subvención glosa');
                 $fila = $filtros === [] ? 7 : 5;
                 $this->assertSame('99999', $glosa->getCell('A'.$fila)->getValue());
                 $this->assertEquals(700, $glosa->getCell('N'.$fila)->getValue());
@@ -555,12 +605,16 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
                 $this->assertEquals(627, $glosa->getCell('J'.$fila)->getValue());
                 $this->assertEquals(627, $glosa->getCell('F'.$fila)->getValue());
                 $this->assertEquals(14.25, $glosa->getCell('E'.$fila)->getValue());
+                $this->assertEquals(627, $glosaSubvencion->getCell('C'.$fila)->getValue());
+                $this->assertEquals(583, $glosaSubvencion->getCell('N'.$fila)->getValue());
                 if ($filtros === []) {
                     $this->assertEquals(0, $glosa->getCell('O5')->getValue());
                     $this->assertEquals(616, $glosa->getCell('O6')->getValue());
                     $this->assertEquals(1199, $glosa->getCell('O8')->getCalculatedValue());
                     $this->assertEquals(27.25, $glosa->getCell('P8')->getCalculatedValue());
                     $this->assertEquals(1273, $glosa->getCell('J8')->getCalculatedValue());
+                    $this->assertEquals(1199, $glosaSubvencion->getCell('N8')->getCalculatedValue());
+                    $this->assertEquals(1273, $glosaSubvencion->getCell('I8')->getCalculatedValue());
                 }
             } finally {
                 $libro->disconnectWorksheets();
