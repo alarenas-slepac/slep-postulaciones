@@ -18,7 +18,16 @@
                 <a class="btn btn-primary rounded-pill" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'export_excel' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}" aria-describedby="informe-excel-ayuda"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i> Descargar Excel</a>
                 <a class="btn btn-outline-primary rounded-pill" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'export_planes' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}" aria-describedby="informe-planes-ayuda"><i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i> Excel planes de estudio</a>
                 <a class="btn btn-outline-primary rounded-pill" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'export_planes_niveles' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}" aria-describedby="informe-niveles-ayuda"><i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i> Excel por niveles</a>
-                <a class="btn btn-outline-primary rounded-pill" href="{{ route('admin.dotacion-establecimiento.index', ['informe_funciones' => 1, 'export_financiamiento' => 1, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}"><i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i> Excel por financiamiento</a>
+                <form method="POST" action="{{ route('admin.dotacion-establecimiento.financiamiento.store') }}">
+                    @csrf
+                    <input type="hidden" name="anio" value="{{ $anio }}">
+                    <input type="hidden" name="q" value="{{ $q }}">
+                    <input type="hidden" name="comuna" value="{{ $comuna }}">
+                    <button type="submit" class="btn btn-outline-primary rounded-pill"><i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i> Excel por financiamiento</button>
+                </form>
+                @if ($ultimaExportacionFinanciamiento ?? null)
+                    <a class="btn btn-outline-secondary rounded-pill" href="{{ route('admin.dotacion-establecimiento.financiamiento.show', $ultimaExportacionFinanciamiento->id) }}">Ver última exportación</a>
+                @endif
                 <a class="btn btn-outline-secondary rounded-pill" href="{{ route('admin.dotacion-establecimiento.index', ['anio' => $anio, 'q' => $q, 'comuna' => $comuna]) }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Volver a dotación</a>
             </div>
         </div>

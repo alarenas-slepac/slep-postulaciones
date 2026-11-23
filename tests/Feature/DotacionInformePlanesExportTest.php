@@ -25,9 +25,12 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
 use Tests\Support\IsolatedSecurityTestCase;
+use Tests\Support\PreparaExcelFinanciamiento;
 
 class DotacionInformePlanesExportTest extends IsolatedSecurityTestCase
 {
+    use PreparaExcelFinanciamiento;
+
     private Establecimiento $ee;
 
     protected function setUp(): void
@@ -44,6 +47,7 @@ class DotacionInformePlanesExportTest extends IsolatedSecurityTestCase
             $t->string('icon')->nullable(); $t->integer('sort')->default(0); $t->timestamps();
         });
         Schema::table('users', fn (Blueprint $t) => $t->unsignedBigInteger('establecimiento_id')->nullable());
+        $this->instalarExportacionFinanciamiento();
         $this->ee = $this->establecimiento(99999);
         $this->actingAs($this->testUser(role: 3))->withSession(['active_role' => 'admin']);
     }
@@ -222,12 +226,7 @@ class DotacionInformePlanesExportTest extends IsolatedSecurityTestCase
         $this->assertSame(5, EstablecimientoCurso::count());
 
         EstablecimientoCurso::where('anio', $year)->where('letra', 'B')->update(['regimen_jec' => 'No aplica']);
-        $respuesta = $this->get(route('admin.dotacion-establecimiento.index', [
-            'informe_funciones' => 1, 'anio' => $year, 'export_financiamiento' => 1,
-        ]))->assertOk()->assertDownload();
-        $disk = Storage::disk('local');
-        $disk->put('oferta-educativa.xlsx', $respuesta->streamedContent());
-        $libro = IOFactory::load($disk->path('oferta-educativa.xlsx'));
+        $libro = $this->abrirExcelFinanciamiento($year);
         try {
             $hoja = $libro->getSheetByName('Oferta educativa');
             $this->assertSame('99999', $hoja->getCell('A5')->getValue());

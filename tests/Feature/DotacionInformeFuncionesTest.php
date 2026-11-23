@@ -19,14 +19,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
 use Tests\Support\IsolatedSecurityTestCase;
+use Tests\Support\PreparaExcelFinanciamiento;
 
 class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
 {
+    use PreparaExcelFinanciamiento;
+
     private Establecimiento $ee;
 
     protected function setUp(): void
@@ -58,6 +60,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             (require database_path('migrations/'.$migration))->up();
         }
         Schema::table('users', fn (Blueprint $t) => $t->unsignedBigInteger('establecimiento_id')->nullable());
+        $this->instalarExportacionFinanciamiento();
         $this->ee = $this->establecimiento(99999);
         $this->actingAs($this->testUser(role: 3))->withSession(['active_role' => 'admin']);
     }
@@ -267,11 +270,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         }
 
         $this->get($this->url(2027))->assertOk()->assertSee('Excel por financiamiento');
-        $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1, 'page' => 2]));
-        $respuesta->assertOk()->assertDownload();
-        $disk = Storage::disk('local');
-        $disk->put('financiamiento.xlsx', $respuesta->streamedContent());
-        $libro = IOFactory::load($disk->path('financiamiento.xlsx'));
+        $libro = $this->abrirExcelFinanciamiento(2027, ['page' => 2]);
         try {
             $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa',
                 'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente', 'Dotación docente glosa'], $libro->getSheetNames());
@@ -334,10 +333,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             ] + PieHorasCalculator::calculate($curso, $neet, $neep));
         }
 
-        $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1]))->assertOk()->assertDownload();
-        $disk = Storage::disk('local');
-        $disk->put('proyeccion-pie.xlsx', $respuesta->streamedContent());
-        $libro = IOFactory::load($disk->path('proyeccion-pie.xlsx'));
+        $libro = $this->abrirExcelFinanciamiento(2027);
         try {
             $hoja = $libro->getSheetByName('Proyección PIE');
             $this->assertSame('99999', $hoja->getCell('B5')->getValue());
@@ -379,10 +375,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $this->asignacion($anio, '99000001-K', 'plan_estudio', 'Asistente', 50, ['estamento_cobertura' => 'asistente']);
         $this->asignacion($anio, '99000006-K', 'otra_funcion', 'Apoyo de asistente', 6, ['estamento_cobertura' => 'asistente']);
 
-        $respuesta = $this->get($this->url($anio, ['export_financiamiento' => 1, 'q' => '99999']))->assertOk()->assertDownload();
-        $disk = Storage::disk('local');
-        $disk->put('dotacion-proporcional.xlsx', $respuesta->streamedContent());
-        $libro = IOFactory::load($disk->path('dotacion-proporcional.xlsx'));
+        $libro = $this->abrirExcelFinanciamiento($anio, ['q' => '99999']);
         try {
             $hoja = $libro->getSheetByName('Dotación docente');
             $this->assertSame('99999', $hoja->getCell('A5')->getValue());
@@ -479,10 +472,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         $this->asignacion(2027, '99000004K', 'otra_funcion', 'Apoyo AAEE', 10, ['estamento_cobertura' => 'asistente']);
         $this->cupo($this->ee, 'pie', 8);
 
-        $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1, 'q' => '99999']))->assertOk()->assertDownload();
-        $disk = Storage::disk('local');
-        $disk->put('dotacion-pal.xlsx', $respuesta->streamedContent());
-        $libro = IOFactory::load($disk->path('dotacion-pal.xlsx'));
+        $libro = $this->abrirExcelFinanciamiento(2027, ['q' => '99999']);
         try {
             $hoja = $libro->getSheetByName('Dotación docente');
             $this->assertSame('99999', $hoja->getCell('A5')->getValue());
@@ -508,11 +498,8 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
                 'max_horas_bloque_1' => $maximo, 'max_horas_bloque_2' => 0, 'max_horas_bloque_3' => 0,
             ]);
         }
-        $disk = Storage::disk('local');
         foreach ([[], ['q' => '99999']] as $filtros) {
-            $respuesta = $this->get($this->url(2027, ['export_financiamiento' => 1] + $filtros))->assertOk()->assertDownload();
-            $disk->put('dotacion-glosa.xlsx', $respuesta->streamedContent());
-            $libro = IOFactory::load($disk->path('dotacion-glosa.xlsx'));
+            $libro = $this->abrirExcelFinanciamiento(2027, $filtros);
             try {
                 $base = $libro->getSheetByName('Dotación docente');
                 $glosa = $libro->getSheetByName('Dotación docente glosa');

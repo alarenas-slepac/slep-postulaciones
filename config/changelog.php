@@ -6594,8 +6594,21 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.18.697',
+    'current_version' => '2026.11.23.698',
     'entries' => [
+        [
+            'version' => '2026.11.23.698',
+            'title' => 'Excel por financiamiento preparado en segundo plano',
+            'summary' => 'La solicitud devuelve una pantalla de estado y habilita la descarga cuando termina la generación del libro territorial.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'El cálculo y la escritura del XLSX se ejecutan en la cola de financiamiento. La petición web encola el trabajo y consulta su estado.',
+                'Se aplican el año, la comuna y la búsqueda del informe a la descarga. Las hojas y los cálculos territoriales de dotación y glosa conservan sus reglas.',
+                'La descarga se limita a la cuenta solicitante con rol vigente y queda disponible por 24 horas tras generarse.',
+                'El despliegue requiere la migración aditiva y la tarea programada de Laravel cada minuto.',
+            ],
+            'published_at' => '2026-11-23',
+        ],
         [
             'version' => '2026.11.18.697',
             'title' => 'Docentes no renovados visibles en nómina y Sobredotación',

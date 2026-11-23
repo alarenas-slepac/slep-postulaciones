@@ -36,6 +36,16 @@ return [
             'queue' => 'sga-mail', 'retry_after' => 120, 'after_commit' => true,
         ],
 
+        // Comparte jobs, pero reserva más tiempo para construir el libro territorial.
+        'sga_dotacion' => [
+            'driver' => 'database',
+            'connection' => null,
+            'table' => 'jobs',
+            'queue' => 'dotacion-financiamiento',
+            'retry_after' => 660,
+            'after_commit' => false,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],
