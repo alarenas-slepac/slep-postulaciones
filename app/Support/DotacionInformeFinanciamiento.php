@@ -55,7 +55,7 @@ class DotacionInformeFinanciamiento
             }
             $fuente = DotacionAsignacionCalculator::esAsignacionPie($asignacion)
                 ? 'pie'
-                : (self::fuente(self::normalizar($asignacion->subvencion)) ?? 'general');
+                : (self::fuenteSubvencion($asignacion->subvencion) ?? 'general');
             $horas[$fuente] += max(0.0, (float) $asignacion->horas_contrato);
         }
 
@@ -112,6 +112,11 @@ class DotacionInformeFinanciamiento
     private static function normalizar(?string $texto): string
     {
         return Str::of($texto ?? '')->ascii()->upper()->replaceMatches('/[^A-Z0-9]+/', ' ')->squish()->toString();
+    }
+
+    public static function fuenteSubvencion(?string $texto): ?string
+    {
+        return self::fuente(self::normalizar($texto));
     }
 
     private static function fuente(string $texto): ?string

@@ -351,6 +351,10 @@ class DotacionPal2027
             if ($clasificarAsignacion !== null && $contrato > 0) {
                 $grupoDotacion = $clasificarAsignacion($a);
                 $grupos[$key]['dotacion'][$grupoDotacion] = ($grupos[$key]['dotacion'][$grupoDotacion] ?? 0.0) + $contrato;
+                if ($columna === 'incompatible' && ! $reserva
+                    && in_array(DotacionInformeFinanciamiento::fuenteSubvencion($fondos), ['sep', 'pro_retencion'], true)) {
+                    $grupos[$key]['sep_equivalente'] = ($grupos[$key]['sep_equivalente'] ?? 0.0) + $contrato;
+                }
             }
             $grupos[$key]['pedagogicas'] += max(0, (float) data_get($a, 'horas_plan_pedagogicas', 0));
             $grupos[$key]['detalle'][] = (string) (data_get($a, 'asignatura_nombre') ?: data_get($a, 'observacion') ?: (\App\Models\DotacionDocenteAsignacion::TIPOS[$tipo] ?? $tipo));
@@ -481,6 +485,10 @@ class DotacionPal2027
                 if ($grupo['reserva_origen'] === null) { $notas[] = 'Reserva histórica sin origen contractual: calidad inferida del contrato disponible, primero titular.'; }
             } elseif ($grupo['columna'] === 'incompatible') {
                 $problemas[] = 'financiamiento sin equivalencia en el formato';
+                if (! $exceso && isset($grupo['sep_equivalente'])) {
+                    // Sólo el resumen por subvención puede contabilizar este tramo como SEP.
+                    $fila['_pal_sep_equivalente'] = round($grupo['sep_equivalente'] * $factor, 4);
+                }
             } elseif (! $exceso) { $fila[$grupo['columna']] = $parte; }
             if (isset($grupo['dotacion']) && ! $exceso && $problemas === []) {
                 $columna = $grupo['columna'] === 'reserva' ? 'R' : $grupo['columna'];

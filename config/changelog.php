@@ -6594,8 +6594,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.23.699',
+    'current_version' => '2026.11.23.700',
     'entries' => [
+        [
+            'version' => '2026.11.23.700',
+            'title' => 'Docentes por subvención en el Excel de financiamiento',
+            'summary' => 'El informe incorpora docentes prorrateados y horas por establecimiento, con una segunda hoja de ajuste para 2027.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'La hoja agrupa Subv. General, SEP y PIE. ProRetención se incorpora a SEP.',
+                'El prorrateo considera las horas de cada docente en todo el territorio, incluso al filtrar el Excel.',
+                'La variante 2027 muestra los máximos, justificaciones, saldo y glosa. Las horas de glosa y sus docentes equivalentes se suman a Subv. General.',
+            ],
+            'published_at' => '2026-11-23',
+        ],
         [
             'version' => '2026.11.23.699',
             'title' => 'Menor uso de memoria en el Excel por financiamiento',
