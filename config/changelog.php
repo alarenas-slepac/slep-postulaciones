@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.23.698',
+    'current_version' => '2026.11.23.699',
     'entries' => [
+        [
+            'version' => '2026.11.23.699',
+            'title' => 'Menor uso de memoria en el Excel por financiamiento',
+            'summary' => 'El worker libera las asignaciones de cada establecimiento al terminar su cálculo.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'La caché de lectura se comparte dentro de un establecimiento y se descarta antes de procesar el siguiente.',
+                'El prorrateo docente y la distribución de la glosa mantienen su cálculo territorial.',
+            ],
+            'published_at' => '2026-11-23',
+        ],
         [
             'version' => '2026.11.23.698',
             'title' => 'Excel por financiamiento preparado en segundo plano',
