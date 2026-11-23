@@ -25,27 +25,25 @@ class DotacionInformeFinanciamientoExport
 
     public function guardar(Builder $establecimientos, int $anio, string $ruta): void
     {
-        $book = DotacionLecturaCache::ejecutar(function () use ($establecimientos, $anio): Spreadsheet {
-            $periodo = $this->calculador->periodoAsistentes();
-            $informe = $this->dotacionDocente->paraInforme($anio);
-            $filas = [];
-            foreach ((clone $establecimientos)->lazy(10) as $ee) {
-                try {
-                    $filas[] = $this->calculador->fila($ee, $anio, $periodo) + [
-                        'establecimiento_id' => $ee->id,
-                        'dotacion_docente' => $informe['dotacion'][$ee->id] ?? [],
-                    ];
-                } catch (\Throwable $exception) {
-                    report($exception);
-                    throw ValidationException::withMessages([
-                        'export_financiamiento' => 'No se pudo calcular el financiamiento del RBD '.$ee->rbd.'.',
-                    ]);
-                }
+        $periodo = $this->calculador->periodoAsistentes();
+        $informe = $this->dotacionDocente->paraInforme($anio);
+        $filas = [];
+        foreach ((clone $establecimientos)->lazy(10) as $ee) {
+            try {
+                $fila = DotacionLecturaCache::ejecutar(fn () => $this->calculador->fila($ee, $anio, $periodo));
+                $filas[] = $fila + [
+                    'establecimiento_id' => $ee->id,
+                    'dotacion_docente' => $informe['dotacion'][$ee->id] ?? [],
+                ];
+            } catch (\Throwable $exception) {
+                report($exception);
+                throw ValidationException::withMessages([
+                    'export_financiamiento' => 'No se pudo calcular el financiamiento del RBD '.$ee->rbd.'.',
+                ]);
             }
+        }
 
-            return $this->workbook($filas, $anio, $periodo, $informe['glosa']);
-        });
-
+        $book = $this->workbook($filas, $anio, $periodo, $informe['glosa']);
         try {
             (new Xlsx($book))->save($ruta);
         } finally {

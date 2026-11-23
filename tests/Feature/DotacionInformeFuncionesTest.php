@@ -16,6 +16,7 @@ use App\Support\PieHorasCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -24,6 +25,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
 use Tests\Support\IsolatedSecurityTestCase;
 use Tests\Support\PreparaExcelFinanciamiento;
+use WeakReference;
 
 class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
 {
@@ -481,6 +483,47 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             $this->assertEquals(15, $hoja->getCell('H5')->getValue());
             $this->assertEqualsWithDelta(2 + 31 / 41, $hoja->getCell('I5')->getValue(), 0.00001);
             $this->assertEquals(59, $hoja->getCell('J6')->getCalculatedValue());
+        } finally {
+            $libro->disconnectWorksheets();
+        }
+    }
+
+    public function test_excel_libera_las_asignaciones_al_pasar_al_siguiente_establecimiento(): void
+    {
+        $otro = $this->establecimiento(99998);
+        $rut = '99000001K';
+        $this->personal($rut, 24);
+        $this->personal($rut, 20, ['establecimiento_id' => $otro->id, 'rbd' => $otro->rbd]);
+        $this->asignacion(2027, $rut, 'otra_funcion', 'Función sintética', 24);
+        $this->asignacion(2027, $rut, 'otra_funcion', 'Función sintética', 20, ['establecimiento_id' => $otro->id]);
+
+        $referencias = [];
+        $lecturas = [];
+        $retuvoAsignaciones = false;
+        Event::listen('eloquent.retrieved: '.DotacionDocenteAsignacion::class,
+            function (DotacionDocenteAsignacion $asignacion) use (&$referencias, &$lecturas, &$retuvoAsignaciones): void {
+                $id = $asignacion->establecimiento_id;
+                foreach ($referencias as $anterior => $referencia) {
+                    if ($anterior !== $id && $referencia->get() !== null) {
+                        $retuvoAsignaciones = true;
+                    }
+                }
+                $referencias[$id] = WeakReference::create($asignacion);
+                $lecturas[$id] = ($lecturas[$id] ?? 0) + 1;
+            });
+
+        $libro = $this->abrirExcelFinanciamiento(2027);
+        try {
+            $this->assertFalse($retuvoAsignaciones, 'El cálculo retuvo asignaciones del establecimiento anterior.');
+            // El cálculo territorial y las filas del Excel leen cada establecimiento.
+            $this->assertGreaterThanOrEqual(2, $lecturas[$this->ee->id] ?? 0);
+            $this->assertGreaterThanOrEqual(2, $lecturas[$otro->id] ?? 0);
+            foreach ($referencias as $referencia) {
+                $this->assertNull($referencia->get());
+            }
+            $hoja = $libro->getSheetByName('Dotación docente');
+            $this->assertEquals(1, $hoja->getCell('I7')->getCalculatedValue());
+            $this->assertEquals(44, $hoja->getCell('J7')->getCalculatedValue());
         } finally {
             $libro->disconnectWorksheets();
         }

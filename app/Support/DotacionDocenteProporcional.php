@@ -51,68 +51,73 @@ class DotacionDocenteProporcional
         $glosa = $incluirGlosa ? new DotacionDocenteGlosa : null;
         $criterios = [];
         foreach ($establecimientos as $establecimiento) {
-            $id = (int) $establecimiento->id;
-            if ($anio === 2027) {
-                $datos = app(DotacionPal2027::class)->datos($establecimiento);
-                foreach ($this->horasPal2027($establecimiento, $datos, $tablasPal, $reglas) as $rut => $grupos) {
-                    foreach ($grupos as $grupo => $horas) {
-                        $acumular($id, $grupo, (string) $rut, $horas, true);
+            // Conservar sólo los acumulados territoriales al cambiar de establecimiento.
+            DotacionLecturaCache::ejecutar(function () use (
+                $establecimiento, $anio, $acumular, $reglas, $contrataciones, $informeFunciones, $tablasPal, $glosa, &$filas, &$criterios
+            ): void {
+                $id = (int) $establecimiento->id;
+                if ($anio === 2027) {
+                    $datos = app(DotacionPal2027::class)->datos($establecimiento);
+                    foreach ($this->horasPal2027($establecimiento, $datos, $tablasPal, $reglas) as $rut => $grupos) {
+                        foreach ($grupos as $grupo => $horas) {
+                            $acumular($id, $grupo, (string) $rut, $horas, true);
+                        }
+                    }
+                    if ($glosa !== null) {
+                        $horasDotacion = array_sum(array_column($filas[$id] ?? [], 'horas'));
+                        $criterios[$id] = $glosa->criterio($establecimiento, $datos, $horasDotacion);
+                    }
+                    return;
+                }
+                $justificados = array_flip(DotacionSobredotacionJustificacion::rutsJustificados($id, $anio));
+                $cupos = $contrataciones->docentesVirtuales($establecimiento, $anio, false)->pluck('rut_normalizado')->flip()->all();
+                $asignaciones = [];
+                $hayDirectorAdp = false;
+                foreach (DotacionAsignacionCalculator::assignmentsFor($establecimiento, $anio) as $asignacion) {
+                    $rut = DotacionEstablecimientoCalculator::normalizeRut($asignacion->docente_rut_normalizado ?: $asignacion->docente_rut);
+                    $horas = (float) $asignacion->horas_contrato;
+                    if ($rut === ''
+                        || (ContratacionHabilitacionService::esRutVirtual($rut) && ! isset($cupos[$rut]))
+                        || $horas <= 0
+                        || $asignacion->tipo_asignacion === 'reserva_no_normativa') {
+                        continue;
+                    }
+                    $esDocente = DotacionAsignacionCalculator::coverageEstamento($asignacion) === 'docente';
+                    $cargo = $this->cargoAsignacion($asignacion, $reglas);
+                    $hayDirectorAdp = $hayDirectorAdp || ($esDocente && $asignacion->tipo_asignacion === 'funcion_directiva' && $cargo === 'director_adp');
+                    if (isset($justificados[$rut])) {
+                        continue;
+                    }
+                    $asignaciones[] = [$asignacion, $rut, $horas, $cargo, $esDocente];
+                }
+
+                if (! $hayDirectorAdp) {
+                    foreach (DotacionAsignacionCalculator::plazasPorAsumir($establecimiento, $anio) as $plaza) {
+                        $acumular($id, 'directiva', 'DIRECTOR_ADP_POR_ASUMIR_'.$id, (float) $plaza['horas_contrato'], true);
+                        $hayDirectorAdp = true;
                     }
                 }
-                if ($glosa !== null) {
-                    $horasDotacion = array_sum(array_column($filas[$id] ?? [], 'horas'));
-                    $criterios[$id] = $glosa->criterio($establecimiento, $datos, $horasDotacion);
-                }
-                continue;
-            }
-            $justificados = array_flip(DotacionSobredotacionJustificacion::rutsJustificados($id, $anio));
-            $cupos = $contrataciones->docentesVirtuales($establecimiento, $anio, false)->pluck('rut_normalizado')->flip()->all();
-            $asignaciones = [];
-            $hayDirectorAdp = false;
-            foreach (DotacionAsignacionCalculator::assignmentsFor($establecimiento, $anio) as $asignacion) {
-                $rut = DotacionEstablecimientoCalculator::normalizeRut($asignacion->docente_rut_normalizado ?: $asignacion->docente_rut);
-                $horas = (float) $asignacion->horas_contrato;
-                if ($rut === ''
-                    || (ContratacionHabilitacionService::esRutVirtual($rut) && ! isset($cupos[$rut]))
-                    || $horas <= 0
-                    || $asignacion->tipo_asignacion === 'reserva_no_normativa') {
-                    continue;
-                }
-                $esDocente = DotacionAsignacionCalculator::coverageEstamento($asignacion) === 'docente';
-                $cargo = $this->cargoAsignacion($asignacion, $reglas);
-                $hayDirectorAdp = $hayDirectorAdp || ($esDocente && $asignacion->tipo_asignacion === 'funcion_directiva' && $cargo === 'director_adp');
-                if (isset($justificados[$rut])) {
-                    continue;
-                }
-                $asignaciones[] = [$asignacion, $rut, $horas, $cargo, $esDocente];
-            }
 
-            if (! $hayDirectorAdp) {
-                foreach (DotacionAsignacionCalculator::plazasPorAsumir($establecimiento, $anio) as $plaza) {
-                    $acumular($id, 'directiva', 'DIRECTOR_ADP_POR_ASUMIR_'.$id, (float) $plaza['horas_contrato'], true);
-                    $hayDirectorAdp = true;
+                foreach ($asignaciones as [$asignacion, $rut, $horas, $cargo, $esDocente]) {
+                    $grupo = $this->grupoAsignacion($asignacion, $cargo, $hayDirectorAdp);
+                    $acumular($id, $grupo, $rut, $horas, $esDocente);
                 }
-            }
 
-            foreach ($asignaciones as [$asignacion, $rut, $horas, $cargo, $esDocente]) {
-                $grupo = $this->grupoAsignacion($asignacion, $cargo, $hayDirectorAdp);
-                $acumular($id, $grupo, $rut, $horas, $esDocente);
-            }
-
-            $pendientes = $informeFunciones->saldosSinAsignar($establecimiento, $anio);
-            if ($pendientes !== []) {
-                $saldoAula = $this->saldoAula($establecimiento, $anio, $filas[$id]['aula']['horas'] ?? 0);
-                foreach ($pendientes as $rut => $horas) {
-                    $aula = min($horas, $saldoAula);
-                    $saldoAula = round($saldoAula - $aula, 2);
-                    if ($aula > 0) {
-                        $acumular($id, 'aula', $rut, $aula, true);
-                    }
-                    if ($horas > $aula) {
-                        $acumular($id, 'tecnico_pedagogica', $rut, round($horas - $aula, 2), true);
+                $pendientes = $informeFunciones->saldosSinAsignar($establecimiento, $anio);
+                if ($pendientes !== []) {
+                    $saldoAula = $this->saldoAula($establecimiento, $anio, $filas[$id]['aula']['horas'] ?? 0);
+                    foreach ($pendientes as $rut => $horas) {
+                        $aula = min($horas, $saldoAula);
+                        $saldoAula = round($saldoAula - $aula, 2);
+                        if ($aula > 0) {
+                            $acumular($id, 'aula', $rut, $aula, true);
+                        }
+                        if ($horas > $aula) {
+                            $acumular($id, 'tecnico_pedagogica', $rut, round($horas - $aula, 2), true);
+                        }
                     }
                 }
-            }
+            });
         }
 
         foreach ($horasPorEstablecimiento as $id => $grupos) {
