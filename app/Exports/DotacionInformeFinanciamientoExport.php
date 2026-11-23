@@ -15,7 +15,6 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DotacionInformeFinanciamientoExport
 {
@@ -24,9 +23,8 @@ class DotacionInformeFinanciamientoExport
         private readonly DotacionDocenteProporcional $dotacionDocente,
     ) {}
 
-    public function download(Builder $establecimientos, int $anio): StreamedResponse
+    public function guardar(Builder $establecimientos, int $anio, string $ruta): void
     {
-        @set_time_limit(240);
         $book = DotacionLecturaCache::ejecutar(function () use ($establecimientos, $anio): Spreadsheet {
             $periodo = $this->calculador->periodoAsistentes();
             $informe = $this->dotacionDocente->paraInforme($anio);
@@ -48,16 +46,11 @@ class DotacionInformeFinanciamientoExport
             return $this->workbook($filas, $anio, $periodo, $informe['glosa']);
         });
 
-        return response()->streamDownload(function () use ($book): void {
-            try {
-                (new Xlsx($book))->save('php://output');
-            } finally {
-                $book->disconnectWorksheets();
-            }
-        }, 'horas_financiamiento_por_rbd_'.$anio.'_'.now()->format('Ymd_His').'.xlsx', [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Cache-Control' => 'private, no-store, max-age=0',
-        ]);
+        try {
+            (new Xlsx($book))->save($ruta);
+        } finally {
+            $book->disconnectWorksheets();
+        }
     }
 
     public function workbook(array $filas, int $anio, ?array $periodo, ?array $glosa = null): Spreadsheet

@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exports\DotacionInformeFuncionesExport;
-use App\Exports\DotacionInformeFinanciamientoExport;
 use App\Exports\DotacionInformePlanesExport;
 use App\Exports\DotacionInformePlanesNivelesExport;
 use App\Http\Controllers\Controller;
+use App\Models\DotacionFinanciamientoExportacion;
 use App\Models\Establecimiento;
 use App\Support\DotacionInformeFunciones;
 use App\Support\DotacionLecturaCache;
@@ -31,17 +31,10 @@ class DotacionInformeFuncionesController extends Controller
         $anio = (int) ($data['anio'] ?? (now()->year === 2026 ? 2026 : 2027));
         $q = trim((string) ($data['q'] ?? ''));
         $comuna = trim((string) ($data['comuna'] ?? ''));
-        $base = Establecimiento::query()->where(fn ($query) => $query->whereNull('sala_cuna')->orWhere('sala_cuna', false));
-        $filtrados = (clone $base)
-            ->when($q !== '', fn ($query) => $query->where(fn ($inner) => $inner
-                ->where('nombre_establecimiento', 'like', "%{$q}%")
-                ->orWhere('rbd', 'like', "%{$q}%")
-                ->orWhere('comuna', 'like', "%{$q}%")))
-            ->when($comuna !== '', fn ($query) => $query->where('comuna', $comuna))
-            ->orderBy('comuna')->orderBy('nombre_establecimiento')->orderBy('id');
         if ($request->boolean('export_financiamiento')) {
-            return app(DotacionInformeFinanciamientoExport::class)->download($filtrados, $anio);
+            return redirect()->route('admin.dotacion-establecimiento.financiamiento.create', compact('anio', 'q', 'comuna'));
         }
+        $filtrados = DotacionInformeFunciones::establecimientosFiltrados($q, $comuna);
         if ($request->boolean('export_planes_niveles')) {
             return app(DotacionInformePlanesNivelesExport::class)->download($filtrados, $anio, ['q' => $q, 'comuna' => $comuna]);
         }
@@ -75,7 +68,11 @@ class DotacionInformeFuncionesController extends Controller
 
         return view('admin.dotacion-establecimiento.informe-funciones', [
             'establecimientos' => $establecimientos, 'anio' => $anio, 'q' => $q, 'comuna' => $comuna,
-            'comunas' => (clone $base)->whereNotNull('comuna')->distinct()->orderBy('comuna')->pluck('comuna')->filter()->values(),
+            'comunas' => DotacionInformeFunciones::establecimientos()->whereNotNull('comuna')->distinct()->orderBy('comuna')->pluck('comuna')->filter()->values(),
+            'ultimaExportacionFinanciamiento' => DotacionFinanciamientoExportacion::disponible()
+                ? DotacionFinanciamientoExportacion::query()->where('user_id', $request->user()->id)
+                    ->where('expires_at', '>', now())->latest()->first()
+                : null,
             'grupos' => DotacionInformeFunciones::GRUPOS, 'totales' => $totales,
             'errores' => $establecimientos->count() - $validos->count(), 'generadoEn' => now(),
         ]);

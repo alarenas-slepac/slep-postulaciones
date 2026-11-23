@@ -7,6 +7,7 @@ use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
 use App\Services\Dotacion\ContratacionHabilitacionService;
 use App\Services\Padron\PadronPeriodoService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -26,6 +27,22 @@ class DotacionInformeFunciones
     public static function puedeVer(?string $rol): bool
     {
         return in_array($rol, self::ROLES, true);
+    }
+
+    public static function establecimientos(): Builder
+    {
+        return Establecimiento::query()->where(fn ($query) => $query->whereNull('sala_cuna')->orWhere('sala_cuna', false));
+    }
+
+    public static function establecimientosFiltrados(string $q, string $comuna): Builder
+    {
+        return self::establecimientos()
+            ->when($q !== '', fn ($query) => $query->where(fn ($inner) => $inner
+                ->where('nombre_establecimiento', 'like', "%{$q}%")
+                ->orWhere('rbd', 'like', "%{$q}%")
+                ->orWhere('comuna', 'like', "%{$q}%")))
+            ->when($comuna !== '', fn ($query) => $query->where('comuna', $comuna))
+            ->orderBy('comuna')->orderBy('nombre_establecimiento')->orderBy('id');
     }
 
     public function fila(Establecimiento $establecimiento, int $anio): array
