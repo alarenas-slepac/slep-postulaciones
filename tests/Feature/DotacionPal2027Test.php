@@ -107,6 +107,13 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
             $this->assertSame('38', (string) $docs->xpath('//m:c[@r="K3"]/m:v')[0]);
             $this->assertSame('65/35', (string) $docs->xpath('//m:c[@r="M3"]/m:is/m:t')[0]);
             $this->assertEmpty($docs->xpath('//m:c[@r="A4"]/*'));
+            $this->assertSame('TRAMO DOCENTE', (string) $docs->xpath('//m:c[@r="T2"]/m:is/m:t')[0]);
+            $this->assertSame('Avanzado', (string) $docs->xpath('//m:c[@r="T3"]/m:is/m:t')[0]);
+            $this->assertEmpty($docs->xpath('//m:c[@r="T4"]/*'));
+            $table = $this->xml($zip->getFromName('xl/tables/table1.xml'));
+            $this->assertSame('A1:T94', (string) $table['ref']);
+            $this->assertSame('20', (string) $table->xpath('//m:tableColumns')[0]['count']);
+            $this->assertCount(1, $table->xpath('//m:tableColumn[@name="Tramo docente"]'));
         } finally { $zip->close(); $original->close(); }
         $this->assertSame($before, DB::table('establecimientos')->get()->toJson());
     }
@@ -637,7 +644,8 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
             $this->assertSame($formulas['J3'], $formulas['J222']);
             $this->assertSame($formulas['N3'], $formulas['N222']);
             $this->assertSame($formulas['O3'], $formulas['O222']);
-            $this->assertStringContainsString('ref="A1:S222"', $zip->getFromName('xl/tables/table1.xml'));
+            $this->assertStringContainsString('ref="A1:T222"', $zip->getFromName('xl/tables/table1.xml'));
+            $this->assertSame('Avanzado', (string) $this->xml($docs)->xpath('//m:c[@r="T222"]/m:is/m:t')[0]);
             $this->assertStringContainsString('sqref="M3:M222"', $docs);
             $summary = $zip->getFromName('xl/worksheets/sheet2.xml');
             $this->assertStringContainsString('$A$3:$A$222', $summary);
@@ -670,7 +678,7 @@ class DotacionPal2027Test extends IsolatedSecurityTestCase
     private function reporte(array $data): array { return app(DotacionPal2027::class)->construir($this->ee, $data, app(DotacionPal2027Export::class)->tablas()); }
     private function data(): array
     {
-        return ['docentes' => [$this->docente()], 'cursos' => ['resumen_cursos_planes' => ['totales' => ['horas' => 38, 'horas_contrato_equivalente' => 44]], 'rows' => ['1B' => ['label' => '1° Básico', 'matricula' => 25,
+        return ['docentes' => [$this->docente(['tramo' => ' Avanzado '])], 'cursos' => ['resumen_cursos_planes' => ['totales' => ['horas' => 38, 'horas_contrato_equivalente' => 44]], 'rows' => ['1B' => ['label' => '1° Básico', 'matricula' => 25,
             'cursos' => 1, 'horas_por_nivel' => 38, 'total_horas_contrato_equivalente' => 44, 'detalles' => [['establecimiento_curso_id' => 1,
                 'nombre_seccion' => '1° Básico A', 'matricula' => 25, 'horas_plan_base' => 38, 'horas_contrato_base' => 44]]]]]];
     }

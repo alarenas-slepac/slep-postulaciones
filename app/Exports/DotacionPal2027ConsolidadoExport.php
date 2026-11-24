@@ -39,6 +39,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             $partes = $this->partes($zip);
             $ee = $this->esquema($zip, $partes['Info Establecimiento'], 4, 34);
             $docs = $this->esquema($zip, $partes['Info Funcionario (DOCENTE)'], 3, 94);
+            $this->prepararColumnaTramo($docs['doc'], $docs['fin']);
             $styles = $this->xml($zip, 'xl/styles.xml');
             foreach (['asistentes' => ['Info Funcionario(AE)', 204, 'M', ['B','M']], 'vtf' => ['Info Funcionario (VTF)', 133, 'J', ['B','J']]] as $key => [$nombre, $fin, $columna, $textos]) {
                 $modelo = $this->esquema($zip, $partes[$nombre], 3, $fin);
@@ -87,7 +88,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             $eeSheet = $temporales[] = $this->temporal(); $docSheet = $temporales[] = $this->temporal();
             $this->componer($ee, $eeRows, $eeSheet, 'H', $eeLast);
             $this->validaciones($docs['doc'], $docLast);
-            $this->componer($docs, $docRows, $docSheet, 'S', $docLast);
+            $this->componer($docs, $docRows, $docSheet, self::COLUMNA_TRAMO, $docLast);
             if (! $zip->addFile($eeSheet, $partes['Info Establecimiento']) || ! $zip->addFile($docSheet, $partes['Info Funcionario (DOCENTE)'])) {
                 throw new \RuntimeException('No se pudieron incorporar las hojas PAL.');
             }
@@ -106,10 +107,7 @@ class DotacionPal2027ConsolidadoExport extends DotacionPal2027Export
             }
             unset($hoja);
             $this->reemplazar($zip, 'xl/styles.xml', $styles);
-            $table = $this->xml($zip, 'xl/tables/table1.xml');
-            $table->documentElement->setAttribute('ref', 'A1:S'.$docLast);
-            foreach ($table->getElementsByTagNameNS(self::NS, 'autoFilter') as $filter) { $filter->setAttribute('ref', 'A1:S'.$docLast); }
-            $this->reemplazar($zip, 'xl/tables/table1.xml', $table);
+            $this->ampliarTablaDocentes($zip, $docLast);
             $this->resumen($zip, $partes['Resumen'], $cantidad, $eeLast, $docLast, $personalLast);
             $exclusiones->incorporar($zip);
             if (! $zip->close()) { throw new \RuntimeException('No se pudo finalizar el consolidado PAL.'); }

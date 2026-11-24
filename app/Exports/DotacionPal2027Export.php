@@ -14,6 +14,8 @@ use ZipArchive;
 class DotacionPal2027Export
 {
     protected const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    protected const COLUMNA_TRAMO = 'T';
+    private const TITULO_TRAMO = 'Tramo docente';
 
     public function template(): string
     {
@@ -88,9 +90,11 @@ class DotacionPal2027Export
             $exclusiones->agregar($reporte['excluidos'] ?? []);
             $last = max(94, count($reporte['docentes']) + 2);
             $doc = $this->xml($zip, $partes['Info Funcionario (DOCENTE)']);
+            $this->prepararColumnaTramo($doc, 94);
             $this->rellenar($doc, $reporte['docentes'], 3, 94, ['J','N','O'], $styles);
             $this->validaciones($doc, $last);
             $zip->addFromString($partes['Info Funcionario (DOCENTE)'], $doc->saveXML());
+            $this->ampliarTablaDocentes($zip, $last);
             $ee = $this->xml($zip, $partes['Info Establecimiento']);
             $this->rellenar($ee, $reporte['cursos'], 4, 34, ['G'], $styles);
             $zip->addFromString($partes['Info Establecimiento'], $ee->saveXML());
@@ -112,12 +116,6 @@ class DotacionPal2027Export
                 $zip->addFromString($partes[$hoja], $personal->saveXML());
             }
             $zip->addFromString('xl/styles.xml', $styles->saveXML());
-            if ($last > 94) {
-                $table = $this->xml($zip, 'xl/tables/table1.xml');
-                $table->documentElement->setAttribute('ref', 'A1:S'.$last);
-                foreach ($table->getElementsByTagNameNS(self::NS, 'autoFilter') as $filter) { $filter->setAttribute('ref', 'A1:S'.$last); }
-                $zip->addFromString('xl/tables/table1.xml', $table->saveXML());
-            }
             if ($last > 176 || $personalLast !== []) {
                 $summary = $this->xml($zip, $partes['Resumen']);
                 $docEnd = max(176, $last);
@@ -153,6 +151,56 @@ class DotacionPal2027Export
         $doc = new DOMDocument;
         if ($bytes === false || ! $doc->loadXML($bytes, LIBXML_NONET)) { throw new \RuntimeException('La plantilla PAL no contiene una estructura válida.'); }
         return $doc;
+    }
+
+    protected function prepararColumnaTramo(DOMDocument $doc, int $finModelo): void
+    {
+        // Al agregar la columna a la derecha, los rangos y fórmulas de la plantilla mantienen sus referencias.
+        $cols = $doc->getElementsByTagNameNS(self::NS, 'cols')->item(0);
+        $col = $doc->createElementNS(self::NS, 'col');
+        foreach (['min' => '20', 'max' => '20', 'width' => '27', 'customWidth' => '1'] as $atributo => $valor) {
+            $col->setAttribute($atributo, $valor);
+        }
+        $cols->appendChild($col);
+        $dimension = $doc->getElementsByTagNameNS(self::NS, 'dimension')->item(0);
+        $dimension->setAttribute('ref', preg_replace('/S(?=\d+$)/', self::COLUMNA_TRAMO, $dimension->getAttribute('ref')));
+
+        foreach ($doc->getElementsByTagNameNS(self::NS, 'row') as $row) {
+            $numero = (int) $row->getAttribute('r');
+            if ($numero > $finModelo) { break; }
+
+            $modelo = $row->getElementsByTagNameNS(self::NS, 'c')->item($numero === 1 ? 0 : 4);
+            $cell = $doc->createElementNS(self::NS, 'c');
+            $cell->setAttribute('r', self::COLUMNA_TRAMO.$numero);
+            if ($modelo?->hasAttribute('s')) { $cell->setAttribute('s', $modelo->getAttribute('s')); }
+            if ($numero <= 2) {
+                $cell->setAttribute('t', 'inlineStr');
+                $texto = $doc->createElementNS(self::NS, 't', $numero === 1 ? self::TITULO_TRAMO : mb_strtoupper(self::TITULO_TRAMO));
+                $cell->appendChild($doc->createElementNS(self::NS, 'is'))->appendChild($texto);
+            }
+            $row->appendChild($cell);
+            $row->setAttribute('spans', '1:20');
+        }
+    }
+
+    protected function ampliarTablaDocentes(ZipArchive $zip, int $last): void
+    {
+        $part = 'xl/tables/table1.xml';
+        $table = $this->xml($zip, $part);
+        $rango = 'A1:'.self::COLUMNA_TRAMO.$last;
+        $table->documentElement->setAttribute('ref', $rango);
+        foreach ($table->getElementsByTagNameNS(self::NS, 'autoFilter') as $filter) { $filter->setAttribute('ref', $rango); }
+        $columnas = $table->getElementsByTagNameNS(self::NS, 'tableColumns')->item(0);
+        $id = 0;
+        foreach ($columnas->getElementsByTagNameNS(self::NS, 'tableColumn') as $existente) {
+            $id = max($id, (int) $existente->getAttribute('id'));
+        }
+        $columna = $table->createElementNS(self::NS, 'tableColumn');
+        $columna->setAttribute('id', (string) ($id + 1));
+        $columna->setAttribute('name', self::TITULO_TRAMO);
+        $columnas->appendChild($columna);
+        $columnas->setAttribute('count', (string) $columnas->getElementsByTagNameNS(self::NS, 'tableColumn')->length);
+        if (! $zip->addFromString($part, $table->saveXML())) { throw new \RuntimeException('No se pudo ampliar la tabla docente del PAL.'); }
     }
 
     private function rellenar(DOMDocument $doc, array $datos, int $inicio, int $originalFin, array $calculadas, ?DOMDocument $styles = null, ?array $textos = null): void
@@ -221,10 +269,10 @@ class DotacionPal2027Export
                     $esDocente = in_array('J', $calculadas, true);
                     $identidadSintetica = $column === 'A' && str_starts_with((string) $value, 'VACANTE-');
                     $envolver = $textos !== null ? in_array($column, $textos, true)
-                        : ($column === 'S' || ($esDocente ? $identidadSintetica : in_array($column, ['A','C'], true)));
+                        : ($column === 'S' || ($esDocente ? $identidadSintetica || $column === self::COLUMNA_TRAMO : in_array($column, ['A','C'], true)));
                     if ($styles && $envolver) {
                         $porLinea = $textos !== null ? ($column === 'B' ? 18 : 26)
-                            : ($column === 'A' ? 13 : ($column === 'C' ? 25 : 50));
+                            : match ($column) { 'A' => 13, 'C' => 25, self::COLUMNA_TRAMO => 26, default => 50 };
                         $height = min(409, max((float) $row->getAttribute('ht'), ceil(mb_strlen($clean) / $porLinea) * 14 + 6));
                         $row->setAttribute('ht', (string) $height); $row->setAttribute('customHeight', '1');
                         if ($styles) {

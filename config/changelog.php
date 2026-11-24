@@ -6594,8 +6594,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.706',
+    'current_version' => '2026.11.24.707',
     'entries' => [
+        [
+            'version' => '2026.11.24.707',
+            'title' => 'Tramo docente en el Excel PAL 2027',
+            'summary' => 'Añade el tramo del padrón a la hoja Info Funcionario (DOCENTE) del PAL por establecimiento y consolidado.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Cada fila docente muestra su tramo registrado. Las vacantes y los registros sin tramo quedan en blanco.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.24.706',
             'title' => 'Cantidad de cursos en el detalle de planes de estudio',

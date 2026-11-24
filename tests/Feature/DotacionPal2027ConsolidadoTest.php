@@ -98,6 +98,8 @@ class DotacionPal2027ConsolidadoTest extends IsolatedSecurityTestCase
             $this->assertSame('99015', (string) $ee->xpath('//m:c[@r="B19"]/m:is/m:t')[0]);
             $this->assertStringContainsString('Sin cursos registrados', (string) $ee->xpath('//m:c[@r="C19"]/m:is/m:t')[0]);
             $this->assertSame('99014', (string) $docs->xpath('//m:c[@r="C17"]/m:is/m:t')[0]);
+            $this->assertSame('TRAMO DOCENTE', (string) $docs->xpath('//m:c[@r="T2"]/m:is/m:t')[0]);
+            $this->assertCount(15, $docs->xpath('//m:c[starts-with(@r,"T")]/m:is/m:t[text()="Experto I"]'));
             $this->assertStringContainsString("'Info Establecimiento'!\$B\$4:\$B\$34", (string) $summary->xpath('//m:c[@r="A3"]/m:f')[0]);
             $this->assertSame('A3:A18', (string) $summary->xpath('//m:c[@r="A3"]/m:f')[0]['ref']);
             $this->assertEmpty($summary->xpath('//m:row[@r>=3]/m:c/m:v'));
@@ -114,7 +116,7 @@ class DotacionPal2027ConsolidadoTest extends IsolatedSecurityTestCase
     public function test_amplia_110_establecimientos_1540_niveles_y_11000_filas_sin_truncar(): void
     {
         $entry = ['A' => '99000001-K', 'B' => '=Escuela sintética', 'C' => '99000', 'D' => 'Educación Básica',
-            'E' => 'Docente', 'F' => 'Docente', 'G' => 'Docente aula', 'H' => 'Titular', 'K' => 38, 'M' => '65/35', 'S' => 'Borrador de prueba'];
+            'E' => 'Docente', 'F' => 'Docente', 'G' => 'Docente aula', 'H' => 'Titular', 'K' => 38, 'M' => '65/35', 'S' => 'Borrador de prueba', 'T' => 'Experto I'];
         $curso = ['A' => '=Escuela sintética', 'B' => '99000', 'C' => '1° Básico', 'D' => 25, 'E' => 1, 'F' => 38, 'H' => 44];
         $visitados = 0;
         $reportes = (function () use ($entry, $curso, &$visitados) {
@@ -142,13 +144,14 @@ class DotacionPal2027ConsolidadoTest extends IsolatedSecurityTestCase
                         else {
                             $last = (string) $row->xpath('//m:c[@r="J11002"]/m:f')[0];
                             $this->assertSame('99109', (string) $row->xpath('//m:c[@r="C11002"]/m:is/m:t')[0]);
+                            $this->assertSame('Experto I', (string) $row->xpath('//m:c[@r="T11002"]/m:is/m:t')[0]);
                         }
                     }
                 }
             }
             $reader->close();
             $this->assertSame(11000, $count); $this->assertSame($first, $last);
-            $this->assertStringContainsString('ref="A1:S11002"', $zip->getFromName('xl/tables/table1.xml'));
+            $this->assertStringContainsString('ref="A1:T11002"', $zip->getFromName('xl/tables/table1.xml'));
             $this->assertStringContainsString('sqref="M3:M11002"', $xml);
             unset($xml);
             $ee = $this->xml($zip->getFromName('xl/worksheets/sheet3.xml'));
@@ -197,7 +200,7 @@ class DotacionPal2027ConsolidadoTest extends IsolatedSecurityTestCase
         return ['resumen' => ['anio_padron' => 2026], 'cursos' => ['rows' => ['1B' => ['label' => '1° Básico', 'matricula' => 25,
             'cursos' => 1, 'horas_por_nivel' => 38, 'total_horas_contrato_equivalente' => 44, 'detalles' => [['establecimiento_curso_id' => 1,
                 'nombre_seccion' => '1° Básico A', 'matricula' => 25, 'horas_plan_base' => 38, 'horas_contrato_base' => 44]]]]],
-            'docentes' => [['rut' => '99000001-K', 'titulo' => 'Sin título declarado', 'funcion' => 'Docente', 'horas_contrato' => 44, 'horas_planta' => 44,
+            'docentes' => [['rut' => '99000001-K', 'titulo' => 'Sin título declarado', 'funcion' => 'Docente', 'tramo' => 'Experto I', 'horas_contrato' => 44, 'horas_planta' => 44,
                 'asignaciones' => [['id' => 1, 'docente_rut' => '99000001-K', 'estado' => 'activa', 'tipo_asignacion' => 'plan_estudio', 'subvencion' => 'General',
                     'horas_contrato' => 44, 'horas_plan_pedagogicas' => 38, 'proporcion_aplicada' => '65/35',
                     'establecimientoCurso' => ['curso' => ['codigo' => '1B', 'nivel_educativo' => 'Educación Básica']]]]]]];
