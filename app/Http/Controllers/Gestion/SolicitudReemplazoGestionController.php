@@ -26,6 +26,7 @@ use App\Mail\SolicitudReemplazoRechazadaUatp;
 use App\Mail\SolicitudReemplazoValidadaPlani;
 use Illuminate\Support\Carbon;
 use App\Support\NotificationAudit;
+use App\Support\ReemplazoDisponibilidadPostulante;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
@@ -1554,26 +1555,7 @@ class SolicitudReemplazoGestionController extends Controller
         }
         $request->validate([$fechaCampo => $fechaReglas]);
         $selectedInicioTrabajo = (string) $request->query($fechaCampo, '');
-        $busyIds = [];
-        $busyQuery = $this->buildAcceptedPeriodConflictQuery(
-            SolicitudReemplazo::query(),
-            $solicitud,
-            $selectedInicioTrabajo !== '' ? $selectedInicioTrabajo : null
-        );
-        if ($busyQuery) {
-            $busyIds = $busyQuery
-                ->whereNotNull('postulant_profile_id')
-                ->pluck('postulant_profile_id')
-                ->map(fn($x) => (int) $x)
-                ->all();
-        }
-        $busySet = array_fill_keys($busyIds, true);
         $requestedHours = $this->resolveSolicitudRequestedHours($solicitud);
-        $hourBlockedSet = $this->buildMaxHoursBlockedSet(
-            $solicitud,
-            $selectedInicioTrabajo !== '' ? $selectedInicioTrabajo : null,
-            $requestedHours
-        );
 
         $q = User::query()
             ->select(['id', 'rut', 'nombres', 'apellido_paterno', 'apellido_materno'])
@@ -1625,6 +1607,13 @@ class SolicitudReemplazoGestionController extends Controller
             ->orderBy('nombres')
             ->limit(300)
             ->get();
+        $disponibilidad = app(ReemplazoDisponibilidadPostulante::class);
+        $cruces = $disponibilidad->cruces(
+            $this->resolveEffectiveStartDate($solicitud, $selectedInicioTrabajo),
+            $this->resolveEffectiveEndDate($solicitud),
+            $solicitud->id,
+            $candidatos->pluck('postulantProfile.id')->filter()->all(),
+        );
 
         $types = \App\Models\DocumentType::query()
             ->orderBy('sort_order')
@@ -1667,8 +1656,9 @@ class SolicitudReemplazoGestionController extends Controller
             $percent = $total > 0 ? (int) round($uploaded * 100 / $total) : 100;
             $docsEligible = ($percent >= 100);
 
-            $periodConflict = isset($busySet[$ppId]);
-            $hourConflict = isset($hourBlockedSet[$ppId]);
+            $cruce = $cruces->get($ppId);
+            $periodConflict = $cruce !== null;
+            $hourConflict = $disponibilidad->superaLimite($cruce, $requestedHours);
 
             $item = [
                 'id' => $ppId,
@@ -1685,7 +1675,7 @@ class SolicitudReemplazoGestionController extends Controller
                     ? (bool) ($u->documents?->firstWhere('document_type_id', $cvTypeId)?->path)
                     : false,
                 'period_conflict' => (bool) $periodConflict,
-                'conflict_reason' => $periodConflict ? 'Tiene solicitud aceptada en el mismo período' : null,
+                'conflict_reason' => $periodConflict ? $disponibilidad->detalle($cruce, null)['aviso'] : null,
                 'hour_conflict' => (bool) $hourConflict,
                 'hour_conflict_reason' => $hourConflict ? 'Supera el máximo permitido de 44 horas considerando solicitudes vigentes.' : null,
                 'manual_restriction' => (bool) ($restriction['manual_active'] ?? false),
@@ -2252,22 +2242,6 @@ class SolicitudReemplazoGestionController extends Controller
         return $solicitud->estado === 'pendiente_validacion' ? 'supervisor_plani' : 'coordinador_uatp';
     }
 
-    private function buildAcceptedPeriodConflictQuery($query, SolicitudReemplazo $solicitud, ?string $overrideInicioTrabajo = null)
-    {
-        $currentStart = $this->resolveEffectiveStartDate($solicitud, $overrideInicioTrabajo);
-        $currentEnd = $this->resolveEffectiveEndDate($solicitud);
-
-        if (!$currentStart || !$currentEnd) {
-            return null;
-        }
-
-        return $query
-            ->where('id', '<>', $solicitud->id)
-            ->whereIn('estado', ['aceptada'])
-            ->whereRaw('DATE(COALESCE(fecha_inicio_trabajo, fecha_inicio)) <= ?', [$currentEnd])
-            ->whereDate('fecha_termino', '>=', $currentStart);
-    }
-
     private function resolveEffectiveStartDate(SolicitudReemplazo $solicitud, ?string $overrideInicioTrabajo = null): ?string
     {
         if ($overrideInicioTrabajo !== null && trim($overrideInicioTrabajo) !== '') {
@@ -2294,46 +2268,6 @@ class SolicitudReemplazoGestionController extends Controller
         return null;
     }
 
-    private function buildMaxHoursBlockedSet(SolicitudReemplazo $solicitud, ?string $overrideInicioTrabajo = null, float $requestedHours = 0): array
-    {
-        $startDate = $this->resolveEffectiveStartDate($solicitud, $overrideInicioTrabajo);
-        $endDate = $this->resolveEffectiveEndDate($solicitud);
-
-        if (!$startDate || !$endDate) {
-            return [];
-        }
-
-        $rows = SolicitudReemplazo::query()
-            ->select('solicitudes_reemplazo.id', 'solicitudes_reemplazo.postulant_profile_id')
-            ->join('solicitud_reemplazo_jornadas as srj', 'srj.solicitud_reemplazo_id', '=', 'solicitudes_reemplazo.id')
-            ->where('solicitudes_reemplazo.id', '<>', $solicitud->id)
-            ->whereIn('solicitudes_reemplazo.estado', ['aceptada'])
-            ->whereNotNull('solicitudes_reemplazo.postulant_profile_id')
-            ->whereRaw('DATE(COALESCE(solicitudes_reemplazo.fecha_inicio_trabajo, solicitudes_reemplazo.fecha_inicio)) <= ?', [$endDate])
-            ->whereDate('solicitudes_reemplazo.fecha_termino', '>=', $startDate)
-            ->groupBy('solicitudes_reemplazo.id', 'solicitudes_reemplazo.postulant_profile_id')
-            ->selectRaw('COALESCE(SUM(srj.reemplazo_total), 0) as total_horas')
-            ->get();
-
-        $totals = [];
-        foreach ($rows as $row) {
-            $profileId = (int) ($row->postulant_profile_id ?? 0);
-            if ($profileId <= 0) {
-                continue;
-            }
-            $totals[$profileId] = round((float) ($totals[$profileId] ?? 0) + (float) ($row->total_horas ?? 0), 2);
-        }
-
-        $blocked = [];
-        foreach ($totals as $profileId => $hours) {
-            if (round($hours + max(0, $requestedHours), 2) > 44.0) {
-                $blocked[(int) $profileId] = true;
-            }
-        }
-
-        return $blocked;
-    }
-
     private function wouldExceedMaxActiveHours(int $postulantProfileId, SolicitudReemplazo $solicitud, ?string $overrideInicioTrabajo = null, float $requestedHours = 0): bool
     {
         if ($postulantProfileId <= 0) {
@@ -2346,16 +2280,10 @@ class SolicitudReemplazoGestionController extends Controller
             return false;
         }
 
-        $activeHours = (float) SolicitudReemplazoJornada::query()
-            ->join('solicitudes_reemplazo', 'solicitudes_reemplazo.id', '=', 'solicitud_reemplazo_jornadas.solicitud_reemplazo_id')
-            ->where('solicitudes_reemplazo.postulant_profile_id', $postulantProfileId)
-            ->where('solicitudes_reemplazo.id', '<>', $solicitud->id)
-            ->whereIn('solicitudes_reemplazo.estado', ['aceptada'])
-            ->whereRaw('DATE(COALESCE(solicitudes_reemplazo.fecha_inicio_trabajo, solicitudes_reemplazo.fecha_inicio)) <= ?', [$endDate])
-            ->whereDate('solicitudes_reemplazo.fecha_termino', '>=', $startDate)
-            ->sum('solicitud_reemplazo_jornadas.reemplazo_total');
+        $disponibilidad = app(ReemplazoDisponibilidadPostulante::class);
+        $cruce = $disponibilidad->cruces($startDate, $endDate, $solicitud->id, [$postulantProfileId])->get($postulantProfileId);
 
-        return round($activeHours + max(0, $requestedHours), 2) > 44.0;
+        return $disponibilidad->superaLimite($cruce, $requestedHours);
     }
 
     private function resolveSolicitudRequestedHours(SolicitudReemplazo $solicitud): float

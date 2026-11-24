@@ -26,9 +26,11 @@ use App\Support\DocumentRules;
 use Illuminate\Validation\Rule;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\RestrictedRutService;
+use App\Support\ReemplazoDisponibilidadPostulante;
 use App\Support\ReemplazoSolicitudReglaMinima;
 use App\Support\TipoReemplazo;
 use App\Services\WhatsApp\ReemplazoWhatsAppNotifier;
+use Illuminate\Validation\ValidationException;
 
 class SolicitudReemplazoController extends Controller
 {
@@ -297,6 +299,7 @@ class SolicitudReemplazoController extends Controller
         $distTitular = $this->distribucionJornadaTitular($establecimiento->id, $titular);
         // Validación horas propuestas (no superar titular)
         $jornadasIn = $request->input('jornadas', []);
+        $reemplazoTotalHoras = 0.0;
         foreach ($distTitular as $row) {
             $fin = $row['financiamiento'];
 
@@ -314,10 +317,11 @@ class SolicitudReemplazoController extends Controller
             if ($mediaIn > (float)$row['media']) {
                 return back()->withErrors(['jornadas' => "En {$fin}: HRS MEDIA no puede exceder {$row['media']}"])->withInput();
             }
+            $reemplazoTotalHoras += round($basicaIn + $mediaIn, 2);
         }
 
         $titularTotalHoras = $this->sumDistribucionTotal($distTitular);
-        $reemplazoTotalHoras = $this->sumJornadasReemplazo($distTitular, $jornadasIn);
+        $this->validarDisponibilidadPropuesta($selectedProfile, $inicio, $termino, $reemplazoTotalHoras);
 
         $horasAulaCronologicasTitular = 0.0;
         $horasAulaPedagogicasTitular = 0.0;
@@ -751,6 +755,7 @@ class SolicitudReemplazoController extends Controller
         $distTitular = $this->distribucionJornadaTitular($establecimiento->id, $titular, $solicitud);
         $jornadasIn = $request->input('jornadas', []);
 
+        $reemplazoTotalHoras = 0.0;
         foreach ($distTitular as $row) {
             $fin = $row['financiamiento'];
 
@@ -769,10 +774,11 @@ class SolicitudReemplazoController extends Controller
             if ($mediaIn > (float)$row['media']) {
                 return back()->withErrors(['jornadas' => "En {$fin}: HRS MEDIA no puede exceder {$row['media']}"])->withInput();
             }
+            $reemplazoTotalHoras += round($basicaIn + $mediaIn, 2);
         }
 
         $titularTotalHoras = $this->sumDistribucionTotal($distTitular);
-        $reemplazoTotalHoras = $this->sumJornadasReemplazo($distTitular, $jornadasIn);
+        $this->validarDisponibilidadPropuesta($selectedProfile, $inicio, $termino, $reemplazoTotalHoras, $solicitud->id);
 
         $horasAulaCronologicasTitular = 0.0;
         $horasAulaPedagogicasTitular = 0.0;
@@ -1199,7 +1205,7 @@ class SolicitudReemplazoController extends Controller
     {
         $establecimiento = $this->establecimientoDelUsuario();
 
-        $request->validate([
+        $datos = $request->validate([
             'reemplazo_personal_id' => ['nullable', 'integer'],
             'postulant_profile_id' => ['nullable', 'integer'],
             'area_desempeno_id' => ['nullable', 'integer'],
@@ -1207,6 +1213,7 @@ class SolicitudReemplazoController extends Controller
             'fecha_termino' => ['nullable', 'date_format:d/m/Y'],
             'continuidad' => ['nullable', 'in:0,1'],
             'solicitud_id' => ['nullable', 'integer'],
+            'horas_reemplazo' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         if (!$request->filled('reemplazo_personal_id') || !$request->filled('fecha_inicio') || !$request->filled('fecha_termino')) {
@@ -1256,6 +1263,14 @@ class SolicitudReemplazoController extends Controller
             $area
         );
 
+        if ($postulante) {
+            $disponibilidad = app(ReemplazoDisponibilidadPostulante::class);
+            $cruce = $disponibilidad->cruces($inicio->toDateString(), $termino->toDateString(), $solicitud?->id, [$postulante->id])->get($postulante->id);
+            $resultado['disponibilidad_postulante'] = $disponibilidad->detalle(
+                $cruce, isset($datos['horas_reemplazo']) ? (float) $datos['horas_reemplazo'] : null,
+            );
+        }
+
         return response()->json(array_merge(['evaluable' => true], $resultado));
     }
 
@@ -1264,6 +1279,12 @@ class SolicitudReemplazoController extends Controller
         $term      = trim((string) $request->query('term', ''));
         $areaId    = (int) $request->query('area_desempeno_id', 0);
         $estamento = trim((string) $request->query('estamento', ''));
+        $datos = $request->validate([
+            'fecha_inicio' => ['nullable', 'date_format:d/m/Y'],
+            'fecha_termino' => ['nullable', 'date_format:d/m/Y'],
+            'horas_reemplazo' => ['nullable', 'numeric', 'min:0'],
+            'solicitud_id' => ['nullable', 'integer', 'min:1'],
+        ]);
 
         // -----------------------------
         // Área del titular (seleccionada) y regla especial EP
@@ -1362,6 +1383,20 @@ class SolicitudReemplazoController extends Controller
             ->limit(300)
             ->get();
 
+        $disponibilidad = app(ReemplazoDisponibilidadPostulante::class);
+        $cruces = collect();
+        $jornada = null;
+        if ($request->filled(['fecha_inicio', 'fecha_termino'])) {
+            $solicitud = $this->solicitudContexto($request, (int) $this->establecimientoDelUsuario()->id);
+            $cruces = $disponibilidad->cruces(
+                Carbon::createFromFormat('d/m/Y', $datos['fecha_inicio'])->toDateString(),
+                Carbon::createFromFormat('d/m/Y', $datos['fecha_termino'])->toDateString(),
+                $solicitud?->id,
+                $candidatos->pluck('postulantProfile.id')->filter()->all(),
+            );
+            $jornada = isset($datos['horas_reemplazo']) ? (float) $datos['horas_reemplazo'] : null;
+        }
+
         $types = DocumentType::query()
             ->orderBy('sort_order')
             ->orderBy('label')
@@ -1372,6 +1407,7 @@ class SolicitudReemplazoController extends Controller
 
         $eligibleItems = [];
         $ineligibleItems = [];
+        $hourConflictItems = [];
 
         foreach ($candidatos as $u) {
             if (!$u->postulantProfile) continue;
@@ -1404,6 +1440,7 @@ class SolicitudReemplazoController extends Controller
             $total   = max(0, count($requiredIds));
             $percent = $total > 0 ? (int) round($uploaded * 100 / $total) : 100;
             $eligible = ($percent >= 100);
+            $estadoJornada = $disponibilidad->detalle($cruces->get($u->postulantProfile->id), $jornada);
 
             $item = [
                 'id'             => (int) $u->postulantProfile->id,
@@ -1415,7 +1452,8 @@ class SolicitudReemplazoController extends Controller
                 'total_required' => (int) $total,
                 'percent'        => (int) $percent,
                 'eligible'       => $eligible,
-                'disabled'       => !$eligible,
+                'disabled'       => !$eligible || $estadoJornada['bloqueo'] !== null,
+                'disponibilidad' => $estadoJornada,
                 'missing_docs'   => $missingDocs,
                 'has_cv'         => $cvTypeId > 0
                     ? (bool) ($u->documents?->firstWhere('document_type_id', $cvTypeId)?->path)
@@ -1430,13 +1468,14 @@ class SolicitudReemplazoController extends Controller
                 '_area_sort'      => mb_strtolower((string) (optional($u->postulantProfile->areaDesempeno)->nombre ?? ''), 'UTF-8'),
             ];
 
-            if ($eligible) $eligibleItems[] = $item;
+            if ($estadoJornada['bloqueo'] !== null) $hourConflictItems[] = $item;
+            elseif ($eligible) $eligibleItems[] = $item;
             else $ineligibleItems[] = $item;
         }
 
         // -----------------------------
         // Ordenamiento:
-        // - Mantener grupos: Cumplen (100%) primero, luego Faltan.
+        // - Mantener grupos: seleccionables, bloqueados por jornada y faltantes de documentos.
         // - Dentro de cada grupo: primero misma área que el titular, luego otras áreas ordenadas por área.
         // - En "Faltan": ordenar por % desc dentro del mismo segmento.
         // - Caso EP: como sólo mostramos EP, el orden por área es estable.
@@ -1466,29 +1505,16 @@ class SolicitudReemplazoController extends Controller
 
         usort($eligibleItems, $cmpEligible);
         usort($ineligibleItems, $cmpIneligible);
-
-        foreach ($eligibleItems as &$it) { unset($it['_same_area'], $it['_area_sort']); }
-        unset($it);
-        foreach ($ineligibleItems as &$it) { unset($it['_same_area'], $it['_area_sort']); }
-        unset($it);
-
-        $max = 60;
-        $eligibleItems = array_slice($eligibleItems, 0, $max);
-        $remaining = $max - count($eligibleItems);
-        $ineligibleItems = array_slice($ineligibleItems, 0, max(0, $remaining));
+        usort($hourConflictItems, $cmpEligible);
 
         $groups = [];
-        if (!empty($eligibleItems)) {
-            $groups[] = [
-                'text' => '✅ Cumplen (100%)',
-                'children' => $eligibleItems,
-            ];
-        }
-        if (!empty($ineligibleItems)) {
-            $groups[] = [
-                'text' => '⚠️ Faltan documentos',
-                'children' => $ineligibleItems,
-            ];
+        $remaining = 60;
+        foreach (['✅ Cumplen (100%)' => $eligibleItems, '⛔ Superan 44 horas' => $hourConflictItems, '⚠️ Faltan documentos' => $ineligibleItems] as $label => $items) {
+            $items = array_slice($items, 0, $remaining);
+            if ($items !== []) {
+                $groups[] = ['text' => $label, 'children' => array_map(fn ($item) => array_diff_key($item, ['_same_area' => true, '_area_sort' => true]), $items)];
+                $remaining -= count($items);
+            }
         }
 
         return response()->json(['results' => $groups]);
@@ -1830,16 +1856,19 @@ class SolicitudReemplazoController extends Controller
         return (float) collect($distTitular)->sum(fn ($row) => (float) ($row['total'] ?? 0));
     }
 
-    private function sumJornadasReemplazo(array $distTitular, array $jornadasIn): float
+    private function validarDisponibilidadPropuesta(?PostulantProfile $postulante, Carbon $inicio, Carbon $termino, float $jornada, ?int $solicitudId = null): void
     {
-        $total = 0.0;
-
-        foreach ($distTitular as $row) {
-            $fin = (string) ($row['financiamiento'] ?? '');
-            $total += $this->jornadaIn($jornadasIn, $fin, 'basica', 0.0);
-            $total += $this->jornadaIn($jornadasIn, $fin, 'media', 0.0);
+        if (! $postulante) {
+            return;
         }
 
-        return (float) $total;
+        $disponibilidad = app(ReemplazoDisponibilidadPostulante::class);
+        $cruce = $disponibilidad->cruces($inicio->toDateString(), $termino->toDateString(), $solicitudId, [$postulante->id])->get($postulante->id);
+        $detalle = $disponibilidad->detalle($cruce, $jornada);
+        if ($detalle['bloqueo'] !== null) {
+            throw ValidationException::withMessages([
+                'postulant_profile_id' => trim($detalle['aviso'].' '.$detalle['bloqueo']),
+            ]);
+        }
     }
 }

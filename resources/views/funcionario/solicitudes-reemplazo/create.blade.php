@@ -323,12 +323,13 @@
                         </div>
 
                         <div class="col-md-8">
-                            <label class="form-label">
+                            <label for="postulant_profile_id" class="form-label">
                                 Postulante / funcionario propuesto
                                 <span class="text-danger" id="req-postulante" style="display:none">*</span>
                             </label>
                             <div class="d-flex gap-2">
                                 <select id="postulant_profile_id" name="postulant_profile_id"
+                                    aria-describedby="disponibilidadPostulante"
                                     class="form-select @error('postulant_profile_id') is-invalid @enderror">
                                     @if ($isEdit && $solicitud->postulante && $solicitud->postulante->user)
                                         @php
@@ -357,6 +358,7 @@
                                 <a id="btnDescPdf" class="btn btn-outline-secondary disabled d-none"
                                     href="#">Descargar</a>
                             </div>
+                            <div id="disponibilidadPostulante" class="d-none" role="status" aria-live="polite"></div>
 
                         </div>
                     </div>
@@ -583,6 +585,9 @@
             let permisoSinGoceAutorizado = false;
             let reglaMinimaBloqueada = false;
             let reglaMinimaTimer = null;
+            let revisionReglaMinima = 0;
+            let disponibilidadBloqueada = false;
+            let horasReemplazo = null;
             const permisoSinGoceTipo = 'Permiso sin goce de sueldo';
 
             const $func = $('#funcionarioSelect');
@@ -614,7 +619,7 @@
                     $submitBtns.prop('disabled', true);
                 } else {
                     $areaAlert.addClass('d-none');
-                    $submitBtns.prop('disabled', reglaMinimaBloqueada);
+                    $submitBtns.prop('disabled', reglaMinimaBloqueada || disponibilidadBloqueada);
                 }
             }
 
@@ -623,7 +628,27 @@
                 return checked ? String(checked.value) : '';
             }
 
+            function datosPeriodoReemplazo() {
+                return {
+                    fecha_inicio: document.getElementById('fechaInicio')?.value || '',
+                    fecha_termino: document.getElementById('fechaTermino')?.value || '',
+                    horas_reemplazo: horasReemplazo ?? '',
+                    solicitud_id: solicitudId ?? '',
+                };
+            }
+
+            function setDisponibilidadPostulante(disponibilidad) {
+                const aviso = disponibilidad?.aviso || '';
+                const bloqueo = disponibilidad?.bloqueo || '';
+                disponibilidadBloqueada = Boolean(bloqueo);
+                const alert = document.getElementById('disponibilidadPostulante');
+                alert.textContent = [aviso, bloqueo].filter(Boolean).join(' ');
+                alert.className = bloqueo ? 'alert alert-danger small mt-2 mb-0'
+                    : (aviso ? 'alert alert-warning small mt-2 mb-0' : 'd-none');
+            }
+
             function setReglaMinimaUI(result) {
+                setDisponibilidadPostulante(result?.disponibilidad_postulante);
                 const alertEl = document.getElementById('reglaMinimaAlert');
                 if (!alertEl) return;
 
@@ -654,28 +679,25 @@
                 updateAreaBlockedUI();
             }
 
-            async function refreshReglaMinima() {
+            async function refreshReglaMinima(revision) {
                 if (!reglaMinimaUrl) return;
 
                 const funcionarioId = $func.val() || '';
-                const postulanteId = $post.val() || '';
-                const fechaInicio = document.getElementById('fechaInicio')?.value || '';
-                const fechaTermino = document.getElementById('fechaTermino')?.value || '';
+                const postulanteId = isProponeActive() ? ($post.val() || '') : '';
+                const periodo = datosPeriodoReemplazo();
 
-                if (!funcionarioId || !fechaInicio || !fechaTermino) {
+                if (!funcionarioId || !periodo.fecha_inicio || !periodo.fecha_termino) {
                     setReglaMinimaUI({ evaluable: false, permitido: true });
                     return;
                 }
 
                 const params = new URLSearchParams({
+                    ...periodo,
                     reemplazo_personal_id: funcionarioId,
                     postulant_profile_id: postulanteId,
                     area_desempeno_id: areaEl?.value || '',
-                    fecha_inicio: fechaInicio,
-                    fecha_termino: fechaTermino,
                     continuidad: getContinuidadValue() || '0',
                 });
-                if (solicitudId) params.set('solicitud_id', String(solicitudId));
 
                 try {
                     const res = await fetch(`${reglaMinimaUrl}?${params.toString()}`, {
@@ -686,7 +708,7 @@
                         credentials: 'same-origin',
                     });
                     const data = await res.json();
-                    setReglaMinimaUI(data);
+                    if (revision === revisionReglaMinima) setReglaMinimaUI(data);
                 } catch (error) {
                     console.error('Error validando regla mínima de reemplazo', error);
                 }
@@ -694,7 +716,8 @@
 
             function refreshReglaMinimaDebounced() {
                 clearTimeout(reglaMinimaTimer);
-                reglaMinimaTimer = setTimeout(refreshReglaMinima, 250);
+                const revision = ++revisionReglaMinima;
+                reglaMinimaTimer = setTimeout(() => refreshReglaMinima(revision), 250);
             }
 
             const propuestaWrap = document.getElementById('propuestaWrap');
@@ -1130,6 +1153,8 @@
                 document.getElementById('r_media').textContent = fmt(m);
                 document.getElementById('r_total').textContent = fmt(t);
                 syncChronologicalInput(reemplazoCronoEl, reemplazoHorasMaxLabel, t);
+                horasReemplazo = Number(t.toFixed(2));
+                refreshReglaMinimaDebounced();
             }
 
             // -----------------------------
@@ -1293,7 +1318,7 @@
                 const manualRestriction = !!item.manual_restriction;
 
                 const $wrap = $('<div class="d-flex flex-column gap-1"></div>');
-                if (disabled) $wrap.addClass('opacity-50');
+                if (disabled && !item.disponibilidad?.bloqueo) $wrap.addClass('opacity-50');
                 if (manualRestriction) {
                     $wrap.addClass('p-1 rounded');
                     $wrap.css({
@@ -1324,6 +1349,12 @@
                 $progress.append($bar);
 
                 $wrap.append($top).append($meta).append($area).append($progress);
+                if (item.disponibilidad?.aviso) {
+                    $wrap.append($('<div class="small text-warning-emphasis"></div>').text(item.disponibilidad.aviso));
+                }
+                if (item.disponibilidad?.bloqueo) {
+                    $wrap.append($('<div class="small fw-semibold text-danger"></div>').text(item.disponibilidad.bloqueo));
+                }
                 if (manualRestriction) {
                     const reason = (item.manual_restriction_comment || '').toString().trim();
                     if (reason) {
@@ -1362,14 +1393,15 @@ $post.select2({
                     data: params => ({
                         term: params.term || '',
                         area_desempeno_id: areaEl ? areaEl.value : '',
-                        estamento: currentEstamento || ''
+                        estamento: currentEstamento || '',
+                        ...datosPeriodoReemplazo(),
                     }),
                     processResults: data => data
                 },
                 width: '100%'
             });
 
-            // Bloqueo extra (defensivo): evita seleccionar postulantes incompletos
+            // Respeta los bloqueos por documentos o disponibilidad al seleccionar.
             $post.on('select2:selecting', function(e) {
                 const data = e?.params?.args?.data;
                 if (data && data.disabled) {
@@ -1472,7 +1504,7 @@ $post.select2({
                         validateFileSize(horarioTitularInput, 'Horario Titular'),
                     ].every(Boolean);
 
-                    if (!ok || reglaMinimaBloqueada) {
+                    if (!ok || reglaMinimaBloqueada || disponibilidadBloqueada) {
                         event.preventDefault();
                         event.stopPropagation();
                         window.scrollTo({ top: formEl.offsetTop - 20, behavior: 'smooth' });

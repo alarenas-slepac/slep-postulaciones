@@ -6594,8 +6594,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.704',
+    'current_version' => '2026.11.24.705',
     'entries' => [
+        [
+            'version' => '2026.11.24.705',
+            'title' => 'Disponibilidad horaria al proponer reemplazantes',
+            'summary' => 'El selector informa hasta cuándo hay reemplazos activos en el período y bloquea las propuestas que superan 44 horas acumuladas.',
+            'roles' => ['admin', 'funcionario_estab', 'funcionario_slep', 'coordinador_gdp'],
+            'items' => [
+                'Recalcula la disponibilidad al modificar fechas o jornada y comprueba el mismo límite al guardar la solicitud.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.24.704',
             'title' => 'Reparación de la reapertura administrativa UATP',

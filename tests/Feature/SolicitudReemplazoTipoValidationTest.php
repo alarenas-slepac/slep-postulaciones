@@ -116,6 +116,85 @@ class SolicitudReemplazoTipoValidationTest extends IsolatedSecurityTestCase
         Mail::assertSent(SolicitudReemplazoCreada::class);
     }
 
+    public function test_el_selector_avisa_del_cruce_y_solo_deshabilita_si_supera_44_horas(): void
+    {
+        $this->withoutExceptionHandling();
+        $postulanteId = $this->postulanteConReemplazoAceptado();
+        DB::table('roles')->insert(['name' => 'funcionario', 'guard_name' => 'web']);
+        Schema::create('document_types', function (Blueprint $table): void {
+            $table->id();
+            $table->string('label');
+            $table->integer('sort_order');
+        });
+        Schema::create('user_documents', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('document_type_id');
+            $table->string('path')->nullable();
+            $table->string('status')->nullable();
+        });
+        $filtros = ['term' => 'Cuenta', 'area_desempeno_id' => $this->area->id, 'estamento' => 'asistente',
+            'fecha_inicio' => '06/10/2026', 'fecha_termino' => '15/10/2026'];
+        $ruta = 'funcionario.solicitudes-reemplazo.ajax.postulantes';
+
+        $this->getJson(route($ruta, $filtros + ['horas_reemplazo' => 14]))->assertOk()
+            ->assertJsonPath('results.0.children.0.id', $postulanteId)
+            ->assertJsonPath('results.0.children.0.disponibilidad.aviso', 'En reemplazo activo hasta el 06/10/2026.')
+            ->assertJsonPath('results.0.children.0.disabled', false);
+        $this->getJson(route($ruta, $filtros + ['horas_reemplazo' => 15]))->assertOk()
+            ->assertJsonPath('results.0.children.0.disponibilidad.bloqueo', 'La suma supera el máximo de 44 horas: 30 h vigentes + 15 h solicitadas = 45 h.')
+            ->assertJsonPath('results.0.children.0.disabled', true);
+
+        $filtros['fecha_inicio'] = '07/10/2026';
+        $this->getJson(route($ruta, $filtros + ['horas_reemplazo' => 44]))->assertOk()
+            ->assertJsonPath('results.0.children.0.disponibilidad.aviso', null)
+            ->assertJsonPath('results.0.children.0.disabled', false);
+    }
+
+    public function test_crear_propuesta_comprueba_las_horas_que_se_guardaran(): void
+    {
+        $postulanteId = $this->postulanteConReemplazoAceptado();
+        $ruta = route('funcionario.solicitudes-reemplazo.store');
+        $payload = array_replace($this->payload(TipoReemplazo::REPOSO_MUTUALIDAD), [
+            'propone_reemplazo' => '1', 'continuidad' => '0', 'postulant_profile_id' => $postulanteId,
+            'jornadas' => ['SUBV_GRAL' => ['media' => 0]],
+        ]);
+
+        // En el ingreso original, el campo omitido toma las 44 horas del titular.
+        $this->postJson($ruta, $payload)->assertUnprocessable()->assertJsonValidationErrors('postulant_profile_id')
+            ->assertJsonPath('errors.postulant_profile_id.0', 'En reemplazo activo hasta el 06/10/2026. La suma supera el máximo de 44 horas: 30 h vigentes + 44 h solicitadas = 74 h.');
+        $this->assertDatabaseCount('solicitudes_reemplazo', 1);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+
+        $payload['jornadas']['SUBV_GRAL']['basica'] = 14;
+        $this->post($ruta, $payload)->assertSessionHasNoErrors()->assertRedirect(route('funcionario.solicitudes-reemplazo.index'));
+        $this->assertSame('14.00', SolicitudReemplazo::whereEstado('pendiente_uatp')->sole()->jornadas()->sole()->reemplazo_total);
+    }
+
+    public function test_recalcula_la_propuesta_existente_y_bloquea_la_edicion_si_aumenta_la_jornada(): void
+    {
+        $postulanteId = $this->postulanteConReemplazoAceptado();
+        $solicitud = $this->existingRequest(TipoReemplazo::ENFERMEDAD_ACCIDENTE_COMUN, 2);
+        $solicitud->update(['postulant_profile_id' => $postulanteId, 'propone_reemplazo' => true]);
+        $filtros = ['reemplazo_personal_id' => $this->titular->id, 'postulant_profile_id' => $postulanteId,
+            'fecha_inicio' => '06/10/2026', 'fecha_termino' => '15/10/2026', 'solicitud_id' => $solicitud->id];
+        $ruta = 'funcionario.solicitudes-reemplazo.ajax.regla-minima';
+
+        $this->getJson(route($ruta, $filtros + ['horas_reemplazo' => 15]))->assertOk()
+            ->assertJsonPath('disponibilidad_postulante.aviso', 'En reemplazo activo hasta el 06/10/2026.')
+            ->assertJsonPath('disponibilidad_postulante.bloqueo', 'La suma supera el máximo de 44 horas: 30 h vigentes + 15 h solicitadas = 45 h.');
+
+        $payload = array_replace($this->payload(TipoReemplazo::ENFERMEDAD_ACCIDENTE_COMUN, false), [
+            'propone_reemplazo' => '1', 'continuidad' => '0', 'postulant_profile_id' => $postulanteId,
+            'jornadas' => ['SUBV_GRAL' => ['basica' => 15, 'media' => 0]],
+        ]);
+        $this->putJson(route('funcionario.solicitudes-reemplazo.update', $solicitud), $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('postulant_profile_id');
+        $this->assertFalse($solicitud->jornadas()->exists());
+        $this->getJson(route($ruta, $filtros + ['horas_reemplazo' => 14]))->assertOk()
+            ->assertJsonPath('disponibilidad_postulante.bloqueo', null);
+    }
+
     #[DataProvider('correctionStages')]
     public function test_correction_notifies_return_stage_once_and_keeps_existing_uatp_approval(string $stage, string $state, string $event): void
     {
@@ -376,12 +455,33 @@ class SolicitudReemplazoTipoValidationTest extends IsolatedSecurityTestCase
         return $payload;
     }
 
-    private function existingRequest(string $tipo): SolicitudReemplazo
+    private function postulanteConReemplazoAceptado(): int
+    {
+        (require database_path('migrations/2026_02_25_220000_add_orden_trabajo_fields_to_solicitudes_reemplazo_table.php'))->up();
+        Schema::table('postulant_profiles', function (Blueprint $table): void {
+            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('area_desempeno_id');
+            foreach (['estamento', 'cargos_funcion', 'genero', 'nivel_estudios', 'mencion'] as $column) {
+                $table->string($column)->nullable();
+            }
+        });
+        $postulanteId = DB::table('postulant_profiles')->insertGetId([
+            'user_id' => $this->testUser(2)->id, 'area_desempeno_id' => $this->area->id, 'estamento' => 'asistente',
+        ]);
+        $anterior = $this->existingRequest(TipoReemplazo::ENFERMEDAD_ACCIDENTE_COMUN);
+        $anterior->update(['estado' => 'aceptada', 'postulant_profile_id' => $postulanteId,
+            'fecha_inicio' => '2026-10-01', 'fecha_inicio_trabajo' => '2026-10-02', 'fecha_termino' => '2026-10-06']);
+        $anterior->jornadas()->create(['financiamiento' => 'SUBV GRAL', 'reemplazo_total' => 30]);
+
+        return $postulanteId;
+    }
+
+    private function existingRequest(string $tipo, int $correlativo = 1): SolicitudReemplazo
     {
         return SolicitudReemplazo::create([
             'establecimiento_id' => $this->titular->establecimiento_id,
             'reemplazo_personal_id' => $this->titular->id, 'area_desempeno_id' => $this->area->id,
-            'anio' => 2026, 'correlativo' => 1, 'numero_solicitud' => '00001-2026',
+            'anio' => 2026, 'correlativo' => $correlativo, 'numero_solicitud' => sprintf('%05d-2026', $correlativo),
             'contacto_nombre' => 'Contacto de prueba', 'contacto_fono' => '000000000',
             'contacto_email' => 'contacto@example.test', 'tipo_reemplazo' => $tipo,
             'fecha_inicio' => '2026-10-06', 'fecha_termino' => '2026-10-15',
