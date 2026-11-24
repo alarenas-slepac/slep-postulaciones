@@ -55,6 +55,8 @@ class DotacionPal2027
         $nomina = $docentes->concat($cupos)->concat($plazas);
         foreach ($nomina as $docente) {
             $sintetico = isset($docente['cupo_contrata_id']) || ! empty($docente['es_plaza_por_asumir']);
+            $tramo = trim((string) ($docente['tramo'] ?? ''));
+            $docente['pal_tramo'] = $sintetico || $tramo === '' ? null : $tramo;
             $docente['pal_titulares_justificadas'] = $sintetico ? 0.0 : ($justificadas[self::identidad($docente['rut'] ?? null)] ?? 0.0);
             $docente['pal_detalle_justificaciones'] = $sintetico ? '' : ($detalleJustificaciones[self::identidad($docente['rut'] ?? null)] ?? '');
             $filas = $this->docente($ee, $docente, $tablas, $clasificarAsignacion);
@@ -434,7 +436,8 @@ class DotacionPal2027
             'C' => (string) $ee->rbd, 'D' => $docente['pal_nivel'] ?? ($grupo['nivel'] ?? $this->nivel([], $docente)),
             'E' => $perfil['es_educacion_parvulos'] ? 'Educadora de Parvulos' : 'Docente',
             'F' => (string) ($docente['funcion'] ?? ''), 'G' => $grupo['funcion'] ?? '', 'H' => $capacidad['calidad'],
-            'I' => data_get($docente, 'exclusion_docente.motivo') === 'horas_catedra_art_69' ? 'si' : null]);
+            'I' => data_get($docente, 'exclusion_docente.motivo') === 'horas_catedra_art_69' ? 'si' : null,
+            'T' => $docente['pal_tramo']]);
         $notas = ['Borrador PAL 2027. Contrato '.$capacidad['calidad'].': '.$capacidad['horas'].' h.'];
         if (isset($docente['cupo_contrata_id'])) {
             $notas[] = 'Docente por contratar: '.$docente['nombre'].'. RUT sintético '.$docente['rut'].'; cupo #'.$docente['cupo_contrata_id']
