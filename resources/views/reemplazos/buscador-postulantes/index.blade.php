@@ -169,10 +169,14 @@
                                 <div class="slep-listing__detail mt-2"><i class="bi bi-geo-alt" aria-hidden="true"></i><span>{{ $usuario?->communes?->pluck('name')->implode(', ') ?: 'Sin comunas de desempeño registradas' }}</span></div>
                             </td>
                             <td data-label="Perfil profesional" role="cell">
-                                <strong>{{ $perfil->areaDesempeno?->nombre ?: ($perfil->area_desempeno_nombre ?: 'Área no informada') }}</strong>
-                                @if ($perfil->especialidad_tp)<p class="slep-listing__muted mb-1 mt-2">Especialidad TP: {{ $perfil->especialidad_tp }}</p>@endif
-                                @if ($perfil->mencion)<p class="slep-listing__muted mb-1 mt-2">Mención: {{ $perfil->mencion }}</p>@endif
-                                <p class="slep-listing__muted mb-0 mt-2">{{ $perfil->anios_experiencia !== null ? $perfil->anios_experiencia.' años de experiencia' : 'Experiencia no informada' }}</p>
+                                @php $career = $perfil->getRelations()['matchingCareer'] ?? $perfil; @endphp
+                                <strong>{{ $career->area_desempeno_nombre ?: 'Área no informada' }}</strong>
+                                @if ($career->especialidad_tp)<p class="slep-listing__muted mb-1 mt-2">Especialidad TP: {{ $career->especialidad_tp }}</p>@endif
+                                @if ($career->mencion)<p class="slep-listing__muted mb-1 mt-2">Mención: {{ $career->mencion }}</p>@endif
+                                <p class="slep-listing__muted mb-0 mt-2">{{ $career->anios_experiencia !== null ? $career->anios_experiencia.' años de experiencia' : 'Experiencia no informada' }}</p>
+                                @foreach (($perfil->getRelations()['additionalCareers'] ?? collect())->reject(fn ($job) => $job === $career) as $job)
+                                    <span class="slep-status-pill slep-status-pill--neutral mt-2">{{ $job->area_desempeno_nombre }}</span>
+                                @endforeach
                             </td>
                             <td data-label="Estado laboral" role="cell">
                                 @include('partials.ui.estado-laboral', ['contratos' => $perfil->contratosLaboralesActivos ?? collect(), 'reemplazos' => $perfil->relationLoaded('reemplazosActivosActuales') ? $perfil->getRelation('reemplazosActivosActuales') : collect(), 'externo' => $usuario?->trabaja_en_otro_lugar ?? false, 'observacion' => $usuario?->trabaja_en_otro_lugar_observacion])

@@ -42,6 +42,7 @@ class BolsaTrabajoOferta extends Model
         'etapa_changed_at',
         'created_by_user_id',
         'updated_by_user_id',
+        'requisitos_documentales',
     ];
 
     protected function casts(): array
@@ -57,6 +58,7 @@ class BolsaTrabajoOferta extends Model
             'fecha_termino_postulaciones' => 'date',
             'selected_postulacion_id' => 'integer',
             'etapa_changed_at' => 'datetime',
+            'requisitos_documentales' => 'array',
         ];
     }
 

@@ -17,7 +17,7 @@ class DocumentReviewSummary
         $pending = $documents->where('status', 'pending');
         // updated_at representa la última carga/reenvío; created_at respalda datos históricos.
         $dates = $pending->map(fn ($doc) => $doc->updated_at ?? $doc->created_at)->filter();
-        $uploaded = $user->documents->whereIn('document_type_id', $requiredIds)->count();
+        $uploaded = $user->documents->whereIn('document_type_id', $requiredIds)->unique('document_type_id')->count();
 
         return [
             'uploaded' => $uploaded,

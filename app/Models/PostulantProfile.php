@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\AreaDesempeno;
+use Closure;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -71,6 +73,23 @@ class PostulantProfile extends Model
     public function areaDesempeno(): BelongsTo
     {
         return $this->belongsTo(AreaDesempeno::class, 'area_desempeno_id');
+    }
+
+    public function jobProfiles(): HasMany
+    {
+        return $this->hasMany(PostulantJobProfile::class);
+    }
+
+    public function scopeMatchingCareer(Builder $query, Closure $criteria): Builder
+    {
+        $hasJobs = $this->getConnection()->getSchemaBuilder()->hasTable('postulant_job_profiles');
+
+        return $query->where(function (Builder $alternatives) use ($criteria, $hasJobs) {
+            $alternatives->where($criteria);
+            if ($hasJobs) {
+                $alternatives->orWhereHas('jobProfiles', fn (Builder $job) => $job->where('activo', true)->whereNotNull('area_desempeno_id')->where($criteria));
+            }
+        });
     }
 
     public function contratosLaborales(): HasMany

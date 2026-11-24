@@ -235,7 +235,11 @@
                                         <i class="bi bi-person-vcard"></i>
                                     </button>
                                 @endif
-                                @if ($postulacion->user)
+                                @if ($postulacion->cargo_presentado !== null)
+                                    <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('gestion.bolsa-trabajo.documentos-presentados', [$item, $postulacion->id]) }}">
+                                        <i class="bi bi-folder2-open" aria-hidden="true"></i> Documentos presentados
+                                    </a>
+                                @elseif ($postulacion->user)
                                     <a class="btn btn-sm btn-outline-secondary" href="{{ route('reemplazos.documents.forUser', $postulacion->user) }}" title="Ver documentos">
                                         <i class="bi bi-folder2-open"></i>
                                     </a>

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BolsaTrabajoOferta;
 use App\Models\BolsaTrabajoPostulacion;
 use App\Models\DocumentType;
-use App\Support\DocumentRules;
+use App\Services\BolsaTrabajoPostulacionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,38 +31,62 @@ class OfertaLaboralController extends Controller
         ]);
     }
 
-    public function index(Request $request): View
+    public function index(BolsaTrabajoPostulacionService $service): View
     {
         $user = $this->authorizeOfertas();
-        $user->loadMissing(['postulantProfile.areaDesempeno', 'documents.type']);
-
-        $eligibility = $this->eligibilityForUser($user);
-        $appliedIds = BolsaTrabajoPostulacion::query()
-            ->where('user_id', $user->id)
-            ->pluck('bolsa_trabajo_oferta_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
+        $now = BolsaTrabajoOferta::portalNow();
         $items = BolsaTrabajoOferta::query()
-            ->visibleEnPortal(BolsaTrabajoOferta::portalNow())
+            ->visibleEnPortal($now)
             ->with(['establecimiento', 'areaDesempeno'])
             ->withCount('postulaciones')
             ->orderByDesc('fecha_inicio_postulaciones')
             ->orderByDesc('hora_inicio_postulaciones')
             ->paginate(12);
+        $applied = BolsaTrabajoPostulacion::query()->where('user_id', $user->id)
+            ->whereIn('bolsa_trabajo_oferta_id', $items->pluck('id'))->get()->keyBy('bolsa_trabajo_oferta_id');
+        $compatible = $items->getCollection()->mapWithKeys(
+            fn ($item) => [$item->id => $service->compatibleProfiles($user, $item)->isNotEmpty()]
+        );
 
-        return view('postulant.ofertas-laborales.index', [
-            'items' => $items,
-            'eligibility' => $eligibility,
-            'appliedIds' => $appliedIds,
-            'user' => $user,
-        ]);
+        return view('postulant.ofertas-laborales.index', compact('items', 'applied', 'compatible', 'now'));
+    }
+
+    public function show(Request $request, BolsaTrabajoOferta $oferta, BolsaTrabajoPostulacionService $service): View
+    {
+        $user = $this->authorizeOfertas();
+        $now = BolsaTrabajoOferta::portalNow();
+        $application = $oferta->postulaciones()->where('user_id', $user->id)->with('submittedDocuments.type')->first();
+        abort_unless($application || $oferta->isVisibleEnPortal($now), 404);
+        $oferta->loadMissing(['establecimiento', 'areaDesempeno'])->loadCount('postulaciones');
+        $open = $oferta->isPostulacionAbierta($now);
+        $profiles = $service->compatibleProfiles($user, $oferta);
+        $requested = old('perfil_laboral', $request->query('cargo'));
+        $profileKey = is_string($requested) && $profiles->has($requested) ? $requested : $profiles->keys()->first();
+        $profile = $profiles->get($profileKey ?? '');
+        $requirements = $profile && $open && ! $application ? $service->requirements(
+            $user, $oferta, $profile,
+            DocumentType::orderBy('sort_order')->orderBy('label')->get(),
+            $user->documents()->with('type')->get(),
+            (array) old('documentos', [])
+        ) : collect();
+
+        return view('postulant.ofertas-laborales.show', compact('oferta', 'application', 'open', 'profiles', 'profileKey', 'requirements'));
+    }
+
+    public function history(): View
+    {
+        $user = $this->authorizeOfertas();
+        $applications = BolsaTrabajoPostulacion::query()->where('user_id', $user->id)
+            ->with(['oferta.establecimiento', 'oferta.areaDesempeno'])->latest('id')->paginate(12);
+
+        return view('postulant.ofertas-laborales.history', compact('applications'));
     }
 
     public function downloadBasesPdf(BolsaTrabajoOferta $oferta)
     {
-        $this->authorizeOfertas();
-        abort_unless($oferta->isVisibleEnPortal(BolsaTrabajoOferta::portalNow()), 404);
+        $user = $this->authorizeOfertas();
+        abort_unless($oferta->isVisibleEnPortal(BolsaTrabajoOferta::portalNow())
+            || $oferta->postulaciones()->where('user_id', $user->id)->exists(), 404);
         abort_unless($oferta->bases_pdf_path && Storage::disk('local')->exists($oferta->bases_pdf_path), 404);
 
         return Storage::disk('local')->download(
@@ -72,41 +96,19 @@ class OfertaLaboralController extends Controller
         );
     }
 
-    public function store(Request $request, BolsaTrabajoOferta $oferta): RedirectResponse
+    public function store(Request $request, BolsaTrabajoOferta $oferta, BolsaTrabajoPostulacionService $service): RedirectResponse
     {
         $user = $this->authorizeOfertas();
-        $user->loadMissing(['postulantProfile', 'documents.type']);
-
-        if (!$oferta->isVisibleEnPortal(BolsaTrabajoOferta::portalNow())) {
-            return back()->with('error', 'La oferta laboral aún no inicia su periodo de postulación.');
-        }
-
-        if (!$oferta->isPostulacionAbierta(BolsaTrabajoOferta::portalNow())) {
-            return back()->with('error', 'La oferta laboral ya no se encuentra disponible para postular.');
-        }
-
-        $eligibility = $this->eligibilityForUser($user);
-        if (!$eligibility['eligible']) {
-            return back()->with('error', $eligibility['message']);
-        }
-
-        $exists = BolsaTrabajoPostulacion::query()
-            ->where('bolsa_trabajo_oferta_id', $oferta->id)
-            ->where('user_id', $user->id)
-            ->exists();
-
-        if ($exists) {
-            return back()->with('status', 'Ya registraste tu postulación en esta oferta laboral.');
-        }
-
-        BolsaTrabajoPostulacion::create([
-            'bolsa_trabajo_oferta_id' => $oferta->id,
-            'user_id' => $user->id,
-            'postulant_profile_id' => $user->postulantProfile?->id,
-            'estado' => 'postulado',
+        $data = $request->validate([
+            'perfil_laboral' => ['required', 'string', 'regex:/^(principal|cargo-[1-9][0-9]*)$/', 'max:32'],
+            'documentos' => ['nullable', 'array', 'max:150'],
+            'documentos.*' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        return back()->with('status', 'Postulación registrada correctamente en la oferta laboral.');
+        $created = $service->submit($user, $oferta, $data['perfil_laboral'], $data['documentos'] ?? []);
+
+        return redirect()->route('postulant.ofertas-laborales.show', $oferta)->with('status', $created
+            ? 'Postulación registrada correctamente.' : 'Ya registraste tu postulación en esta oferta laboral.');
     }
 
     protected function authorizeOfertas()
@@ -133,62 +135,4 @@ class OfertaLaboralController extends Controller
             && $user->canModule('postulant.ofertas-laborales', $activeRole);
     }
 
-    protected function eligibilityForUser($user): array
-    {
-        $profile = $user->postulantProfile;
-        if (!$profile || blank($profile->estamento)) {
-            return [
-                'eligible' => false,
-                'message' => 'No puedes postular todavía. Debes completar tu perfil básico para determinar los documentos requeridos.',
-                'missing_docs' => [],
-                'rejected_docs' => [],
-            ];
-        }
-
-        $types = DocumentType::query()->orderBy('sort_order')->orderBy('label')->get();
-        $required = DocumentRules::requiredTypesFromCatalog($user, $types);
-        $requiredIds = $required->pluck('id')->map(fn ($id) => (int) $id)->all();
-
-        $docs = $user->documents ? $user->documents->whereIn('document_type_id', $requiredIds) : collect();
-        $docsWithFile = $docs->filter(fn ($doc) => filled($doc->path));
-        $uploadedIds = $docsWithFile->pluck('document_type_id')->map(fn ($id) => (int) $id)->flip();
-
-        $missingDocs = $required
-            ->filter(fn ($type) => !isset($uploadedIds[(int) $type->id]))
-            ->pluck('label')
-            ->values()
-            ->all();
-
-        $rejectedDocs = $docsWithFile
-            ->filter(fn ($doc) => (string) $doc->status === 'rejected')
-            ->map(fn ($doc) => (string) optional($doc->type)->label)
-            ->filter()
-            ->values()
-            ->all();
-
-        if (!empty($missingDocs)) {
-            return [
-                'eligible' => false,
-                'message' => 'No puedes postular todavía. Debes cargar todos tus documentos requeridos.',
-                'missing_docs' => $missingDocs,
-                'rejected_docs' => $rejectedDocs,
-            ];
-        }
-
-        if (!empty($rejectedDocs)) {
-            return [
-                'eligible' => false,
-                'message' => 'No puedes postular todavía. Tienes documentos rechazados que deben corregirse y volver a cargarse.',
-                'missing_docs' => $missingDocs,
-                'rejected_docs' => $rejectedDocs,
-            ];
-        }
-
-        return [
-            'eligible' => true,
-            'message' => 'Puedes postular a las ofertas laborales publicadas. Cumples con la carga documental requerida.',
-            'missing_docs' => [],
-            'rejected_docs' => [],
-        ];
-    }
 }

@@ -5,28 +5,16 @@
         $requiredMessage = $requiredMessage ?? 'Este campo es obligatorio.';
     @endphp
 
-    <div class="dashboard dashboard--postulante">
-        <div class="dashboard-hero mb-4 d-flex align-items-center gap-3">
-            <div class="hero-icon display-6"><i class="bi bi-person-badge"></i></div>
-            <div>
-                <h2 class="hero-title h4 m-0">Mi Perfil</h2>
-                <p class="hero-subtitle m-0 text-muted">Completa tus datos personales</p>
+    <x-postulant-page title="Mi perfil" icon="bi-person-badge" description="Completa tus datos personales y los antecedentes de tu cargo principal.">
+        <section class="slep-listing__panel mb-4" aria-labelledby="profile-jobs-heading">
+            <div class="slep-listing__panel-header">
+                <div>
+                    <h2 id="profile-jobs-heading"><i class="bi bi-briefcase" aria-hidden="true"></i> Cargos a los que quiero postular</h2>
+                    <p class="slep-listing__muted mb-0">Agrega otras áreas de desempeño o títulos en tu misma cuenta.</p>
+                </div>
+                <a href="{{ route('postulant.profile.cargos.index') }}" class="slep-listing__button slep-listing__button--secondary">Administrar mis cargos</a>
             </div>
-        </div>
-
-        @if (session('status'))
-            <div class="alert alert-success">{{ session('status') }}</div>
-        @endif
-        @if ($errors->any())
-            <div class="alert alert-danger">
-                <strong>No se pudo guardar.</strong>
-                <ul class="mb-0">
-                    @foreach ($errors->all() as $e)
-                        <li>{{ $e }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
+        </section>
         <form id="profileForm" class="needs-validation" novalidate method="POST"
             action="{{ route('postulant.profile.update', auth()->id()) }}" enctype="multipart/form-data">
             @csrf
@@ -36,9 +24,9 @@
                 <div class="col-lg-8">
 
                     {{-- ======= Datos personales ======= --}}
-                    <div class="card mb-4" id="card-datos-personales">
-                        <div class="card-body">
-                            <h5 class="card-title mb-3">Datos personales</h5>
+                    <div class="slep-listing__panel mb-4" id="card-datos-personales">
+                        <div class="slep-listing__panel-header"><h2>Datos personales</h2></div>
+                        <div class="slep-listing__filters">
 
                             {{-- Email de contacto --}}
                             <div class="mb-3" id="anchor-email_contacto">
@@ -243,9 +231,9 @@
                     </div>
 
                     {{-- ======= Académicos ======= --}}
-                    <div class="card mb-4" id="card-academicos">
-                        <div class="card-body">
-                            <h5 class="card-title mb-3">Antecedentes académicos</h5>
+                    <div class="slep-listing__panel mb-4" id="card-academicos">
+                        <div class="slep-listing__panel-header"><h2>Antecedentes académicos del cargo principal</h2></div>
+                        <div class="slep-listing__filters">
 
                             {{-- Estamento --}}
                             <div class="mb-3" id="anchor-estamento">
@@ -627,9 +615,9 @@
                     </div>
 
                     {{-- ======= Lugares de desempeño ======= --}}
-                    <div class="card mb-4" id="card-lugares">
-                        <div class="card-body">
-                            <h5 class="card-title mb-3">Lugares de desempeño</h5>
+                    <div class="slep-listing__panel mb-4" id="card-lugares">
+                        <div class="slep-listing__panel-header"><h2>Lugares de desempeño</h2></div>
+                        <div class="slep-listing__filters">
                             <p class="text-muted mb-3">Selecciona al menos una comuna donde estás disponible para
                                 desempeñarte.</p>
 
@@ -684,9 +672,9 @@
                     </div>
 
                     {{-- ======= Datos previsionales y bancarios ======= --}}
-                    <div class="card mb-4" id="card-previsional-bancario">
-                        <div class="card-body">
-                            <h5 class="card-title mb-3">Datos previsionales y bancarios</h5>
+                    <div class="slep-listing__panel mb-4" id="card-previsional-bancario">
+                        <div class="slep-listing__panel-header"><h2>Datos previsionales y bancarios</h2></div>
+                        <div class="slep-listing__filters">
 
                             {{-- AFP --}}
                             <div class="mb-3" id="anchor-prevision_afp">
@@ -781,17 +769,17 @@
                     </div>
 
 
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">Guardar</button>
-                        <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary btn-back">Volver</a>
+                    <div class="slep-listing__actions">
+                        <button type="submit" class="slep-listing__button slep-listing__button--primary"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar perfil</button>
+                        <a href="{{ route('dashboard') }}" class="slep-listing__button slep-listing__button--secondary btn-back">Volver</a>
                     </div>
                 </div>
 
                 {{-- ======= Checklist lateral ======= --}}
                 <div class="col-lg-4">
-                    <div class="card profile-checklist">
-                        <div class="card-body">
-                            <h5 class="card-title">Checklist de Perfil</h5>
+                    <div class="slep-listing__panel profile-checklist">
+                        <div class="slep-listing__panel-header"><h2>Avance del perfil</h2></div>
+                        <div class="p-3 p-md-4">
 
                             {{-- Barra de progreso dinámica --}}
                             <div class="progress mb-2" role="progressbar" aria-valuemin="0" aria-valuemax="100">
@@ -807,9 +795,8 @@
                     </div>
                 </div>
             </div>
-    </div>
-    </form>
-    </div>
+        </form>
+    </x-postulant-page>
 
     @push('styles')
         @vite('resources/js/postulante-perfil.js')

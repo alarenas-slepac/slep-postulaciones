@@ -1,13 +1,13 @@
 @extends('layouts.app')
 @section('content')
-<div class="container py-4">
-    <h2 class="h4 mb-3">Nueva oferta laboral</h2>
-    <div class="card">
-        <div class="card-body">
-            <form method="POST" action="{{ route('gestion.bolsa-trabajo.store') }}" enctype="multipart/form-data">
+<x-postulant-page title="Nueva oferta laboral" icon="bi-briefcase">
+    <section class="slep-listing__panel">
+        <div class="slep-listing__panel-header"><h2>Datos de la oferta</h2></div>
+        <div class="slep-listing__filters">
+            <form method="POST" action="{{ route('gestion.bolsa-trabajo.store') }}" enctype="multipart/form-data" data-slep-saving="Guardando…">
                 @include('gestion.bolsa-trabajo._form')
             </form>
         </div>
-    </div>
-</div>
+    </section>
+</x-postulant-page>
 @endsection

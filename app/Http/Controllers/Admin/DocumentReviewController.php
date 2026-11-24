@@ -33,53 +33,7 @@ class DocumentReviewController extends Controller
     {
         $this->authorize('viewAny', UserDocument::class);
 
-        $types = DocumentType::query()
-            ->orderByRaw('sort_order IS NULL, sort_order ASC')
-            ->orderBy('label')
-            ->get();
-
-        $docs = UserDocument::with(['type', 'reviewer'])
-            ->where('user_id', $user->id)
-            ->get()
-            ->keyBy('document_type_id');
-
-        $freshSince = \Carbon\Carbon::now()->subHours(72);
-        $visibleTypes = DocumentRules::visibleTypesFromCatalog($user, $types);
-        $requiredIds = DocumentRules::requiredTypesFromCatalog($user, $types)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        $items = [];
-        foreach ($visibleTypes as $t) {
-            $doc = $docs->get($t->id);
-
-            $items[] = [
-                'type'        => $t,
-                'doc'         => $doc,
-                'is_required' => in_array((int) $t->id, $requiredIds, true),
-                'is_new'      => $doc
-                    && $doc->status === 'pending'
-                    && $doc->updated_at
-                    && $doc->updated_at->gte($freshSince),
-            ];
-        }
-
-        $total    = count($requiredIds);
-        $uploaded = collect($items)->filter(fn($row) => $row['is_required'] && $row['doc'])->count();
-        $approved = collect($items)->filter(fn($x) => $x['doc'] && $x['doc']->status === 'approved')->count();
-        $newCount = collect($items)->filter(fn($x) => $x['is_new'])->count();
-        $percent  = $total > 0 ? (int) round($uploaded * 100 / $total) : 0;
-
-        return view('reemplazos.documents.user', compact(
-            'user',
-            'items',
-            'total',
-            'uploaded',
-            'approved',
-            'newCount',
-            'percent'
-        ));
+        return view('reemplazos.documents.user', $this->userDocumentRows($user));
     }
 
     public function downloadView(UserDocument $document)
@@ -408,66 +362,36 @@ class DocumentReviewController extends Controller
 
     public function forUser(User $user)
     {
-        // (Opcional) Restringe a admin/funcionario_slep
-        if (!auth()->user()->hasAnyRole(['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp'])) {
-            abort(403);
-        }
+        $this->authorize('viewAny', UserDocument::class);
 
-        // Tipos requeridos para armar la grilla
-        $types = DocumentType::query()
-            ->orderByRaw('sort_order IS NULL, sort_order ASC')
-            ->orderBy('label')
-            ->get();
+        return view('admin.documents.user', $this->userDocumentRows($user));
+    }
 
-        // Trae documentos del usuario con relaciones necesarias:
-        // - type (por si la vista lo usa)
-        // - reviewer (quien aprobó/rechazó)  ✅
-        $docs = UserDocument::with(['type', 'reviewer'])
-            ->where('user_id', $user->id)
-            ->get()
-            ->keyBy('document_type_id');
+    private function userDocumentRows(User $user): array
+    {
+        $types = DocumentType::query()->orderByRaw('sort_order IS NULL, sort_order ASC')->orderBy('label')->get();
+        $docs = $user->documents()->with(['type', 'reviewer'])->get()->groupBy('document_type_id');
+        $careers = \App\Support\PostulantJobProfiles::forUser($user);
+        $requiredIds = $careers->flatMap(fn ($career) => DocumentRules::requiredTypesFromCatalog($user, $types, $career)->pluck('id'))->unique();
+        $visibleIds = $careers->flatMap(fn ($career) => DocumentRules::visibleTypesFromCatalog($user, $types, $career)->pluck('id'));
+        $freshSince = now()->subHours(72);
 
-        // Ventana para marcar “Nuevo” (solo pendientes)
-        $freshSince = \Carbon\Carbon::now()->subHours(72);
-        $visibleTypes = DocumentRules::visibleTypesFromCatalog($user, $types);
-        $requiredIds = DocumentRules::requiredTypesFromCatalog($user, $types)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $items = $types->whereIn('id', $visibleIds->merge($docs->keys()))->flatMap(function (DocumentType $type) use ($docs, $requiredIds, $freshSince) {
+            return $docs->get($type->id, collect([null]))->map(fn (?UserDocument $doc) => [
+                'type' => $type,
+                'doc' => $doc,
+                'is_required' => $requiredIds->contains($type->id),
+                'is_new' => $doc?->status === 'pending' && $doc->updated_at?->gte($freshSince),
+            ]);
+        });
 
-        $items = [];
-        foreach ($visibleTypes as $t) {
-            /** @var \App\Models\UserDocument|null $doc */
-            $doc = $docs->get($t->id);
+        $total = $requiredIds->count();
+        $uploaded = $requiredIds->intersect($docs->keys())->count();
+        $approved = $items->filter(fn (array $row) => $row['doc']?->status === 'approved')->count();
+        $newCount = $items->where('is_new', true)->count();
+        $percent = $total > 0 ? (int) round($uploaded * 100 / $total) : 0;
 
-            $items[] = [
-                'type'        => $t,
-                'doc'         => $doc, // ->reviewer y ->reviewed_at vienen listos para la vista
-                'is_required' => in_array((int) $t->id, $requiredIds, true),
-                // “Nuevo” únicamente cuando está pendiente y reciente
-                'is_new'      => $doc
-                    && $doc->status === 'pending'
-                    && $doc->updated_at
-                    && $doc->updated_at->gte($freshSince),
-            ];
-        }
-
-        // Métricas para cabecera / progreso
-        $total    = count($requiredIds);
-        $uploaded = collect($items)->filter(fn($row) => $row['is_required'] && $row['doc'])->count();
-        $approved = collect($items)->filter(fn($x) => $x['doc'] && $x['doc']->status === 'approved')->count();
-        $newCount = collect($items)->filter(fn($x) => $x['is_new'])->count();
-        $percent  = $total > 0 ? (int) round($uploaded * 100 / $total) : 0;
-
-        return view('admin.documents.user', compact(
-            'user',
-            'items',
-            'total',
-            'uploaded',
-            'approved',
-            'newCount',
-            'percent'
-        ));
+        return compact('user', 'items', 'total', 'uploaded', 'approved', 'newCount', 'percent');
     }
 
 
@@ -477,7 +401,7 @@ class DocumentReviewController extends Controller
         // $this->authorize('reviewAny', UserDocument::class);
 
         // Documentos aprobados del postulante
-        $docs = UserDocument::where('user_id', $user->id)
+        $docs = $user->documents()
             ->where('status', 'approved')
             ->get();
 

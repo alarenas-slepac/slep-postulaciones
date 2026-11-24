@@ -98,6 +98,24 @@ function initialize(root) {
             submit.disabled = false; label.textContent = 'Buscar'; form.removeAttribute('aria-busy');
         });
     });
+    root.querySelectorAll('form[data-slep-saving]').forEach(form => {
+        const button = form.querySelector('button[type="submit"]');
+        const label = button?.querySelector('[data-slep-save-label]');
+        if (!label) return;
+        const initial = label.textContent;
+        form.addEventListener('submit', event => {
+            if (event.defaultPrevented) return;
+            if (button.disabled) { event.preventDefault(); return; }
+            button.disabled = true;
+            label.textContent = form.dataset.slepSaving;
+            form.setAttribute('aria-busy', 'true');
+        });
+        window.addEventListener('pageshow', () => {
+            button.disabled = false;
+            label.textContent = initial;
+            form.removeAttribute('aria-busy');
+        });
+    });
     root.querySelector('[data-slep-errors]')?.focus();
 }
 
