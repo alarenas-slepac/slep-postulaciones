@@ -227,9 +227,9 @@ class DotacionInformeFinanciamientoExport
     private function escribirCursosProyectados(Worksheet $sheet, array $filas): void
     {
         $this->prepararHoja($sheet, 'Cursos y estudiantes 2027', 'Cantidad de cursos y estudiantes proyectados 2027',
-            'Cada combinado cuenta como un curso y suma la matrícula de sus integrantes. Las horas docentes corresponden a la necesidad contractual del plan.',
-            'H', ['Nombre EE', 'RBD', 'Nivel', "Matrícula por nivel\n2027", "Cursos por nivel\n2027",
-                "Hrs. plan de estudio\npor semana", "Hrs. total\nplan de estudio", "Total horas\ndocentes"]);
+            'Cada combinado cuenta como un curso y suma la matrícula de sus integrantes. El total docente suma el contrato requerido por el plan y el Trabajo Colaborativo PIE.',
+            'I', ['Nombre EE', 'RBD', 'Nivel', "Matrícula por nivel\n2027", "Cursos por nivel\n2027",
+                "Hrs. plan de estudio\npor semana", "Hrs. total\nplan de estudio", "Trabajo\nColaborativo PIE", "Total horas\ndocentes"]);
         $sheet->mergeCells('A3:B3');
         $sheet->mergeCells('C3:E3')->setCellValue('C3', "CANTIDAD DE CURSOS Y ESTUDIANTES\nPOR NIVEL PROYECTADOS");
         $sheet->mergeCells('F3:G3')->setCellValue('F3', 'HRS. PLAN DE ESTUDIO');
@@ -248,30 +248,32 @@ class DotacionInformeFinanciamientoExport
                 $sheet->setCellValueExplicit('B'.$row, $fila['rbd'], DataType::TYPE_STRING);
                 $sheet->setCellValueExplicit('C'.$row, $curso['C'], DataType::TYPE_STRING);
                 $horasPlan = $curso['F'] !== null ? '=E'.$row.'*F'.$row : null;
-                $sheet->fromArray([$curso['D'], $curso['E'], $curso['F'], $horasPlan, $curso['H']], null, 'D'.$row, true);
+                $horasPie = $curso['trabajo_colaborativo_pie'] ?? 0;
+                $totalDocente = $curso['H'] === null ? null : round($curso['H'] + $horasPie, 2);
+                $sheet->fromArray([$curso['D'], $curso['E'], $curso['F'], $horasPlan, $horasPie, $totalDocente], null, 'D'.$row, true);
                 $lineas = max(1, ceil(mb_strlen($fila['nombre']) / 32), ceil(mb_strlen($curso['C']) / 47));
                 $sheet->getRowDimension($row)->setRowHeight(min(409, 17 * $lineas));
                 $row++;
             }
         }
 
-        $this->cerrarTabla($sheet, $row, 'H', [], ['A' => 39, 'B' => 12, 'C' => 54, 'D' => 20,
-            'E' => 18, 'F' => 22, 'G' => 18, 'H' => 19], 'Sin establecimientos para los filtros aplicados.');
-        $banda = $sheet->getStyle('A3:H3');
+        $this->cerrarTabla($sheet, $row, 'I', [], ['A' => 39, 'B' => 12, 'C' => 54, 'D' => 20,
+            'E' => 18, 'F' => 22, 'G' => 18, 'H' => 21, 'I' => 19], 'Sin establecimientos para los filtros aplicados.');
+        $banda = $sheet->getStyle('A3:I3');
         $banda->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4C91CB');
         $banda->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('424C61');
         $banda->getFont()->setBold(true);
-        $sheet->getStyle('A3:H4')->getAlignment()->setHorizontal('center')->setVertical('center')->setWrapText(true);
+        $sheet->getStyle('A3:I4')->getAlignment()->setHorizontal('center')->setVertical('center')->setWrapText(true);
         if ($row > 5) {
             $ultimaFila = $row - 1;
-            $sheet->getStyle('A5:H'.$ultimaFila)->getFill()->setFillType(Fill::FILL_NONE);
+            $sheet->getStyle('A5:I'.$ultimaFila)->getFill()->setFillType(Fill::FILL_NONE);
             $sheet->getStyle('A5:C'.$ultimaFila)->getAlignment()->setWrapText(true);
-            $sheet->getStyle('A5:H'.$ultimaFila)->getAlignment()->setVertical('center');
+            $sheet->getStyle('A5:I'.$ultimaFila)->getAlignment()->setVertical('center');
             $rbd = $sheet->getStyle('B5:B'.$ultimaFila);
             $rbd->getAlignment()->setHorizontal('center');
             $rbd->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FBE4D7');
             $rbd->getFont()->getColor()->setRGB('973A25');
-            $sheet->getStyle('D5:H'.$ultimaFila)->getAlignment()->setHorizontal('center');
+            $sheet->getStyle('D5:I'.$ultimaFila)->getAlignment()->setHorizontal('center');
             $sheet->getStyle('D5:E'.$ultimaFila)->getNumberFormat()->setFormatCode('#,##0');
         }
         $sheet->freezePane('D5');
