@@ -2288,6 +2288,15 @@
       "progreso-animado.css"
     ]
   },
+  "resources/css/slep-sidebar.css": {
+    "file": "assets/slep-sidebar-CAG4_1XC.css",
+    "src": "resources/css/slep-sidebar.css",
+    "isEntry": true,
+    "name": "slep-sidebar",
+    "names": [
+      "slep-sidebar.css"
+    ]
+  },
   "resources/css/votaciones-admin.css": {
     "file": "assets/votaciones-admin-Bufya2o9.css",
     "src": "resources/css/votaciones-admin.css",

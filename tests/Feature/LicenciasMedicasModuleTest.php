@@ -468,6 +468,11 @@ class LicenciasMedicasModuleTest extends TestCase
     {
         $usuario = new class
         {
+            public function can(string $permission): bool
+            {
+                return false;
+            }
+
             public function canModule(string $module, ?string $role = null): bool
             {
                 return true;

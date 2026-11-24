@@ -1,3 +1,7 @@
+@php
+    $layoutUser = auth()->user();
+    $layoutActiveRole = $layoutUser && method_exists($layoutUser, 'activeRoleName') ? $layoutUser->activeRoleName() : null;
+@endphp
 <!doctype html>
 <html lang="es">
 
@@ -22,6 +26,9 @@
     <meta property="og:image" content="{{ asset('branding/android-chrome-512x512.png') }}">
 
     @vite(['resources/js/app.js', 'resources/scss/app.scss'])
+    @if (\App\Support\SlepSidebarNavigation::appliesTo($layoutActiveRole))
+        @vite('resources/css/slep-sidebar.css')
+    @endif
     @if(!empty($dotacionEdicionPanel))
         @vite('resources/js/dotacion-bloqueos.js')
     @endif
@@ -189,11 +196,10 @@
     } catch (error) {}
 </script>
 @php
-    $layoutUser = auth()->user();
-    $layoutActiveRole = $layoutUser && method_exists($layoutUser, 'activeRoleName') ? $layoutUser->activeRoleName() : null;
     $layoutRoleLabel = $layoutUser ? \App\Support\SlepUiRegistry::roleLabel($layoutActiveRole) : null;
     $layoutRoleTone = \App\Support\SlepUiRegistry::roleTone($layoutActiveRole);
     $layoutMenuGroups = $layoutUser ? \App\Support\SlepUiRegistry::menuGroups($layoutUser, $layoutActiveRole) : [];
+    $layoutSidebarSections = \App\Support\SlepSidebarNavigation::forRole($layoutMenuGroups, $layoutActiveRole, request()->route()?->getName());
     $layoutTutorialImpersonation = session('tutorial_postulante_impersonation');
     $layoutTutorialStopUrl = Route::has('gestion.postulante-tutorial.stop')
         ? route('gestion.postulante-tutorial.stop')
@@ -211,7 +217,8 @@
 
 @auth
     <div class="slep-shell">
-        <aside class="slep-sidebar" aria-label="Menú principal">
+        <aside class="slep-sidebar @if ($layoutSidebarSections) slep-sidebar--sectioned @endif" aria-label="Menú principal"
+            @if ($layoutSidebarSections) id="slep-sectioned-sidebar" @endif>
             <a class="slep-brand text-decoration-none" href="{{ Route::has('dashboard') ? route('dashboard') : url('/') }}">
                 <span class="slep-brand-logo" aria-hidden="true">
                     <img src="{{ $layoutSidebarLogoUrl }}" alt="" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('d-none');">
@@ -223,39 +230,43 @@
                 </span>
             </a>
 
-            <div class="slep-nav-scroll">
-                @foreach ($layoutMenuGroups as $group => $items)
-                    <div class="slep-menu-group">
-                        <div class="slep-menu-title">{{ $group }}</div>
-                        @foreach ($items as $item)
-                            @php
-                                $layoutCurrentRouteName = request()->route()?->getName();
-                                $layoutItemActive = request()->routeIs($item['route']);
+            @if ($layoutSidebarSections)
+                @include('partials.sidebar-sections', ['navigation' => $layoutSidebarSections])
+            @else
+                <div class="slep-nav-scroll">
+                    @foreach ($layoutMenuGroups as $group => $items)
+                        <div class="slep-menu-group">
+                            <div class="slep-menu-title">{{ $group }}</div>
+                            @foreach ($items as $item)
+                                @php
+                                    $layoutItemActive = request()->routeIs($item['route']);
 
-                                if (! $layoutItemActive && $item['route'] === 'gestion.solicitudes-reemplazo.index') {
-                                    $layoutItemActive = request()->routeIs('gestion.solicitudes-reemplazo.*')
-                                        && ! request()->routeIs('gestion.solicitudes-reemplazo.finiquitos.*');
-                                } elseif (! $layoutItemActive && $item['route'] === 'gestion.solicitudes-reemplazo.finiquitos.index') {
-                                    $layoutItemActive = request()->routeIs('gestion.solicitudes-reemplazo.finiquitos.*');
-                                } elseif (! $layoutItemActive && ! in_array($item['route'], ['gestion.solicitudes-reemplazo.index', 'gestion.solicitudes-reemplazo.finiquitos.index'], true)) {
-                                    $layoutRoutePrefix = \Illuminate\Support\Str::beforeLast($item['route'], '.');
-                                    $layoutItemActive = $layoutRoutePrefix !== $item['route'] && request()->routeIs($layoutRoutePrefix . '.*');
-                                }
-                            @endphp
-                            <a class="slep-menu-link {{ $layoutItemActive ? 'active' : '' }}" href="{{ route($item['route']) }}">
-                                <i class="bi {{ $item['icon'] }}"></i>
-                                <span>{{ $item['label'] }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                @endforeach
-            </div>
+                                    if (! $layoutItemActive && $item['route'] === 'gestion.solicitudes-reemplazo.index') {
+                                        $layoutItemActive = request()->routeIs('gestion.solicitudes-reemplazo.*')
+                                            && ! request()->routeIs('gestion.solicitudes-reemplazo.finiquitos.*');
+                                    } elseif (! $layoutItemActive && $item['route'] === 'gestion.solicitudes-reemplazo.finiquitos.index') {
+                                        $layoutItemActive = request()->routeIs('gestion.solicitudes-reemplazo.finiquitos.*');
+                                    } elseif (! $layoutItemActive) {
+                                        $layoutRoutePrefix = \Illuminate\Support\Str::beforeLast($item['route'], '.');
+                                        $layoutItemActive = $layoutRoutePrefix !== $item['route'] && request()->routeIs($layoutRoutePrefix . '.*');
+                                    }
+                                @endphp
+                                <a class="slep-menu-link {{ $layoutItemActive ? 'active' : '' }}" href="{{ route($item['route']) }}">
+                                    <i class="bi {{ $item['icon'] }}"></i>
+                                    <span>{{ $item['label'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </aside>
         <div class="slep-overlay" data-slep-close></div>
 
         <div class="slep-main">
             <header class="slep-topbar">
-                <button type="button" class="slep-sidebar-toggle" data-slep-toggle aria-label="Ocultar menú" title="Ocultar menú"><i class="bi bi-layout-sidebar-inset fs-5" data-slep-toggle-icon></i></button>
+                <button type="button" class="slep-sidebar-toggle" data-slep-toggle aria-label="Ocultar menú" title="Ocultar menú"
+                    @if ($layoutSidebarSections) aria-controls="slep-sectioned-sidebar" @endif><i class="bi bi-layout-sidebar-inset fs-5" data-slep-toggle-icon></i></button>
 
                 <div class="slep-global-search" data-global-search data-search-url="{{ Route::has('global-search') ? route('global-search') : '' }}">
                     <i class="bi bi-search"></i>
@@ -383,12 +394,19 @@
 @stack('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        var sectionedSidebar = document.getElementById('slep-sectioned-sidebar');
+        var sectionedSidebarToggle = document.querySelector('[aria-controls="slep-sectioned-sidebar"]');
+
         function isDesktopSidebar() {
             return window.matchMedia('(min-width: 1200px)').matches;
         }
 
         function updateSidebarToggleState() {
             var isCollapsed = document.body.classList.contains('slep-sidebar-collapsed');
+            var isOpenOnMobile = document.body.classList.contains('slep-sidebar-open');
+            if (sectionedSidebarToggle) {
+                sectionedSidebarToggle.setAttribute('aria-expanded', String(isDesktopSidebar() ? !isCollapsed : isOpenOnMobile));
+            }
             document.querySelectorAll('[data-slep-toggle]').forEach(function (button) {
                 var icon = button.querySelector('[data-slep-toggle-icon]');
                 if (isDesktopSidebar()) {
@@ -396,10 +414,33 @@
                     button.setAttribute('title', isCollapsed ? 'Mostrar menú' : 'Ocultar menú');
                     if (icon) icon.className = 'bi ' + (isCollapsed ? 'bi-layout-sidebar-inset-reverse' : 'bi-layout-sidebar-inset') + ' fs-5';
                 } else {
-                    button.setAttribute('aria-label', 'Abrir menú');
-                    button.setAttribute('title', 'Abrir menú');
+                    var label = button === sectionedSidebarToggle && isOpenOnMobile ? 'Cerrar menú' : 'Abrir menú';
+                    button.setAttribute('aria-label', label);
+                    button.setAttribute('title', label);
                     if (icon) icon.className = 'bi bi-list fs-5';
                 }
+            });
+        }
+
+        function closeMobileSidebar() {
+            document.body.classList.remove('slep-sidebar-open');
+            if (sectionedSidebarToggle) {
+                updateSidebarToggleState();
+                sectionedSidebarToggle.focus();
+            }
+        }
+
+        function focusSectionedSidebar() {
+            window.requestAnimationFrame(function () {
+                var slide = sectionedSidebar.getAnimations?.().find(function (animation) {
+                    return animation.transitionProperty === 'transform';
+                });
+                var visible = slide ? slide.finished : Promise.resolve();
+                visible.then(function () {
+                    if (isDesktopSidebar() || !document.body.classList.contains('slep-sidebar-open')) return;
+                    var current = sectionedSidebar.querySelector('[aria-current="page"]') || sectionedSidebar.querySelector('nav a');
+                    if (current) current.focus();
+                }, function () {});
             });
         }
 
@@ -414,13 +455,24 @@
                     return;
                 }
 
-                document.body.classList.toggle('slep-sidebar-open');
+                var isOpen = document.body.classList.toggle('slep-sidebar-open');
                 updateSidebarToggleState();
+                if (isOpen && sectionedSidebar) {
+                    focusSectionedSidebar();
+                }
             });
         });
         document.querySelectorAll('[data-slep-close]').forEach(function (button) {
-            button.addEventListener('click', function () { document.body.classList.remove('slep-sidebar-open'); });
+            button.addEventListener('click', closeMobileSidebar);
         });
+        if (sectionedSidebar) {
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && !event.defaultPrevented && !isDesktopSidebar() && document.body.classList.contains('slep-sidebar-open')) {
+                    event.preventDefault();
+                    closeMobileSidebar();
+                }
+            });
+        }
         window.addEventListener('resize', function () {
             if (isDesktopSidebar()) {
                 document.body.classList.remove('slep-sidebar-open');

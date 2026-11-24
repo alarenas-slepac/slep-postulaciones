@@ -1,0 +1,55 @@
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+.slep-sidebar.slep-sidebar--sectioned { width: min(var(--slep-sidebar), 100vw); }
+.slep-nav-scroll.slep-sidebar-sections { padding: .85rem .75rem; }
+.slep-sidebar-shortcuts { margin: 0 0 .75rem; padding-bottom: .65rem; border-bottom: 1px solid var(--slep-border); }
+.slep-sidebar-section { margin-bottom: .4rem; border: 1px solid transparent; border-radius: .875rem; }
+.slep-sidebar-section[open] { background: #f8fafc; border-color: var(--slep-border); }
+.slep-sidebar-section-heading {
+    display: grid;
+    grid-template-columns: 1.75rem minmax(0, 1fr) 1rem;
+    align-items: center;
+    gap: .6rem;
+    min-height: 2.75rem;
+    padding: .45rem .6rem;
+    list-style: none;
+    border-radius: .8rem;
+    color: #334155;
+    cursor: pointer;
+    font-size: .87rem;
+    font-weight: 700;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+.slep-sidebar-section-heading::-webkit-details-marker { display: none; }
+.slep-sidebar-section-heading:hover,
+.slep-sidebar-section.is-current > .slep-sidebar-section-heading { background: #eef6ff; color: var(--slep-blue-dark); }
+.slep-sidebar-section-icon { color: var(--slep-blue-dark); text-align: center; font-size: 1.1rem; }
+.slep-sidebar-section-chevron { color: #475569; text-align: center; font-size: .75rem; transition: transform .18s ease; }
+.slep-sidebar-section[open] .slep-sidebar-section-chevron { transform: rotate(180deg); }
+.slep-sidebar-section-links { margin: .2rem .3rem .4rem; padding-left: .3rem; }
+.slep-sidebar-sections .slep-menu-link {
+    gap: .55rem;
+    min-height: 2.75rem;
+    padding: .45rem .6rem;
+    margin-bottom: .12rem;
+    font-size: .82rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+.slep-sidebar-sections .slep-menu-link i { flex: 0 0 1.35rem; }
+.slep-sidebar-shortcuts .slep-menu-link { font-size: .87rem; }
+.slep-sidebar-section-heading:focus-visible,
+.slep-sidebar-sections .slep-menu-link:focus-visible { outline: 2px solid var(--slep-blue); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) {
+    .slep-sidebar.slep-sidebar--sectioned, .slep-sidebar-sections .slep-menu-link, .slep-sidebar-section-chevron { transition: none; }
+}
+
+@media (min-width: 1200px) {
+    .slep-sidebar-collapsed .slep-sidebar--sectioned { visibility: hidden; }
+}
+
+@media (max-width: 1199.98px) {
+    .slep-sidebar--sectioned { visibility: hidden; }
+    .slep-sidebar-open .slep-sidebar--sectioned { visibility: visible; }
+}

@@ -14,6 +14,7 @@ export default defineConfig({
             input: [
                 'resources/scss/app.scss',
                 'resources/js/app.js',
+                'resources/css/slep-sidebar.css',
                 'resources/js/account-verification.js',
                 'resources/js/dotacion-disposicion.js',
                 'resources/js/slep-listados.js',
