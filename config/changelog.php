@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.23.700',
+    'current_version' => '2026.11.24.701',
     'entries' => [
+        [
+            'version' => '2026.11.24.701',
+            'title' => 'Cursos y estudiantes proyectados en el Excel de financiamiento',
+            'summary' => 'El Excel de 2027 agrega la proyección de cursos, matrícula y horas por establecimiento.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'La hoja usa la matrícula, el plan semanal y la necesidad contractual de Info Establecimiento del PAL 2027.',
+                'Cada curso combinado muestra su nombre, suma la matrícula de sus integrantes y cuenta una vez para el total de horas del plan.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.23.700',
             'title' => 'Docentes por subvención en el Excel de financiamiento',

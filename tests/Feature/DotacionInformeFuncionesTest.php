@@ -8,8 +8,10 @@ use App\Models\DotacionDocenteDistribucion;
 use App\Models\Establecimiento;
 use App\Models\EstablecimientoCurso;
 use App\Models\EstablecimientoCursoPie;
+use App\Models\PlanEstudio;
 use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
+use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionInformeFunciones;
 use App\Support\PieHorasCalculator;
@@ -276,7 +278,10 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         try {
             $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa',
                 'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente', 'Dotación docente glosa',
-                'Docentes por Subvención', 'Docentes por Subvención glosa'], $libro->getSheetNames());
+                'Docentes por Subvención', 'Docentes por Subvención glosa', 'Cursos y estudiantes 2027'], $libro->getSheetNames());
+            $proyeccion = $libro->getSheetByName('Cursos y estudiantes 2027');
+            $this->assertSame(['99998', 'Sin cursos activos con matrícula', 0, 0, null, null, null],
+                $proyeccion->rangeToArray('B6:H6', null, true, false)[0]);
             $niveles = $libro->getSheetByName('Niveles y modalidades');
             $this->assertSame(['99999', '=Escuela de prueba', 'No', 'Sí', 'Sí', 'Sí', 'No', 'No', 'Sí'], $niveles->rangeToArray('A5:I5')[0]);
             $this->assertSame(DataType::TYPE_STRING, $niveles->getCell('B5')->getDataType());
@@ -304,6 +309,60 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             $this->assertSame('Municipal', $otras->getCell('D5')->getValue());
             $this->assertSame('PIE / SEP', $otras->getCell('D6')->getValue());
             $this->assertSame(9.0, (float) $otras->getCell('E7')->getCalculatedValue());
+        } finally {
+            $libro->disconnectWorksheets();
+        }
+    }
+
+    public function test_excel_proyecta_cursos_independientes_y_un_plan_por_curso_combinado(): void
+    {
+        (require database_path('migrations/2026_07_23_160000_create_dotacion_cursos_combinados_tables.php'))->up();
+        $this->ee->update(['nombre_establecimiento' => '=Escuela sintética 99999']);
+        $this->establecimiento(99998);
+        $planes = [];
+        foreach (['1B', '2B', '3B'] as $codigo) {
+            $planes[$codigo] = PlanEstudio::create([
+                'curso_id' => Curso::where('codigo', $codigo)->value('id'), 'anio' => 2027,
+                'nombre_plan' => 'Plan sintético '.$codigo, 'regimen_jec' => 'Con JEC',
+                'horas_semanales_total' => 38, 'activo' => true,
+            ]);
+            $planes[$codigo]->asignaturas()->create(['asignatura' => 'Lenguaje', 'horas_semanales' => 38]);
+        }
+
+        $secciones = [];
+        foreach ([
+            ['1B', 'A', 10, true, 2027], ['1B', 'B', 14, true, 2027],
+            ['2B', 'A', 10, true, 2027], ['3B', 'A', 15, true, 2027],
+            ['1B', 'C', 40, false, 2027], ['1B', 'D', 0, true, 2027], ['1B', 'E', 20, true, 2026],
+        ] as [$codigo, $letra, $matricula, $activo, $anio]) {
+            $secciones[$codigo.$letra] = EstablecimientoCurso::create([
+                'establecimiento_id' => $this->ee->id, 'curso_id' => $planes[$codigo]->curso_id,
+                'plan_estudio_id' => $anio === 2027 ? $planes[$codigo]->id : null,
+                'nombre_seccion' => $codigo.' '.$letra, 'regimen_jec' => 'Con JEC',
+            ] + compact('anio', 'letra', 'matricula', 'activo'));
+        }
+        $grupo = DB::table('dotacion_cursos_combinados')->insertGetId([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'nombre' => 'Multigrado de prueba', 'activo' => true,
+        ]);
+        foreach (['2BA', '3BA'] as $seccion) {
+            DB::table('dotacion_curso_combinado_miembros')->insert([
+                'dotacion_curso_combinado_id' => $grupo, 'establecimiento_curso_id' => $secciones[$seccion]->id,
+            ]);
+        }
+
+        $libro = $this->abrirExcelFinanciamiento(2027, ['q' => '99999']);
+        try {
+            $hoja = $libro->getSheetByName('Cursos y estudiantes 2027');
+            $this->assertSame('Cantidad de cursos y estudiantes proyectados 2027', $hoja->getCell('A1')->getValue());
+            $this->assertSame('=Escuela sintética 99999', $hoja->getCell('A5')->getValue());
+            $this->assertSame(DataType::TYPE_STRING, $hoja->getCell('A5')->getDataType());
+            $this->assertSame(DataType::TYPE_STRING, $hoja->getCell('B5')->getDataType());
+            $this->assertSame(['99999', '99999'], array_column($hoja->rangeToArray('B5:B6'), 0));
+            $this->assertSame('1° Básico', $hoja->getCell('C5')->getValue());
+            $this->assertSame('Curso combinado «Multigrado de prueba»: 2B A + 3B A', $hoja->getCell('C6')->getValue());
+            $this->assertSame('=E6*F6', $hoja->getCell('G6')->getValue());
+            $this->assertEquals([[24, 2, 38, 76, 88], [25, 1, 38, 38, 44]], $hoja->rangeToArray('D5:H6', null, true, false));
+            $this->assertSame(6, $hoja->getHighestDataRow());
         } finally {
             $libro->disconnectWorksheets();
         }
@@ -531,6 +590,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
                 }
             } else {
                 $this->assertNull($glosa);
+                $this->assertNull($libro->getSheetByName('Cursos y estudiantes 2027'));
             }
         } finally {
             $libro->disconnectWorksheets();
@@ -800,5 +860,6 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         }
         (new ReflectionProperty(DocenteHorasNoLectivasCalculator::class, 'proportionRowsCache'))->setValue(null, []);
         DocenteHorasNoLectivasCalculator::clearExceptionCache();
+        DotacionCursoCombinadoCalculator::clearCache();
     }
 }
