@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.702',
+    'current_version' => '2026.11.24.703',
     'entries' => [
+        [
+            'version' => '2026.11.24.703',
+            'title' => 'Horas aula por asignatura en el Excel de financiamiento',
+            'summary' => 'El Excel de 2027 agrega ocho hojas de horas pedagógicas por RBD, nivel y curso combinado.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Agrupa las secciones del mismo nivel en una fila e indica Con JEC / Sin JEC cuando figuran ambos regímenes.',
+                'La libre disposición se muestra como un total y los combinados informan las horas de su plan compartido.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.24.702',
             'title' => 'Trabajo Colaborativo PIE en cursos proyectados',

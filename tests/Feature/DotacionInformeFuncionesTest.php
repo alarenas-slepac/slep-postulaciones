@@ -14,6 +14,7 @@ use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
 use App\Support\DotacionInformeFunciones;
+use App\Support\DotacionInformeHorasAula;
 use App\Support\PieHorasCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -278,7 +279,8 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
         try {
             $this->assertSame(['Sub. General', 'PIE', 'SEP', 'Pro-Retención', 'Otras fuentes AAEE', 'Proyección PIE', 'Oferta educativa',
                 'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente', 'Dotación docente glosa',
-                'Docentes por Subvención', 'Docentes por Subvención glosa', 'Cursos y estudiantes 2027'], $libro->getSheetNames());
+                'Docentes por Subvención', 'Docentes por Subvención glosa', 'Cursos y estudiantes 2027',
+                ...array_values(DotacionInformeHorasAula::HOJAS)], $libro->getSheetNames());
             $proyeccion = $libro->getSheetByName('Cursos y estudiantes 2027');
             $this->assertEquals(0, $proyeccion->getCell('H5')->getValue());
             $this->assertSame(['99998', 'Sin cursos activos con matrícula', 0, 0, null, null, 0, null],
@@ -374,6 +376,96 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             $this->assertEquals([[24, 2, 38, 76, 6, 94], [25, 1, 38, 38, 3, 47]], $hoja->rangeToArray('D5:I6', null, true, false));
             $this->assertEquals(9, $libro->getSheetByName('Oferta educativa')->getCell('K5')->getValue());
             $this->assertSame(6, $hoja->getHighestDataRow());
+        } finally {
+            $libro->disconnectWorksheets();
+        }
+    }
+
+    public function test_excel_separa_horas_aula_por_ensenanza_y_consolida_jec_y_libre_disposicion(): void
+    {
+        (require database_path('migrations/2026_07_23_160000_create_dotacion_cursos_combinados_tables.php'))->up();
+        $excluido = $this->establecimiento(99998);
+        $this->ee->update(['nombre_establecimiento' => '=Escuela sintética 99999']);
+        Curso::create(['codigo' => 'EPJA-1B', 'nombre' => 'Primer nivel EPJA', 'nivel_educativo' => 'Básica Adultos']);
+        Curso::create(['codigo' => 'LAB-1', 'nombre' => 'Laboral 1', 'nivel_educativo' => 'Educación Especial']);
+        $secciones = [];
+        foreach ([
+            ['1B', 'A', 'Con JEC', 'Lenguaje y Comunicación', 8, 2],
+            ['1B', 'B', 'Sin JEC', 'Lenguaje y Comunicación', 6, 1],
+            ['6B', 'A', 'Con JEC', 'Matemática', 5, 1],
+            ['7B', 'A', 'Sin JEC', 'Matemática', 4, 2],
+            ['8B', 'A', 'Sin JEC', 'Ciencias Naturales', 4, 0],
+            ['NT1', 'A', 'Con JEC', 'Lenguaje verbal', 5, 0],
+            ['1M', 'A', 'Con JEC', 'Lengua y Literatura', 6, 0],
+            ['3M-HC', 'A', 'Con JEC', 'Filosofía', 2, 0],
+            ['3M-TP', 'A', 'Con JEC', 'Módulo técnico', 4, 0],
+            ['EPJA-1B', 'A', 'No aplica', 'Comunicación', 3, 0],
+            ['LAB-1', 'A', 'Sin JEC', 'Formación laboral', 7, 0],
+        ] as [$codigo, $letra, $jec, $asignatura, $horas, $libre]) {
+            $curso = Curso::where('codigo', $codigo)->firstOrFail();
+            $plan = PlanEstudio::create([
+                'curso_id' => $curso->id, 'anio' => 2027, 'regimen_jec' => $jec, 'activo' => true,
+                'nombre_plan' => 'Plan sintético '.$codigo.' '.$letra, 'horas_semanales_total' => $horas + $libre,
+                'horas_semanales_libre_disposicion' => $libre,
+            ]);
+            $plan->asignaturas()->create(['asignatura' => $asignatura, 'horas_semanales' => $horas]);
+            if ($libre > 0) {
+                $plan->asignaturas()->create(['asignatura' => 'Taller sintético', 'horas_semanales' => $libre, 'tipo_bloque' => 'libre_disposicion']);
+            }
+            $secciones[$codigo.$letra] = EstablecimientoCurso::create([
+                'establecimiento_id' => $this->ee->id, 'curso_id' => $curso->id, 'plan_estudio_id' => $plan->id,
+                'anio' => 2027, 'letra' => $letra, 'nombre_seccion' => $curso->nombre.' '.$letra,
+                'regimen_jec' => $jec, 'matricula' => 10, 'activo' => true,
+            ]);
+        }
+        $secciones['1BA']->replicate()->forceFill(['establecimiento_id' => $excluido->id])->save();
+        $grupo = DB::table('dotacion_cursos_combinados')->insertGetId([
+            'establecimiento_id' => $this->ee->id, 'anio' => 2027, 'nombre' => 'Grupo mixto sintético', 'activo' => true,
+        ]);
+        foreach (['6BA', '7BA'] as $seccion) {
+            DB::table('dotacion_curso_combinado_miembros')->insert([
+                'dotacion_curso_combinado_id' => $grupo, 'establecimiento_curso_id' => $secciones[$seccion]->id,
+            ]);
+        }
+
+        $libro = $this->abrirExcelFinanciamiento(2027, ['q' => '99999']);
+        try {
+            $this->assertSame(['Educación Parvularia', 'Básica 1° a 6°', 'Básica 7° y 8°', 'Media 1° y 2°',
+                'Media HC 3° y 4°', 'Media TP 3° y 4°', 'EPJA', 'Especial (Laborales)'], array_slice($libro->getSheetNames(), -8));
+            $basica = $libro->getSheetByName('Básica 1° a 6°');
+            $this->assertSame('99999', $basica->getCell('A5')->getValue());
+            $this->assertSame(DataType::TYPE_STRING, $basica->getCell('A5')->getDataType());
+            $this->assertSame(DataType::TYPE_STRING, $basica->getCell('B5')->getDataType());
+            $this->assertSame('1° Básico A / 1° Básico B', $basica->getCell('C5')->getValue());
+            $this->assertSame('Con JEC / Sin JEC', $basica->getCell('D5')->getValue());
+            $this->assertSame('Lenguaje y Comunicación', $basica->getCell('E4')->getValue());
+            $this->assertSame('Horas de Libre Disposición', $basica->getCell('P4')->getValue());
+            $this->assertSame(90, $basica->getStyle('E4')->getAlignment()->getTextRotation());
+            $this->assertEquals(14, $basica->getCell('E5')->getValue());
+            $this->assertEquals(3, $basica->getCell('P5')->getValue());
+            $this->assertEquals(17, $basica->getCell('Q5')->getCalculatedValue());
+            $this->assertSame('Curso combinado «Grupo mixto sintético» · 6° Básico A + 7° Básico A', $basica->getCell('C6')->getValue());
+            $this->assertSame('Con JEC / Sin JEC', $basica->getCell('D6')->getValue());
+            $this->assertEquals(5, $basica->getCell('F6')->getValue());
+            $this->assertEquals(2, $basica->getCell('P6')->getValue());
+            $this->assertEquals(7, $basica->getCell('Q6')->getCalculatedValue());
+            $this->assertSame(6, $basica->getHighestDataRow());
+            foreach ([
+                'Educación Parvularia' => ['NT1 A', 'Con JEC', 'Lenguaje verbal', 5],
+                'Básica 7° y 8°' => ['8° Básico A', 'Sin JEC', 'Ciencias Naturales', 4],
+                'Media 1° y 2°' => ['1° Medio A', 'Con JEC', 'Lengua y Literatura', 6],
+                'Media HC 3° y 4°' => ['3° Medio HC A', 'Con JEC', 'Filosofía', 2],
+                'Media TP 3° y 4°' => ['3° Medio TP A', 'Con JEC', 'Módulo técnico', 4],
+                'EPJA' => ['Primer nivel EPJA A', 'No aplica', 'Comunicación', 3],
+                'Especial (Laborales)' => ['Laboral 1 A', 'Sin JEC', 'Formación laboral', 7],
+            ] as $pestana => [$curso, $jec, $asignatura, $horas]) {
+                $hoja = $libro->getSheetByName($pestana);
+                $this->assertSame($curso, $hoja->getCell('C5')->getValue());
+                $this->assertSame($jec, $hoja->getCell('D5')->getValue());
+                $this->assertSame($asignatura, $hoja->getCell('E4')->getValue());
+                $this->assertEquals($horas, $hoja->getCell('E5')->getValue());
+                $this->assertSame(5, $hoja->getHighestDataRow());
+            }
         } finally {
             $libro->disconnectWorksheets();
         }
@@ -602,6 +694,7 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             } else {
                 $this->assertNull($glosa);
                 $this->assertNull($libro->getSheetByName('Cursos y estudiantes 2027'));
+                $this->assertNull($libro->getSheetByName('Educación Parvularia'));
             }
         } finally {
             $libro->disconnectWorksheets();

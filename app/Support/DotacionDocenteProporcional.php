@@ -21,12 +21,12 @@ class DotacionDocenteProporcional
         return $this->calcular($anio)['dotacion'];
     }
 
-    public function paraInforme(int $anio): array
+    public function paraInforme(int $anio, array $idsHorasAula = []): array
     {
-        return $this->calcular($anio, incluirSubvenciones: true);
+        return $this->calcular($anio, incluirSubvenciones: true, establecimientosHorasAula: array_fill_keys($idsHorasAula, true));
     }
 
-    private function calcular(int $anio, bool $incluirSubvenciones = false): array
+    private function calcular(int $anio, bool $incluirSubvenciones = false, array $establecimientosHorasAula = []): array
     {
         $dotacion = new DotacionDocenteAcumulado;
         $subvenciones = $incluirSubvenciones ? new DotacionDocenteAcumulado : null;
@@ -42,11 +42,12 @@ class DotacionDocenteProporcional
         $criterios = [];
         $criteriosSubvencion = [];
         $cursosProyectados = [];
+        $horasAula = [];
         foreach ($establecimientos as $establecimiento) {
             // Conservar los acumulados y las filas del informe, sin retener los modelos de cada establecimiento.
             DotacionLecturaCache::ejecutar(function () use (
                 $establecimiento, $anio, $dotacion, $subvenciones, $reglas, $contrataciones, $informeFunciones,
-                $tablasPal, $glosa, &$criterios, &$criteriosSubvencion, &$cursosProyectados
+                $tablasPal, $glosa, $establecimientosHorasAula, &$criterios, &$criteriosSubvencion, &$cursosProyectados, &$horasAula
             ): void {
                 $id = (int) $establecimiento->id;
                 if ($anio === 2027) {
@@ -66,6 +67,9 @@ class DotacionDocenteProporcional
                         $criterios[$id] = $glosa->criterio($establecimiento, $datos, $dotacion->horas($id));
                         $criteriosSubvencion[$id] = $glosa->recalcularBrecha($criterios[$id], $subvenciones->horas($id));
                         $cursosProyectados[$id] = $cursosPal;
+                    }
+                    if (isset($establecimientosHorasAula[$id])) {
+                        $horasAula[$id] = app(DotacionInformeHorasAula::class)->filas($datos);
                     }
                     return;
                 }
@@ -128,6 +132,7 @@ class DotacionDocenteProporcional
             'subvenciones' => $subvenciones?->resumir() ?? [],
             'glosa_subvencion' => $glosa?->distribuir($criteriosSubvencion),
             'cursos_proyectados' => $cursosProyectados,
+            'horas_aula' => $horasAula,
         ];
     }
 

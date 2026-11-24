@@ -5,10 +5,12 @@ namespace App\Exports;
 use App\Support\DotacionDocenteGlosa;
 use App\Support\DotacionDocenteProporcional;
 use App\Support\DotacionInformeFinanciamiento;
+use App\Support\DotacionInformeHorasAula;
 use App\Support\DotacionInformePlanesNiveles;
 use App\Support\DotacionLecturaCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -26,7 +28,8 @@ class DotacionInformeFinanciamientoExport
     public function guardar(Builder $establecimientos, int $anio, string $ruta): void
     {
         $periodo = $this->calculador->periodoAsistentes();
-        $informe = $this->dotacionDocente->paraInforme($anio);
+        $idsHorasAula = $anio === 2027 ? (clone $establecimientos)->pluck('id')->all() : [];
+        $informe = $this->dotacionDocente->paraInforme($anio, $idsHorasAula);
         $filas = [];
         foreach ((clone $establecimientos)->lazy(10) as $ee) {
             try {
@@ -36,6 +39,7 @@ class DotacionInformeFinanciamientoExport
                     'dotacion_docente' => $informe['dotacion'][$ee->id] ?? [],
                     'docentes_por_subvencion' => $informe['subvenciones'][$ee->id] ?? [],
                     'cursos_proyectados' => $informe['cursos_proyectados'][$ee->id] ?? [],
+                    'horas_aula' => $informe['horas_aula'][$ee->id] ?? [],
                 ];
             } catch (\Throwable $exception) {
                 report($exception);
@@ -45,7 +49,7 @@ class DotacionInformeFinanciamientoExport
             }
         }
 
-        unset($informe['cursos_proyectados']);
+        unset($informe['cursos_proyectados'], $informe['horas_aula']);
         $book = $this->workbook($filas, $anio, $periodo, $informe['glosa'], $informe['glosa_subvencion']);
         try {
             (new Xlsx($book))->save($ruta);
@@ -94,6 +98,9 @@ class DotacionInformeFinanciamientoExport
         }
         if ($anio === 2027) {
             $this->escribirCursosProyectados($book->createSheet(), $filas);
+            foreach (DotacionInformeHorasAula::HOJAS as $nivel => $nombre) {
+                $this->escribirHorasAula($book->createSheet(), $nivel, $nombre, $filas);
+            }
         }
         $book->setActiveSheetIndex(0);
 
@@ -277,6 +284,82 @@ class DotacionInformeFinanciamientoExport
             $sheet->getStyle('D5:E'.$ultimaFila)->getNumberFormat()->setFormatCode('#,##0');
         }
         $sheet->freezePane('D5');
+        $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)
+            ->setRowsToRepeatAtTopByStartAndEnd(3, 4);
+    }
+
+    private function escribirHorasAula(Worksheet $sheet, string $nivel, string $nombre, array $filas): void
+    {
+        $cursos = [];
+        $asignaturas = $nivel === 'basica_1_6' ? DotacionInformeHorasAula::ASIGNATURAS_BASICA_1_6 : [];
+        $otras = [];
+        foreach ($filas as $fila) {
+            foreach ($fila['horas_aula'][$nivel] ?? [] as $curso) {
+                $cursos[] = ['rbd' => $fila['rbd'], 'establecimiento' => $fila['nombre']] + $curso;
+                foreach ($curso['asignaturas'] as $clave => $asignatura) {
+                    $otras[$clave] ??= $asignatura['nombre'];
+                }
+            }
+        }
+        natcasesort($otras);
+        $asignaturas += $otras;
+        $titulos = [...array_values($asignaturas), 'Horas de Libre Disposición', 'Total horas aula'];
+        $ultima = Coordinate::stringFromColumnIndex(4 + count($titulos));
+        $libre = Coordinate::stringFromColumnIndex(3 + count($titulos));
+        $this->prepararHoja($sheet, $nombre, $nombre.' · Horas aula 2027',
+            'Los niveles suman las horas semanales de sus secciones activas con matrícula. Cada combinado se registra una vez con su plan compartido.',
+            $ultima, ['RBD', 'Establecimiento', 'Curso o combinado', 'Régimen JEC']);
+        $sheet->setShowGridlines(true);
+        $sheet->mergeCells('E3:'.$ultima.'3')->setCellValue('E3', 'Horas pedagógicas semanales');
+        $sheet->getStyle('E3:'.$ultima.'3')->getAlignment()->setHorizontal('center');
+        $sheet->getStyle('A2')->getAlignment()->setWrapText(true);
+        $sheet->getRowDimension(2)->setRowHeight(29);
+        $columnas = [];
+        foreach (array_keys($asignaturas) as $indice => $clave) {
+            $columnas[$clave] = Coordinate::stringFromColumnIndex(5 + $indice);
+        }
+        foreach ($titulos as $indice => $titulo) {
+            $columna = Coordinate::stringFromColumnIndex(5 + $indice);
+            $sheet->setCellValueExplicit($columna.'4', $titulo, DataType::TYPE_STRING);
+            $sheet->getColumnDimension($columna)->setWidth(9);
+        }
+        foreach (['A' => 12, 'B' => 37, 'C' => 53, 'D' => 24] as $columna => $ancho) {
+            $sheet->getColumnDimension($columna)->setWidth($ancho);
+        }
+        $encabezado = $sheet->getStyle('A4:'.$ultima.'4');
+        $encabezado->getFont()->setBold(true);
+        $encabezado->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D6E4F1');
+        $encabezado->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('424C61');
+        $encabezado->getAlignment()->setHorizontal('center')->setVertical('center')->setWrapText(true);
+        $sheet->getStyle('E4:'.$ultima.'4')->getAlignment()->setTextRotation(90);
+        $sheet->getRowDimension(4)->setRowHeight(min(390, max(116, 5.5 * max(array_map('mb_strlen', $titulos)))));
+
+        $row = 5;
+        foreach ($cursos as $curso) {
+            $label = $curso['curso'].($curso['nota'] !== '' ? "\n".$curso['nota'] : '');
+            foreach (['A' => $curso['rbd'], 'B' => $curso['establecimiento'], 'C' => $label, 'D' => $curso['jec']] as $columna => $valor) {
+                $sheet->setCellValueExplicit($columna.$row, $valor, DataType::TYPE_STRING);
+            }
+            $sheet->getStyle('B'.$row.':D'.$row)->getAlignment()->setWrapText(true);
+            $lineas = max(1, ceil(mb_strlen($curso['establecimiento']) / 32), ceil(mb_strlen($curso['curso']) / 47)
+                + ceil(mb_strlen($curso['nota']) / 47), ceil(mb_strlen($curso['jec']) / 24));
+            $sheet->getRowDimension($row)->setRowHeight(min(409, 17 * $lineas));
+            foreach ($curso['asignaturas'] as $clave => $asignatura) {
+                $sheet->setCellValue($columnas[$clave].$row, $asignatura['horas']);
+            }
+            if ($curso['libre'] !== null) {
+                $sheet->setCellValue($libre.$row, $curso['libre']);
+                $sheet->setCellValue($ultima.$row, '=SUM(E'.$row.':'.$libre.$row.')');
+            }
+            $row++;
+        }
+
+        if ($row === 5) {
+            $sheet->mergeCells('A5:'.$ultima.'5')->setCellValue('A5', 'Sin cursos para los establecimientos seleccionados.');
+        } else {
+            $sheet->setAutoFilter('A4:'.$ultima.($row - 1));
+        }
+        $sheet->freezePane('E5');
         $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)
             ->setRowsToRepeatAtTopByStartAndEnd(3, 4);
     }

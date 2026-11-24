@@ -13,6 +13,7 @@ use App\Support\DocenteHorasNoLectivasCalculator;
 use App\Support\DotacionAsignacionCalculator;
 use App\Support\DotacionCursoCombinadoCalculator;
 use App\Support\DotacionEstablecimientoCalculator;
+use App\Support\DotacionInformeHorasAula;
 use App\Support\DotacionLecturaCache;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +95,22 @@ class DotacionPlanConfiguradoSinDuplicadosTest extends IsolatedSecurityTestCase
         $this->assertCount(2, $needs->where('titulo', 'Matemática')); // 7 h base y 1 h LD son necesidades distintas.
         $this->assertSame(8.0, (float) $needs->where('titulo', 'Matemática')->sum('horas_plan_requeridas'));
         $this->assertSame($before, $this->snapshot());
+    }
+
+    public function test_detalle_de_horas_aula_separa_la_libre_disposicion_consolidada_en_orientacion(): void
+    {
+        $this->configurar('1M', 2027);
+        $datos = [
+            'cursos' => DotacionEstablecimientoCalculator::cursosPorNivel($this->ee, 2027),
+            'asignacion' => ['necesidades' => ['plan_estudio' => $this->necesidades()]],
+        ];
+        $fila = app(DotacionInformeHorasAula::class)->filas($datos)['media'][0];
+        $this->assertSame(1.0, $fila['asignaturas']['orientacion']['horas']);
+        $this->assertSame(7.0, $fila['asignaturas']['matematica']['horas']);
+        $this->assertSame(6.0, $fila['libre']);
+        $this->assertArrayNotHasKey('formacion integral 1', $fila['asignaturas']);
+        $this->assertArrayNotHasKey('formacion integral 2', $fila['asignaturas']);
+        $this->assertSame(42.0, array_sum(array_column($fila['asignaturas'], 'horas')) + $fila['libre']);
     }
 
     public function test_conserva_asignaciones_equivalentes_y_separa_la_asignatura_reemplazada_sin_doble_conteo(): void
