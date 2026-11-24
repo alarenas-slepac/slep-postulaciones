@@ -6594,8 +6594,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.705',
+    'current_version' => '2026.11.24.706',
     'entries' => [
+        [
+            'version' => '2026.11.24.706',
+            'title' => 'Cantidad de cursos en el detalle de planes de estudio',
+            'summary' => 'Incluye la columna Cursos en las ocho hojas de horas aula del Excel por financiamiento 2027.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Cuenta las secciones activas con matrícula de cada fila y considera cada grupo combinado como un curso.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.24.705',
             'title' => 'Disponibilidad horaria al proponer reemplazantes',

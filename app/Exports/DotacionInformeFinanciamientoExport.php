@@ -303,27 +303,30 @@ class DotacionInformeFinanciamientoExport
         }
         natcasesort($otras);
         $asignaturas += $otras;
+        $encabezados = ['RBD', 'Establecimiento', 'Curso o combinado', 'Cursos', 'Régimen JEC'];
         $titulos = [...array_values($asignaturas), 'Horas de Libre Disposición', 'Total horas aula'];
-        $ultima = Coordinate::stringFromColumnIndex(4 + count($titulos));
-        $libre = Coordinate::stringFromColumnIndex(3 + count($titulos));
+        $indicePrimeraHora = count($encabezados) + 1;
+        $primeraHora = Coordinate::stringFromColumnIndex($indicePrimeraHora);
+        $ultima = Coordinate::stringFromColumnIndex($indicePrimeraHora + count($titulos) - 1);
+        $libre = Coordinate::stringFromColumnIndex($indicePrimeraHora + count($titulos) - 2);
         $this->prepararHoja($sheet, $nombre, $nombre.' · Horas aula 2027',
-            'Los niveles suman las horas semanales de sus secciones activas con matrícula. Cada combinado se registra una vez con su plan compartido.',
-            $ultima, ['RBD', 'Establecimiento', 'Curso o combinado', 'Régimen JEC']);
+            'Los niveles suman las horas semanales de las secciones activas con matrícula. Cada combinado cuenta como un curso con su plan compartido.',
+            $ultima, $encabezados);
         $sheet->setShowGridlines(true);
-        $sheet->mergeCells('E3:'.$ultima.'3')->setCellValue('E3', 'Horas pedagógicas semanales');
-        $sheet->getStyle('E3:'.$ultima.'3')->getAlignment()->setHorizontal('center');
+        $sheet->mergeCells($primeraHora.'3:'.$ultima.'3')->setCellValue($primeraHora.'3', 'Horas pedagógicas semanales');
+        $sheet->getStyle($primeraHora.'3:'.$ultima.'3')->getAlignment()->setHorizontal('center');
         $sheet->getStyle('A2')->getAlignment()->setWrapText(true);
         $sheet->getRowDimension(2)->setRowHeight(29);
         $columnas = [];
         foreach (array_keys($asignaturas) as $indice => $clave) {
-            $columnas[$clave] = Coordinate::stringFromColumnIndex(5 + $indice);
+            $columnas[$clave] = Coordinate::stringFromColumnIndex($indicePrimeraHora + $indice);
         }
         foreach ($titulos as $indice => $titulo) {
-            $columna = Coordinate::stringFromColumnIndex(5 + $indice);
+            $columna = Coordinate::stringFromColumnIndex($indicePrimeraHora + $indice);
             $sheet->setCellValueExplicit($columna.'4', $titulo, DataType::TYPE_STRING);
             $sheet->getColumnDimension($columna)->setWidth(9);
         }
-        foreach (['A' => 12, 'B' => 37, 'C' => 53, 'D' => 24] as $columna => $ancho) {
+        foreach (['A' => 12, 'B' => 37, 'C' => 53, 'D' => 9, 'E' => 24] as $columna => $ancho) {
             $sheet->getColumnDimension($columna)->setWidth($ancho);
         }
         $encabezado = $sheet->getStyle('A4:'.$ultima.'4');
@@ -331,16 +334,17 @@ class DotacionInformeFinanciamientoExport
         $encabezado->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D6E4F1');
         $encabezado->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('424C61');
         $encabezado->getAlignment()->setHorizontal('center')->setVertical('center')->setWrapText(true);
-        $sheet->getStyle('E4:'.$ultima.'4')->getAlignment()->setTextRotation(90);
+        $sheet->getStyle($primeraHora.'4:'.$ultima.'4')->getAlignment()->setTextRotation(90);
         $sheet->getRowDimension(4)->setRowHeight(min(390, max(116, 5.5 * max(array_map('mb_strlen', $titulos)))));
 
         $row = 5;
         foreach ($cursos as $curso) {
             $label = $curso['curso'].($curso['nota'] !== '' ? "\n".$curso['nota'] : '');
-            foreach (['A' => $curso['rbd'], 'B' => $curso['establecimiento'], 'C' => $label, 'D' => $curso['jec']] as $columna => $valor) {
+            foreach (['A' => $curso['rbd'], 'B' => $curso['establecimiento'], 'C' => $label, 'E' => $curso['jec']] as $columna => $valor) {
                 $sheet->setCellValueExplicit($columna.$row, $valor, DataType::TYPE_STRING);
             }
-            $sheet->getStyle('B'.$row.':D'.$row)->getAlignment()->setWrapText(true);
+            $sheet->setCellValue('D'.$row, $curso['cursos']);
+            $sheet->getStyle('B'.$row.':E'.$row)->getAlignment()->setWrapText(true);
             $lineas = max(1, ceil(mb_strlen($curso['establecimiento']) / 32), ceil(mb_strlen($curso['curso']) / 47)
                 + ceil(mb_strlen($curso['nota']) / 47), ceil(mb_strlen($curso['jec']) / 24));
             $sheet->getRowDimension($row)->setRowHeight(min(409, 17 * $lineas));
@@ -349,7 +353,7 @@ class DotacionInformeFinanciamientoExport
             }
             if ($curso['libre'] !== null) {
                 $sheet->setCellValue($libre.$row, $curso['libre']);
-                $sheet->setCellValue($ultima.$row, '=SUM(E'.$row.':'.$libre.$row.')');
+                $sheet->setCellValue($ultima.$row, '=SUM('.$primeraHora.$row.':'.$libre.$row.')');
             }
             $row++;
         }
@@ -358,8 +362,11 @@ class DotacionInformeFinanciamientoExport
             $sheet->mergeCells('A5:'.$ultima.'5')->setCellValue('A5', 'Sin cursos para los establecimientos seleccionados.');
         } else {
             $sheet->setAutoFilter('A4:'.$ultima.($row - 1));
+            $cantidad = $sheet->getStyle('D5:D'.($row - 1));
+            $cantidad->getAlignment()->setHorizontal('center');
+            $cantidad->getNumberFormat()->setFormatCode('#,##0');
         }
-        $sheet->freezePane('E5');
+        $sheet->freezePane($primeraHora.'5');
         $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)
             ->setRowsToRepeatAtTopByStartAndEnd(3, 4);
     }
