@@ -41,16 +41,17 @@ class DotacionDocenteProporcional
         $glosa = $incluirSubvenciones && $anio === DotacionProceso2027Calculator::ANIO ? new DotacionDocenteGlosa : null;
         $criterios = [];
         $criteriosSubvencion = [];
+        $cursosProyectados = [];
         foreach ($establecimientos as $establecimiento) {
-            // Conservar sólo los acumulados territoriales al cambiar de establecimiento.
+            // Conservar los acumulados y las filas del informe, sin retener los modelos de cada establecimiento.
             DotacionLecturaCache::ejecutar(function () use (
                 $establecimiento, $anio, $dotacion, $subvenciones, $reglas, $contrataciones, $informeFunciones,
-                $tablasPal, $glosa, &$criterios, &$criteriosSubvencion
+                $tablasPal, $glosa, &$criterios, &$criteriosSubvencion, &$cursosProyectados
             ): void {
                 $id = (int) $establecimiento->id;
                 if ($anio === 2027) {
                     $datos = app(DotacionPal2027::class)->datos($establecimiento);
-                    [$horasFuncion, $horasSubvencion] = $this->horasPal2027($establecimiento, $datos, $tablasPal, $reglas);
+                    [$horasFuncion, $horasSubvencion, $cursosPal] = $this->horasPal2027($establecimiento, $datos, $tablasPal, $reglas);
                     foreach ($horasFuncion as $rut => $grupos) {
                         foreach ($grupos as $grupo => $horas) {
                             $dotacion->agregar($id, $grupo, (string) $rut, $horas);
@@ -64,6 +65,7 @@ class DotacionDocenteProporcional
                     if ($glosa !== null) {
                         $criterios[$id] = $glosa->criterio($establecimiento, $datos, $dotacion->horas($id));
                         $criteriosSubvencion[$id] = $glosa->recalcularBrecha($criterios[$id], $subvenciones->horas($id));
+                        $cursosProyectados[$id] = $cursosPal;
                     }
                     return;
                 }
@@ -125,6 +127,7 @@ class DotacionDocenteProporcional
             'glosa' => $glosa?->distribuir($criterios),
             'subvenciones' => $subvenciones?->resumir() ?? [],
             'glosa_subvencion' => $glosa?->distribuir($criteriosSubvencion),
+            'cursos_proyectados' => $cursosProyectados,
         ];
     }
 
@@ -175,7 +178,7 @@ class DotacionDocenteProporcional
         }
 
         if (array_column($porRut, 'pendiente') === []) {
-            return [$porRut, $porSubvencion];
+            return [$porRut, $porSubvencion, $reporte['cursos']];
         }
         $saldoAula = $this->saldoAula($establecimiento, 2027, array_sum(array_column($porRut, 'aula')));
         ksort($porRut);
@@ -191,7 +194,7 @@ class DotacionDocenteProporcional
         }
         unset($grupos);
 
-        return [$porRut, $porSubvencion];
+        return [$porRut, $porSubvencion, $reporte['cursos']];
     }
 
     private function subvencionHistorica(object $asignacion): string
