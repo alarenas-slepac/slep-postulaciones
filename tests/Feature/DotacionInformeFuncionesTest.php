@@ -437,18 +437,23 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             $this->assertSame(DataType::TYPE_STRING, $basica->getCell('A5')->getDataType());
             $this->assertSame(DataType::TYPE_STRING, $basica->getCell('B5')->getDataType());
             $this->assertSame('1° Básico A / 1° Básico B', $basica->getCell('C5')->getValue());
-            $this->assertSame('Con JEC / Sin JEC', $basica->getCell('D5')->getValue());
-            $this->assertSame('Lenguaje y Comunicación', $basica->getCell('E4')->getValue());
-            $this->assertSame('Horas de Libre Disposición', $basica->getCell('P4')->getValue());
-            $this->assertSame(90, $basica->getStyle('E4')->getAlignment()->getTextRotation());
-            $this->assertEquals(14, $basica->getCell('E5')->getValue());
-            $this->assertEquals(3, $basica->getCell('P5')->getValue());
-            $this->assertEquals(17, $basica->getCell('Q5')->getCalculatedValue());
+            $this->assertSame('Cursos', $basica->getCell('D4')->getValue());
+            $this->assertSame(2, $basica->getCell('D5')->getValue());
+            $this->assertSame(DataType::TYPE_NUMERIC, $basica->getCell('D5')->getDataType());
+            $this->assertSame('Con JEC / Sin JEC', $basica->getCell('E5')->getValue());
+            $this->assertSame('Lenguaje y Comunicación', $basica->getCell('F4')->getValue());
+            $this->assertSame('Horas de Libre Disposición', $basica->getCell('Q4')->getValue());
+            $this->assertSame(90, $basica->getStyle('F4')->getAlignment()->getTextRotation());
+            $this->assertSame('F5', $basica->getFreezePane());
+            $this->assertEquals(14, $basica->getCell('F5')->getValue());
+            $this->assertEquals(3, $basica->getCell('Q5')->getValue());
+            $this->assertEquals(17, $basica->getCell('R5')->getCalculatedValue());
             $this->assertSame('Curso combinado «Grupo mixto sintético» · 6° Básico A + 7° Básico A', $basica->getCell('C6')->getValue());
-            $this->assertSame('Con JEC / Sin JEC', $basica->getCell('D6')->getValue());
-            $this->assertEquals(5, $basica->getCell('F6')->getValue());
-            $this->assertEquals(2, $basica->getCell('P6')->getValue());
-            $this->assertEquals(7, $basica->getCell('Q6')->getCalculatedValue());
+            $this->assertSame(1, $basica->getCell('D6')->getValue());
+            $this->assertSame('Con JEC / Sin JEC', $basica->getCell('E6')->getValue());
+            $this->assertEquals(5, $basica->getCell('G6')->getValue());
+            $this->assertEquals(2, $basica->getCell('Q6')->getValue());
+            $this->assertEquals(7, $basica->getCell('R6')->getCalculatedValue());
             $this->assertSame(6, $basica->getHighestDataRow());
             foreach ([
                 'Educación Parvularia' => ['NT1 A', 'Con JEC', 'Lenguaje verbal', 5],
@@ -461,9 +466,11 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             ] as $pestana => [$curso, $jec, $asignatura, $horas]) {
                 $hoja = $libro->getSheetByName($pestana);
                 $this->assertSame($curso, $hoja->getCell('C5')->getValue());
-                $this->assertSame($jec, $hoja->getCell('D5')->getValue());
-                $this->assertSame($asignatura, $hoja->getCell('E4')->getValue());
-                $this->assertEquals($horas, $hoja->getCell('E5')->getValue());
+                $this->assertSame('Cursos', $hoja->getCell('D4')->getValue());
+                $this->assertSame(1, $hoja->getCell('D5')->getValue());
+                $this->assertSame($jec, $hoja->getCell('E5')->getValue());
+                $this->assertSame($asignatura, $hoja->getCell('F4')->getValue());
+                $this->assertEquals($horas, $hoja->getCell('F5')->getValue());
                 $this->assertSame(5, $hoja->getHighestDataRow());
             }
         } finally {

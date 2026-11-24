@@ -61,7 +61,7 @@ class DotacionInformeHorasAula
             $miembrosCombinados += array_fill_keys($miembros->keys()->all(), true);
             $plan = collect($grupo['asignaturas'] ?? []);
             $nombre = 'Curso combinado «'.$grupo['nombre'].'» · '.$miembros->pluck('seccion')->implode(' + ');
-            $filas[$hoja][] = $this->fila($nombre, $miembros, $plan, $plan->isEmpty() ? 'Plan pendiente de configurar.' : '');
+            $filas[$hoja][] = $this->fila($nombre, $miembros, $plan, $plan->isEmpty() ? 'Plan pendiente de configurar.' : '', combinado: true);
         }
 
         $independientes = $secciones->except(array_keys($miembrosCombinados))->filter(fn ($seccion) => $seccion['hoja'] !== null)
@@ -121,7 +121,7 @@ class DotacionInformeHorasAula
             });
     }
 
-    private function fila(string $nombre, Collection $secciones, Collection $plan, string $nota): array
+    private function fila(string $nombre, Collection $secciones, Collection $plan, string $nota, bool $combinado = false): array
     {
         $asignaturas = [];
         $libre = 0.0;
@@ -155,6 +155,7 @@ class DotacionInformeHorasAula
 
         return [
             'curso' => $nombre, 'orden' => $secciones->min('orden'), 'nota' => $nota,
+            'cursos' => $combinado ? 1 : $secciones->count(),
             'jec' => collect(['Con JEC', 'Sin JEC', 'No aplica', 'Sin información'])
                 ->filter(fn ($regimen) => $regimenes->contains($regimen))->implode(' / '),
             'asignaturas' => $asignaturas, 'libre' => $plan->isEmpty() ? null : round($libre, 2),
