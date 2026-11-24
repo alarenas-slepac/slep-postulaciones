@@ -6594,8 +6594,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.703',
+    'current_version' => '2026.11.24.704',
     'entries' => [
+        [
+            'version' => '2026.11.24.704',
+            'title' => 'Reparación de la reapertura administrativa UATP',
+            'summary' => 'Restablece los campos de trazabilidad de la reapertura UATP cuando faltan en la base de datos.',
+            'roles' => ['admin', 'funcionario_slep', 'supervisor_plani', 'coordinador_gdp'],
+            'items' => [
+                'Completa los campos del rechazo original y del motivo, usuario y fecha de reapertura. Conserva las solicitudes existentes.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.24.703',
             'title' => 'Horas aula por asignatura en el Excel de financiamiento',
