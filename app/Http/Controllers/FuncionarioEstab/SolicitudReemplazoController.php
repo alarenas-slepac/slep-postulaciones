@@ -593,6 +593,7 @@ class SolicitudReemplazoController extends Controller
         if ($cvTypeId <= 0) return false;
 
         return UserDocument::query()
+            ->inLibrary()
             ->where('user_id', $userId)
             ->where('document_type_id', $cvTypeId)
             ->whereNotNull('path')
@@ -985,6 +986,7 @@ class SolicitudReemplazoController extends Controller
         abort_unless($cvType, 404);
 
         $doc = UserDocument::query()
+            ->inLibrary()
             ->where('user_id', (int) $postulantProfile->user_id)
             ->where('document_type_id', (int) $cvType->id)
             ->first();
@@ -1338,7 +1340,7 @@ class SolicitudReemplazoController extends Controller
                 'postulantProfile.areaDesempeno:id,nombre,slug,estamento',
                 'documents:id,user_id,document_type_id,path,status',
             ])
-            ->whereHas('postulantProfile', function ($qq) use ($estamento, $isEpSelected, $epAreaIds) {
+            ->whereHas('postulantProfile', fn ($query) => $query->matchingCareer(function ($qq) use ($estamento, $isEpSelected, $epAreaIds) {
                 if ($isEpSelected) {
                     // ✅ EP: sólo área Educadora de Párvulos (sin filtrar por estamento)
                     if (!empty($epAreaIds)) {
@@ -1350,7 +1352,11 @@ class SolicitudReemplazoController extends Controller
                     // ✅ Normal: filtra solo por estamento
                     $qq->where('estamento', $estamento);
                 }
-            });
+            }));
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('postulant_job_profiles')) {
+            $q->with('postulantProfile.jobProfiles.areaDesempeno');
+        }
 
         // Si usas Spatie y quieres limitar a rol postulante
         if (method_exists(User::class, 'scopeRole')) {
@@ -1420,11 +1426,12 @@ class SolicitudReemplazoController extends Controller
             // ✅ Progreso REAL: mismo set de requeridos que "Mis Documentos"
             // y conteo de "subidos" alineado con la vista de revisión de documentos (administración):
             // se considera "subido" si existe el registro UserDocument (no necesariamente path).
-            $required    = DocumentRules::requiredTypesFromCatalog($u, $types);
+            $career = \App\Support\PostulantJobProfiles::forReplacement($u->postulantProfile, $estamento, $areaId, $isEpSelected, $epAreaIds);
+            $required = DocumentRules::requiredTypesFromCatalog($u, $types, $career);
             $requiredIds = $required->pluck('id')->all();
 
             $uploadedDocs = $u->documents
-                ? $u->documents->whereIn('document_type_id', $requiredIds)
+                ? $u->documents->whereIn('document_type_id', $requiredIds)->unique('document_type_id')
                 : collect();
 
             $uploaded = (int) $uploadedDocs->count();
@@ -1446,8 +1453,8 @@ class SolicitudReemplazoController extends Controller
                 'id'             => (int) $u->postulantProfile->id,
                 'text'           => $label, // fallback / selection
                 'label'          => $label,
-                'area'           => (string) (optional($u->postulantProfile->areaDesempeno)->nombre ?? '—'),
-                'area_desempeno_id' => (int) ($u->postulantProfile->area_desempeno_id ?? 0),
+                'area'           => (string) ($career?->area_desempeno_nombre ?? '—'),
+                'area_desempeno_id' => (int) ($career?->area_desempeno_id ?? 0),
                 'uploaded'       => (int) $uploaded,
                 'total_required' => (int) $total,
                 'percent'        => (int) $percent,
@@ -1464,8 +1471,8 @@ class SolicitudReemplazoController extends Controller
                 'manual_restriction_end' => $restriction['manual_end'] ?? null,
 
                 // Campos internos para ordenar (no se exponen al frontend)
-                '_same_area'      => ($areaId > 0 && (int) ($u->postulantProfile->area_desempeno_id ?? 0) === $areaId),
-                '_area_sort'      => mb_strtolower((string) (optional($u->postulantProfile->areaDesempeno)->nombre ?? ''), 'UTF-8'),
+                '_same_area'      => ($areaId > 0 && (int) $career?->area_desempeno_id === $areaId),
+                '_area_sort'      => mb_strtolower((string) $career?->area_desempeno_nombre, 'UTF-8'),
             ];
 
             if ($estadoJornada['bloqueo'] !== null) $hourConflictItems[] = $item;

@@ -73,6 +73,7 @@ use App\Http\Controllers\Gestion\PostulanteTutorialController;
 use App\Http\Controllers\Gestion\BolsaTrabajoController;
 use App\Http\Controllers\Gestion\AgendamientoRecursoController;
 use App\Http\Controllers\Postulante\OfertaLaboralController;
+use App\Http\Controllers\Postulante\PerfilLaboralController;
 use App\Http\Controllers\Admin\RestrictedRutController;
 use App\Http\Controllers\Admin\PermisoSinGoceExcepcionController;
 use App\Http\Controllers\Admin\NotificationDispatchLogController;
@@ -932,15 +933,35 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     Route::get('/postulante/perfil.pdf', [PostulantProfileController::class, 'exportPdf'])
         ->name('postulant.profile.pdf');
 
+    Route::prefix('/postulante/perfil/cargos')->name('postulant.profile.cargos.')->group(function () {
+        Route::get('/', [PerfilLaboralController::class, 'index'])->name('index');
+        Route::get('/nuevo', [PerfilLaboralController::class, 'create'])->name('create');
+        Route::post('/', [PerfilLaboralController::class, 'store'])->name('store');
+        Route::get('/{cargo}/editar', [PerfilLaboralController::class, 'edit'])->whereNumber('cargo')->name('edit');
+        Route::put('/{cargo}', [PerfilLaboralController::class, 'update'])->whereNumber('cargo')->name('update');
+    });
+
     Route::get('/mis-documentos', [PostulantDocumentsController::class, 'index'])
         ->name('postulant.documents.index');
 
     Route::post('/mis-documentos/{type}', [PostulantDocumentsController::class, 'store'])
         ->name('postulant.documents.store');
 
+    Route::get('/mis-documentos/{document}/descargar', [PostulantDocumentsController::class, 'download'])
+        ->whereNumber('document')->name('postulant.documents.download');
+
+    Route::patch('/mis-documentos/{document}/emision', [PostulantDocumentsController::class, 'storeIssueDate'])
+        ->whereNumber('document')->name('postulant.documents.issue-date');
+
     Route::get('/ofertas-laborales', [OfertaLaboralController::class, 'index'])
         ->middleware('ensure.role:postulante|funcionario')
         ->name('postulant.ofertas-laborales.index');
+
+    Route::get('/ofertas-laborales/mis-postulaciones', [OfertaLaboralController::class, 'history'])
+        ->middleware('ensure.role:postulante|funcionario')->name('postulant.ofertas-laborales.history');
+
+    Route::get('/ofertas-laborales/{oferta}', [OfertaLaboralController::class, 'show'])
+        ->whereNumber('oferta')->middleware('ensure.role:postulante|funcionario')->name('postulant.ofertas-laborales.show');
 
     Route::get('/ofertas-laborales/{oferta}/bases-pdf', [OfertaLaboralController::class, 'downloadBasesPdf'])
         ->middleware('ensure.role:postulante|funcionario')
@@ -1526,6 +1547,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::get('bolsa-trabajo/{bolsa_trabajo}/cvs-zip', [BolsaTrabajoController::class, 'downloadCurriculumZip'])
             ->middleware('ensure.role:admin|funcionario_slep')
             ->name('bolsa-trabajo.cvs-zip');
+
+        Route::get('bolsa-trabajo/{bolsa_trabajo}/postulaciones/{postulacion}/documentos', [BolsaTrabajoController::class, 'submittedDocuments'])
+            ->whereNumber('postulacion')->middleware('ensure.role:admin|funcionario_slep')
+            ->name('bolsa-trabajo.documentos-presentados');
 
         Route::patch('bolsa-trabajo/{bolsa_trabajo}/etapa', [BolsaTrabajoController::class, 'updateEtapa'])
             ->middleware('ensure.role:admin|funcionario_slep')

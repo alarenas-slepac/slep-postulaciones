@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class BolsaTrabajoPostulacion extends Model
 {
@@ -16,12 +17,14 @@ class BolsaTrabajoPostulacion extends Model
         'estado',
         'observacion',
         'avanza_etapa',
+        'cargo_presentado',
     ];
 
     protected function casts(): array
     {
         return [
             'avanza_etapa' => 'boolean',
+            'cargo_presentado' => 'array',
         ];
     }
 
@@ -38,6 +41,11 @@ class BolsaTrabajoPostulacion extends Model
     public function postulantProfile(): BelongsTo
     {
         return $this->belongsTo(PostulantProfile::class, 'postulant_profile_id');
+    }
+
+    public function submittedDocuments(): BelongsToMany
+    {
+        return $this->belongsToMany(UserDocument::class, 'bolsa_trabajo_documentos_presentados', 'postulacion_id', 'user_document_id');
     }
 
     public function canParticipateInStageSelection(): bool

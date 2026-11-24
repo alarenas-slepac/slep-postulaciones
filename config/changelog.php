@@ -6594,8 +6594,20 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.707',
+    'current_version' => '2026.11.24.708',
     'entries' => [
+        [
+            'version' => '2026.11.24.708',
+            'title' => 'Postulaciones a varios cargos y biblioteca de documentos',
+            'summary' => 'Permite registrar varios cargos en una cuenta y reutilizar documentos al postular a cada oferta compatible.',
+            'roles' => ['admin', 'postulante', 'funcionario', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp'],
+            'items' => [
+                'Muestra los requisitos de cada oferta y el estado de cada postulación.',
+                'Conserva las versiones de los PDF presentados cuando se reemplaza un archivo.',
+                'Incluye los cargos adicionales en el buscador y las propuestas de reemplazo.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.24.707',
             'title' => 'Tramo docente en el Excel PAL 2027',

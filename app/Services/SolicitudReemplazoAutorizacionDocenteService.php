@@ -108,6 +108,7 @@ class SolicitudReemplazoAutorizacionDocenteService
             ->keyBy('slug');
 
         $documentos = UserDocument::query()
+            ->inLibrary()
             ->with('type')
             ->where('user_id', $usuario->id)
             ->whereHas('type', fn ($query) => $query->whereIn('slug', $slugs))
@@ -155,6 +156,7 @@ class SolicitudReemplazoAutorizacionDocenteService
         }
 
         $documento = UserDocument::query()
+            ->inLibrary()
             ->with('type')
             ->where('user_id', $userId)
             ->whereHas('type', fn ($query) => $query->where('slug', 'titulo'))

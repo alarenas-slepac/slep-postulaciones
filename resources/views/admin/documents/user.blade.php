@@ -68,6 +68,7 @@
                             <tr>
                                 <td class="fw-semibold">
                                     {{ $t->label }}
+                                    @if ($d?->credential_label)<span class="small text-muted d-block">{{ $d->credential_label }}</span>@endif
                                     @unless ($row['is_required'] ?? true)
                                         <span class="badge text-bg-light ms-1">Opcional</span>
                                     @endunless

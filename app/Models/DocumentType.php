@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class DocumentType extends Model
 {
+    public const CREDENTIAL_TYPES = [
+        'titulo', 'titulo_mencion', 'licencia_media', 'cert_semestres_horas', 'tramo_docente',
+        'idoneidad_religion', 'registro_mineduc', 'wisc_v', 'certificado_experiencia',
+    ];
+
     protected $fillable = [
         'slug',
         'label',
@@ -28,27 +33,32 @@ class DocumentType extends Model
      * Determina si este tipo es requerido para un usuario dado
      * en base a estamento, área, cargo, género, nivel y mención.
      */
-    public function isRequiredForUser(\App\Models\User $user): bool
+    public function isRequiredForUser(User $user, PostulantProfile|PostulantJobProfile|null $profile = null): bool
     {
-        return $this->matchesUserProfile($user, allowOptional: false);
+        return $this->matchesUserProfile($user, $profile, allowOptional: false);
     }
 
     /**
      * Determina si este tipo debe mostrarse/permitirse para el usuario,
      * incluyendo documentos opcionales condicionados por el perfil.
      */
-    public function isVisibleForUser(\App\Models\User $user): bool
+    public function isVisibleForUser(User $user, PostulantProfile|PostulantJobProfile|null $profile = null): bool
     {
-        return $this->matchesUserProfile($user, allowOptional: true);
+        return $this->matchesUserProfile($user, $profile, allowOptional: true);
     }
 
-    protected function matchesUserProfile(\App\Models\User $user, bool $allowOptional): bool
+    public function supportsMultipleCredentials(): bool
     {
-        $profile = $user->postulantProfile;
+        return in_array($this->slug, self::CREDENTIAL_TYPES, true);
+    }
+
+    protected function matchesUserProfile(User $user, PostulantProfile|PostulantJobProfile|null $profile, bool $allowOptional): bool
+    {
+        $profile ??= $user->postulantProfile;
         $est     = (string) ($profile->estamento ?? '');
         $area    = (string) ($profile->area_desempeno_nombre ?? '');
         $cargo   = (string) ($profile->cargos_funcion ?? '');
-        $genero  = (string) ($profile->genero ?? '');
+        $genero  = (string) ($user->postulantProfile?->genero ?? '');
         $nivel   = (string) ($profile->nivel_estudios ?? '');
         $mencion = (string) ($profile->mencion ?? '');
         $aniosExperiencia = (int) ($profile->anios_experiencia ?? 0);

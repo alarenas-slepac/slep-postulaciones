@@ -20,9 +20,12 @@ class UserDocumentReplacement
         return "user-document-upload:{$userId}:{$typeId}";
     }
 
-    public function replace(User $user, DocumentType $type, UploadedFile $file, string $filename): UserDocument
+    public function replace(
+        User $user, DocumentType $type, UploadedFile $file, string $filename,
+        ?int $documentId = null, ?string $credentialLabel = null, ?string $issuedOn = null, bool $additional = false,
+    ): UserDocument
     {
-        $result = Cache::lock($this->lockKey($user->id, $type->id), 120)->get(function () use ($user, $type, $file, $filename) {
+        $result = Cache::lock($this->lockKey($user->id, $type->id), 120)->get(function () use ($user, $type, $file, $filename, $documentId, $credentialLabel, $issuedOn, $additional) {
             $connection = $user->getConnection();
             // Esta acción HTTP no tiene una transacción exterior. No se borra
             // un archivo mientras sus metadatos puedan revertirse más adelante.
@@ -36,6 +39,7 @@ class UserDocumentReplacement
             $directory = "documents/{$user->id}/{$type->id}/".Str::uuid();
             $newPath = $directory.'/'.$filename;
             $oldPath = null;
+            $hasLibrary = $connection->getSchemaBuilder()->hasColumn('user_documents', 'library_slot');
 
             try {
                 $storedPath = $disk->putFileAs($directory, $file, $filename);
@@ -43,15 +47,37 @@ class UserDocumentReplacement
                     throw new \RuntimeException('No se confirmó la escritura del documento.');
                 }
 
-                $document = $connection->transaction(function () use ($user, $type, $file, $newPath, &$oldPath, $connection) {
+                $document = $connection->transaction(function () use ($user, $type, $file, $newPath, &$oldPath, $connection, $hasLibrary, $documentId, $credentialLabel, $issuedOn, $additional) {
                     // Bloquea también la primera carga, cuando aún no hay fila
                     // en user_documents. La clave única histórica es otra defensa.
                     User::on($connection->getName())->whereKey($user->id)->lockForUpdate()->firstOrFail();
-                    $document = UserDocument::on($connection->getName())
-                        ->where('user_id', $user->id)->where('document_type_id', $type->id)
-                        ->lockForUpdate()->first();
+                    $entries = UserDocument::on($connection->getName())
+                        ->where('user_id', $user->id)->where('document_type_id', $type->id);
+                    $document = null;
+                    if ($documentId !== null) {
+                        $document = $entries->inLibrary()->lockForUpdate()->find($documentId);
+                        if (! $document) {
+                            throw ValidationException::withMessages(['file' => 'El documento cambió. Actualiza la página antes de reemplazarlo.']);
+                        }
+                    } elseif (! $additional) {
+                        $document = $entries->when($hasLibrary, fn ($query) => $query->where('library_slot', ''))
+                            ->lockForUpdate()->first();
+                    }
+                    $slot = $additional ? (string) Str::uuid() : ($document?->library_slot ?? '');
+                    $oldPath = $document?->path;
+                    if ($document && $hasLibrary && $document->submissions()->exists()) {
+                        $document->update(['library_slot' => UserDocument::ARCHIVED_SLOT_PREFIX.$document->id]);
+                        $document = null;
+                        $oldPath = null;
+                    }
                     $document ??= (new UserDocument)->setConnection($connection->getName());
-                    $oldPath = $document->path;
+                    if ($hasLibrary) {
+                        $document->fill([
+                            'library_slot' => $slot,
+                            'credential_label' => $credentialLabel,
+                            'issued_on' => $issuedOn,
+                        ]);
+                    }
                     $document->fill([
                         'user_id' => $user->id,
                         'document_type_id' => $type->id,
@@ -72,6 +98,9 @@ class UserDocumentReplacement
                 });
             } catch (Throwable $exception) {
                 $this->cleanFile($newPath, $user->id, $type->id, 'unassociated', false);
+                if ($exception instanceof ValidationException) {
+                    throw $exception;
+                }
                 // No incluye nombres, contraseñas, tokens ni el SQL de la excepción.
                 Log::warning('Falló el reemplazo documental; se conservó el anterior.', [
                     'user_id' => $user->id, 'document_type_id' => $type->id,

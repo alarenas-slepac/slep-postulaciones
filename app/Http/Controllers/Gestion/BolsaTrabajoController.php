@@ -331,6 +331,16 @@ class BolsaTrabajoController extends Controller
         return $this->downloadPostulacionesZip($request, $bolsa_trabajo, 'curriculum_only');
     }
 
+    public function submittedDocuments(BolsaTrabajoOferta $bolsa_trabajo, int $postulacion): View
+    {
+        $this->authorizeGestionBolsa();
+        $offer = $bolsa_trabajo;
+        $application = $offer->postulaciones()->with(['user', 'submittedDocuments.type'])->findOrFail($postulacion);
+        abort_unless($application->cargo_presentado !== null, 404);
+
+        return view('gestion.bolsa-trabajo.documentos-presentados', compact('offer', 'application'));
+    }
+
     protected function downloadPostulacionesZip(Request $request, BolsaTrabajoOferta $oferta, string $mode)
     {
         $scope = (string) $request->query('scope', 'stage');
@@ -345,6 +355,7 @@ class BolsaTrabajoController extends Controller
             'postulaciones.user.documents.type',
             'postulaciones.user.postulantProfile',
             'postulaciones.postulantProfile',
+            'postulaciones.submittedDocuments.type',
         ]);
 
         $postulaciones = $this->resolvePostulacionesForExport($oferta, $scope);
@@ -378,9 +389,15 @@ class BolsaTrabajoController extends Controller
             $folder = $this->candidateFolderName($user);
             $zip->addEmptyDir($folder);
 
-            $documents = $mode === 'curriculum_only'
-                ? $this->curriculumDocumentsForZip($user, $curriculumTypeId)
-                : $this->approvedDocumentsForZip($user);
+            if ($postulacion->cargo_presentado !== null) {
+                $documents = $mode === 'curriculum_only'
+                    ? $postulacion->submittedDocuments->where('document_type_id', $curriculumTypeId)
+                    : $postulacion->submittedDocuments->where('status', 'approved');
+            } else {
+                $documents = $mode === 'curriculum_only'
+                    ? $this->curriculumDocumentsForZip($user, $curriculumTypeId)
+                    : $this->approvedDocumentsForZip($user);
+            }
 
             foreach ($documents as $document) {
                 $disk = (string) ($document->disk ?? 'public');
@@ -508,6 +525,7 @@ class BolsaTrabajoController extends Controller
                 ->orderBy('nombre_establecimiento')
                 ->get(['id', 'rbd', 'nombre_establecimiento', 'comuna']),
             'comunas' => $this->availableComunas(),
+            'documentTypes' => DocumentType::orderBy('sort_order')->orderBy('label')->get(),
             'areasGrouped' => AreaDesempeno::query()
                 ->activos()
                 ->orderBy('estamento')
@@ -542,6 +560,12 @@ class BolsaTrabajoController extends Controller
             'hora_termino_postulaciones' => ['required', 'date_format:H:i'],
             'correo_contacto' => ['required', 'email:rfc', 'max:190'],
             'bases_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:102400'],
+            'requisitos_documentales' => ['nullable', 'array', 'max:150'],
+            'requisitos_documentales.*' => ['array:document_type_id,incluir,aprobado,vigencia_dias'],
+            'requisitos_documentales.*.document_type_id' => ['required', 'integer', 'distinct', 'exists:document_types,id'],
+            'requisitos_documentales.*.incluir' => ['nullable', 'boolean'],
+            'requisitos_documentales.*.aprobado' => ['nullable', 'boolean'],
+            'requisitos_documentales.*.vigencia_dias' => ['nullable', 'integer', 'min:1', 'max:3650'],
         ], [
             'establecimientos_ids.required' => 'Debe seleccionar al menos un establecimiento.',
             'establecimientos_ids.min' => 'Debe seleccionar al menos un establecimiento.',
@@ -568,6 +592,15 @@ class BolsaTrabajoController extends Controller
 
         $data['establecimientos_ids'] = $establecimientosIds->all();
         $data['establecimiento_id'] = (int) $establecimientosIds->first();
+        if ($request->has('requisitos_documentales')) {
+            $data['requisitos_documentales'] = collect($data['requisitos_documentales'] ?? [])
+                ->filter(fn (array $rule) => (bool) ($rule['incluir'] ?? false))
+                ->map(fn (array $rule) => [
+                    'document_type_id' => (int) $rule['document_type_id'],
+                    'aprobado' => (bool) ($rule['aprobado'] ?? false),
+                    'vigencia_dias' => isset($rule['vigencia_dias']) ? (int) $rule['vigencia_dias'] : null,
+                ])->values()->all();
+        }
 
         $area = AreaDesempeno::query()->find($data['area_desempeno_id']);
         if (!$area || (string) $area->estamento !== (string) $data['estamento']) {

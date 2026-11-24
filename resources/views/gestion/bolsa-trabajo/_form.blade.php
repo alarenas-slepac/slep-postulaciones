@@ -1,34 +1,13 @@
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
-<style>
-    .bolsa-trabajo-form .select2-container { width: 100% !important; }
-    .bolsa-trabajo-form .select2-container--default .select2-selection--multiple {
-        min-height: 38px;
-        border: 1px solid #ced4da;
-        border-radius: .375rem;
-        padding: .15rem .35rem;
-    }
-    .bolsa-trabajo-form .select2-container--default.select2-container--focus .select2-selection--multiple {
-        border-color: #86b7fe;
-        box-shadow: 0 0 0 .25rem rgba(13,110,253,.25);
-    }
-    .bolsa-trabajo-form .select2-container--default .select2-selection--multiple .select2-selection__choice {
-        background: #e9f2ff;
-        border-color: #b6d4fe;
-        color: #0a58ca;
-    }
-</style>
-
-<div class="bolsa-trabajo-form">
 @csrf
 <div class="row g-3">
     <div class="col-md-6">
-        <label class="form-label">Establecimiento</label>
+        <label class="form-label" for="establecimientos_ids">Establecimiento</label>
         @php
             $selectedEstablecimientos = collect(old('establecimientos_ids', $item->establecimientos_seleccionados_ids ?? ($item->establecimiento_id ? [$item->establecimiento_id] : [])))
                 ->map(fn ($id) => (string) $id)
                 ->all();
         @endphp
-        <select name="establecimientos_ids[]" id="establecimientos_ids" class="form-select @error('establecimientos_ids') is-invalid @enderror @error('establecimientos_ids.*') is-invalid @enderror" multiple required>
+        <select name="establecimientos_ids[]" id="establecimientos_ids" data-slep-select="search" class="form-select @error('establecimientos_ids') is-invalid @enderror @error('establecimientos_ids.*') is-invalid @enderror" multiple required>
             @foreach ($establecimientos as $establecimiento)
                 <option value="{{ $establecimiento->id }}" data-comuna="{{ $establecimiento->comuna }}" @selected(in_array((string) $establecimiento->id, $selectedEstablecimientos, true))>
                     {{ $establecimiento->rbd }} - {{ $establecimiento->nombre_establecimiento }}
@@ -40,7 +19,7 @@
         @error('establecimientos_ids.*')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-md-6">
-        <label class="form-label">Comuna</label>
+        <label class="form-label" for="comuna">Comuna</label>
         <select name="comuna" id="comuna" class="form-select @error('comuna') is-invalid @enderror" required>
             <option value="">Seleccione</option>
             @foreach ($comunas as $comunaOption)
@@ -51,7 +30,7 @@
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Estamento</label>
+        <label class="form-label" for="estamento">Estamento</label>
         <select name="estamento" id="estamento" class="form-select @error('estamento') is-invalid @enderror" required>
             <option value="">Seleccione</option>
             <option value="docente" @selected(old('estamento', $item->estamento) === 'docente')>Docente</option>
@@ -61,7 +40,7 @@
     </div>
 
     <div class="col-md-8">
-        <label class="form-label">Área de desempeño</label>
+        <label class="form-label" for="area_desempeno_id">Área de desempeño</label>
         <select name="area_desempeno_id" id="area_desempeno_id" class="form-select @error('area_desempeno_id') is-invalid @enderror" required>
             <option value="">Seleccione</option>
             @foreach ($areasGrouped as $groupLabel => $areas)
@@ -79,8 +58,8 @@
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Calidad contractual</label>
-        <select name="calidad_contractual" class="form-select @error('calidad_contractual') is-invalid @enderror" required>
+        <label class="form-label" for="calidad_contractual">Calidad contractual</label>
+        <select name="calidad_contractual" id="calidad_contractual" class="form-select @error('calidad_contractual') is-invalid @enderror" required>
             <option value="">Seleccione</option>
             @foreach ($calidadesContractuales as $key => $label)
                 <option value="{{ $key }}" @selected(old('calidad_contractual', $item->calidad_contractual) === $key)>{{ $label }}</option>
@@ -90,57 +69,57 @@
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Cantidad de horas</label>
-        <input type="number" min="1" max="60" name="cantidad_horas" class="form-control @error('cantidad_horas') is-invalid @enderror" value="{{ old('cantidad_horas', $item->cantidad_horas) }}" required>
+        <label class="form-label" for="cantidad_horas">Cantidad de horas</label>
+        <input type="number" min="1" max="60" name="cantidad_horas" id="cantidad_horas" class="form-control @error('cantidad_horas') is-invalid @enderror" value="{{ old('cantidad_horas', $item->cantidad_horas) }}" required>
         @error('cantidad_horas')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Remuneración bruta</label>
-        <input type="number" min="1" step="1" inputmode="numeric" name="remuneracion_bruta" class="form-control @error('remuneracion_bruta') is-invalid @enderror" value="{{ old('remuneracion_bruta', $item->remuneracion_bruta) }}" required>
+        <label class="form-label" for="remuneracion_bruta">Remuneración bruta</label>
+        <input type="number" min="1" step="1" inputmode="numeric" name="remuneracion_bruta" id="remuneracion_bruta" class="form-control @error('remuneracion_bruta') is-invalid @enderror" value="{{ old('remuneracion_bruta', $item->remuneracion_bruta) }}" required>
         <div class="form-text">Ingrese el monto bruto en pesos, sin puntos ni comas.</div>
         @error('remuneracion_bruta')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Inicio de trabajo aproximado</label>
-        <input type="date" name="inicio_trabajo_aproximado" class="form-control @error('inicio_trabajo_aproximado') is-invalid @enderror" value="{{ old('inicio_trabajo_aproximado', optional($item->inicio_trabajo_aproximado)->format('Y-m-d')) }}" required>
+        <label class="form-label" for="inicio_trabajo_aproximado">Inicio de trabajo aproximado</label>
+        <input type="date" name="inicio_trabajo_aproximado" id="inicio_trabajo_aproximado" class="form-control @error('inicio_trabajo_aproximado') is-invalid @enderror" value="{{ old('inicio_trabajo_aproximado', optional($item->inicio_trabajo_aproximado)->format('Y-m-d')) }}" required>
         @error('inicio_trabajo_aproximado')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Fecha inicio postulaciones</label>
-        <input type="date" name="fecha_inicio_postulaciones" class="form-control @error('fecha_inicio_postulaciones') is-invalid @enderror" value="{{ old('fecha_inicio_postulaciones', optional($item->fecha_inicio_postulaciones)->format('Y-m-d')) }}" required>
+        <label class="form-label" for="fecha_inicio_postulaciones">Fecha inicio postulaciones</label>
+        <input type="date" name="fecha_inicio_postulaciones" id="fecha_inicio_postulaciones" class="form-control @error('fecha_inicio_postulaciones') is-invalid @enderror" value="{{ old('fecha_inicio_postulaciones', optional($item->fecha_inicio_postulaciones)->format('Y-m-d')) }}" required>
         @error('fecha_inicio_postulaciones')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Hora inicio postulaciones</label>
-        <input type="time" name="hora_inicio_postulaciones" class="form-control @error('hora_inicio_postulaciones') is-invalid @enderror" value="{{ old('hora_inicio_postulaciones', $item->hora_inicio_postulaciones) }}" required>
+        <label class="form-label" for="hora_inicio_postulaciones">Hora inicio postulaciones</label>
+        <input type="time" name="hora_inicio_postulaciones" id="hora_inicio_postulaciones" class="form-control @error('hora_inicio_postulaciones') is-invalid @enderror" value="{{ old('hora_inicio_postulaciones', $item->hora_inicio_postulaciones) }}" required>
         @error('hora_inicio_postulaciones')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Fecha término postulaciones</label>
-        <input type="date" name="fecha_termino_postulaciones" class="form-control @error('fecha_termino_postulaciones') is-invalid @enderror" value="{{ old('fecha_termino_postulaciones', optional($item->fecha_termino_postulaciones)->format('Y-m-d')) }}" required>
+        <label class="form-label" for="fecha_termino_postulaciones">Fecha término postulaciones</label>
+        <input type="date" name="fecha_termino_postulaciones" id="fecha_termino_postulaciones" class="form-control @error('fecha_termino_postulaciones') is-invalid @enderror" value="{{ old('fecha_termino_postulaciones', optional($item->fecha_termino_postulaciones)->format('Y-m-d')) }}" required>
         @error('fecha_termino_postulaciones')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Hora término postulaciones</label>
-        <input type="time" name="hora_termino_postulaciones" class="form-control @error('hora_termino_postulaciones') is-invalid @enderror" value="{{ old('hora_termino_postulaciones', $item->hora_termino_postulaciones) }}" required>
+        <label class="form-label" for="hora_termino_postulaciones">Hora término postulaciones</label>
+        <input type="time" name="hora_termino_postulaciones" id="hora_termino_postulaciones" class="form-control @error('hora_termino_postulaciones') is-invalid @enderror" value="{{ old('hora_termino_postulaciones', $item->hora_termino_postulaciones) }}" required>
         @error('hora_termino_postulaciones')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-4">
-        <label class="form-label">Correo de contacto</label>
-        <input type="email" name="correo_contacto" class="form-control @error('correo_contacto') is-invalid @enderror" value="{{ old('correo_contacto', $item->correo_contacto) }}" maxlength="190" required>
+        <label class="form-label" for="correo_contacto">Correo de contacto</label>
+        <input type="email" name="correo_contacto" id="correo_contacto" class="form-control @error('correo_contacto') is-invalid @enderror" value="{{ old('correo_contacto', $item->correo_contacto) }}" maxlength="190" required>
         @error('correo_contacto')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="col-md-8">
-        <label class="form-label">Bases (PDF)</label>
-        <input type="file" name="bases_pdf" class="form-control @error('bases_pdf') is-invalid @enderror" accept="application/pdf">
+        <label class="form-label" for="bases_pdf">Bases (PDF)</label>
+        <input type="file" name="bases_pdf" id="bases_pdf" class="form-control @error('bases_pdf') is-invalid @enderror" accept="application/pdf">
         <div class="form-text">Adjunte las bases en formato PDF. Tamaño máximo permitido: 100 MB.</div>
         @if (!empty($item->bases_pdf_path))
             <div class="mt-2">
@@ -155,14 +134,14 @@
         @error('bases_pdf')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
 </div>
-<div class="d-flex gap-2 mt-4">
-    <button class="btn btn-primary" type="submit">Guardar oferta</button>
-    <a class="btn btn-outline-secondary" href="{{ route('gestion.bolsa-trabajo.index') }}">Volver</a>
+@include('gestion.bolsa-trabajo._requisitos')
+<div class="slep-listing__filter-actions">
+    <button class="slep-listing__button slep-listing__button--primary" type="submit"><i class="bi bi-check-lg" aria-hidden="true"></i> <span data-slep-save-label>Guardar oferta</span></button>
+    <a class="slep-listing__button slep-listing__button--secondary" href="{{ route('gestion.bolsa-trabajo.index') }}">Volver</a>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script>
+<script type="module">
+import { selectQuery } from @json(Vite::asset('resources/js/slep-listados.js'));
 (function () {
     const estab = document.getElementById('establecimientos_ids');
     const comuna = document.getElementById('comuna');
@@ -206,20 +185,6 @@
         filterAreas();
     }
 
-    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2 && estab) {
-        window.jQuery(estab).select2({
-            width: '100%',
-            placeholder: 'Buscar establecimiento',
-            closeOnSelect: false,
-            allowClear: false,
-            language: {
-                noResults: function () { return 'No se encontraron establecimientos'; },
-                searching: function () { return 'Buscando...'; }
-            }
-        });
-        window.jQuery(estab).on('change', syncComuna);
-    }
+    if (estab) selectQuery(estab).on('change', syncComuna);
 })();
 </script>
-
-</div>

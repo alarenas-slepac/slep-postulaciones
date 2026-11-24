@@ -668,7 +668,7 @@ class SolicitudReemplazoGestionController extends Controller
                         'documents:id,user_id,document_type_id,path,status',
                     ])
                     ->whereHas('postulantProfile', function ($qq) use ($expectedEstamento, $busyIds, $isEpSelected, $epAreaIds) {
-                        $qq->where(function ($w) use ($expectedEstamento, $isEpSelected, $epAreaIds) {
+                        $qq->matchingCareer(function ($w) use ($expectedEstamento, $isEpSelected, $epAreaIds) {
                             $w->where('estamento', $expectedEstamento);
 
                             if ($isEpSelected && !empty($epAreaIds)) {
@@ -685,6 +685,9 @@ class SolicitudReemplazoGestionController extends Controller
                     $q->role(['postulante', 'funcionario']);
                 }
 
+                if (\Illuminate\Support\Facades\Schema::hasTable('postulant_job_profiles')) {
+                    $q->with('postulantProfile.jobProfiles.areaDesempeno');
+                }
                 $users = $q->orderBy('apellido_paterno')
                     ->orderBy('apellido_materno')
                     ->orderBy('nombres')
@@ -708,7 +711,8 @@ class SolicitudReemplazoGestionController extends Controller
                     $rutFmt = $this->formatRutChile($u->rut);
                     $baseText = trim($name . ' ' . $rutFmt);
 
-                    $docsOk = $this->userHasAllRequiredDocsUploaded($u, $types);
+                    $career = \App\Support\PostulantJobProfiles::forReplacement($u->postulantProfile, $expectedEstamento, (int) $solicitud->area_desempeno_id, false, $epAreaIds);
+                    $docsOk = $this->userHasAllRequiredDocsUploaded($u, $types, $career);
 
                     $item = [
                         'id' => (int) $u->postulantProfile->id,
@@ -716,7 +720,7 @@ class SolicitudReemplazoGestionController extends Controller
                     ];
 
                     $isEp = $isEpSelected && !empty($epAreaIds)
-                        && in_array((int) $u->postulantProfile->area_desempeno_id, $epAreaIds, true);
+                        && in_array((int) $career?->area_desempeno_id, $epAreaIds, true);
 
                     if ($isEp) {
                         if ($docsOk) $epOk[] = $item;
@@ -1565,7 +1569,7 @@ class SolicitudReemplazoGestionController extends Controller
                 'postulantProfile.areaDesempeno:id,nombre,slug,estamento',
                 'documents:id,user_id,document_type_id,path,status',
             ])
-            ->whereHas('postulantProfile', function ($qq) use ($expectedEstamento, $isEpSelected, $epAreaIds) {
+            ->whereHas('postulantProfile', fn ($query) => $query->matchingCareer(function ($qq) use ($expectedEstamento, $isEpSelected, $epAreaIds) {
                 if ($isEpSelected) {
                     // EP: solo área Educadora de Párvulos (sin filtrar por estamento)
                     if (!empty($epAreaIds)) {
@@ -1577,7 +1581,11 @@ class SolicitudReemplazoGestionController extends Controller
                     // Normal: filtrar por estamento
                     $qq->where('estamento', $expectedEstamento);
                 }
-            });
+            }));
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('postulant_job_profiles')) {
+            $q->with('postulantProfile.jobProfiles.areaDesempeno');
+        }
 
         if (method_exists(User::class, 'scopeRole')) {
             $q->role(['postulante', 'funcionario']);
@@ -1636,11 +1644,12 @@ class SolicitudReemplazoGestionController extends Controller
             $label = trim($name . ' ' . $rutFmt);
             $restriction = app(RestrictedRutService::class)->restrictionContextForUser($u);
 
-            $required = \App\Support\DocumentRules::requiredTypesFromCatalog($u, $types);
+            $career = \App\Support\PostulantJobProfiles::forReplacement($u->postulantProfile, $expectedEstamento, $areaId, $isEpSelected, $epAreaIds);
+            $required = \App\Support\DocumentRules::requiredTypesFromCatalog($u, $types, $career);
             $requiredIds = $required->pluck('id')->all();
 
             $uploadedDocs = $u->documents
-                ? $u->documents->whereIn('document_type_id', $requiredIds)
+                ? $u->documents->whereIn('document_type_id', $requiredIds)->unique('document_type_id')
                 : collect();
 
             $uploaded = (int) $uploadedDocs->count();
@@ -1664,8 +1673,8 @@ class SolicitudReemplazoGestionController extends Controller
                 'id' => $ppId,
                 'text' => $label,
                 'label' => $label,
-                'area' => (string) (optional($u->postulantProfile->areaDesempeno)->nombre ?? '—'),
-                'area_desempeno_id' => (int) ($u->postulantProfile->area_desempeno_id ?? 0),
+                'area' => (string) ($career?->area_desempeno_nombre ?? '—'),
+                'area_desempeno_id' => (int) ($career?->area_desempeno_id ?? 0),
                 'uploaded' => (int) $uploaded,
                 'total_required' => (int) $total,
                 'percent' => (int) $percent,
@@ -1684,8 +1693,8 @@ class SolicitudReemplazoGestionController extends Controller
                 'manual_restriction_end' => $restriction['manual_end'] ?? null,
 
                 // Ordenamiento
-                '_same_area' => ($areaId > 0 && (int) ($u->postulantProfile->area_desempeno_id ?? 0) === $areaId),
-                '_area_sort' => mb_strtolower((string) (optional($u->postulantProfile->areaDesempeno)->nombre ?? ''), 'UTF-8'),
+                '_same_area' => ($areaId > 0 && (int) $career?->area_desempeno_id === $areaId),
+                '_area_sort' => mb_strtolower((string) $career?->area_desempeno_nombre, 'UTF-8'),
             ];
 
             // Disabled: si faltan docs o supera el máximo de horas.
@@ -1857,8 +1866,7 @@ class SolicitudReemplazoGestionController extends Controller
                 ->all();
         }
 
-        $isOk = ((string) $pp->estamento === (string) $expectedEstamento)
-            || ($isEpSelected && !empty($epAreaIds) && in_array((int) $pp->area_desempeno_id, $epAreaIds, true));
+        $isOk = \App\Support\PostulantJobProfiles::forReplacement($pp, $expectedEstamento, (int) $solicitud->area_desempeno_id, false, $epAreaIds) !== null;
 
         if (!$isOk) {
             return back()->withErrors([
@@ -2111,8 +2119,7 @@ class SolicitudReemplazoGestionController extends Controller
                 ->all();
         }
 
-        $isOk = ((string) $pp->estamento === (string) $expectedEstamento)
-            || ($isEpSelected && !empty($epAreaIds) && in_array((int) $pp->area_desempeno_id, $epAreaIds, true));
+        $isOk = \App\Support\PostulantJobProfiles::forReplacement($pp, $expectedEstamento, (int) $solicitud->area_desempeno_id, false, $epAreaIds) !== null;
 
         if (!$isOk) {
             return back()->withErrors([
@@ -2416,8 +2423,7 @@ class SolicitudReemplazoGestionController extends Controller
                 ->all();
         }
 
-        $isOk = ((string) $pp->estamento === (string) $expectedEstamento)
-            || ($isEpSelected && !empty($epAreaIds) && in_array((int) $pp->area_desempeno_id, $epAreaIds, true));
+        $isOk = \App\Support\PostulantJobProfiles::forReplacement($pp, $expectedEstamento, (int) $solicitud->area_desempeno_id, false, $epAreaIds) !== null;
 
         if (!$isOk) {
             return back()->withErrors([
@@ -4702,14 +4708,14 @@ public function gdpReasignar(Request $request, SolicitudReemplazo $solicitud)
         return trim(preg_replace('/\s+/u', ' ', (string) ($value ?? '')));
     }
 
-private function userHasAllRequiredDocsUploaded(\App\Models\User $u, $types): bool
+    private function userHasAllRequiredDocsUploaded(\App\Models\User $u, $types, $career = null): bool
     {
         // Para el tag "(documentos sin cargar)" consideramos solo existencia de archivo (path),
         // no el estado de revisión.
         $u->loadMissing(['postulantProfile', 'documents']);
 
-        $docsByType = $u->documents->keyBy('document_type_id');
-        $required = $types->filter(fn(\App\Models\DocumentType $t) => $t->isRequiredForUser($u));
+        $docsByType = $u->documents->filter(fn ($doc) => filled($doc->path))->keyBy('document_type_id');
+        $required = \App\Support\DocumentRules::requiredTypesFromCatalog($u, $types, $career);
 
         foreach ($required as $t) {
             $doc = $docsByType->get($t->id);

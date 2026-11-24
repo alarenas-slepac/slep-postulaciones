@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Models\DocumentType;
+use App\Models\PostulantJobProfile;
+use App\Models\PostulantProfile;
 use App\Models\User;
 
 class DocumentRules
@@ -11,14 +13,14 @@ class DocumentRules
      * @param \Illuminate\Support\Collection<int,\App\Models\DocumentType> $types
      * @return \Illuminate\Support\Collection<int,\App\Models\DocumentType>
      */
-    protected static function filterTypesForUser(User $user, $types, string $method)
+    protected static function filterTypesForUser(User $user, $types, string $method, PostulantProfile|PostulantJobProfile|null $profile = null)
     {
         // Datos del perfil para condicionales "OR" especiales
-        $profile = $user->postulantProfile;
+        $profile ??= $user->postulantProfile;
         $area    = (string) ($profile->area_desempeno_nombre ?? '');
         $cargo   = (string) ($profile->cargos_funcion ?? '');
 
-        return $types->filter(function (DocumentType $t) use ($user, $area, $cargo, $method) {
+        return $types->filter(function (DocumentType $t) use ($user, $area, $cargo, $method, $profile) {
             // Soporte de "OR" opcional en condiciones
             $c = $t->conditions ?? [];
 
@@ -36,12 +38,12 @@ class DocumentRules
                     unset($cc['require_area_in'], $cc['or_require_cargo_in']);
                     $temp = new DocumentType($t->toArray());
                     $temp->conditions = $cc;
-                    return $temp->{$method}($user);
+                    return $temp->{$method}($user, $profile);
                 }
                 return false;
             }
 
-            return $t->{$method}($user);
+            return $t->{$method}($user, $profile);
         })->values();
     }
 
@@ -72,9 +74,9 @@ class DocumentRules
      * @param \Illuminate\Support\Collection<int,\App\Models\DocumentType> $types
      * @return \Illuminate\Support\Collection<int,\App\Models\DocumentType>
      */
-    public static function requiredTypesFromCatalog(User $user, $types)
+    public static function requiredTypesFromCatalog(User $user, $types, PostulantProfile|PostulantJobProfile|null $profile = null)
     {
-        return self::filterTypesForUser($user, $types, 'isRequiredForUser');
+        return self::filterTypesForUser($user, $types, 'isRequiredForUser', $profile);
     }
 
     /**
@@ -83,9 +85,9 @@ class DocumentRules
      * @param \Illuminate\Support\Collection<int,\App\Models\DocumentType> $types
      * @return \Illuminate\Support\Collection<int,\App\Models\DocumentType>
      */
-    public static function visibleTypesFromCatalog(User $user, $types)
+    public static function visibleTypesFromCatalog(User $user, $types, PostulantProfile|PostulantJobProfile|null $profile = null)
     {
-        return self::filterTypesForUser($user, $types, 'isVisibleForUser');
+        return self::filterTypesForUser($user, $types, 'isVisibleForUser', $profile);
     }
 
 }

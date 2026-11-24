@@ -99,6 +99,7 @@ class BuscadorPostulantesController extends Controller
         $selectedAreaId = !empty($filters['area_desempeno_id']) ? (int) $filters['area_desempeno_id'] : null;
         $isAreaDocenteSelected = $selectedAreaId && $areaDocenteIds->contains($selectedAreaId);
         $isAreaTpSelected = $selectedAreaId && $areaTpIds->contains($selectedAreaId);
+        $hasAdditionalCareers = \Illuminate\Support\Facades\Schema::hasTable('postulant_job_profiles');
 
         $especialidadesTp = $areaTpIds->isEmpty()
             ? collect()
@@ -107,6 +108,7 @@ class BuscadorPostulantesController extends Controller
                 ->whereNotNull('especialidad_tp')
                 ->where('especialidad_tp', '<>', '')
                 ->pluck('especialidad_tp')
+                ->merge($hasAdditionalCareers ? \App\Models\PostulantJobProfile::where('activo', true)->whereIn('area_desempeno_id', $areaTpIds)->pluck('especialidad_tp') : [])
                 ->map(fn ($especialidad) => trim((string) $especialidad))
                 ->filter()
                 ->unique(fn ($especialidad) => mb_strtolower($especialidad))
@@ -120,6 +122,7 @@ class BuscadorPostulantesController extends Controller
                 ->whereNotNull('mencion')
                 ->where('mencion', '<>', '')
                 ->pluck('mencion')
+                ->merge($hasAdditionalCareers ? \App\Models\PostulantJobProfile::where('activo', true)->whereIn('area_desempeno_id', $areaDocenteIds)->pluck('mencion') : [])
                 ->map(fn ($mencion) => trim((string) $mencion))
                 ->filter()
                 ->unique(fn ($mencion) => mb_strtolower($mencion))
@@ -147,6 +150,9 @@ class BuscadorPostulantesController extends Controller
             ->whereHas('user.roles', function ($rq) {
                 $rq->whereIn('name', ['postulante', 'funcionario']);
             });
+        if ($hasAdditionalCareers) {
+            $q->with('jobProfiles.areaDesempeno');
+        }
 
         // --- Filtros combinables ---
 
@@ -186,31 +192,14 @@ class BuscadorPostulantesController extends Controller
             }
         }
 
-        // Área de desempeño
-        if (!empty($filters['area_desempeno_id'])) {
-            $areaId = (int)$filters['area_desempeno_id'];
-            if ($areaId > 0) {
-                $q->where('postulant_profiles.area_desempeno_id', $areaId);
-            }
-        }
-
-        // Especialidad TP: sólo aplica cuando el área seleccionada es Docente Técnico Profesional
-        if ($isAreaTpSelected && $filters['especialidad_tp'] !== '') {
-            $q->where('postulant_profiles.especialidad_tp', $filters['especialidad_tp']);
-        }
-
-        // Mención: sólo aplica cuando el área seleccionada pertenece al estamento docente
-        if ($isAreaDocenteSelected && $filters['mencion'] !== '') {
-            $mencion = $filters['mencion'];
-            $q->where('postulant_profiles.mencion', 'like', "%{$mencion}%");
-        }
-
-        // Años experiencia
-        if ($filters['exp_min'] !== null && $filters['exp_min'] !== '') {
-            $q->where('postulant_profiles.anios_experiencia', '>=', (int)$filters['exp_min']);
-        }
-        if ($filters['exp_max'] !== null && $filters['exp_max'] !== '') {
-            $q->where('postulant_profiles.anios_experiencia', '<=', (int)$filters['exp_max']);
+        if ($selectedAreaId || filled($filters['exp_min']) || filled($filters['exp_max'])) {
+            $q->matchingCareer(function ($job) use ($selectedAreaId, $filters) {
+                $job->when($selectedAreaId, fn ($query) => $query->where($query->qualifyColumn('area_desempeno_id'), $selectedAreaId))
+                    ->when($filters['especialidad_tp'] !== '', fn ($query) => $query->where($query->qualifyColumn('especialidad_tp'), $filters['especialidad_tp']))
+                    ->when($filters['mencion'] !== '', fn ($query) => $query->where($query->qualifyColumn('mencion'), 'like', '%'.$filters['mencion'].'%'))
+                    ->when(filled($filters['exp_min']), fn ($query) => $query->where($query->qualifyColumn('anios_experiencia'), '>=', (int) $filters['exp_min']))
+                    ->when(filled($filters['exp_max']), fn ($query) => $query->where($query->qualifyColumn('anios_experiencia'), '<=', (int) $filters['exp_max']));
+            });
         }
 
         // Orden estable
@@ -223,6 +212,16 @@ class BuscadorPostulantesController extends Controller
         $profiles = $q->paginate($perPage)->withQueryString();
 
         $currentProfiles = $profiles->getCollection();
+        $currentProfiles->each(function (PostulantProfile $profile) use ($hasAdditionalCareers, $selectedAreaId, $filters) {
+            $careers = $hasAdditionalCareers ? \App\Support\PostulantJobProfiles::additional($profile) : collect();
+            $profile->setRelation('additionalCareers', $careers);
+            $matching = $careers->prepend($profile)->first(fn ($job) => (! $selectedAreaId || (int) $job->area_desempeno_id === $selectedAreaId)
+                && ($filters['especialidad_tp'] === '' || strcasecmp($job->especialidad_tp ?? '', $filters['especialidad_tp']) === 0)
+                && ($filters['mencion'] === '' || mb_stripos($job->mencion ?? '', $filters['mencion']) !== false)
+                && (blank($filters['exp_min']) || $job->anios_experiencia >= (int) $filters['exp_min'])
+                && (blank($filters['exp_max']) || $job->anios_experiencia <= (int) $filters['exp_max']));
+            $profile->setRelation('matchingCareer', $matching === $profile ? null : $matching);
+        });
 
         $reemplazosActivosPorPerfil = $this->reemplazosActivosPorPerfil(
             $currentProfiles->pluck('id')->all()
@@ -300,6 +299,7 @@ class BuscadorPostulantesController extends Controller
             ->values();
 
         $documentsByUser = UserDocument::query()
+            ->inLibrary()
             ->whereIn('user_id', $userIds)
             ->whereNotNull('path')
             ->where('path', '<>', '')
@@ -324,7 +324,7 @@ class BuscadorPostulantesController extends Controller
             // ya cargado para evitar consultas adicionales y usar exactamente la fila listada.
             $user->setRelation('postulantProfile', $profile);
 
-            $requiredTypes = DocumentRules::requiredTypesFromCatalog($user, $documentTypes);
+            $requiredTypes = DocumentRules::requiredTypesFromCatalog($user, $documentTypes, $profile->getRelation('matchingCareer'));
             $requiredIds = $requiredTypes->pluck('id')->map(fn($id) => (int) $id)->all();
             $uploadedIds = ($documentsByUser->get($user->id, collect()))
                 ->pluck('document_type_id')
@@ -398,6 +398,7 @@ class BuscadorPostulantesController extends Controller
         return view('reemplazos.buscador-postulantes.show', [
             'title'              => 'Postulante: ' . ($user?->nombre_completo ?? 'Ficha'),
             'profile'            => $postulantProfile,
+            'additionalCareers'  => \App\Support\PostulantJobProfiles::additional($postulantProfile),
             'user'               => $user,
             'solicitudes'        => $solicitudes,
             'restrictionContext' => $restrictionContext,

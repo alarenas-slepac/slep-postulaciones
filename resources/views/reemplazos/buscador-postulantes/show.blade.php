@@ -79,6 +79,14 @@
                         <div class="slep-profile__data-wide"><dt>Dirección y comuna de residencia</dt><dd>{{ collect([$profile->direccion, $profile->comuna?->name])->filter()->implode(' · ') ?: 'No informada' }}</dd></div>
                         @if ($profile->especialidad_tp)<div><dt>Especialidad TP</dt><dd>{{ $profile->especialidad_tp }}</dd></div>@endif
                         @if ($profile->mencion)<div><dt>Mención</dt><dd>{{ $profile->mencion }}</dd></div>@endif
+                        @if (($additionalCareers ?? collect())->isNotEmpty())
+                            <div>
+                                <dt>Otros cargos registrados</dt>
+                                <dd><ul class="ps-3 mb-0">
+                                    @foreach ($additionalCareers as $job)<li>{{ \App\Support\PostulantJobProfiles::label($job) }}</li>@endforeach
+                                </ul></dd>
+                            </div>
+                        @endif
                     </dl>
                 </div>
             </section>

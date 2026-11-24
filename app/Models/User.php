@@ -140,7 +140,7 @@ class User extends Authenticatable implements MustVerifyEmail
     // App\Models\User
     public function documents()
     {
-        return $this->hasMany(UserDocument::class);
+        return $this->hasMany(UserDocument::class)->inLibrary();
     }
     public function getDisplayNameAttribute(): string
     {

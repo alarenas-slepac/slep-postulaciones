@@ -3,22 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\DocumentType;
+use App\Models\BolsaTrabajoOferta;
 use App\Models\UserDocument;
+use App\Services\BolsaTrabajoPostulacionService;
 use App\Services\UserDocumentReplacement;
 use App\Support\DocumentRules;
 use App\Support\ProfileChecklist;
+use App\Support\PostulantJobProfiles;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class PostulantDocumentsController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, BolsaTrabajoPostulacionService $offers)
     {
         $user = $request->user();
-        $user->loadMissing(['postulantProfile', 'documents' => function ($q) {
-            $q->with('type')->latest('updated_at');
-        }]);
+        $user->loadMissing('postulantProfile');
 
         // Bloqueo por perfil incompleto
         $check = ProfileChecklist::compute($user);
@@ -33,17 +35,19 @@ class PostulantDocumentsController extends Controller
             ->orderBy('label')
             ->get();
 
-        $documentTypes = DocumentRules::visibleTypesFromCatalog($user, $catalog);
-        $requiredTypeIds = DocumentRules::requiredTypesFromCatalog($user, $catalog)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->flip();
-        $byTypeId = $user->documents->keyBy('document_type_id');
+        $context = $this->offerContext($request, $offers);
+        $visibility = $this->availableTypes($request, $catalog, $context);
+        $byTypeId = $user->documents()->latest('updated_at')->get()->groupBy('document_type_id');
+        $requestedType = $request->integer('tipo');
+        $documentTypes = $catalog->filter(fn ($type) => ($visibility['visible']->has($type->id) || $byTypeId->has($type->id))
+            && (! $requestedType || (int) $type->id === $requestedType));
+        $requiredTypeIds = $visibility['required'];
+        $visibleTypeIds = $visibility['visible'];
 
-        return view('postulant.documents.index', compact('documentTypes', 'requiredTypeIds', 'byTypeId', 'user'));
+        return view('postulant.documents.index', compact('documentTypes', 'requiredTypeIds', 'visibleTypeIds', 'byTypeId', 'context', 'requestedType'));
     }
 
-    public function store(Request $request, DocumentType $type)
+    public function store(Request $request, DocumentType $type, BolsaTrabajoPostulacionService $offers)
     {
         $user = $request->user();
         $user->loadMissing(['postulantProfile']);
@@ -54,8 +58,9 @@ class PostulantDocumentsController extends Controller
             return back()->with('warning', 'Completa tu perfil antes de subir documentos.');
         }
 
-        // Solo permitir subir si este tipo está disponible para el perfil actual.
-        if (!(new DocumentType($type->toArray()))->isVisibleForUser($user)) {
+        $context = $this->offerContext($request, $offers);
+        $types = $this->availableTypes($request, collect([$type]), $context);
+        if (! $types['visible']->has($type->id)) {
             return back()->withErrors(['file' => 'Este documento no está disponible para tu perfil.']);
         }
 
@@ -63,7 +68,7 @@ class PostulantDocumentsController extends Controller
         $request->merge(['type_id' => $type->id]);
 
         // Validación: SOLO PDF (10 MB máx)
-        $request->validate([
+        $data = $request->validate([
             'type_id' => ['required', 'integer', 'exists:document_types,id'],
             'file'    => [
                 'required',
@@ -72,11 +77,20 @@ class PostulantDocumentsController extends Controller
                 'mimes:pdf',
                 'max:10240',
             ],
+            'library_document_id' => ['nullable', 'integer', 'min:1'],
+            'additional' => ['nullable', 'boolean'],
+            'credential_label' => ['nullable', 'string', 'max:150', 'required_if:additional,1'],
+            'issued_on' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.BolsaTrabajoOferta::portalNow()->toDateString()],
         ], [
             'file.mimetypes' => 'Solo se permiten archivos PDF.',
             'file.mimes'     => 'Solo se permiten archivos PDF.',
             'file.max'       => 'El PDF no puede superar 10 MB.',
         ]);
+        $additional = $request->boolean('additional');
+        $documentId = isset($data['library_document_id']) ? (int) $data['library_document_id'] : null;
+        if ($additional && (! $type->supportsMultipleCredentials() || $documentId !== null)) {
+            return back()->withErrors(['file' => 'Este tipo de documento admite un solo archivo vigente.']);
+        }
 
         $f = $request->file('file');
 
@@ -121,7 +135,14 @@ class PostulantDocumentsController extends Controller
 
         // 5) Nombre final
         $filename = "{$rutPart}_{$namePart}_{$labelPart}.pdf";
-        app(UserDocumentReplacement::class)->replace($user, $type, $f, $filename);
+        app(UserDocumentReplacement::class)->replace(
+            $user, $type, $f, $filename, $documentId, $data['credential_label'] ?? null, $data['issued_on'] ?? null, $additional,
+        );
+
+        if ($context) {
+            return redirect()->route('postulant.ofertas-laborales.show', ['oferta' => $context['offer'], 'cargo' => $context['key']])
+                ->with('status', 'Documento guardado y pendiente de revisión.');
+        }
 
         return back()->with('status', 'Documento subido correctamente. Queda pendiente de revisión.');
     }
@@ -166,5 +187,60 @@ class PostulantDocumentsController extends Controller
 
         $downloadAs = basename($path); // <- usa el nombre físico renombrado
         return Storage::disk($disk)->download($path, $downloadAs);
+    }
+
+    public function storeIssueDate(Request $request, UserDocument $document, BolsaTrabajoPostulacionService $offers)
+    {
+        $this->authorize('update', $document);
+        $data = $request->validate([
+            'issued_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.BolsaTrabajoOferta::portalNow()->toDateString()],
+        ]);
+        $user = $request->user();
+        $connection = $user->getConnection();
+        $connection->transaction(function () use ($user, $document, $data, $connection) {
+            $user->newQuery()->lockForUpdate()->findOrFail($user->id);
+            $current = $user->documents()->lockForUpdate()->findOrFail($document->id);
+            if ($current->issued_on !== null || $current->status === 'rejected'
+                || ! $current->path || ! Storage::disk($current->disk ?? 'public')->exists($current->path)) {
+                throw ValidationException::withMessages(['issued_on' => 'No se puede registrar la fecha de emisión de este archivo.']);
+            }
+            $connection->table('user_documents')->where('id', $current->id)->update(['issued_on' => $data['issued_on']]);
+        });
+        $context = $this->offerContext($request, $offers);
+
+        return $context
+            ? redirect()->route('postulant.ofertas-laborales.show', ['oferta' => $context['offer'], 'cargo' => $context['key']])->with('status', 'Fecha de emisión registrada.')
+            : back()->with('status', 'Fecha de emisión registrada.');
+    }
+
+    private function offerContext(Request $request, BolsaTrabajoPostulacionService $offers): ?array
+    {
+        $user = $request->user();
+        $offerId = $request->integer('oferta');
+        $key = $request->input('cargo');
+        $role = $user->activeRoleName();
+        if (! $offerId || ! is_string($key) || ! in_array($role, ['postulante', 'funcionario'], true)
+            || ! $user->canModule('postulant.ofertas-laborales', $role)) {
+            return null;
+        }
+        $offer = BolsaTrabajoOferta::find($offerId);
+        $now = BolsaTrabajoOferta::portalNow();
+        if (! $offer || ! $offer->isVisibleEnPortal($now) || ! $offer->isPostulacionAbierta($now)) {
+            return null;
+        }
+        $profile = $offers->compatibleProfiles($user, $offer)->get($key);
+
+        return $profile ? compact('offer', 'key') : null;
+    }
+
+    private function availableTypes(Request $request, $catalog, ?array $context): array
+    {
+        $user = $request->user();
+        $profiles = PostulantJobProfiles::forUser($user);
+        $required = $profiles->flatMap(fn ($profile) => DocumentRules::requiredTypesFromCatalog($user, $catalog, $profile)->pluck('id'));
+        $visible = $profiles->flatMap(fn ($profile) => DocumentRules::visibleTypesFromCatalog($user, $catalog, $profile)->pluck('id'));
+        $specific = collect(($context['offer'] ?? null)?->requisitos_documentales ?? [])->pluck('document_type_id');
+
+        return ['required' => $required->merge($specific)->flip(), 'visible' => $visible->merge($specific)->flip()];
     }
 }
