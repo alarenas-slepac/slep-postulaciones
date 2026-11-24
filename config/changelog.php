@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.708',
+    'current_version' => '2026.11.24.709',
     'entries' => [
+        [
+            'version' => '2026.11.24.709',
+            'title' => 'Menú lateral por secciones',
+            'summary' => 'Organiza los accesos de Administrador, Funcionario SLEP, Coordinador GDP y Coordinador UATP en secciones desplegables.',
+            'roles' => ['admin', 'funcionario_slep', 'coordinador_gdp', 'coordinador_uatp'],
+            'items' => [
+                'Prioriza las secciones según el rol activo y abre la sección de la página actual.',
+                'Mantiene Inicio y Mensajes como accesos directos y muestra Agendamiento en Cometidos y recursos.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.24.708',
             'title' => 'Postulaciones a varios cargos y biblioteca de documentos',
