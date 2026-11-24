@@ -12,6 +12,8 @@ class DotacionPalCursos2027
     {
         $niveles = (array) data_get($data, 'cursos.rows', []);
         $grupos = collect(data_get($data, 'cursos_combinados.grupos', []))->where('activo', true)->values();
+        $pieCombinados = collect(data_get($data, 'cursos.resumen_cursos_planes.combinados', []))
+            ->pluck('total_trabajo_colaborativo_pie', 'id');
         $detalles = []; $etiquetas = [];
         foreach ($niveles as $nivel) {
             foreach ($nivel['detalles'] ?? [] as $detalle) {
@@ -51,7 +53,8 @@ class DotacionPalCursos2027
             // E=1 unidad de plan compartida; sus cursos administrativos se
             // detallan en C. Así la fórmula G=E*F no multiplica el plan común.
             $filasCombinadas[] = $this->fila($ee, $label, $matriculaCompleta ? $matricula : null, 1,
-                $horas === null ? null : (float) $horas, $contrato === null ? null : (float) $contrato);
+                $horas === null ? null : (float) $horas, $contrato === null ? null : (float) $contrato,
+                (float) $pieCombinados->get((int) data_get($grupo, 'id'), 0));
         }
 
         $filas = [];
@@ -77,7 +80,8 @@ class DotacionPalCursos2027
                 $contratos = $cursos->map(fn ($d) => $this->contratoPlan($d));
                 $matricula = $cursos->contains(fn ($d) => ! isset($d['matricula'])) ? null : (int) $cursos->sum('matricula');
                 $filas[] = $this->fila($ee, $label, $matricula, $cursos->count(), $horas,
-                    $contratos->containsStrict(null) ? null : (float) $contratos->sum());
+                    $contratos->containsStrict(null) ? null : (float) $contratos->sum(),
+                    (float) $cursos->sum('trabajo_colaborativo_pie'));
             }
         }
         array_push($filas, ...$filasCombinadas);
@@ -99,9 +103,11 @@ class DotacionPalCursos2027
         return $horas === null ? null : max(0, (float) $horas);
     }
 
-    private function fila(Establecimiento $ee, string $label, ?int $matricula, int $cantidad, ?float $horas, ?float $contrato): array
-    {
+    private function fila(
+        Establecimiento $ee, string $label, ?int $matricula, int $cantidad, ?float $horas, ?float $contrato, float $pie
+    ): array {
         return ['A' => (string) $ee->nombre_establecimiento, 'B' => (string) $ee->rbd, 'C' => $label,
-            'D' => $matricula, 'E' => $cantidad, 'F' => $horas, 'H' => $contrato];
+            'D' => $matricula, 'E' => $cantidad, 'F' => $horas, 'H' => $contrato,
+            'trabajo_colaborativo_pie' => round($pie, 2)];
     }
 }

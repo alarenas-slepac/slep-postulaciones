@@ -280,8 +280,9 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
                 'Niveles y modalidades', 'Detalle oferta educativa', 'Dotación docente', 'Dotación docente glosa',
                 'Docentes por Subvención', 'Docentes por Subvención glosa', 'Cursos y estudiantes 2027'], $libro->getSheetNames());
             $proyeccion = $libro->getSheetByName('Cursos y estudiantes 2027');
-            $this->assertSame(['99998', 'Sin cursos activos con matrícula', 0, 0, null, null, null],
-                $proyeccion->rangeToArray('B6:H6', null, true, false)[0]);
+            $this->assertEquals(0, $proyeccion->getCell('H5')->getValue());
+            $this->assertSame(['99998', 'Sin cursos activos con matrícula', 0, 0, null, null, 0, null],
+                $proyeccion->rangeToArray('B6:I6', null, true, false)[0]);
             $niveles = $libro->getSheetByName('Niveles y modalidades');
             $this->assertSame(['99999', '=Escuela de prueba', 'No', 'Sí', 'Sí', 'Sí', 'No', 'No', 'Sí'], $niveles->rangeToArray('A5:I5')[0]);
             $this->assertSame(DataType::TYPE_STRING, $niveles->getCell('B5')->getDataType());
@@ -349,6 +350,13 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
                 'dotacion_curso_combinado_id' => $grupo, 'establecimiento_curso_id' => $secciones[$seccion]->id,
             ]);
         }
+        foreach (['1BA', '1BB', '2BA', '3BA'] as $seccion) {
+            $curso = $secciones[$seccion];
+            EstablecimientoCursoPie::create([
+                'establecimiento_id' => $this->ee->id, 'establecimiento_curso_id' => $curso->id,
+                'curso_id' => $curso->curso_id, 'anio' => 2027, 'necesidades_transitorias' => 1, 'total_pie' => 1,
+            ]);
+        }
 
         $libro = $this->abrirExcelFinanciamiento(2027, ['q' => '99999']);
         try {
@@ -361,7 +369,10 @@ class DotacionInformeFuncionesTest extends IsolatedSecurityTestCase
             $this->assertSame('1° Básico', $hoja->getCell('C5')->getValue());
             $this->assertSame('Curso combinado «Multigrado de prueba»: 2B A + 3B A', $hoja->getCell('C6')->getValue());
             $this->assertSame('=E6*F6', $hoja->getCell('G6')->getValue());
-            $this->assertEquals([[24, 2, 38, 76, 88], [25, 1, 38, 38, 44]], $hoja->rangeToArray('D5:H6', null, true, false));
+            $this->assertSame(["Hrs. total\nplan de estudio", "Trabajo\nColaborativo PIE", "Total horas\ndocentes"],
+                $hoja->rangeToArray('G4:I4')[0]);
+            $this->assertEquals([[24, 2, 38, 76, 6, 94], [25, 1, 38, 38, 3, 47]], $hoja->rangeToArray('D5:I6', null, true, false));
+            $this->assertEquals(9, $libro->getSheetByName('Oferta educativa')->getCell('K5')->getValue());
             $this->assertSame(6, $hoja->getHighestDataRow());
         } finally {
             $libro->disconnectWorksheets();

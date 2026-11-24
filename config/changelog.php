@@ -6594,8 +6594,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.701',
+    'current_version' => '2026.11.24.702',
     'entries' => [
+        [
+            'version' => '2026.11.24.702',
+            'title' => 'Trabajo Colaborativo PIE en cursos proyectados',
+            'summary' => 'La proyección 2027 muestra las horas de Trabajo Colaborativo PIE y las suma al total de horas docentes.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Los cursos independientes suman sus horas PIE por fila y los combinados muestran las horas consolidadas del grupo.',
+            ],
+            'published_at' => '2026-11-24',
+        ],
         [
             'version' => '2026.11.24.701',
             'title' => 'Cursos y estudiantes proyectados en el Excel de financiamiento',
