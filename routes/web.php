@@ -89,6 +89,7 @@ use App\Http\Controllers\Liquidaciones\LiquidacionCargaController;
 use App\Http\Controllers\Liquidaciones\MisLiquidacionesController;
 use App\Http\Controllers\Remuneraciones\DescuentoCgrController;
 use App\Http\Controllers\Remuneraciones\DescuentoCgrWorkflowController;
+use App\Http\Controllers\Remuneraciones\SnedController;
 use App\Http\Controllers\Remuneraciones\UtmValorController;
 use App\Http\Controllers\Remuneraciones\VerificarDescuentoCgrController;
 use App\Http\Controllers\Remuneraciones\VerificarDescuentoCgrMensualController;
@@ -1440,8 +1441,25 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
 
 
     // -------------------------
-    // Remuneraciones: Liquidaciones de sueldo
+    // Remuneraciones: SNED
     // -------------------------
+    Route::prefix('remuneraciones/sned')->name('sned.')
+        ->middleware('ensure.role:admin|funcionario_slep')
+        ->group(function () {
+            Route::get('/', [SnedController::class, 'index'])->name('index');
+            Route::post('/', [SnedController::class, 'store'])->name('store');
+            Route::get('/{cuota}', [SnedController::class, 'show'])->whereNumber('cuota')->name('show');
+            Route::post('/{cuota}/mae', [SnedController::class, 'cargar'])->whereNumber('cuota')->name('cargar');
+            Route::patch('/{cuota}/criterio', [SnedController::class, 'configurar'])->whereNumber('cuota')->name('configurar');
+            Route::post('/{cuota}/aportes', [SnedController::class, 'guardarAporte'])->whereNumber('cuota')->name('aportes.store');
+            Route::delete('/{cuota}/aportes/{aporte}', [SnedController::class, 'quitarAporte'])->whereNumber(['cuota', 'aporte'])->name('aportes.destroy');
+            Route::post('/{cuota}/aportes/{aporte}/incentivo', [SnedController::class, 'guardarIncentivo'])->whereNumber(['cuota', 'aporte'])->name('incentivo');
+            Route::post('/{cuota}/cerrar', [SnedController::class, 'cerrar'])->whereNumber('cuota')->name('cerrar');
+            Route::post('/{cuota}/version', [SnedController::class, 'nuevaVersion'])->whereNumber('cuota')->name('version');
+            Route::get('/{cuota}/exportar/{formato}', [SnedController::class, 'exportar'])->whereNumber('cuota')->whereIn('formato', ['csv', 'txt'])->name('exportar');
+        });
+
+    // Remuneraciones: Liquidaciones de sueldo
     Route::prefix('liquidaciones')->name('liquidaciones.')->middleware('ensure.role:admin|funcionario_slep')->group(function () {
         Route::get('/cargas', [LiquidacionCargaController::class, 'index'])->name('cargas.index');
         Route::get('/cargas/create', [LiquidacionCargaController::class, 'create'])->name('cargas.create');

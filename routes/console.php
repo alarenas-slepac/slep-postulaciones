@@ -1,10 +1,12 @@
 <?php
 
 use App\Jobs\GenerarExcelFinanciamiento;
+use App\Jobs\ProcesarMaeSned;
 use App\Models\DotacionFinanciamientoExportacion;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Schema;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -23,3 +25,12 @@ Schedule::command('queue:work '.GenerarExcelFinanciamiento::CONEXION, [
 
 Schedule::command('model:prune', ['--model' => [DotacionFinanciamientoExportacion::class]])
     ->dailyAt('03:30')->when(fn () => DotacionFinanciamientoExportacion::disponible());
+
+Schedule::command('queue:work '.ProcesarMaeSned::CONEXION, [
+    '--queue' => ProcesarMaeSned::COLA,
+    '--timeout' => ProcesarMaeSned::TIMEOUT,
+    '--tries' => 1,
+    '--max-jobs' => 1,
+    '--stop-when-empty',
+])->everyMinute()->withoutOverlapping(10)->runInBackground()
+    ->when(fn () => Schema::hasTable('sned_cargas'));

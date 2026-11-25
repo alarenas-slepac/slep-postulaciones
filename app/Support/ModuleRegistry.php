@@ -42,7 +42,7 @@ class ModuleRegistry
     public static function defaultMeta(string $key): array
     {
         $section = match (true) {
-            in_array($key, ['descuentos-cgr', 'endeudamiento'], true) => 'Remuneraciones',
+            in_array($key, ['descuentos-cgr', 'endeudamiento', 'sned'], true) => 'Remuneraciones',
             in_array($key, ['votaciones', 'centro-operaciones', 'reemplazos', 'reemplazos.personal', 'admin.permiso-sin-goce-excepciones', 'incumplimientos', 'declaracion', 'funcionario.solicitudes-reemplazo', 'gestion.solicitudes-reemplazo', 'gestion.estadisticas', 'gestion.informes'], true) => 'Operación',
             Str::startsWith($key, 'admin.establecimientos') ||
                 Str::startsWith($key, 'admin.alumnos-prioritarios') ||
@@ -77,6 +77,7 @@ class ModuleRegistry
             'incumplimientos' => 'Incumplimiento Laboral',
             'endeudamiento' => 'Endeudamiento',
             'descuentos-cgr' => 'Descuentos CGR',
+            'sned' => 'SNED',
             'declaracion' => 'Declaración de Sostenedores',
             'funcionario.solicitudes-reemplazo' => 'Solicitudes de Reemplazo',
             'gestion.solicitudes-reemplazo' => 'Gestión Solicitudes',
@@ -118,6 +119,7 @@ class ModuleRegistry
             'incumplimientos' => 25,
             'endeudamiento' => 27,
             'descuentos-cgr' => 30,
+            'sned' => 31,
             'declaracion' => 28,
             'funcionario.solicitudes-reemplazo' => 30,
             'gestion.solicitudes-reemplazo' => 40,

@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.25.710',
+    'current_version' => '2026.11.25.711',
     'entries' => [
+        [
+            'version' => '2026.11.25.711',
+            'title' => 'Cálculo de cuotas SNED en Remuneraciones',
+            'summary' => 'Carga los MAE mensuales, calcula el reparto por RBD y estamento y permite distribuir el incentivo docente del 10% según cada establecimiento.',
+            'roles' => ['admin', 'funcionario_slep'],
+            'items' => [
+                'Considera a quienes tienen al menos un día de contrato vigente en el mes de corte.',
+                'Exporta una fila por RUT en CSV o TXT por cuota, año y comuna.',
+            ],
+            'published_at' => '2026-11-25',
+        ],
         [
             'version' => '2026.11.25.710',
             'title' => 'Rendición e informe de cometidos en el establecimiento',
