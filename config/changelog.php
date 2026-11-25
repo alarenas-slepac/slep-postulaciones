@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.25.714',
+    'current_version' => '2026.11.25.715',
     'entries' => [
+        [
+            'version' => '2026.11.25.715',
+            'title' => 'Término anticipado durante la gestión SLEP',
+            'summary' => 'Permite adelantar el término de una solicitud derivada a SLEP con un motivo obligatorio antes de que se genere la Orden de Trabajo o el contrato.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep', 'funcionario_estab'],
+            'items' => [
+                'El establecimiento consulta el término original y el motivo en el historial de la solicitud.',
+                'El portal del reemplazante muestra la fecha de término vigente.',
+            ],
+            'published_at' => '2026-11-25',
+        ],
         [
             'version' => '2026.11.25.714',
             'title' => 'Nómina SNED del establecimiento por estamento',

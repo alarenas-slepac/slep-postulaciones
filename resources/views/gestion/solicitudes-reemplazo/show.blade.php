@@ -714,9 +714,15 @@
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <div class="text-muted small">Periodo</div>
+                    <div class="text-muted small">Período vigente</div>
                     <div class="fw-semibold">{{ optional($s->fecha_inicio)->format('d/m/Y') }} -
                         {{ optional($s->fecha_termino)->format('d/m/Y') }}</div>
+                    @if ($fechaTerminoOriginal ?? null)
+                        <div class="small text-muted mt-1">
+                            Término original {{ $fechaTerminoOriginal->format('d/m/Y') }}
+                            · <a href="#historial-termino">Ver historial de término</a>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="col-md-6">
@@ -822,6 +828,10 @@
                     </div>
                 @endif
             </div>
+
+            @if ($canAdelantarTermino ?? false)
+                @include('gestion.solicitudes-reemplazo.partials._termino-anticipado')
+            @endif
 
             @if (!empty($mostrarSolicitudesAnterioresRelacionadas))
                 <hr class="my-3">
@@ -1263,7 +1273,7 @@
     @endif
 
     @if (($modificacionesTermino ?? collect())->isNotEmpty())
-        <div class="card mb-4">
+        <div id="historial-termino" class="card mb-4">
             <div class="card-header fw-semibold">Historial de modificaciones de término</div>
             <div class="card-body p-0">
                 <div class="table-responsive">

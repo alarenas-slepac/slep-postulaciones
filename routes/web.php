@@ -1705,6 +1705,9 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::post('/solicitudes-reemplazo/{solicitud}/reabrir-modificar-termino', [SolicitudReemplazoGestionController::class, 'reabrirParaModificarTermino'])
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
             ->name('solicitudes-reemplazo.reabrir-modificar-termino');
+        Route::patch('/solicitudes-reemplazo/{solicitud}/termino-anticipado', [SolicitudReemplazoGestionController::class, 'adelantarTermino'])
+            ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
+            ->name('solicitudes-reemplazo.termino-anticipado');
         Route::get('/solicitudes-reemplazo/{solicitud}/modificaciones-termino/{modificacion}/documentos/{documento}', [SolicitudReemplazoGestionController::class, 'descargarDocumentoModificacionTermino'])
             ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani|funcionario_estab')
             ->name('solicitudes-reemplazo.modificacion-termino.documento');
