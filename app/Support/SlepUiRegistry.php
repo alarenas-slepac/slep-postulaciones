@@ -147,6 +147,7 @@ class SlepUiRegistry
                 self::entry('Excepciones permiso sin goce', 'admin.permiso-sin-goce-excepciones.index', 'bi-unlock', ['admin', 'coordinador_gdp'], 'admin.permiso-sin-goce-excepciones'),
             ],
             'Remuneraciones' => [
+                self::entry('SNED', 'sned.index', 'bi-award', ['admin', 'funcionario_slep'], 'sned'),
                 self::entry('Liquidaciones', 'liquidaciones.cargas.index', 'bi-receipt-cutoff', ['admin', 'funcionario_slep'], 'liquidaciones'),
                 self::entry('Endeudamiento', 'endeudamiento.cargas.index', 'bi-calculator', ['admin', 'funcionario_slep'], 'endeudamiento'),
                 self::entry('Descuentos CGR', 'descuentos-cgr.index', 'bi-bank', ['admin', 'funcionario_slep', 'funcionario_daf', 'auditoria_slep']),

@@ -46,6 +46,11 @@ return [
             'after_commit' => false,
         ],
 
+        'sga_sned' => [
+            'driver' => 'database', 'connection' => null, 'table' => 'jobs',
+            'queue' => 'sned', 'retry_after' => 540, 'after_commit' => true,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],
