@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.25.711',
+    'current_version' => '2026.11.25.712',
     'entries' => [
+        [
+            'version' => '2026.11.25.712',
+            'title' => 'Nóminas de pago SNED por separado',
+            'summary' => 'Descarga el 90% general y el 10% de incentivo docente en archivos independientes, y el aporte de asistentes en un solo TXT.',
+            'roles' => ['admin', 'funcionario_slep'],
+            'items' => [
+                'Cada archivo conserva un monto consolidado por RUT y comuna.',
+                'Los dos archivos docentes están disponibles en CSV y TXT.',
+            ],
+            'published_at' => '2026-11-25',
+        ],
         [
             'version' => '2026.11.25.711',
             'title' => 'Cálculo de cuotas SNED en Remuneraciones',

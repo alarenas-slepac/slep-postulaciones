@@ -26,6 +26,21 @@ class SnedCuota extends Model
         'jornada_dias' => 'Jornada y días del trimestre',
     ];
 
+    public const NOMINAS = [
+        'docentes-90' => [
+            'titulo' => 'Docentes · 90% general', 'estamento' => 'docentes', 'campo' => 'general',
+            'sufijo' => 'DOCENTES_90', 'formatos' => ['csv', 'txt'],
+        ],
+        'docentes-10' => [
+            'titulo' => 'Docentes · 10% incentivo', 'estamento' => 'docentes', 'campo' => 'incentivo',
+            'sufijo' => 'DOCENTES_10', 'formatos' => ['csv', 'txt'],
+        ],
+        'aaee' => [
+            'titulo' => 'Asistentes de la educación', 'estamento' => 'aaee', 'campo' => 'general',
+            'sufijo' => 'AAEE', 'formatos' => ['txt'],
+        ],
+    ];
+
     public function meses(): array
     {
         return range($this->numero * 3 - 2, $this->numero * 3);

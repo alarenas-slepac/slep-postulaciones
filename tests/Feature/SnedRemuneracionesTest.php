@@ -60,7 +60,7 @@ class SnedRemuneracionesTest extends IsolatedSecurityTestCase
         $this->assertSame('jornada_dias', $cuota->metodo);
         $this->get(route('sned.index'))->assertOk()->assertSee('Cuotas SNED');
         $this->get(route('sned.show', $cuota))->assertOk()->assertSee('MAE de Haberes por Contrato');
-        $this->get(route('sned.exportar', [$cuota, 'csv']))->assertConflict();
+        $this->get(route('sned.exportar', [$cuota, 'docentes-90', 'csv']))->assertConflict();
 
         $principal = $this->rut(1);
         $ultimoDia = $this->rut(2);
@@ -125,17 +125,26 @@ class SnedRemuneracionesTest extends IsolatedSecurityTestCase
         $this->assertSame(1000, $personas[$ultimoDia]['incentivo']);
         $this->assertFalse($personas->has($anterior));
 
-        $csv = $this->get(route('sned.exportar', [$cuota, 'csv']))->assertOk();
-        $this->assertStringContainsString('SNED_CUOTA_3_2026_SANTA_JUANA.csv', $csv->headers->get('Content-Disposition'));
-        $lineas = array_map(fn ($linea) => str_getcsv($linea, escape: ''), explode("\n", trim($csv->streamedContent())));
-        $this->assertSame(['RUT', 'MONTO'], array_shift($lineas));
-        $consolidado = array_column($lineas, 1, 0);
-        $this->assertCount(3, $consolidado);
-        $this->assertSame(10443, array_sum($consolidado));
-        $this->assertSame($personas[$principal]['general'] + 11, (int) $consolidado[$principal]);
-        $txt = $this->get(route('sned.exportar', [$cuota, 'txt']))->assertOk();
-        $this->assertStringContainsString('SNED_CUOTA_3_2026_SANTA_JUANA.txt', $txt->headers->get('Content-Disposition'));
-        $this->assertStringStartsWith("RUT\tMONTO\n", $txt->streamedContent());
+        $cerrada = $this->get(route('sned.show', $cuota))->assertOk()->assertSee('Nóminas para pago');
+        $exportaciones = [
+            ['docentes-90', 'DOCENTES_90', ['csv', 'txt'], [[$principal, '8953'], [$ultimoDia, '58']]],
+            ['docentes-10', 'DOCENTES_10', ['csv', 'txt'], [[$principal, '1'], [$ultimoDia, '1000']]],
+            ['aaee', 'AAEE', ['txt'], [[$aaee, '431']]],
+        ];
+        foreach ($exportaciones as [$nomina, $sufijo, $formatos, $filasEsperadas]) {
+            foreach ($formatos as $formato) {
+                $url = route('sned.exportar', [$cuota, $nomina, $formato]);
+                $cerrada->assertSee($url);
+                $archivo = $this->get($url)->assertOk()->assertDownload("SNED_CUOTA_3_2026_SANTA_JUANA_{$sufijo}.{$formato}");
+                $separador = $formato === 'csv' ? ',' : "\t";
+                $lineas = explode("\n", trim($archivo->streamedContent()));
+                $filas = array_map(fn ($linea) => str_getcsv($linea, $separador, escape: ''), $lineas);
+                $this->assertSame([['RUT', 'MONTO'], ...$filasEsperadas], $filas);
+            }
+        }
+        $csvAsistentes = route('sned.exportar', [$cuota, 'aaee', 'csv']);
+        $cerrada->assertDontSee($csvAsistentes);
+        $this->get($csvAsistentes)->assertNotFound();
 
         $this->post(route('sned.aportes.store', $cuota), ['rbd' => 90001, 'docentes' => 25, 'aaee' => 0])->assertConflict();
         $this->post(route('sned.version', $cuota))->assertRedirect();

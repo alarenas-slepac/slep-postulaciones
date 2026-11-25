@@ -1456,7 +1456,8 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::post('/{cuota}/aportes/{aporte}/incentivo', [SnedController::class, 'guardarIncentivo'])->whereNumber(['cuota', 'aporte'])->name('incentivo');
             Route::post('/{cuota}/cerrar', [SnedController::class, 'cerrar'])->whereNumber('cuota')->name('cerrar');
             Route::post('/{cuota}/version', [SnedController::class, 'nuevaVersion'])->whereNumber('cuota')->name('version');
-            Route::get('/{cuota}/exportar/{formato}', [SnedController::class, 'exportar'])->whereNumber('cuota')->whereIn('formato', ['csv', 'txt'])->name('exportar');
+            Route::get('/{cuota}/exportar/{nomina}/{formato}', [SnedController::class, 'exportar'])
+                ->whereNumber('cuota')->whereIn('formato', ['csv', 'txt'])->name('exportar');
         });
 
     // Remuneraciones: Liquidaciones de sueldo

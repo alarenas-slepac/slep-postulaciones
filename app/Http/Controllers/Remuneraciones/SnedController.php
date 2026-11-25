@@ -258,17 +258,24 @@ class SnedController extends Controller
         return to_route('sned.show', $nueva);
     }
 
-    public function exportar(SnedCuota $cuota, string $formato)
+    public function exportar(SnedCuota $cuota, string $nomina, string $formato)
     {
+        $tipo = SnedCuota::NOMINAS[$nomina] ?? null;
+        abort_unless($tipo && in_array($formato, $tipo['formatos'], true), 404);
         abort_unless($cuota->cerrado_at, 409, 'Cierre la cuota antes de descargar la nómina.');
         $montos = [];
         foreach ($cuota->resultados as $establecimiento) {
             foreach ($establecimiento['personas'] as $persona) {
-                $montos[$persona['rut']] = ($montos[$persona['rut']] ?? 0) + $persona['general'] + $persona['incentivo'];
+                if ($persona['estamento'] === $tipo['estamento']) {
+                    $montos[$persona['rut']] = ($montos[$persona['rut']] ?? 0) + $persona[$tipo['campo']];
+                }
             }
         }
         ksort($montos, SORT_NATURAL);
-        $nombre = sprintf('SNED_CUOTA_%d_%d_%s.%s', $cuota->numero, $cuota->anio, strtoupper(Str::slug($cuota->comuna, '_')), $formato);
+        $nombre = sprintf(
+            'SNED_CUOTA_%d_%d_%s_%s.%s', $cuota->numero, $cuota->anio,
+            strtoupper(Str::slug($cuota->comuna, '_')), $tipo['sufijo'], $formato
+        );
         $separador = $formato === 'csv' ? ',' : "\t";
 
         return response()->streamDownload(function () use ($montos, $separador) {
