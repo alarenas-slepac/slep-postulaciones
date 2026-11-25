@@ -23,10 +23,25 @@ class SolicitudReemplazoReduccionLicenciaTest extends IsolatedSecurityTestCase
     {
         parent::setUp();
         Schema::create('modules', function (Blueprint $table) { $table->id(); $table->string('key'); });
+        Schema::table('users', fn (Blueprint $table) => $table->unsignedBigInteger('establecimiento_id')->nullable());
+        Schema::create('establecimientos', function (Blueprint $table) {
+            $table->id(); $table->unsignedInteger('rbd'); $table->string('nombre_establecimiento');
+        });
+        Schema::create('postulant_profiles', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('user_id');
+        });
+        foreach (['solicitud_reemplazo_jornadas', 'solicitud_reemplazo_autorizaciones_docentes', 'solicitud_reemplazo_deudas_pension'] as $nombre) {
+            Schema::create($nombre, function (Blueprint $table) {
+                $table->id(); $table->unsignedBigInteger('solicitud_reemplazo_id');
+            });
+        }
         Schema::create('reemplazos_personal', function (Blueprint $table) { $table->id(); $table->string('estatuto'); });
         Schema::create('solicitudes_reemplazo', function (Blueprint $table) {
             $table->id(); $table->unsignedBigInteger('reemplazo_personal_id'); $table->string('numero_solicitud')->default('PRUEBA');
             $table->string('tipo_reemplazo'); $table->string('estado'); $table->date('fecha_inicio'); $table->date('fecha_termino');
+            $table->date('fecha_inicio_trabajo')->nullable(); $table->unsignedBigInteger('establecimiento_id')->nullable();
+            $table->unsignedBigInteger('postulant_profile_id')->nullable(); $table->string('contrato_trabajo_docx_path')->nullable();
+            $table->boolean('propone_reemplazo')->default(false);
             $table->unsignedBigInteger('derivada_a_user_id')->nullable(); $table->unsignedBigInteger('cerrado_por_user_id')->nullable(); $table->timestamp('cerrado_at')->nullable();
             $table->string('orden_trabajo_pdf_path')->nullable(); $table->timestamp('orden_trabajo_creada_at')->nullable();
             $table->string('resolucion_docente_docx_path')->nullable(); $table->string('resolucion_docente_firmada_pdf_path')->nullable(); $table->timestamps();
@@ -42,6 +57,7 @@ class SolicitudReemplazoReduccionLicenciaTest extends IsolatedSecurityTestCase
             ['id' => 10, 'name' => 'coordinador_gdp', 'guard_name' => 'web'],
             ['id' => 11, 'name' => 'funcionario_slep', 'guard_name' => 'web'],
             ['id' => 12, 'name' => 'coordinador_uatp', 'guard_name' => 'web'],
+            ['id' => 13, 'name' => 'funcionario_estab', 'guard_name' => 'web'],
         ]);
         $this->actor = $this->testUser(1, 3);
         $this->actingAs($this->actor)->withSession(['active_role' => 'admin']);
@@ -71,6 +87,86 @@ class SolicitudReemplazoReduccionLicenciaTest extends IsolatedSecurityTestCase
     private function reabrir(SolicitudReemplazo $solicitud, array $datos)
     {
         return $this->from('/solicitud-prueba')->post(route('gestion.solicitudes-reemplazo.reabrir-modificar-termino', $solicitud), $datos);
+    }
+
+    public function test_adelanto_conserva_el_periodo_original_y_el_motivo_es_interno(): void
+    {
+        $this->withoutVite();
+        $reemplazante = $this->testUser(2);
+        $perfil = DB::table('postulant_profiles')->insertGetId(['user_id' => $reemplazante->id]);
+        $escuela = DB::table('establecimientos')->insertGetId(['rbd' => 99999, 'nombre_establecimiento' => 'Escuela de prueba']);
+        $s = $this->solicitudDerivada(['establecimiento_id' => $escuela, 'postulant_profile_id' => $perfil]);
+        $url = route('gestion.solicitudes-reemplazo.termino-anticipado', $s);
+        $datos = ['fecha_termino_anticipado' => '2026-11-20', 'motivo_termino_anticipado' => 'Primer ajuste de prueba'];
+        $this->patch($url, $datos)->assertSessionHasNoErrors();
+        $datos = ['fecha_termino_anticipado' => '2026-11-15', 'motivo_termino_anticipado' => 'Segundo ajuste de prueba'];
+        $this->patch($url, $datos)->assertSessionHasNoErrors();
+
+        $s->refresh();
+        $this->assertSame('2026-11-15', $s->fecha_termino->toDateString());
+        $this->assertSame('derivada_slep', $s->estado);
+        $historial = $s->modificacionesTermino->sortBy('id')->values();
+        $this->assertCount(2, $historial);
+        $this->assertSame('2026-11-30', $historial[0]->fecha_termino_anterior->toDateString());
+        $this->assertSame('2026-11-20', $historial[1]->fecha_termino_anterior->toDateString());
+        $this->assertSame('2026-11-15', $historial[1]->fecha_termino_nueva->toDateString());
+        $this->assertSame('derivada_slep', $historial[1]->estado_origen);
+        $this->assertSame($this->actor->id, $historial[1]->reabierta_por_user_id);
+        $this->assertNotNull($historial[1]->finalizada_at);
+
+        $detalleGestion = route('gestion.solicitudes-reemplazo.show', $s);
+        $this->actingAs($reemplazante)->withSession(['active_role' => 'postulante']);
+        $this->get(route('postulant.reemplazos.show', $s))->assertOk()->assertSee('15-11-2026')
+            ->assertDontSee('30-11-2026')->assertDontSee($datos['motivo_termino_anticipado']);
+        $this->get($detalleGestion)->assertForbidden();
+
+        $funcionario = $this->testUser(3, 13);
+        $funcionario->forceFill(['establecimiento_id' => $escuela])->save();
+        $this->actingAs($funcionario)->withSession(['active_role' => 'funcionario_estab']);
+        $this->get($detalleGestion)->assertOk()->assertSee('Término original 30/11/2026')
+            ->assertSee($datos['motivo_termino_anticipado'])->assertDontSee('Adelantar fecha de término');
+        $this->patchJson($url, $datos)->assertForbidden();
+
+        $externo = $this->testUser(4, 13);
+        $externo->forceFill(['establecimiento_id' => $escuela + 1])->save();
+        $this->actingAs($externo)->withSession(['active_role' => 'funcionario_estab']);
+        $this->get($detalleGestion)->assertForbidden();
+    }
+
+    public function test_adelanto_valida_fechas_motivo_estado_documentos_y_asignacion(): void
+    {
+        $this->withoutVite();
+        $s = $this->solicitudDerivada(['fecha_inicio_trabajo' => '2026-11-03', 'propone_reemplazo' => true]);
+        $url = route('gestion.solicitudes-reemplazo.termino-anticipado', $s);
+        $datos = ['fecha_termino_anticipado' => '2026-11-03', 'motivo_termino_anticipado' => 'Ajuste de prueba'];
+        foreach (['2026-11-02', '2026-11-30', '2026-12-01'] as $fecha) {
+            $this->patchJson($url, array_replace($datos, ['fecha_termino_anticipado' => $fecha]))
+                ->assertUnprocessable()->assertJsonValidationErrors('fecha_termino_anticipado');
+        }
+        $this->patchJson($url, ['fecha_termino_anticipado' => '2026-11-15'])
+            ->assertUnprocessable()->assertJsonValidationErrors('motivo_termino_anticipado');
+        foreach ([['estado' => 'aceptada'], ['orden_trabajo_pdf_path' => 'prueba.pdf'], ['contrato_trabajo_docx_path' => 'prueba.docx']] as $bloqueo) {
+            $this->patchJson(route('gestion.solicitudes-reemplazo.termino-anticipado', $this->solicitudDerivada($bloqueo)), $datos)->assertForbidden();
+        }
+
+        $slep = $this->testUser(2, 11);
+        $this->actingAs($slep)->withSession(['active_role' => 'funcionario_slep']);
+        $this->patchJson($url, $datos)->assertForbidden();
+        $this->assertDatabaseCount('solicitudes_reemplazo_modificaciones_termino', 0);
+        $s->forceFill(['derivada_a_user_id' => $slep->id])->save();
+        $this->get(route('gestion.solicitudes-reemplazo.show', $s))->assertOk()
+            ->assertSee('Adelantar fecha de término')->assertSee($url)
+            ->assertSee('min="2026-11-03"', false)->assertSee('max="2026-11-29"', false);
+        $this->patch($url, $datos)->assertSessionHasNoErrors();
+        $this->assertSame('2026-11-03', $s->fresh()->fecha_termino->toDateString());
+    }
+
+    private function solicitudDerivada(array $extra = []): SolicitudReemplazo
+    {
+        return $this->solicitud($extra + [
+            'estado' => 'derivada_slep', 'cerrado_at' => null, 'cerrado_por_user_id' => null,
+            'orden_trabajo_pdf_path' => null, 'orden_trabajo_creada_at' => null, 'resolucion_docente_docx_path' => null,
+        ]);
     }
 
     public function test_nueva_causal_exige_solo_respaldo_y_conserva_documentos_y_auditoria(): void

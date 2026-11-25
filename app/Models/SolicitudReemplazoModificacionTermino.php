@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class SolicitudReemplazoModificacionTermino extends Model
 {
     public const REDUCCION_LICENCIA_REPOSO = 'reduccion_licencia_reposo';
+    public const ADELANTO_DERIVADA_SLEP = 'adelanto_derivada_slep';
     public const CAUSALES = [
         'reduccion_reposo_mutualidad' => 'Disminución de reposo médico por mutualidad',
         'renuncia_voluntaria' => 'Renuncia voluntaria del trabajador',
@@ -55,7 +56,10 @@ class SolicitudReemplazoModificacionTermino extends Model
 
     public function getCausalLabelAttribute(): string
     {
-        return self::CAUSALES[$this->causal] ?? (string) $this->causal;
+        return match ($this->causal) {
+            self::ADELANTO_DERIVADA_SLEP => 'Término anticipado en gestión SLEP',
+            default => self::CAUSALES[$this->causal] ?? (string) $this->causal,
+        };
     }
 
     public function reabiertaPor()

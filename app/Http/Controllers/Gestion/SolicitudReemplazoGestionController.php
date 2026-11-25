@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
 use App\Support\NotificationAudit;
 use App\Support\ReemplazoDisponibilidadPostulante;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -444,6 +445,16 @@ class SolicitudReemplazoGestionController extends Controller
     public function show(SolicitudReemplazo $solicitud)
     {
         $user = request()->user();
+        $activeRole = $user->activeRoleName();
+        $esRolEstablecimiento = in_array($activeRole, ['funcionario_estab', 'funcionario_directivo_estab'], true);
+        if ($esRolEstablecimiento) {
+            abort_unless($user->establecimiento_id && (int) $user->establecimiento_id === (int) $solicitud->establecimiento_id, 403);
+        }
+        $canVerAdelantoTermino = $esRolEstablecimiento || match ($activeRole) {
+            'admin', 'coordinador_gdp', 'coordinador_gdp_admin', 'coordinador_uatp', 'supervisor_plani' => true,
+            'funcionario_slep' => (int) $solicitud->derivada_a_user_id === (int) $user->id,
+            default => false,
+        };
 
         $canUatp = method_exists($user, 'hasAnyRole')
             ? $user->hasAnyRole(['admin', 'coordinador_uatp'])
@@ -475,8 +486,11 @@ class SolicitudReemplazoGestionController extends Controller
             'deudaPension.postulante.user',
             'derivadaA.roles',
         ];
-        if (Schema::hasTable('solicitudes_reemplazo_modificaciones_termino')) {
-            $relacionesSolicitud[] = 'modificacionesTermino.reabiertaPor';
+        $historialTerminoDisponible = Schema::hasTable('solicitudes_reemplazo_modificaciones_termino');
+        if ($historialTerminoDisponible) {
+            $relacionesSolicitud['modificacionesTermino'] = fn ($query) => $query->with('reabiertaPor')->orderByDesc('id')
+                ->when(! $canVerAdelantoTermino, fn ($historial) => $historial
+                    ->where('causal', '!=', SolicitudReemplazoModificacionTermino::ADELANTO_DERIVADA_SLEP));
         }
         $solicitud->load($relacionesSolicitud);
 
@@ -490,9 +504,10 @@ class SolicitudReemplazoGestionController extends Controller
 
         $deudaPension = $solicitud->deudaPension;
         $deudaPensionBloqueaFlujo = $this->deudaPensionBloqueaFlujo($solicitud);
-        $modificacionesTermino = Schema::hasTable('solicitudes_reemplazo_modificaciones_termino')
+        $modificacionesTermino = $historialTerminoDisponible
             ? $solicitud->modificacionesTermino
             : collect();
+        $fechaTerminoOriginal = $modificacionesTermino->sortBy('id')->first()?->fecha_termino_anterior;
         $modificacionTerminoActiva = $modificacionesTermino->first(
             fn (SolicitudReemplazoModificacionTermino $modificacion) => $modificacion->finalizada_at === null
         );
@@ -500,6 +515,9 @@ class SolicitudReemplazoGestionController extends Controller
         $canReabrirTermino = $canGestionarModificacionTermino
             && $modificacionTerminoActiva === null
             && in_array((string) $solicitud->estado, ['aceptada', 'cerrado', 'cerrada'], true);
+        $canAdelantarTermino = $historialTerminoDisponible && $modificacionTerminoActiva === null
+            && $this->puedeAdelantarTermino($user, $solicitud)
+            && max($solicitud->fecha_inicio, $solicitud->fecha_inicio_trabajo) < $solicitud->fecha_termino;
         $canRegenerarOt = $canGestionarModificacionTermino
             && $modificacionTerminoActiva?->orden_trabajo_requiere_regeneracion
             && $modificacionTerminoActiva->orden_trabajo_regenerada_at === null;
@@ -580,7 +598,6 @@ class SolicitudReemplazoGestionController extends Controller
             );
 
         $titularEsDocente = $this->estamentoFromEstatuto($solicitud->funcionarioTitular?->estatuto) === 'docente';
-        $activeRole = method_exists($user, 'activeRoleName') ? (string) $user->activeRoleName() : '';
         $tieneFuncionarioSlepAsignado = $solicitud->derivada_a_user_id
             && $solicitud->derivadaA
             && method_exists($solicitud->derivadaA, 'hasRole')
@@ -755,6 +772,8 @@ class SolicitudReemplazoGestionController extends Controller
             'canGestionarContratoFirmado' => $canGestionarContratoFirmado,
             'canCerrarSolicitudDocente' => $canCerrarSolicitudDocente,
             'canReabrirTermino' => $canReabrirTermino,
+            'canAdelantarTermino' => $canAdelantarTermino,
+            'fechaTerminoOriginal' => $fechaTerminoOriginal,
             'canRegenerarOt' => $canRegenerarOt,
             'canRegenerarResolucionDocente' => $canRegenerarResolucionDocente,
             'modificacionTerminoActiva' => $modificacionTerminoActiva,
@@ -904,6 +923,48 @@ class SolicitudReemplazoGestionController extends Controller
         return redirect()
             ->route('gestion.solicitudes-reemplazo.show', $solicitud)
             ->with('status', 'Solicitud docente cerrada correctamente.');
+    }
+
+    public function adelantarTermino(Request $request, SolicitudReemplazo $solicitud)
+    {
+        $user = $request->user();
+        abort_unless($this->puedeAdelantarTermino($user, $solicitud), 403);
+        abort_unless(Schema::hasTable('solicitudes_reemplazo_modificaciones_termino'), 503);
+
+        $datos = $request->validate([
+            'fecha_termino_anticipado' => ['required', 'date_format:Y-m-d'],
+            'motivo_termino_anticipado' => ['required', 'string', 'max:5000'],
+        ], [], [
+            'fecha_termino_anticipado' => 'nueva fecha de término',
+            'motivo_termino_anticipado' => 'motivo del término anticipado',
+        ]);
+
+        DB::transaction(function () use ($user, $solicitud, $datos) {
+            $s = SolicitudReemplazo::query()->lockForUpdate()->findOrFail($solicitud->id);
+            abort_unless($this->puedeAdelantarTermino($user, $s) && $this->modificacionTerminoActiva($s) === null, 403);
+
+            $fechaNueva = $datos['fecha_termino_anticipado'];
+            $inicioVigente = max($s->fecha_inicio->toDateString(), $s->fecha_inicio_trabajo?->toDateString() ?? '');
+            if ($fechaNueva < $inicioVigente || $fechaNueva >= $s->fecha_termino->toDateString()) {
+                throw ValidationException::withMessages([
+                    'fecha_termino_anticipado' => 'La nueva fecha debe ser igual o posterior al inicio del reemplazo y anterior al término vigente.',
+                ]);
+            }
+
+            $s->modificacionesTermino()->create([
+                'causal' => SolicitudReemplazoModificacionTermino::ADELANTO_DERIVADA_SLEP,
+                'estado_origen' => $s->estado,
+                'fecha_termino_anterior' => $s->fecha_termino,
+                'fecha_termino_nueva' => $fechaNueva,
+                'motivo' => trim($datos['motivo_termino_anticipado']),
+                'reabierta_por_user_id' => $user->id,
+                'finalizada_at' => now(),
+            ]);
+            $s->fecha_termino = $fechaNueva;
+            $s->save();
+        });
+
+        return back()->with('status', 'Fecha de término actualizada. El motivo quedó registrado en el historial de la solicitud.');
     }
 
     public function reabrirParaModificarTermino(Request $request, SolicitudReemplazo $solicitud)
@@ -1132,6 +1193,19 @@ class SolicitudReemplazoGestionController extends Controller
         }
 
         return (int) $solicitud->derivada_a_user_id === (int) $user->id;
+    }
+
+    private function puedeAdelantarTermino(User $user, SolicitudReemplazo $solicitud): bool
+    {
+        $autorizado = match ($user->activeRoleName()) {
+            'admin', 'coordinador_gdp' => true,
+            'funcionario_slep' => (int) $solicitud->derivada_a_user_id === (int) $user->id,
+            default => false,
+        };
+
+        return $autorizado && $solicitud->estado === 'derivada_slep'
+            && $solicitud->fecha_inicio !== null && $solicitud->fecha_termino !== null
+            && ! $this->hasOrdenOrContrato($solicitud);
     }
 
     private function modificacionTerminoActiva(SolicitudReemplazo $solicitud): ?SolicitudReemplazoModificacionTermino
