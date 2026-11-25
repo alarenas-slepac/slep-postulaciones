@@ -118,18 +118,7 @@ class SnedCalculator
 
             return [];
         }
-        if ($instruccion['modo'] === 'iguales') {
-            return $this->repartir($fondo, array_fill_keys($instruccion['ruts'], 1));
-        }
-
-        $montos = array_intersect_key($instruccion['montos'], array_flip($instruccion['ruts']));
-        if (count($montos) !== count($instruccion['ruts']) || array_sum($montos) !== $fondo) {
-            $errores[] = 'Los montos individuales deben sumar el 10% del aporte bruto docente.';
-
-            return [];
-        }
-
-        return $montos;
+        return $this->repartir($fondo, array_fill_keys($instruccion['ruts'], 1));
     }
 
     private function repartir(int $monto, array $pesos): array
