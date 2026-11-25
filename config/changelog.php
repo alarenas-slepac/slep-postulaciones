@@ -6594,8 +6594,15 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.24.709',
+    'current_version' => '2026.11.25.710',
     'entries' => [
+        [
+            'version' => '2026.11.25.710',
+            'title' => 'Rendición e informe de cometidos en el establecimiento',
+            'summary' => 'Permite enviar la rendición y el informe en cualquier orden. La revisión y firma del informe corresponde a un directivo del mismo establecimiento.',
+            'roles' => ['funcionario_estab', 'funcionario_directivo_estab'],
+            'published_at' => '2026-11-25',
+        ],
         [
             'version' => '2026.11.24.709',
             'title' => 'Menú lateral por secciones',

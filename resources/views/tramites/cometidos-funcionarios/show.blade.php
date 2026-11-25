@@ -1769,7 +1769,11 @@
                                 @endif
 
                                 @php
-                                    $estadoReembolsoPermiteRendir = in_array($estadoReembolsoTimeline, ['pendiente_rendicion', 'pendiente_rendicion_informe', 'en_rendicion_reembolso', 'rendicion_enviada_pendiente_informe', 'rendicion_observada_daf'], true);
+                                    $rexCgrReembolsoPendiente = $cometido->tieneRexCgrReembolsoPendiente();
+                                    $estadoReembolsoCometido = $cometido->estado_reembolso ?: $cometido->estado;
+                                    $estadoReembolsoPermiteRendir = in_array($estadoReembolsoTimeline, ['pendiente_rendicion', 'pendiente_rendicion_informe', 'en_rendicion_reembolso', 'rendicion_enviada_pendiente_informe', 'rendicion_observada_daf'], true)
+                                        || (! $cometido->esAdministracionCentral() && ($rexCgrReembolsoPendiente || in_array($estadoReembolsoCometido, ['rendicion_enviada_pendiente_informe', 'informe_observado'], true)));
+                                    $rendicionEnviadaSinRectificacion = $ultimaRendicionParaEstado && $estadoReembolsoTimeline !== 'rendicion_observada_daf';
                                 @endphp
                                 @if ((bool) $cometido->solicita_reembolso && (($activeRoleVista === 'funcionario_estab' && ! $cometido->esAdministracionCentral()) || ($activeRoleVista === 'funcionario_ac' && $cometido->esAdministracionCentral() && (int) $cometido->user_id === (int) auth()->id()) || $activeRoleVista === 'admin') && $estadoReembolsoPermiteRendir)
                                     <div class="card shadow-sm mb-4 stage-panel-card">
@@ -1778,7 +1782,7 @@
                                                 <span class="stage-panel-icon is-reembolso"><i class="bi bi-receipt"></i></span>
                                                 <div>
                                                     <div class="stage-panel-kicker">Rendición de reembolso</div>
-                                                    <h2 class="h5 mb-0">Rendir documentos fiscales</h2>
+                                                    <h2 class="h5 mb-0">{{ $rendicionEnviadaSinRectificacion ? 'Rendición enviada' : 'Rendir documentos fiscales' }}</h2>
                                                     <div class="small text-muted mt-1">Acceso habilitado para {{ $cometido->esAdministracionCentral() ? 'el funcionario AC solicitante' : 'el establecimiento' }} en el flujo de reembolso.</div>
                                                 </div>
                                             </div>
@@ -1790,8 +1794,12 @@
                                             <div class="stage-info-banner is-daf">
                                                 <i class="bi bi-info-circle"></i>
                                                 <div>
-                                                    <div class="fw-semibold mb-1">Carga de respaldos de reembolso</div>
-                                                    <div>{{ $cometido->esAdministracionCentral() ? 'El funcionario AC debe cargar' : 'El establecimiento debe cargar' }} uno o más documentos fiscales emitidos correctamente, indicando fecha, monto y detalle del gasto.</div>
+                                                    @if ($rendicionEnviadaSinRectificacion)
+                                                        <div>Puede consultar los comprobantes enviados y el estado del informe en el panel de reembolso.</div>
+                                                    @else
+                                                        <div class="fw-semibold mb-1">Carga de respaldos de reembolso</div>
+                                                        <div>{{ $cometido->esAdministracionCentral() ? 'El funcionario AC debe cargar' : 'El establecimiento debe cargar' }} uno o más documentos fiscales emitidos correctamente, indicando fecha, monto y detalle del gasto.</div>
+                                                    @endif
                                                 </div>
                                             </div>
                                             <a href="{{ route('tramites.cometidos-funcionarios.rendicion.panel', $cometido) }}" class="btn cometido-btn is-primary is-full">
@@ -1802,8 +1810,7 @@
                                 @endif
 
                                 @php
-                                    $requiereRexCgrReembolsoAcAccion = $cometido->esAdministracionCentral() && (bool) $cometido->solicita_reembolso && ! (bool) $cometido->solicita_viatico;
-                                    $esRexCgrGdpAccion = ($cometido->estado === 'en_gdp_rex_cgr' || $estadoReembolsoTimeline === 'en_gdp_rex_cgr') && $requiereRexCgrReembolsoAcAccion;
+                                    $esRexCgrGdpAccion = $rexCgrReembolsoPendiente && (! $cometido->esAdministracionCentral() || ! $cometido->solicita_viatico);
                                 @endphp
                                 @if ($puedeVerBandejaGdpVista && (in_array($cometido->estado, ['en_gdp_resolucion', 'autorizado_sin_gasto'], true) || $esRexCgrGdpAccion || ($esCometidoSinGastoVista && $cometido->estado === 'resolucion_cometido_emitida') || $estadoViaticoTimeline === 'en_gdp_resolucion'))
                                     <div class="card shadow-sm mb-4 stage-panel-card">
@@ -1934,8 +1941,7 @@
                                         && (in_array($activeRoleVista, ['admin'], true) || ((int) $cometido->user_id === (int) auth()->id() && in_array($activeRoleVista, ['funcionario_ac', 'funcionario_estab'], true)));
                                     $puedeRevisarInformeJefatura = $informeActual
                                         && in_array((string) $informeActual->estado_informe, ['enviado_pendiente_jefatura', 'pendiente_jefatura'], true)
-                                        && in_array($activeRoleVista, ['admin', 'funcionario_ac', 'funcionario_estab'], true)
-                                        && ($activeRoleVista === 'admin' || (int) $cometido->user_id !== (int) auth()->id());
+                                        && $cometido->puedeRevisarInformePor(auth()->user(), $informeActual);
                                     $informeAprobadoJefatura = $informeActual && in_array((string) $informeActual->estado_informe, ['aprobado_jefatura', 'informe_aprobado', 'aprobado'], true);
                                 @endphp
 
@@ -2007,7 +2013,7 @@
                                             @endif
                                             @if ($puedeRevisarInformeJefatura)
                                                 <div class="stage-action-card is-approve mb-3">
-                                                    <div class="stage-action-title"><i class="bi bi-person-check"></i> Revisión de jefatura</div>
+                                                    <div class="stage-action-title"><i class="bi bi-person-check"></i> {{ $cometido->esAdministracionCentral() ? 'Revisión de jefatura' : 'Revisión del establecimiento' }}</div>
                                                     <div class="stage-action-help">Revise el informe del funcionario. Al aprobar, el PDF se actualizará con firma electrónica de jefatura.</div>
                                                     <form method="POST" action="{{ route('tramites.cometidos-funcionarios.informe.jefatura.aprobar', $cometido) }}" class="mb-3">
                                                         @csrf
@@ -2032,7 +2038,7 @@
                                                     </form>
                                                 </div>
                                             @elseif ($estadoViaticoTimeline === 'informe_pendiente_jefatura' || ($informeActual && in_array((string) $informeActual->estado_informe, ['enviado_pendiente_jefatura', 'pendiente_jefatura'], true)))
-                                                <div class="stage-next-box">El informe fue enviado y queda pendiente de revisión y firma electrónica de jefatura.</div>
+                                                <div class="stage-next-box">El informe queda pendiente de revisión y firma electrónica {{ $cometido->esAdministracionCentral() ? 'de jefatura' : 'de un directivo del establecimiento' }}.</div>
                                             @endif
                                         </div>
                                     </div>

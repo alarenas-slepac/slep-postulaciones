@@ -96,7 +96,7 @@ class EnsureModuleAccess
             str_starts_with($routeName, 'tramites.cometidos-funcionarios.')
             && method_exists($user, 'hasAnyRole')
         ) {
-            if ($user->hasAnyRole(['funcionario_estab', 'coordinador_uatp', 'admin', 'funcionario_slep', 'coordinador_gdp', 'supervisor_plani', 'coordinador_plani', 'funcionario_daf', 'funcionario_juridica'])) {
+            if ($user->hasAnyRole(['funcionario_estab', 'funcionario_directivo_estab', 'coordinador_uatp', 'admin', 'funcionario_slep', 'coordinador_gdp', 'supervisor_plani', 'coordinador_plani', 'funcionario_daf', 'funcionario_juridica'])) {
                 return $next($request);
             }
         }

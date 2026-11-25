@@ -95,10 +95,11 @@ class CometidoFuncionarioInformeController extends Controller
                 ? ($rendicionEnviada ? 'rendicion_enviada_pendiente_informe' : 'pendiente_rendicion_informe')
                 : ($cometido->solicita_viatico && $cometido->solicita_reembolso ? 'en_gestion_paralela' : 'informe_pendiente_jefatura');
 
+            $rexCgrPendiente = $cometido->tieneRexCgrReembolsoPendiente();
             $cometido->update([
-                'estado' => $estadoCometido,
+                'estado' => $rexCgrPendiente && $esInformeReembolso ? 'en_gdp_rex_cgr' : $estadoCometido,
                 'estado_viatico' => $esInformeReembolso ? $cometido->estado_viatico : 'informe_pendiente_jefatura',
-                'estado_reembolso' => $esInformeReembolso ? $estadoCometido : $cometido->estado_reembolso,
+                'estado_reembolso' => $rexCgrPendiente ? 'en_gdp_rex_cgr' : ($esInformeReembolso ? $estadoCometido : $cometido->estado_reembolso),
             ]);
 
             $documento = $this->pdfService->generarInformeCometido($cometido->fresh(['funcionarioAcAutorizado', 'establecimiento', 'solicitante']), $informe, $request->user(), $request);
@@ -157,8 +158,7 @@ class CometidoFuncionarioInformeController extends Controller
 
     public function aprobarJefatura(Request $request, CometidoFuncionario $cometido)
     {
-        $this->autorizarJefatura($request, $cometido);
-        $informe = $this->informePendienteJefatura($cometido);
+        $informe = $this->informePendienteJefatura($request, $cometido);
         $estadoAnterior = $cometido->estado;
 
         DB::transaction(function () use ($request, $cometido, $informe, $estadoAnterior) {
@@ -211,11 +211,10 @@ class CometidoFuncionarioInformeController extends Controller
 
     public function observarJefatura(Request $request, CometidoFuncionario $cometido)
     {
-        $this->autorizarJefatura($request, $cometido);
+        $informe = $this->informePendienteJefatura($request, $cometido);
         $data = $request->validate([
             'observacion_jefatura' => ['required', 'string', 'max:5000'],
         ]);
-        $informe = $this->informePendienteJefatura($cometido);
         $estadoAnterior = $cometido->estado;
 
         DB::transaction(function () use ($request, $cometido, $informe, $data, $estadoAnterior) {
@@ -227,9 +226,10 @@ class CometidoFuncionarioInformeController extends Controller
                 'observacion_jefatura' => $data['observacion_jefatura'],
             ]);
 
-            $estadoReembolso = $cometido->solicita_reembolso ? 'informe_observado' : $cometido->estado_reembolso;
+            $rexCgrPendiente = $cometido->tieneRexCgrReembolsoPendiente();
+            $estadoReembolso = $rexCgrPendiente ? 'en_gdp_rex_cgr' : ($cometido->solicita_reembolso ? 'informe_observado' : $cometido->estado_reembolso);
             $cometido->update([
-                'estado' => 'informe_observado',
+                'estado' => $rexCgrPendiente && ! $cometido->solicita_viatico ? 'en_gdp_rex_cgr' : 'informe_observado',
                 'estado_viatico' => $cometido->solicita_viatico ? 'informe_observado' : $cometido->estado_viatico,
                 'estado_reembolso' => $estadoReembolso,
             ]);
@@ -253,11 +253,10 @@ class CometidoFuncionarioInformeController extends Controller
 
     public function rechazarJefatura(Request $request, CometidoFuncionario $cometido)
     {
-        $this->autorizarJefatura($request, $cometido);
+        $informe = $this->informePendienteJefatura($request, $cometido);
         $data = $request->validate([
             'observacion_jefatura' => ['required', 'string', 'max:5000'],
         ]);
-        $informe = $this->informePendienteJefatura($cometido);
         $estadoAnterior = $cometido->estado;
 
         DB::transaction(function () use ($request, $cometido, $informe, $data, $estadoAnterior) {
@@ -326,19 +325,6 @@ class CometidoFuncionarioInformeController extends Controller
         abort_unless((int) $cometido->user_id === (int) $user->id, 403);
     }
 
-    private function autorizarJefatura(Request $request, CometidoFuncionario $cometido): void
-    {
-        $user = $request->user();
-        $activeRole = method_exists($user, 'activeRoleName') ? $user->activeRoleName() : null;
-
-        if ($activeRole === 'admin') {
-            return;
-        }
-
-        abort_unless(in_array($activeRole, ['funcionario_ac', 'funcionario_estab'], true), 403);
-        abort_unless((int) $cometido->user_id !== (int) $user->id, 403);
-    }
-
     private function validarEtapaDisponible(CometidoFuncionario $cometido): void
     {
         $etapasInformeViatico = in_array($cometido->estado_viatico, ['informe_pendiente_funcionario', 'informe_observado'], true)
@@ -354,16 +340,22 @@ class CometidoFuncionarioInformeController extends Controller
                 'informe_observado',
             ], true);
 
+        if ($cometido->tieneRexCgrReembolsoPendiente()) {
+            $informe = $cometido->informeCometidoActual;
+            abort_unless(! $informe || in_array($informe->estado_informe, ['observado_jefatura', 'informe_observado'], true), 403);
+
+            $etapasInformeReembolso = CometidoFuncionarioRendicion::query()
+                ->where('cometido_funcionario_id', $cometido->id)
+                ->exists();
+        }
+
         abort_unless($etapasInformeViatico || $etapasInformeReembolso, 403);
     }
 
-    private function informePendienteJefatura(CometidoFuncionario $cometido): CometidoFuncionarioInforme
+    private function informePendienteJefatura(Request $request, CometidoFuncionario $cometido): CometidoFuncionarioInforme
     {
-        $informe = CometidoFuncionarioInforme::query()
-            ->where('cometido_funcionario_id', $cometido->id)
-            ->latest('id')
-            ->first();
-
+        $informe = $cometido->informeCometidoActual;
+        abort_unless($cometido->puedeRevisarInformePor($request->user(), $informe), 403);
         abort_unless($informe && in_array((string) $informe->estado_informe, ['enviado_pendiente_jefatura', 'pendiente_jefatura'], true), 404);
 
         return $informe;
@@ -379,15 +371,14 @@ class CometidoFuncionarioInformeController extends Controller
         }
 
         if ($cometido->solicita_reembolso) {
-            $estadoReembolso = $rendicionEnviada ? 'en_revision_daf_rendicion' : 'pendiente_rendicion_informe';
-        }
+            $estadoReembolso = match (true) {
+                $cometido->tieneRexCgrReembolsoPendiente() => 'en_gdp_rex_cgr',
+                $rendicionEnviada => 'en_revision_daf_rendicion',
+                default => 'pendiente_rendicion_informe',
+            };
+            $estado = $cometido->solicita_viatico && ! $rendicionEnviada ? 'en_gestion_paralela' : $estadoReembolso;
 
-        if ($cometido->solicita_viatico && $cometido->solicita_reembolso) {
-            return [$rendicionEnviada ? 'en_revision_daf_rendicion' : 'en_gestion_paralela', $estadoViatico, $estadoReembolso];
-        }
-
-        if ($cometido->solicita_reembolso) {
-            return [$rendicionEnviada ? 'en_revision_daf_rendicion' : 'pendiente_rendicion_informe', $estadoViatico, $estadoReembolso];
+            return [$estado, $estadoViatico, $estadoReembolso];
         }
 
         return ['en_daf_viatico', $estadoViatico, $estadoReembolso];
@@ -396,35 +387,48 @@ class CometidoFuncionarioInformeController extends Controller
 
     private function notificarJefaturaInforme(CometidoFuncionario $cometido): void
     {
-        $destinatarios = collect();
-        foreach (['jefatura_autorizadora_user_id', 'uatp_revisado_por'] as $campo) {
-            if (! empty($cometido->{$campo})) {
-                $usuario = User::find($cometido->{$campo});
-                if ($usuario && $usuario->email) {
-                    $destinatarios->push($usuario);
-                }
+        $esEstablecimiento = ! $cometido->esAdministracionCentral();
+        if ($esEstablecimiento) {
+            if (! $cometido->establecimiento_id) {
+                return;
+            }
+
+            $destinatarios = User::query()->whereHas('roles', fn ($rol) => $rol->where('name', 'funcionario_directivo_estab')->where('guard_name', 'web'))
+                ->where('establecimiento_id', $cometido->establecimiento_id)
+                ->whereNotIn('id', array_filter([$cometido->user_id, $cometido->informeCometidoActual?->user_id_envia]))
+                ->whereNotNull('email')
+                ->get();
+        } else {
+            $destinatarios = User::query()
+                ->whereKey(array_filter([$cometido->jefatura_autorizadora_user_id, $cometido->uatp_revisado_por]))
+                ->whereNotNull('email')
+                ->get();
+
+            if ($destinatarios->isEmpty()) {
+                $this->notificarRol(['coordinador_gdp'], 'Informe de Cometido pendiente de revisión de jefatura', 'El funcionario envió el Informe de Cometido. Corresponde que la jefatura lo revise, apruebe, observe o rechace en la plataforma.', $cometido, 'Revisar informe', 'Informe pendiente', 'informe_cometido');
+                return;
             }
         }
 
-        if ($destinatarios->isEmpty()) {
-            $roles = $cometido->esAdministracionCentral() ? ['coordinador_gdp'] : ['coordinador_uatp'];
-            $this->notificarRol($roles, 'Informe de Cometido pendiente de revisión de jefatura', 'El funcionario envió el Informe de Cometido. Corresponde que la jefatura lo revise, apruebe, observe o rechace en la plataforma.', $cometido, 'Revisar informe', 'Informe pendiente', 'informe_cometido');
-            return;
-        }
-
-        foreach ($destinatarios->unique('email') as $usuario) {
+        foreach ($destinatarios->filter(fn (User $usuario) => filled($usuario->email))->unique(fn (User $usuario) => strtolower(trim($usuario->email))) as $usuario) {
             try {
-                Mail::to($usuario->email)->send(new CometidoFuncionarioNotificationMail(
+                $aviso = new CometidoFuncionarioNotificationMail(
                     $usuario->nombre_completo ?? $usuario->name ?? $usuario->email,
                     'Informe de Cometido pendiente de revisión de jefatura',
-                    'El funcionario envió el Informe de Cometido. Corresponde revisar, aprobar, observar o rechazar el informe en la plataforma.',
-                    $cometido,
+                    $esEstablecimiento
+                        ? 'Hay un Informe de Cometido pendiente de revisión en su establecimiento. Ingrese al SGA con el rol Funcionario Directivo Establecimiento para revisarlo.'
+                        : 'El funcionario envió el Informe de Cometido. Corresponde revisar, aprobar, observar o rechazar el informe en la plataforma.',
+                    $esEstablecimiento ? null : $cometido,
                     'Revisar informe',
                     route('tramites.cometidos-funcionarios.show', $cometido),
                     'Informe pendiente',
                     'Esta notificación forma parte de la trazabilidad del trámite de cometido funcionario.',
-                    'informe_cometido'
-                ));
+                    $esEstablecimiento ? null : 'informe_cometido'
+                );
+                if ($esEstablecimiento) {
+                    $aviso->with('sga_event_key', 'cometidos.informe_revision_directivo_estab');
+                }
+                Mail::to($usuario->email)->send($aviso);
             } catch (\Throwable $e) {
                 Log::warning('No fue posible notificar revisión de informe de cometido.', ['cometido_funcionario_id' => $cometido->id, 'error' => $e->getMessage()]);
             }
