@@ -7,12 +7,13 @@ use App\Models\DotacionNoRenovacion;
 use App\Models\DotacionSobredotacionJustificacion;
 use App\Models\Establecimiento;
 use App\Services\Padron\PadronPeriodoService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 /** Catálogo de lectura: no reincorpora personas retiradas a la nómina del SGA. */
 class DotacionPalExclusiones2027
 {
-    public function proyeccion(Establecimiento $ee): array
+    public function proyeccion(Establecimiento $ee, ?Collection $justificaciones = null): array
     {
         if (! Schema::hasTable('reemplazos_personal')) { return []; }
         $anioBase = app(PadronPeriodoService::class)->anioDisponibleParaDotacion(2027) ?? 2027;
@@ -25,6 +26,7 @@ class DotacionPalExclusiones2027
         $noRenovaciones = $retirados === [] ? [] : DotacionNoRenovacion::query()
             ->where('establecimiento_id', $ee->id)->where('anio', 2027)->whereNull('anulada_at')
             ->get()->keyBy('docente_rut_normalizado')->all();
+        $justificaciones ??= $retirados === [] ? collect() : $this->justificaciones($ee);
         $filas = [];
         foreach (DotacionEstablecimientoCalculator::docentes($ee, 2027, incluirAsignaciones: false, incluirExcluidosProyeccion: true) as $docente) {
             $rut = DotacionEstablecimientoCalculator::normalizeRut($docente['rut'] ?? null);
@@ -33,7 +35,8 @@ class DotacionPalExclusiones2027
                 $registro = $noRenovaciones[$rut] ?? null;
                 $detalle = 'No renovación activa registrada para 2027. Contrato del último padrón vigente: '.$horas.' h. '
                     .$this->detalleRegistro($registro?->getAttributes() ?? []);
-                $filas[] = $this->fila($ee, $docente, 'No renovación 2027', $horas, trim($detalle), anioBase: $anioBase);
+                $filas[] = $this->fila($ee, $docente, 'No renovación 2027', $horas, trim($detalle),
+                    anioBase: $anioBase, justificaciones: $justificaciones[$rut]['contrata'] ?? null);
             } elseif (($continuidad[$rut] ?? true) === false) {
                 $situacion = $situaciones[$rut] ?? null;
                 $motivo = $situacion?->motivo_label ?? 'Sin motivo adicional';
@@ -46,23 +49,23 @@ class DotacionPalExclusiones2027
         return $filas;
     }
 
-    /** Misma selección de justificaciones que aplica el descuento del PAL. */
-    public function justificaciones(Establecimiento $ee): array
+    /** Antecedentes por RUT y calidad, acotados al establecimiento y al proceso. */
+    public function justificaciones(Establecimiento $ee): Collection
     {
-        if (! Schema::hasTable('dotacion_sobredotacion_justificaciones')) { return []; }
-        $detalle = [];
-        foreach (DotacionSobredotacionJustificacion::query()->where('establecimiento_id', $ee->id)->where('anio', 2027)
-            ->where('tipo_horas', 'titular')->whereIn('bloque', ['plan_estudio', 'parvularia', 'pie'])
-            ->where('horas_detectadas', '>', 0)->get() as $registro) {
-            if (trim((string) $registro->justificacion) === '') { continue; }
-            $rut = DotacionEstablecimientoCalculator::normalizeRut($registro->docente_rut_normalizado);
-            $detalle[$rut][] = $registro->bloque.': '.$registro->horas_detectadas.' h. '.trim((string) $registro->justificacion);
-        }
-        return array_map(fn ($items) => implode(' | ', $items), $detalle);
+        if (! Schema::hasTable('dotacion_sobredotacion_justificaciones')) { return collect(); }
+
+        return DotacionSobredotacionJustificacion::query()->where('establecimiento_id', $ee->id)->where('anio', 2027)
+            ->whereIn('tipo_horas', ['titular', 'contrata'])->whereIn('bloque', array_keys(DotacionDisposicionDatos::BLOQUES))
+            ->where('horas_detectadas', '>', 0)->orderBy('id')->get()
+            ->filter(fn (DotacionSobredotacionJustificacion $registro) => trim((string) $registro->justificacion) !== '')
+            ->groupBy([
+                fn (DotacionSobredotacionJustificacion $registro) => DotacionEstablecimientoCalculator::normalizeRut($registro->docente_rut_normalizado),
+                'tipo_horas',
+            ]);
     }
 
     public function fila(Establecimiento $ee, array $docente, string $motivo, float $horas, string $detalle,
-        ?string $calidad = null, string $base = 'Contrato docente', ?int $anioBase = null): array
+        ?string $calidad = null, string $base = 'Contrato docente', ?int $anioBase = null, ?Collection $justificaciones = null): array
     {
         $titular = (float) ($docente['horas_planta'] ?? 0);
         $contrata = (float) ($docente['horas_contrata'] ?? 0);
@@ -70,7 +73,27 @@ class DotacionPalExclusiones2027
         return ['rbd' => (string) $ee->rbd, 'establecimiento' => (string) $ee->nombre_establecimiento,
             'rut' => (string) ($docente['rut'] ?? ''), 'nombre' => (string) ($docente['nombre'] ?? ''),
             'calidad' => $calidad, 'motivo' => $motivo, 'horas' => round(max(0, $horas), 4),
-            'detalle' => $detalle, 'base' => $base, 'anio_base' => $anioBase ?? (int) ($docente['anio'] ?? 2027)];
+            'detalle' => $detalle, 'base' => $base, 'anio_base' => $anioBase ?? (int) ($docente['anio'] ?? 2027),
+            'titulo_docente' => (string) ($docente['titulo'] ?? ''),
+        ] + ($justificaciones?->isNotEmpty() ? $this->datosJustificacion($justificaciones) : []);
+    }
+
+    private function datosJustificacion(Collection $registros): array
+    {
+        $datos = ['calidad_sobredotacion' => $registros->first()->tipo_horas === 'titular' ? 'Titular' : 'Contrata'];
+        $varios = $registros->count() > 1;
+        foreach ([
+            'justificacion' => fn ($registro) => (string) $registro->justificacion,
+            'area_ensenanza' => fn ($registro) => implode(', ', $registro->areasEnsenanzaNombres()),
+            'nivel_ensenanza' => fn ($registro) => $registro->nivelEnsenanzaNombre() ?? '',
+        ] as $campo => $valor) {
+            $datos[$campo] = $registros->map(function ($registro) use ($valor, $varios) {
+                $texto = $valor($registro);
+                return $texto !== '' && $varios ? DotacionDisposicionDatos::BLOQUES[$registro->bloque].' · '.$texto : $texto;
+            })->filter(fn ($texto) => $texto !== '')->implode("\n");
+        }
+
+        return $datos;
     }
 
     private function detalleRegistro(array $atributos): string

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Establecimiento;
+use Illuminate\Support\Collection;
 
 /** Adaptación de sólo lectura. Las limitaciones del formato PAL nunca alteran el SGA. */
 class DotacionPal2027
@@ -41,7 +42,8 @@ class DotacionPal2027
         $cupos = $this->cuposPorContratar($data);
         $plazas = $this->plazasPorAsumir($ee, $data);
         $catalogo = new DotacionPalExclusiones2027;
-        $excluidos = $catalogo->proyeccion($ee);
+        $justificaciones = $catalogo->justificaciones($ee);
+        $excluidos = $catalogo->proyeccion($ee, $justificaciones);
         foreach ($docentes->where('exclusion_docente.motivo', 'proceso_bir') as $docente) {
             $horas = (float) ($docente['horas_contrato_base'] ?? $docente['horas_contrato'] ?? 0);
             $excluidos[] = $catalogo->fila($ee, $docente, 'Proceso BIR 2027', $horas,
@@ -49,17 +51,16 @@ class DotacionPal2027
         }
         $cantidadBir = $docentes->where('exclusion_docente.motivo', 'proceso_bir')->count();
         $docentes = $docentes->reject(fn ($d) => data_get($d, 'exclusion_docente.motivo') === 'proceso_bir')->values();
-        $justificadas = $this->titularesJustificados($ee);
-        $detalleJustificaciones = $justificadas === [] ? [] : $catalogo->justificaciones($ee);
         if ($cantidadBir > 0) { $advertencias[] = 'Se excluyen del PAL '.$cantidadBir.' docente(s) con situación Proceso BIR 2027.'; }
         $nomina = $docentes->concat($cupos)->concat($plazas);
         foreach ($nomina as $docente) {
             $sintetico = isset($docente['cupo_contrata_id']) || ! empty($docente['es_plaza_por_asumir']);
             $tramo = trim((string) ($docente['tramo'] ?? ''));
             $docente['pal_tramo'] = $sintetico || $tramo === '' ? null : $tramo;
-            $docente['pal_titulares_justificadas'] = $sintetico ? 0.0 : ($justificadas[self::identidad($docente['rut'] ?? null)] ?? 0.0);
-            $docente['pal_detalle_justificaciones'] = $sintetico ? '' : ($detalleJustificaciones[self::identidad($docente['rut'] ?? null)] ?? '');
-            $filas = $this->docente($ee, $docente, $tablas, $clasificarAsignacion);
+            $rut = self::identidad($docente['rut'] ?? null);
+            $registros = $sintetico || $rut === '' ? collect() : ($justificaciones[$rut]['titular'] ?? collect());
+            $docente['pal_titulares_justificadas'] = round((float) $registros->sum('horas_detectadas'), 2);
+            $filas = $this->docente($ee, $docente, $tablas, $clasificarAsignacion, $registros);
             $this->registrarExclusiones($ee, $filas, [$docente], $excluidos, $catalogo);
             array_push($filasDocentes, ...$filas);
         }
@@ -142,14 +143,14 @@ class DotacionPal2027
                         : (! empty($docente['es_plaza_por_asumir']) ? 'Plaza por asumir' : $base);
                 }
                 $excluidos[] = $catalogo->fila($ee, $docente, $exclusion['motivo'], $exclusion['horas'], $exclusion['detalle'],
-                    $exclusion['calidad'] ?? $fila['H'], $base);
+                    $exclusion['calidad'] ?? $fila['H'], $base, justificaciones: $exclusion['justificaciones'] ?? null);
             }
             unset($fila['_pal_exclusiones']);
         }
         unset($fila);
     }
 
-    private function docente(Establecimiento $ee, array $docente, array $tablas, ?callable $clasificarAsignacion): array
+    private function docente(Establecimiento $ee, array $docente, array $tablas, ?callable $clasificarAsignacion, Collection $justificaciones): array
     {
         $docente['pal_nivel'] = $this->nivelDocente($ee, $docente);
         $base = max(0.0, (float) ($docente['horas_contrato'] ?? 0));
@@ -206,10 +207,12 @@ class DotacionPal2027
         }
         $justificadasExcluidas = round($docente['pal_sobredotacion_excluida'] + $reservasExcluidas, 2);
         if ($justificadasExcluidas > 0) {
+            $detalle = $justificaciones->map(fn ($registro) => $registro->bloque.': '.$registro->horas_detectadas.' h. '
+                .trim((string) $registro->justificacion))->implode(' | ');
             $filas[0]['_pal_exclusiones'][] = ['motivo' => 'Horas titulares justificadas en Sobredotación 2027',
                 'horas' => $justificadasExcluidas, 'calidad' => 'Titular',
-                'detalle' => 'Descuento aplicado una sola vez entre saldo y reservas titulares: '.$justificadasExcluidas.' h. '
-                    .($docente['pal_detalle_justificaciones'] ?? '')];
+                'detalle' => 'Descuento aplicado una sola vez entre saldo y reservas titulares: '.$justificadasExcluidas.' h. '.$detalle,
+                'justificaciones' => $justificaciones];
             foreach ($filas as &$fila) {
                 $fila['S'] .= ' Sobredotación 2027: '.$justificadasExcluidas.' h titulares justificadas excluidas de la incorporación del saldo y las reservas en FUNCIÓN '.self::FUNCION_OTROS.'.';
             }
@@ -244,23 +247,6 @@ class DotacionPal2027
         }
         unset($fila);
         return [$filas, $excluidas];
-    }
-
-    /** Una lectura acotada al establecimiento/año, nunca una consulta por docente. */
-    private function titularesJustificados(Establecimiento $ee): array
-    {
-        if (! \Illuminate\Support\Facades\Schema::hasTable('dotacion_sobredotacion_justificaciones')) { return []; }
-        $horas = [];
-        $registros = \App\Models\DotacionSobredotacionJustificacion::query()
-            ->where('establecimiento_id', $ee->id)->where('anio', 2027)->where('tipo_horas', 'titular')
-            ->whereIn('bloque', ['plan_estudio', 'parvularia', 'pie'])->where('horas_detectadas', '>', 0)
-            ->get(['docente_rut_normalizado', 'horas_detectadas', 'justificacion']);
-        foreach ($registros as $registro) {
-            if (trim((string) $registro->justificacion) === '') { continue; }
-            $rut = DotacionEstablecimientoCalculator::normalizeRut($registro->docente_rut_normalizado);
-            if ($rut !== '') { $horas[$rut] = round(($horas[$rut] ?? 0) + (float) $registro->horas_detectadas, 2); }
-        }
-        return $horas;
     }
 
     private function capacidadesContrato(float $base, array $docente): array

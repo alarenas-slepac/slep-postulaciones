@@ -11,6 +11,8 @@ use ZipArchive;
 class DotacionPalExclusiones2027Export
 {
     private const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    private const ANCHOS = [14, 35, 18, 40, 18, 45, 18, 100, 27, 12, 32, 68, 38, 45, 32];
+    private const ULTIMA_COLUMNA = 'O';
     private string $path;
     private $handle;
     private int $numero = 5;
@@ -27,13 +29,15 @@ class DotacionPalExclusiones2027Export
         $this->escribir('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="'.self::NS.'">'
             .'<sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
             .'<sheetFormatPr defaultRowHeight="30"/><cols>');
-        foreach ([14, 35, 18, 40, 18, 45, 18, 100, 27, 12] as $i => $ancho) {
+        foreach (self::ANCHOS as $i => $ancho) {
             $this->escribir('<col min="'.($i + 1).'" max="'.($i + 1).'" width="'.$ancho.'" customWidth="1"/>');
         }
         $this->escribir('</cols><sheetData>');
         $this->fila(1, ['Excluidos PAL 2027'], $this->estilos['titulo'], 30);
         $this->fila(2, ['Separar por base de referencia: cupos/plazas sin persona y asignaciones excedentes no se restan del padrón docente. Las horas incorporadas en J no se repiten como excluidas.'], $this->estilos['texto'], 44);
-        $this->fila(4, ['RBD', 'Establecimiento', 'RUT', 'Nombre', 'Calidad contractual', 'Motivo', 'Horas excluidas', 'Detalle', 'Base de referencia', 'Año base'], $this->estilos['cabecera'], 40);
+        $this->fila(4, ['RBD', 'Establecimiento', 'RUT', 'Nombre', 'Calidad contractual', 'Motivo', 'Horas excluidas', 'Detalle',
+            'Base de referencia', 'Año base', 'Calidad contractual de horas justificadas', 'Justificación ingresada',
+            'Título del docente', 'Área de enseñanza', 'Nivel de enseñanza'], $this->estilos['cabecera'], 40);
     }
 
     public function agregar(iterable $excluidos): void
@@ -45,16 +49,24 @@ class DotacionPalExclusiones2027Export
             $horas = (float) ($fila['horas'] ?? 0);
             if (! is_finite($horas) || $horas < 0) { throw new \RuntimeException('Las horas excluidas del PAL no son válidas.'); }
             $valores = [$fila['rbd'] ?? '', $fila['establecimiento'] ?? '', $fila['rut'] ?? '', $fila['nombre'] ?? '',
-                $fila['calidad'] ?? '', $fila['motivo'] ?? '', $horas, $fila['detalle'] ?? '', $fila['base'] ?? 'Contrato docente', (int) ($fila['anio_base'] ?? 2027)];
-            $altura = min(180, max(30, ceil(mb_strlen((string) $valores[7]) / 95) * 15));
+                $fila['calidad'] ?? '', $fila['motivo'] ?? '', $horas, $fila['detalle'] ?? '', $fila['base'] ?? 'Contrato docente',
+                (int) ($fila['anio_base'] ?? 2027), $fila['calidad_sobredotacion'] ?? '', $fila['justificacion'] ?? '',
+                $fila['titulo_docente'] ?? '', $fila['area_ensenanza'] ?? '', $fila['nivel_ensenanza'] ?? ''];
+            $lineas = 2;
+            foreach ([7, 11, 12, 13, 14] as $columna) {
+                $parrafos = explode("\n", (string) $valores[$columna]);
+                $lineas = max($lineas, array_sum(array_map(fn ($parrafo) => max(1, ceil(mb_strlen($parrafo) / (self::ANCHOS[$columna] - 5))), $parrafos)));
+            }
+            $altura = min(300, $lineas * 15);
             $this->fila($this->numero++, $valores, $this->estilos['texto'], $altura);
         }
     }
 
     public function incorporar(ZipArchive $zip): void
     {
-        $this->escribir('</sheetData><autoFilter ref="A4:J'.max(4, $this->numero - 1).'"/>'
-            .'<mergeCells count="2"><mergeCell ref="A1:J1"/><mergeCell ref="A2:J2"/></mergeCells></worksheet>');
+        $columna = self::ULTIMA_COLUMNA;
+        $this->escribir('</sheetData><autoFilter ref="A4:'.$columna.max(4, $this->numero - 1).'"/>'
+            .'<mergeCells count="2"><mergeCell ref="A1:'.$columna.'1"/><mergeCell ref="A2:'.$columna.'2"/></mergeCells></worksheet>');
         fclose($this->handle); $this->handle = null;
         $workbook = $this->xml($zip, 'xl/workbook.xml');
         $rels = $this->xml($zip, 'xl/_rels/workbook.xml.rels');

@@ -6594,8 +6594,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.25.715',
+    'current_version' => '2026.11.25.716',
     'entries' => [
+        [
+            'version' => '2026.11.25.716',
+            'title' => 'Antecedentes de sobredotación en Excluidos PAL 2027',
+            'summary' => 'Agrega la calidad contractual de las horas justificadas, el texto ingresado, el título docente, el área y el nivel de enseñanza en la hoja Excluidos PAL 2027.',
+            'roles' => ['admin', 'coordinador_uatp', 'coordinador_gdp', 'supervisor_plani'],
+            'items' => [
+                'Disponible en el Excel por establecimiento y en el consolidado.',
+            ],
+            'published_at' => '2026-11-25',
+        ],
         [
             'version' => '2026.11.25.715',
             'title' => 'Término anticipado durante la gestión SLEP',

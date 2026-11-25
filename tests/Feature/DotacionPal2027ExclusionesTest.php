@@ -44,7 +44,12 @@ class DotacionPal2027ExclusionesTest extends IsolatedSecurityTestCase
 
     public function test_pal_detalla_exclusiones_y_la_nomina_conserva_la_no_renovacion(): void
     {
-        $this->personal('99000001K', 30); $this->personal('99000002K', 20); $this->personal('99000003K', 10);
+        $this->prepararJustificaciones();
+        $this->justificacion('99000002K', [
+            'tipo_horas' => 'contrata', 'justificacion' => 'Fundamento sintético para horas a contrata.', 'nivel_ensenanza' => 'media',
+            'areas_ensenanza' => json_encode([['id' => 9, 'nombre' => 'Área sintética']]),
+        ]);
+        $this->personal('99000001K', 30); $this->personal('99000002K', 20, ['tipocontrato' => 'CONTRATA']); $this->personal('99000003K', 10);
         $this->situacion('99000001K'); $this->situacion('99000002K');
         $this->noRenovacion('99000002K');
         $this->noRenovacion('99000003K', ['anulada_at' => '2026-10-25 12:00:00']);
@@ -65,6 +70,11 @@ class DotacionPal2027ExclusionesTest extends IsolatedSecurityTestCase
         $this->assertStringContainsString('Renuncia voluntaria', $porRut['99000001K']['detalle']);
         $this->assertSame('No renovación 2027', $porRut['99000002K']['motivo']);
         $this->assertStringContainsString('Motivo sintético de no renovación', $porRut['99000002K']['detalle']);
+        $this->assertSame('Contrata', $porRut['99000002K']['calidad_sobredotacion']);
+        $this->assertSame('Fundamento sintético para horas a contrata.', $porRut['99000002K']['justificacion']);
+        $this->assertSame('Área sintética', $porRut['99000002K']['area_ensenanza']);
+        $this->assertSame('Enseñanza Media', $porRut['99000002K']['nivel_ensenanza']);
+        $this->assertArrayNotHasKey('justificacion', $porRut['99000001K']);
         $this->assertSame('Contrato docente', $filas[0]['base']); $this->assertSame(2026, $filas[0]['anio_base']);
         $this->assertSame($antes, DB::table('dotacion_docente_exclusiones')->get()->toJson());
     }
@@ -79,13 +89,8 @@ class DotacionPal2027ExclusionesTest extends IsolatedSecurityTestCase
 
     public function test_bir_sobredotacion_y_excesos_informan_base_motivo_y_detalle_sin_sumar_cupos_al_padron(): void
     {
-        Schema::create('dotacion_sobredotacion_justificaciones', function (Blueprint $t): void {
-            $t->id(); $t->integer('establecimiento_id'); $t->integer('anio'); $t->string('docente_rut_normalizado');
-            $t->string('bloque'); $t->string('tipo_horas'); $t->decimal('horas_detectadas', 8, 2); $t->text('justificacion');
-        });
-        DB::table('dotacion_sobredotacion_justificaciones')->insert(['establecimiento_id' => $this->ee->id, 'anio' => 2027,
-            'docente_rut_normalizado' => '99000002K', 'bloque' => 'plan_estudio', 'tipo_horas' => 'titular',
-            'horas_detectadas' => 4, 'justificacion' => 'Detalle sintético registrado.']);
+        $this->prepararJustificaciones(conEnsenanza: false);
+        $this->justificacion('99000002K', ['justificacion' => 'Detalle sintético registrado.']);
         $datos = ['docentes' => [
             $this->docente('99000001K', ['exclusion_docente' => ['motivo' => 'proceso_bir']]),
             $this->docente('99000002K'),
@@ -99,6 +104,8 @@ class DotacionPal2027ExclusionesTest extends IsolatedSecurityTestCase
         $this->assertEquals(44, $excl['Proceso BIR 2027']['horas']);
         $this->assertEquals(4, $excl['Horas titulares justificadas en Sobredotación 2027']['horas']);
         $this->assertStringContainsString('Detalle sintético registrado.', $excl['Horas titulares justificadas en Sobredotación 2027']['detalle']);
+        $this->assertSame('', $excl['Horas titulares justificadas en Sobredotación 2027']['area_ensenanza']);
+        $this->assertSame('', $excl['Horas titulares justificadas en Sobredotación 2027']['nivel_ensenanza']);
         $this->assertSame('Asignación excedente', $excl['Asignación excede capacidad contractual']['base']);
         $this->assertEquals(2, $excl['Asignación excede capacidad contractual']['horas']);
         $this->assertEquals(0, $excl->where('base', 'Cupo o plaza sin persona')->sum('horas'));
@@ -109,28 +116,71 @@ class DotacionPal2027ExclusionesTest extends IsolatedSecurityTestCase
 
     public function test_ambos_excel_agregan_hoja_filtrable_con_texto_literal_y_sin_cambiar_formulas(): void
     {
+        $this->prepararJustificaciones();
+        $this->justificacion('99000002K', [
+            'justificacion' => '=Fundamento <sintético> & razón', 'nivel_ensenanza' => 'basica',
+            'areas_ensenanza' => json_encode([['id' => 1, 'nombre' => 'Matemática sintética'], ['id' => 2, 'nombre' => 'Ciencias sintéticas']]),
+        ]);
+        $this->justificacion('99000002K', [
+            'bloque' => 'pie', 'horas_detectadas' => 6, 'justificacion' => 'Ajuste sintético PIE.', 'nivel_ensenanza' => 'pie',
+            'areas_ensenanza' => json_encode([['id' => 3, 'nombre' => 'Apoyo sintético']]),
+        ]);
+        $this->justificacion('99000002K', ['tipo_horas' => 'contrata', 'justificacion' => 'No corresponde a la exclusión titular.']);
+        $this->justificacion('99000002K', ['anio' => 2026, 'justificacion' => 'Año de prueba distinto.']);
         $registro = app(DotacionPalExclusiones2027::class)->fila($this->ee,
             ['rut' => '99000001-K', 'nombre' => '=Nombre sintético', 'horas_planta' => 44, 'anio' => 2026],
             'No continúa en 2027, según situación registrada en 2026', 44, '=Detalle <sintético> & razón');
+        $datoDocente = $this->docente('99000002K', ['titulo' => 'Pedagogía sintética', 'horas_planta' => 30, 'horas_contrata' => 14]);
+        $report = app(DotacionPal2027::class)->construir($this->ee, ['docentes' => [$datoDocente]], app(DotacionPal2027Export::class)->tablas());
+        array_unshift($report['excluidos'], $registro);
         foreach ([false, true] as $global) {
-            $report = ['docentes' => [], 'cursos' => [], 'excluidos' => [$registro]];
             $path = Storage::disk('local')->path($global ? 'excluidos-global.xlsx' : 'excluidos.xlsx');
             if ($global) { app(DotacionPal2027ConsolidadoExport::class)->guardarTodos([$report], $path); }
             else { app(DotacionPal2027Export::class)->guardar($report, $path); }
-            $book = IOFactory::load($path);
+            $reader = IOFactory::createReader('Xlsx');
+            $this->assertCount(10, $reader->listWorksheetNames($path));
+            $book = $reader->setLoadSheetsOnly(['Excluidos PAL 2027', 'Info Funcionario (DOCENTE)'])->load($path);
             try {
-                $this->assertCount(10, $book->getAllSheets());
                 $sheet = $book->getSheetByName('Excluidos PAL 2027');
-                $this->assertNotNull($sheet); $this->assertSame('A4:J5', $sheet->getAutoFilter()->getRange());
+                $this->assertNotNull($sheet); $this->assertSame('A4:O6', $sheet->getAutoFilter()->getRange());
                 $this->assertSame('A5', $sheet->getFreezePane());
+                $this->assertContains('A1:O1', $sheet->getMergeCells());
+                $this->assertSame([['Calidad contractual de horas justificadas', 'Justificación ingresada', 'Título del docente', 'Área de enseñanza', 'Nivel de enseñanza']],
+                    $sheet->rangeToArray('K4:O4'));
                 $this->assertSame('=Nombre sintético', (string) $sheet->getCell('D5')->getValue());
                 $this->assertNotSame('f', $sheet->getCell('D5')->getDataType());
                 $this->assertSame('=Detalle <sintético> & razón', (string) $sheet->getCell('H5')->getValue());
                 $this->assertEquals(44, $sheet->getCell('G5')->getValue());
                 $this->assertEquals(2026, $sheet->getCell('J5')->getValue());
+                $this->assertSame('', (string) $sheet->getCell('K5')->getValue());
+                $this->assertEquals(10, $sheet->getCell('G6')->getValue());
+                $this->assertSame([[
+                    'Titular', "Planes de Estudio · =Fundamento <sintético> & razón\nPIE · Ajuste sintético PIE.", 'Pedagogía sintética',
+                    "Planes de Estudio · Matemática sintética, Ciencias sintéticas\nPIE · Apoyo sintético", "Planes de Estudio · Enseñanza Básica\nPIE · PIE",
+                ]], $sheet->rangeToArray('K6:O6'));
+                $this->assertNotSame('f', $sheet->getCell('L6')->getDataType());
+                $this->assertTrue($sheet->getStyle('L6')->getAlignment()->getWrapText());
                 $this->assertStringStartsWith('=', $book->getSheetByName('Info Funcionario (DOCENTE)')->getCell('J3')->getValue());
             } finally { $book->disconnectWorksheets(); }
         }
+    }
+
+    private function prepararJustificaciones(bool $conEnsenanza = true): void
+    {
+        Schema::create('dotacion_sobredotacion_justificaciones', function (Blueprint $t) use ($conEnsenanza): void {
+            $t->id(); $t->integer('establecimiento_id'); $t->integer('anio'); $t->string('docente_rut_normalizado');
+            $t->string('bloque'); $t->string('tipo_horas'); $t->decimal('horas_detectadas', 8, 2); $t->text('justificacion');
+            if ($conEnsenanza) {
+                $t->string('nivel_ensenanza')->nullable();
+                $t->json('areas_ensenanza')->nullable();
+            }
+        });
+    }
+
+    private function justificacion(string $rut, array $extra): void
+    {
+        DB::table('dotacion_sobredotacion_justificaciones')->insert($extra + ['establecimiento_id' => $this->ee->id,
+            'anio' => 2027, 'docente_rut_normalizado' => $rut, 'bloque' => 'plan_estudio', 'tipo_horas' => 'titular', 'horas_detectadas' => 4]);
     }
 
     private function personal(string $rut, float $horas, array $extra = []): void
