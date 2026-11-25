@@ -180,33 +180,49 @@
         <div id="calculo-rbd" class="alert alert-info">El cálculo se habilita cuando los tres MAE estén procesados.</div>
     @endif
 
-    <section class="slep-card p-4 mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3" aria-labelledby="cierre-sned">
-        <div>
-            <h2 id="cierre-sned" class="h5 mb-1">{{ $cerrada ? 'Nómina para pago' : 'Cerrar cuota' }}</h2>
-            @if ($cerrada)
-                <p class="small text-muted mb-0">Cerrada el {{ $cuota->cerrado_at->format('d/m/Y H:i') }}. Un monto consolidado por RUT en la comuna.</p>
-                @if ($cuota->version < $ultimaVersion)<p class="small text-warning-emphasis mb-0">Hay una versión posterior de esta cuota.</p>@endif
-            @else
-                <p class="small text-muted mb-0">Al cerrar, el sistema fija el cálculo de esta versión y habilita la descarga.</p>
-                @if (! $listas || $aportes->isEmpty())
-                    <p class="small text-muted mb-0">Para cerrar, procese los tres MAE y registre al menos un establecimiento con aporte.</p>
+    <section class="slep-card p-4 mb-4" aria-labelledby="cierre-sned">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+            <div>
+                <h2 id="cierre-sned" class="h5 mb-1">{{ $cerrada ? 'Nóminas para pago' : 'Cerrar cuota' }}</h2>
+                @if ($cerrada)
+                    <p class="small text-muted mb-0">Cerrada el {{ $cuota->cerrado_at->format('d/m/Y H:i') }}. Cada archivo consolida un monto por RUT en la comuna.</p>
+                    @if ($cuota->version < $ultimaVersion)<p class="small text-warning-emphasis mb-0">Hay una versión posterior de esta cuota.</p>@endif
+                @else
+                    <p class="small text-muted mb-0">Al cerrar, el sistema fija el cálculo de esta versión y habilita las descargas.</p>
+                    @if (! $listas || $aportes->isEmpty())
+                        <p class="small text-muted mb-0">Para cerrar, procese los tres MAE y registre al menos un establecimiento con aporte.</p>
+                    @endif
                 @endif
-            @endif
-        </div>
-        <div class="d-flex flex-wrap gap-2">
+            </div>
             @if ($cerrada)
-                <a class="btn btn-primary" href="{{ route('sned.exportar', [$cuota, 'csv']) }}"><i class="bi bi-download me-1" aria-hidden="true"></i> Descargar CSV</a>
-                <a class="btn btn-outline-primary" href="{{ route('sned.exportar', [$cuota, 'txt']) }}">Descargar TXT</a>
                 @if ((int) $cuota->version === $ultimaVersion)
                     <form method="POST" action="{{ route('sned.version', $cuota) }}">@csrf<button class="btn btn-outline-secondary">Crear nueva versión</button></form>
                 @endif
             @else
-                <form method="POST" action="{{ route('sned.cerrar', $cuota) }}" onsubmit="return confirm('¿Confirma el cierre de la cuota? Se fijará el cálculo de esta versión y se habilitará la descarga de la nómina.');">
+                <form method="POST" action="{{ route('sned.cerrar', $cuota) }}" onsubmit="return confirm('¿Confirma el cierre de la cuota? Se fijará el cálculo de esta versión y se habilitarán las descargas.');">
                     @csrf
                     <button class="btn btn-primary" @disabled(! $listas || $aportes->isEmpty())>Cerrar cuota</button>
                 </form>
             @endif
         </div>
+        @if ($cerrada)
+            <div class="row g-3 mt-1">
+                @foreach (\App\Models\SnedCuota::NOMINAS as $codigo => $nomina)
+                    <div class="col-md-4">
+                        <div class="border rounded-4 bg-light-subtle p-3 h-100">
+                            <h3 class="h6 mb-3">{{ $nomina['titulo'] }}</h3>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach ($nomina['formatos'] as $formato)
+                                    <a class="btn btn-outline-primary" href="{{ route('sned.exportar', [$cuota, $codigo, $formato]) }}" aria-label="Descargar {{ $nomina['titulo'] }} en {{ strtoupper($formato) }}">
+                                        <i class="bi bi-download me-1" aria-hidden="true"></i> {{ strtoupper($formato) }}
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
     </section>
 </div>
 @endsection
