@@ -34,10 +34,6 @@
     $esFuncionarioEstab = $activeRole === 'funcionario_estab';
     $esFuncionarioAcSolicitante = $activeRole === 'funcionario_ac' && $esCometidoAcRendicion && (int) $cometido->user_id === (int) auth()->id();
     $actorSolicitanteRendicion = $esCometidoAcRendicion ? 'funcionario AC' : 'establecimiento';
-    $mostrarFormularioRendicion = $puedeRendir && ($esFuncionarioEstab || $esFuncionarioAcSolicitante || $activeRole === 'admin') && (! $rendicion);
-    $puedeRectificarRendicion = $rendicion
-        && $estadoRendicion === 'rendicion_observada_daf'
-        && ($esFuncionarioEstab || $esFuncionarioAcSolicitante || $activeRole === 'admin');
     $puedeVerValoresReferenciaDaf = ! ($esFuncionarioEstab || $esFuncionarioAcSolicitante);
     $puedeActuarDaf = $puedeRevisarDaf && in_array($activeRole, ['admin', 'funcionario_daf'], true);
     $puedeActuarCdpRendicion = $puedeRevisarCdp && in_array($activeRole, ['admin', 'supervisor_plani', 'coordinador_plani'], true);
@@ -99,7 +95,7 @@
         $statusInforme = 'pending';
     }
 
-    if ($bloqueaDafPorInforme) {
+    if ($bloqueaDafPorInforme || $bloqueaDafPorRex) {
         $statusDaf = 'pending';
     } elseif (! $rendicion) {
         $statusDaf = 'pending';
@@ -328,7 +324,7 @@
                             </div>
                         @endif
                         @if($informeCometidoAprobado)
-                            <div class="alert alert-success mt-3 mb-0 small"><i class="bi bi-check-circle"></i> Informe aprobado por jefatura. La rendición puede avanzar a revisión DAF cuando también esté enviada.</div>
+                            <div class="alert alert-success mt-3 mb-0 small"><i class="bi bi-check-circle"></i> Informe aprobado por jefatura.</div>
                         @elseif($estadoInformeCometido === 'enviado_pendiente_jefatura')
                             <div class="alert alert-warning mt-3 mb-0 small"><i class="bi bi-hourglass-split"></i> Informe enviado y pendiente de aprobación de jefatura. DAF permanecerá bloqueado.</div>
                         @else
@@ -425,7 +421,7 @@
                         </div>
                     @endif
 
-                    @if($mostrarFormularioRendicion)
+                    @if($puedeRendir)
                         <form method="POST" action="{{ route('tramites.cometidos-funcionarios.rendicion.enviar', $cometido) }}" enctype="multipart/form-data" class="d-grid gap-3" id="rendicionReembolsoForm">
                             @csrf
 
@@ -615,6 +611,11 @@
                             <div class="alert alert-warning mb-0">
                                 <div class="fw-bold"><i class="bi bi-lock"></i> Revisión DAF bloqueada por informe pendiente</div>
                                 <div>DAF podrá revisar la rendición cuando el funcionario haya enviado el Informe de Cometido y la jefatura lo apruebe.</div>
+                            </div>
+                        @elseif($puedeActuarDaf && $rendicionPendienteRevisionDaf && $bloqueaDafPorRex)
+                            <div class="alert alert-warning mb-0">
+                                <div class="fw-bold"><i class="bi bi-lock"></i> Resolución Exenta para CGR pendiente</div>
+                                <div>DAF podrá revisar la rendición cuando GDP registre la resolución.</div>
                             </div>
                         @elseif($puedeActuarDaf && $rendicionPendienteRevisionDaf)
                             <form method="POST" action="{{ route('tramites.cometidos-funcionarios.rendicion.daf.autorizar', $cometido) }}" enctype="multipart/form-data" class="d-grid gap-3 mb-3">

@@ -259,6 +259,12 @@ class CometidoFuncionario extends Model
         return (bool) $this->solicita_viatico && (bool) $this->solicita_reembolso;
     }
 
+    public function tieneRexCgrReembolsoPendiente(): bool
+    {
+        return (bool) $this->solicita_reembolso
+            && ($this->estado === 'en_gdp_rex_cgr' || $this->estado_reembolso === 'en_gdp_rex_cgr');
+    }
+
     public function estadoViaticoActual(): ?string
     {
         if ($this->estado_viatico) {
@@ -405,6 +411,22 @@ class CometidoFuncionario extends Model
     public function esAdministracionCentral(): bool
     {
         return (string) ($this->origen_cometido ?? 'establecimiento') === 'administracion_central';
+    }
+
+    public function puedeRevisarInformePor(User $usuario, ?CometidoFuncionarioInforme $informe): bool
+    {
+        $rol = $usuario->activeRoleName();
+        $esSolicitante = (int) $usuario->id === (int) $this->user_id;
+
+        if ($this->esAdministracionCentral()) {
+            return $rol === 'admin' || (! $esSolicitante && in_array($rol, ['funcionario_ac', 'funcionario_estab'], true));
+        }
+
+        return $rol === 'funcionario_directivo_estab'
+            && (int) $this->establecimiento_id > 0
+            && (int) $usuario->establecimiento_id === (int) $this->establecimiento_id
+            && ! $esSolicitante
+            && (int) $usuario->id !== (int) $informe?->user_id_envia;
     }
 
     public function esEditablePorFuncionarioAc(): bool

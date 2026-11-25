@@ -46,7 +46,7 @@ class CometidoFuncionarioRendicionController extends Controller
             ->first();
 
         $informeAprobado = $this->informeCometidoAprobado($cometido, $informeCometido);
-        $puedeCompletarInforme = $this->puedeCompletarInformeReembolso($cometido, $informeCometido);
+        $puedeCompletarInforme = $this->puedeCompletarInformeReembolso($cometido, $informeCometido, $rendicion !== null);
 
         return view('tramites.cometidos-funcionarios.rendicion-reembolso', [
             'cometido' => $cometido,
@@ -58,8 +58,10 @@ class CometidoFuncionarioRendicionController extends Controller
             'documentosRendicionVisibles' => $this->documentosRendicionVisibles($cometido, $rendicion),
             'topeReembolsoCdp' => $this->topeReembolsoCdp($cometido),
             'referenciaReembolso' => $this->referenciaReembolsoDesdeViatico($cometido),
-            'puedeRendir' => $this->puedeRendir($cometido),
+            'puedeRendir' => $this->puedeRendir($cometido, $rendicion !== null),
+            'puedeRectificarRendicion' => $rendicion?->estado === 'rendicion_observada_daf' && $this->puedeGestionarRendicion($cometido),
             'bloqueaDafPorInforme' => $this->bloqueaDafPorInforme($cometido, $rendicion, $informeCometido),
+            'bloqueaDafPorRex' => $rendicion !== null && $cometido->tieneRexCgrReembolsoPendiente(),
             'puedeRevisarDaf' => $this->userHasAnyRole(['funcionario_daf', 'admin']),
             'puedeRevisarCdp' => $this->userHasAnyRole(['supervisor_plani', 'coordinador_plani', 'admin']),
             'puedeJuridica' => $this->userHasAnyRole(['juridica', 'juridico', 'abogado_juridica', 'coordinador_juridica', 'funcionario_juridica', 'admin']),
@@ -70,7 +72,8 @@ class CometidoFuncionarioRendicionController extends Controller
 
     public function enviarRendicion(Request $request, CometidoFuncionario $cometido)
     {
-        abort_unless($this->puedeRendir($cometido), 403);
+        $rendicionEnviada = CometidoFuncionarioRendicion::query()->where('cometido_funcionario_id', $cometido->id)->exists();
+        abort_unless($this->puedeRendir($cometido, $rendicionEnviada), 403);
 
         $data = $request->validate([
             'monto_rendido' => ['required', 'integer', 'min:0'],
@@ -154,14 +157,7 @@ class CometidoFuncionarioRendicionController extends Controller
             ]);
         }
 
-        $user = Auth::user();
-        $activeRole = session('active_role') ?? session('rol_activo') ?? ($user->rol ?? null);
-        $esSolicitanteAc = $cometido->esAdministracionCentral()
-            && $activeRole === 'funcionario_ac'
-            && (int) $cometido->user_id === (int) Auth::id();
-        $esEstablecimiento = ! $cometido->esAdministracionCentral() && $activeRole === 'funcionario_estab';
-
-        abort_unless($this->userHasAnyRole(['admin']) || $esSolicitanteAc || $esEstablecimiento, 403);
+        abort_unless($this->puedeGestionarRendicion($cometido), 403);
 
         $data = $request->validate([
             'monto_rendido' => ['required', 'integer', 'min:0'],
@@ -252,16 +248,7 @@ class CometidoFuncionarioRendicionController extends Controller
 
     public function observarDaf(Request $request, CometidoFuncionario $cometido)
     {
-        $informe = CometidoFuncionarioInforme::query()
-            ->where('cometido_funcionario_id', $cometido->id)
-            ->latest('id')
-            ->first();
-
-        if ($this->requiereInformeParaDaf($cometido) && ! $this->informeCometidoAprobado($cometido, $informe)) {
-            throw ValidationException::withMessages([
-                'informe_cometido' => 'DAF no puede revisar la rendición hasta que el funcionario envíe el Informe de Cometido y la jefatura lo apruebe.',
-            ]);
-        }
+        $this->validarRevisionDafDisponible($cometido);
 
         $data = $request->validate([
             'observacion_daf' => ['required', 'string', 'max:5000'],
@@ -284,16 +271,7 @@ class CometidoFuncionarioRendicionController extends Controller
 
     public function rechazarDaf(Request $request, CometidoFuncionario $cometido)
     {
-        $informe = CometidoFuncionarioInforme::query()
-            ->where('cometido_funcionario_id', $cometido->id)
-            ->latest('id')
-            ->first();
-
-        if ($this->requiereInformeParaDaf($cometido) && ! $this->informeCometidoAprobado($cometido, $informe)) {
-            throw ValidationException::withMessages([
-                'informe_cometido' => 'DAF no puede revisar la rendición hasta que el funcionario envíe el Informe de Cometido y la jefatura lo apruebe.',
-            ]);
-        }
+        $this->validarRevisionDafDisponible($cometido);
 
         $data = $request->validate([
             'observacion_daf' => ['required', 'string', 'max:5000'],
@@ -317,16 +295,7 @@ class CometidoFuncionarioRendicionController extends Controller
 
     public function autorizarDaf(Request $request, CometidoFuncionario $cometido)
     {
-        $informe = CometidoFuncionarioInforme::query()
-            ->where('cometido_funcionario_id', $cometido->id)
-            ->latest('id')
-            ->first();
-
-        if ($this->requiereInformeParaDaf($cometido) && ! $this->informeCometidoAprobado($cometido, $informe)) {
-            throw ValidationException::withMessages([
-                'informe_cometido' => 'DAF no puede revisar la rendición hasta que el funcionario envíe el Informe de Cometido y la jefatura lo apruebe.',
-            ]);
-        }
+        $this->validarRevisionDafDisponible($cometido);
 
         $data = $request->validate([
             'monto_autorizado_daf' => ['required', 'integer', 'min:0'],
@@ -909,7 +878,7 @@ class CometidoFuncionarioRendicionController extends Controller
             return false;
         }
 
-        $activeRole = session('active_role') ?? session('rol_activo') ?? ($user->rol ?? null);
+        $activeRole = $user->activeRoleName();
 
         if (in_array($activeRole, [
             'admin',
@@ -927,11 +896,7 @@ class CometidoFuncionarioRendicionController extends Controller
             return true;
         }
 
-        if ($cometido->esAdministracionCentral()) {
-            return $activeRole === 'funcionario_ac' && (int) $cometido->user_id === (int) $user->id;
-        }
-
-        return $activeRole === 'funcionario_estab';
+        return $this->puedeGestionarRendicion($cometido);
     }
 
 
@@ -1443,7 +1408,7 @@ class CometidoFuncionarioRendicionController extends Controller
             || in_array((string) $cometido->estado, ['informe_aprobado'], true);
     }
 
-    private function puedeCompletarInformeReembolso(CometidoFuncionario $cometido, ?CometidoFuncionarioInforme $informe = null): bool
+    private function puedeCompletarInformeReembolso(CometidoFuncionario $cometido, ?CometidoFuncionarioInforme $informe, bool $rendicionEnviada): bool
     {
         $user = Auth::user();
         if (! $user) {
@@ -1454,16 +1419,33 @@ class CometidoFuncionarioRendicionController extends Controller
             return false;
         }
 
-        $activeRole = session('active_role') ?? session('rol_activo') ?? ($user->rol ?? null);
+        $activeRole = $user->activeRoleName();
         $esSolicitante = (int) $cometido->user_id === (int) $user->id;
+        $etapaDisponible = $this->cometidoTieneEtapaInformeReembolsoDisponible($cometido)
+            || ($rendicionEnviada && $cometido->tieneRexCgrReembolsoPendiente());
 
-        return ($activeRole === 'admin')
-            || ($esSolicitante && in_array($activeRole, ['funcionario_ac', 'funcionario_estab'], true) && $this->cometidoTieneEtapaInformeReembolsoDisponible($cometido));
+        return $activeRole === 'admin'
+            || ($etapaDisponible && $esSolicitante && in_array($activeRole, ['funcionario_ac', 'funcionario_estab'], true));
     }
 
     private function bloqueaDafPorInforme(CometidoFuncionario $cometido, ?CometidoFuncionarioRendicion $rendicion = null, ?CometidoFuncionarioInforme $informe = null): bool
     {
         return (bool) $rendicion && $this->requiereInformeParaDaf($cometido) && ! $this->informeCometidoAprobado($cometido, $informe);
+    }
+
+    private function validarRevisionDafDisponible(CometidoFuncionario $cometido): void
+    {
+        if ($this->requiereInformeParaDaf($cometido) && ! $this->informeCometidoAprobado($cometido, $cometido->informeCometidoActual)) {
+            throw ValidationException::withMessages([
+                'informe_cometido' => 'DAF no puede revisar la rendición hasta que el funcionario envíe el Informe de Cometido y la jefatura lo apruebe.',
+            ]);
+        }
+
+        if ($cometido->tieneRexCgrReembolsoPendiente()) {
+            throw ValidationException::withMessages([
+                'rex_cgr' => 'DAF puede revisar la rendición cuando GDP registre la Resolución Exenta para CGR.',
+            ]);
+        }
     }
 
     private function cometidoTieneEtapaInformeReembolsoDisponible(CometidoFuncionario $cometido): bool
@@ -1492,26 +1474,44 @@ class CometidoFuncionarioRendicionController extends Controller
         return 'en_gdp_rex_cgr';
     }
 
-    private function puedeRendir(CometidoFuncionario $cometido): bool
+    private function puedeRendir(CometidoFuncionario $cometido, bool $rendicionEnviada): bool
+    {
+        if ($rendicionEnviada || ! $cometido->solicita_reembolso || ! $this->puedeGestionarRendicion($cometido)) {
+            return false;
+        }
+
+        $estado = (string) ($cometido->estado_reembolso ?: $cometido->estado);
+        $etapas = ['pendiente_rendicion', 'pendiente_rendicion_informe', 'en_rendicion_reembolso', 'informe_observado'];
+
+        if ($cometido->esAdministracionCentral()) {
+            $etapas = array_merge($etapas, ['en_gdp_rex_cgr', 'rendicion_enviada_pendiente_informe', 'rendicion_observada_daf']);
+        }
+
+        return in_array($estado, $etapas, true);
+    }
+
+    private function puedeGestionarRendicion(CometidoFuncionario $cometido): bool
     {
         $user = Auth::user();
         if (! $user) {
             return false;
         }
 
-        if ($this->userHasAnyRole(['admin'])) {
+        $activeRole = $user->activeRoleName();
+        if ($activeRole === 'admin') {
             return true;
         }
 
-        $activeRole = session('active_role') ?? session('rol_activo') ?? ($user->rol ?? null);
+        $esSolicitante = (int) $cometido->user_id === (int) $user->id;
 
         if ($cometido->esAdministracionCentral()) {
-            return $activeRole === 'funcionario_ac'
-                && (int) $cometido->user_id === (int) $user->id
-                && in_array((string) ($cometido->estado_reembolso ?? $cometido->estado), ['en_gdp_rex_cgr', 'pendiente_rendicion', 'pendiente_rendicion_informe', 'en_rendicion_reembolso', 'rendicion_enviada_pendiente_informe', 'rendicion_observada_daf'], true);
+            return $activeRole === 'funcionario_ac' && $esSolicitante;
         }
 
-        return $activeRole === 'funcionario_estab';
+        return $activeRole === 'funcionario_estab'
+            && ($cometido->establecimiento_id
+                ? (int) $cometido->establecimiento_id === (int) $user->establecimiento_id
+                : $esSolicitante);
     }
 
     private function userHasAnyRole(array $roles): bool

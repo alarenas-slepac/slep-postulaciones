@@ -9,7 +9,9 @@ return [
     ],
     // Eventos sin clase propia (vistas directas o emisores con sga_event_key).
     // [clave => [módulo, nombre, destinatarios]]; aparecen sin insertar filas en la BD.
-    'events' => [],
+    'events' => [
+        'cometidos.informe_revision_directivo_estab' => ['Cometidos', 'Informe pendiente de revisión del establecimiento', 'Directivos del establecimiento del cometido, excepto quien lo solicitó o envió. El aviso enlaza al detalle en el SGA.'],
+    ],
     'account_whatsapp' => [
         'auth.whatsapp_verification' => ['Acceso', 'Verificación de cuenta por WhatsApp', 'Cuenta autenticada que solicita un código a su propio celular; no requiere verificación de correo previa'],
     ],

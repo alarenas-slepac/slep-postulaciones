@@ -284,6 +284,26 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
         $this->put('/admin/eventos-notificaciones/system.generic_mail/mail', $this->data())->assertStatus(503);
     }
 
+    public function test_approval_notice_for_school_leaders_is_configurable_without_sending_mail(): void
+    {
+        $clave = 'cometidos.informe_revision_directivo_estab';
+        $this->actingAs($this->testUser(role: 3))->get(route('admin.notification-events.index', ['module' => 'Cometidos', 'q' => $clave]))
+            ->assertOk()->assertSee('Informe pendiente de revisión del establecimiento');
+        $this->get('/admin/eventos-notificaciones/'.$clave.'/editar')->assertOk();
+
+        $this->setting($clave, 'mail')->update(['enabled' => false]);
+        $aviso = (new \App\Mail\CometidoFuncionarioNotificationMail(
+            'Directivo de prueba',
+            'Informe de Cometido pendiente de revisión de jefatura',
+            'Revise el informe en el SGA.',
+            actionUrl: 'https://sga.example.test/tramites/cometidos-funcionarios/1',
+        ))->to('directivo@example.test')->with('sga_event_key', $clave);
+
+        $this->assertNull($this->deliver($aviso));
+        $this->assertCount(0, Mail::mailer()->getSymfonyTransport()->messages());
+        Queue::assertNothingPushed();
+    }
+
     public function test_migration_can_be_repeated_without_replacing_saved_preferences(): void
     {
         $setting = $this->setting('system.generic_mail', 'mail'); $setting->update(['enabled' => false]);
@@ -320,9 +340,9 @@ class NotificationEventConfigurationTest extends IsolatedSecurityTestCase
     public function test_new_whatsapp_channels_are_available_but_disabled_by_default_and_reset(): void
     {
         $catalog = app(NotificationEventCatalog::class); $policy = app(NotificationEventPolicy::class);
-        $this->assertCount(91, $catalog->all());
-        $this->assertCount(89, array_filter($catalog->all(), fn ($e) => in_array('whatsapp', $e['channels'], true)));
-        $this->assertCount(77, array_filter($catalog->all(), fn ($e) => $e['whatsapp_from_mail'] ?? false));
+        $this->assertCount(92, $catalog->all());
+        $this->assertCount(90, array_filter($catalog->all(), fn ($e) => in_array('whatsapp', $e['channels'], true)));
+        $this->assertCount(78, array_filter($catalog->all(), fn ($e) => $e['whatsapp_from_mail'] ?? false));
         foreach ($catalog->all() as $key => $event) {
             if (!($event['whatsapp_from_mail'] ?? false)) continue;
             $this->assertContains('whatsapp', $event['channels']); $this->assertFalse($policy->enabled($key, 'whatsapp'));

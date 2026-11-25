@@ -451,6 +451,7 @@
         $estadoLabel = $estadoSeleccionado && isset($estados[$estadoSeleccionado]) ? $estados[$estadoSeleccionado] : 'Todos los estados';
         $roleLabels = [
             'funcionario_estab' => 'Vista establecimiento',
+            'funcionario_directivo_estab' => 'Vista directiva del establecimiento',
             'coordinador_uatp' => 'Vista UATP',
             'director_ejecutivo' => 'Vista Director Ejecutivo',
             'supervisor_plani' => 'Vista Planificación',
@@ -526,12 +527,12 @@
                 [
                     'key' => 'establecimiento',
                     'eyebrow' => 'Listado',
-                    'title' => 'Solicitudes registradas',
-                    'subtitle' => 'Solicitudes de cometido registradas por el establecimiento.',
+                    'title' => $activeRole === 'funcionario_directivo_estab' ? 'Informes de cometido' : 'Solicitudes registradas',
+                    'subtitle' => $activeRole === 'funcionario_directivo_estab' ? 'Informes enviados por funcionarios del establecimiento.' : 'Solicitudes de cometido registradas por el establecimiento.',
                     'items' => $cometidos,
                     'total' => $cometidos->total(),
                     'icon' => 'bi-collection',
-                    'empty_title' => 'No hay solicitudes registradas',
+                    'empty_title' => $activeRole === 'funcionario_directivo_estab' ? 'No hay informes para mostrar' : 'No hay solicitudes registradas',
                     'empty_text' => 'No se encontraron cometidos con los criterios actuales. Ajusta los filtros o limpia la búsqueda para volver a consultar.',
                 ],
             ];

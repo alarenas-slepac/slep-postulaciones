@@ -71,7 +71,8 @@ class CometidoFuncionarioController extends Controller
     {
         $user = $request->user();
         $activeRole = method_exists($user, 'activeRoleName') ? $user->activeRoleName() : null;
-        $usaBandejasInternas = ! in_array($activeRole, ['funcionario_estab', 'funcionario_ac'], true);
+        $esRolEstablecimiento = in_array($activeRole, ['funcionario_estab', 'funcionario_directivo_estab'], true);
+        $usaBandejasInternas = ! $esRolEstablecimiento && $activeRole !== 'funcionario_ac';
         $tabsBandejasInternas = ['ac_por_autorizar', 'ac_autorizados', 'estab_por_autorizar', 'estab_autorizados'];
         $activeCometidosTab = $usaBandejasInternas
             ? (in_array((string) $request->query('tab'), $tabsBandejasInternas, true) ? (string) $request->query('tab') : 'ac_por_autorizar')
@@ -83,7 +84,7 @@ class CometidoFuncionarioController extends Controller
 
         $this->applyIndexRoleScope($baseQuery, $user, $activeRole);
 
-        $puedeFiltrarEstablecimiento = $activeRole !== 'funcionario_estab';
+        $puedeFiltrarEstablecimiento = ! $esRolEstablecimiento;
 
         if ($request->query('exportar') === 'excel') {
             abort_unless($usaBandejasInternas && in_array($request->query('tab'), ['ac_por_autorizar', 'estab_por_autorizar'], true), 403);
@@ -637,9 +638,13 @@ class CometidoFuncionarioController extends Controller
             return;
         }
 
-        if ($activeRole === 'funcionario_estab') {
+        if (in_array($activeRole, ['funcionario_estab', 'funcionario_directivo_estab'], true)) {
             $establecimiento = $this->establecimientoDelUsuario();
             $query->where('establecimiento_id', $establecimiento->id);
+            if ($activeRole === 'funcionario_directivo_estab') {
+                $query->where(fn ($q) => $q->where('origen_cometido', 'establecimiento')->orWhereNull('origen_cometido'))
+                    ->whereHas('informesCometido');
+            }
             return;
         }
 
@@ -3427,9 +3432,12 @@ class CometidoFuncionarioController extends Controller
         $user = $request->user();
         $activeRole = method_exists($user, 'activeRoleName') ? $user->activeRoleName() : null;
 
-        if ($activeRole === 'funcionario_estab') {
+        if (in_array($activeRole, ['funcionario_estab', 'funcionario_directivo_estab'], true)) {
             $establecimiento = $this->establecimientoDelUsuario();
             abort_unless((int) $cometido->establecimiento_id === (int) $establecimiento->id, 403);
+            if ($activeRole === 'funcionario_directivo_estab') {
+                abort_unless(! $cometido->esAdministracionCentral() && $cometido->informesCometido()->exists(), 403);
+            }
             return;
         }
 

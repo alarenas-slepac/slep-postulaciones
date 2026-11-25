@@ -1108,11 +1108,30 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
     // -------------------------
     // Trámites: Cometido Funcionario
     // -------------------------
+    $rolesCometidos = 'ensure.role:funcionario_estab|funcionario_ac|coordinador_uatp|admin|funcionario_slep|coordinador_gdp|supervisor_plani|coordinador_plani|funcionario_daf|funcionario_daf_compra|director_ejecutivo|juridica|juridico|abogado_juridica|coordinador_juridica|funcionario_juridica';
     Route::prefix('tramites/cometidos-funcionarios')
-        ->middleware('ensure.role:funcionario_estab|funcionario_ac|coordinador_uatp|admin|funcionario_slep|coordinador_gdp|supervisor_plani|coordinador_plani|funcionario_daf|funcionario_daf_compra|director_ejecutivo|juridica|juridico|abogado_juridica|coordinador_juridica|funcionario_juridica')
+        ->middleware($rolesCometidos.'|funcionario_directivo_estab')
         ->name('tramites.cometidos-funcionarios.')
         ->group(function () {
             Route::get('/', [CometidoFuncionarioController::class, 'index'])->name('index');
+            Route::get('/{cometido}/documentos/{documento}/ver', [CometidoFuncionarioController::class, 'verDocumento'])->name('documentos.ver');
+            Route::get('/{cometido}/documentos-generados/{documento}/ver', [CometidoFuncionarioController::class, 'verDocumentoGenerado'])->name('documentos-generados.ver');
+            Route::get('/{cometido}', [CometidoFuncionarioController::class, 'show'])->whereNumber('cometido')->name('show');
+        });
+
+    Route::prefix('tramites/cometidos-funcionarios/{cometido}/informe-cometido/jefatura')
+        ->middleware('ensure.role:funcionario_directivo_estab|funcionario_estab|funcionario_ac|admin')
+        ->name('tramites.cometidos-funcionarios.informe.jefatura.')
+        ->group(function () {
+            Route::patch('/aprobar', [CometidoFuncionarioInformeController::class, 'aprobarJefatura'])->name('aprobar');
+            Route::patch('/observar', [CometidoFuncionarioInformeController::class, 'observarJefatura'])->name('observar');
+            Route::patch('/rechazar', [CometidoFuncionarioInformeController::class, 'rechazarJefatura'])->name('rechazar');
+        });
+
+    Route::prefix('tramites/cometidos-funcionarios')
+        ->middleware($rolesCometidos)
+        ->name('tramites.cometidos-funcionarios.')
+        ->group(function () {
             Route::get('/seguimiento/exportar-excel', [CometidoFuncionarioController::class, 'exportarSeguimientoExcel'])
                 ->middleware('ensure.role:coordinador_uatp|admin|funcionario_slep|coordinador_gdp|supervisor_plani|coordinador_plani|funcionario_daf|juridica|juridico|abogado_juridica|coordinador_juridica|funcionario_juridica')
                 ->name('seguimiento.exportar-excel');
@@ -1125,8 +1144,6 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::get('/{cometido}/editar', [CometidoFuncionarioController::class, 'edit'])->middleware('ensure.role:funcionario_estab|funcionario_ac')->name('edit');
             Route::put('/{cometido}', [CometidoFuncionarioController::class, 'update'])->middleware('ensure.role:funcionario_estab|funcionario_ac')->name('update');
             Route::delete('/{cometido}', [CometidoFuncionarioController::class, 'destroy'])->middleware('ensure.role:funcionario_estab|funcionario_ac')->name('destroy');
-            Route::get('/{cometido}/documentos/{documento}/ver', [CometidoFuncionarioController::class, 'verDocumento'])->name('documentos.ver');
-            Route::get('/{cometido}/documentos-generados/{documento}/ver', [CometidoFuncionarioController::class, 'verDocumentoGenerado'])->name('documentos-generados.ver');
             Route::post('/{cometido}/documentos-generados/regenerar-solicitud', [CometidoFuncionarioController::class, 'regenerarSolicitudCometidoPdf'])->middleware('ensure.role:funcionario_ac|admin')->name('documentos-generados.regenerar-solicitud');
             Route::patch('/{cometido}/jefatura-ac/aprobar', [CometidoFuncionarioController::class, 'aprobarJefaturaAc'])->middleware('ensure.role:funcionario_ac|director_ejecutivo|admin')->name('jefatura-ac.aprobar');
             Route::patch('/{cometido}/jefatura-ac/observar', [CometidoFuncionarioController::class, 'observarJefaturaAc'])->middleware('ensure.role:funcionario_ac|director_ejecutivo|admin')->name('jefatura-ac.observar');
@@ -1145,9 +1162,6 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::patch('/{cometido}/gdp/resolucion', [CometidoFuncionarioController::class, 'emitirResolucionGdp'])->middleware('ensure.role:coordinador_gdp|funcionario_slep|admin')->name('gdp.resolucion');
             Route::get('/{cometido}/informe-cometido', [CometidoFuncionarioInformeController::class, 'create'])->middleware('ensure.role:funcionario_estab|funcionario_ac|admin')->name('informe.create');
             Route::post('/{cometido}/informe-cometido', [CometidoFuncionarioInformeController::class, 'store'])->middleware('ensure.role:funcionario_estab|funcionario_ac|admin')->name('informe.store');
-            Route::patch('/{cometido}/informe-cometido/jefatura/aprobar', [CometidoFuncionarioInformeController::class, 'aprobarJefatura'])->middleware('ensure.role:funcionario_estab|funcionario_ac|admin')->name('informe.jefatura.aprobar');
-            Route::patch('/{cometido}/informe-cometido/jefatura/observar', [CometidoFuncionarioInformeController::class, 'observarJefatura'])->middleware('ensure.role:funcionario_estab|funcionario_ac|admin')->name('informe.jefatura.observar');
-            Route::patch('/{cometido}/informe-cometido/jefatura/rechazar', [CometidoFuncionarioInformeController::class, 'rechazarJefatura'])->middleware('ensure.role:funcionario_estab|funcionario_ac|admin')->name('informe.jefatura.rechazar');
             Route::patch('/{cometido}/daf/contabilidad-viatico', [CometidoFuncionarioController::class, 'registrarContabilidadViatico'])->middleware('ensure.role:funcionario_daf|admin')->name('daf.contabilidad-viatico');
             Route::patch('/{cometido}/daf/pago-viatico', [CometidoFuncionarioController::class, 'registrarPagoViatico'])->middleware('ensure.role:funcionario_daf|admin')->name('daf.pago-viatico');
             Route::patch('/{cometido}/cerrar', [CometidoFuncionarioController::class, 'cerrar'])->middleware('ensure.role:coordinador_gdp|funcionario_slep|funcionario_daf|admin')->name('cerrar');
@@ -1213,7 +1227,6 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
                 ->name('cierre.cerrar');
 
             Route::get('/ajax/funcionarios/{reemplazoPersonal}/detalle', [CometidoFuncionarioController::class, 'funcionarioDetalle'])->middleware('ensure.role:funcionario_estab')->name('ajax.funcionario.detalle');
-            Route::get('/{cometido}', [CometidoFuncionarioController::class, 'show'])->whereNumber('cometido')->name('show');
         });
 
     // -------------------------
