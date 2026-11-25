@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.25.713',
+    'current_version' => '2026.11.25.714',
     'entries' => [
+        [
+            'version' => '2026.11.25.714',
+            'title' => 'Nómina SNED del establecimiento por estamento',
+            'summary' => 'Separa el detalle por establecimiento en las pestañas Docentes y Asistentes y habilita la descarga CSV para asistentes de la educación.',
+            'roles' => ['admin', 'funcionario_slep'],
+            'items' => [
+                'Cada pestaña muestra los tramos y el total de su estamento.',
+                'Aclara la elección entre solo jornada y jornada con días trabajados para el reparto general.',
+            ],
+            'published_at' => '2026-11-25',
+        ],
         [
             'version' => '2026.11.25.713',
             'title' => 'Selección de docentes para el incentivo SNED',

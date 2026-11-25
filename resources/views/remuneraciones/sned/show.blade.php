@@ -98,12 +98,15 @@
                 @method('PATCH')
                 <div class="col-md-8">
                     <label for="metodo" class="form-label">Criterio de reparto general</label>
-                    <select id="metodo" name="metodo" class="form-select" aria-describedby="ayuda-metodo">
+                    <select id="metodo" name="metodo" class="form-select" aria-describedby="ayuda-metodo" required>
                         @foreach ($metodos as $clave => $metodo)
                             <option value="{{ $clave }}" @selected(old('metodo', $cuota->metodo) === $clave)>{{ $metodo }}</option>
                         @endforeach
                     </select>
-                    <div id="ayuda-metodo" class="form-text">El prorrateo trimestral combina horas y días de los tres MAE, con 30 días equivalentes por mes completo. El criterio de corte usa las horas vigentes en el último día activo de la persona en ese mes.</div>
+                    <div id="ayuda-metodo" class="form-text">
+                        <p class="mb-1"><strong>Solo jornada.</strong> Usa las horas semanales vigentes en el último día activo de cada persona en {{ mb_strtolower($nombresMes[max($cuota->meses())]) }}, el mes de corte.</p>
+                        <p class="mb-0"><strong>Jornada y días del trimestre.</strong> Pondera las horas de cada tramo por los días trabajados en los tres meses. Cada mes completo equivale a 30 días.</p>
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label for="mes-pago" class="form-label">Mes de pago (opcional)</label>
@@ -112,7 +115,7 @@
                 <div class="col-12">
                     <label for="instruccion-calculo" class="form-label">Referencia de la instrucción del SLEP</label>
                     <textarea id="instruccion-calculo" name="instruccion_calculo" class="form-control" rows="2" maxlength="2000" aria-describedby="ayuda-instruccion">{{ old('instruccion_calculo', $cuota->instruccion_calculo) }}</textarea>
-                    <div id="ayuda-instruccion" class="form-text">Requerida para cerrar una cuota con prorrateo por días.</div>
+                    <div id="ayuda-instruccion" class="form-text">Requerida al cerrar con el criterio Jornada y días del trimestre.</div>
                 </div>
                 <div class="col-12"><button class="btn btn-outline-primary">Guardar criterio</button></div>
             </form>
@@ -156,7 +159,7 @@
                             <td class="text-end text-nowrap">{{ $pesos($item->aaee) }}</td>
                             <td>
                                 <div class="d-flex flex-wrap justify-content-end gap-2">
-                                    <a class="btn btn-sm btn-outline-primary text-nowrap" href="{{ route('sned.show', [$cuota, 'rbd' => $item->rbd]) }}#calculo-rbd" @if ($aporte?->id === $item->id) aria-current="true" @endif>Ver cálculo</a>
+                                    <a class="btn btn-sm btn-outline-primary text-nowrap" href="{{ route('sned.show', [$cuota, 'rbd' => $item->rbd, 'estamento' => $estamento]) }}#calculo-rbd" @if ($aporte?->id === $item->id) aria-current="true" @endif>Ver cálculo</a>
                                     @unless ($cerrada)
                                         <form method="POST" action="{{ route('sned.aportes.destroy', [$cuota, $item]) }}" onsubmit="return confirm('¿Desea quitar el establecimiento, su aporte y su reparto del borrador?');">
                                             @csrf @method('DELETE')

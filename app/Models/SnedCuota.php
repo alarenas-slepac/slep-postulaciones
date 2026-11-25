@@ -22,7 +22,7 @@ class SnedCuota extends Model
     ];
 
     public const METODOS = [
-        'jornada_corte' => 'Jornada del mes de corte',
+        'jornada_corte' => 'Solo jornada',
         'jornada_dias' => 'Jornada y días del trimestre',
     ];
 
@@ -37,7 +37,7 @@ class SnedCuota extends Model
         ],
         'aaee' => [
             'titulo' => 'Asistentes de la educación', 'estamento' => 'aaee', 'campo' => 'general',
-            'sufijo' => 'AAEE', 'formatos' => ['txt'],
+            'sufijo' => 'AAEE', 'formatos' => ['csv', 'txt'],
         ],
     ];
 

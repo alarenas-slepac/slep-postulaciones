@@ -65,6 +65,7 @@ class SnedController extends Controller
         $listas = $this->cargasListas($cargas, $cuota);
         $aportes = $cuota->aportes()->orderBy('establecimiento')->get();
         $aporte = $aportes->firstWhere('rbd', $request->integer('rbd')) ?? $aportes->first();
+        $estamento = $request->query('estamento') === 'aaee' ? 'aaee' : 'docentes';
         $establecimientos = $cuota->cerrado_at ? collect() : $this->establecimientos($cuota->comuna_clave)->unique('rbd');
         $resultado = $aporte && $listas
             ? ($cuota->resultados[$aporte->rbd] ?? $this->calculadora->calcular($cuota, $aporte, $cargas))
@@ -74,7 +75,7 @@ class SnedController extends Controller
         ])->max('version');
 
         return response()->view('remuneraciones.sned.show', compact(
-            'cuota', 'cargas', 'listas', 'aportes', 'aporte', 'establecimientos', 'resultado', 'ultimaVersion'
+            'cuota', 'cargas', 'listas', 'aportes', 'aporte', 'establecimientos', 'resultado', 'ultimaVersion', 'estamento'
         ))->header('Cache-Control', 'private, no-store');
     }
 
