@@ -59,7 +59,8 @@ class SnedRemuneracionesTest extends IsolatedSecurityTestCase
         $cuota = SnedCuota::sole();
         $this->assertSame('jornada_dias', $cuota->metodo);
         $this->get(route('sned.index'))->assertOk()->assertSee('Cuotas SNED');
-        $this->get(route('sned.show', $cuota))->assertOk()->assertSee('MAE de Haberes por Contrato');
+        $this->get(route('sned.show', $cuota))->assertOk()->assertSee('MAE de Haberes por Contrato')
+            ->assertSee('Solo jornada')->assertSee('Jornada y días del trimestre');
         $this->get(route('sned.exportar', [$cuota, 'docentes-90', 'csv']))->assertConflict();
 
         $principal = $this->rut(1);
@@ -117,7 +118,13 @@ class SnedRemuneracionesTest extends IsolatedSecurityTestCase
         ]]);
         $this->get(route('sned.show', [$cuota, 'rbd' => 90001]))->assertOk()
             ->assertSee('Incentivo docente 10%')->assertSee('Docente de prueba de septiembre')
-            ->assertSee('Seleccionar todos')->assertSee('Deseleccionar todos')->assertDontSee('Monto individual');
+            ->assertSee('Seleccionar todos')->assertSee('Deseleccionar todos')->assertDontSee('Monto individual')
+            ->assertSee('Total docentes')->assertDontSee('Asistente de prueba');
+        $this->get(route('sned.show', [$cuota, 'rbd' => 90001, 'estamento' => 'aaee']))->assertOk()
+            ->assertSee('Asistente de prueba')->assertSee('Total asistentes')
+            ->assertDontSee('Docente de prueba anterior')->assertDontSee('Incentivo docente 10%');
+        $this->get(route('sned.show', [$cuota, 'rbd' => 90002, 'estamento' => 'aaee']))->assertOk()
+            ->assertSee('Sin personas elegibles en el mes de corte.');
         $this->post(route('sned.cerrar', $cuota))->assertSessionHasNoErrors();
         $resultado = $cuota->refresh()->resultados[90001];
         $this->assertSame(['docentes' => 9001, 'incentivo' => 1000, 'aaee' => 431], $resultado['pagos']);
@@ -135,7 +142,7 @@ class SnedRemuneracionesTest extends IsolatedSecurityTestCase
         $exportaciones = [
             ['docentes-90', 'DOCENTES_90', ['csv', 'txt'], [[$principal, '8953'], [$ultimoDia, '58']]],
             ['docentes-10', 'DOCENTES_10', ['csv', 'txt'], [[$principal, '501'], [$ultimoDia, '500']]],
-            ['aaee', 'AAEE', ['txt'], [[$aaee, '431']]],
+            ['aaee', 'AAEE', ['csv', 'txt'], [[$aaee, '431']]],
         ];
         foreach ($exportaciones as [$nomina, $sufijo, $formatos, $filasEsperadas]) {
             foreach ($formatos as $formato) {
@@ -148,16 +155,22 @@ class SnedRemuneracionesTest extends IsolatedSecurityTestCase
                 $this->assertSame([['RUT', 'MONTO'], ...$filasEsperadas], $filas);
             }
         }
-        $csvAsistentes = route('sned.exportar', [$cuota, 'aaee', 'csv']);
-        $cerrada->assertDontSee($csvAsistentes);
-        $this->get($csvAsistentes)->assertNotFound();
-
         $this->post(route('sned.aportes.store', $cuota), ['rbd' => 90001, 'docentes' => 25, 'aaee' => 0])->assertConflict();
         $this->post(route('sned.version', $cuota))->assertRedirect();
         $nueva = SnedCuota::query()->where('version', 2)->sole();
         $this->assertNull($nueva->resultados);
         $this->assertSame(3, $nueva->cargas()->count());
         $this->assertSame(2, $nueva->aportes()->count());
+
+        $this->patch(route('sned.configurar', $nueva), [
+            'metodo' => 'jornada_corte', 'instruccion_calculo' => null,
+        ])->assertSessionHasNoErrors();
+        $this->post(route('sned.cerrar', $nueva))->assertSessionHasNoErrors();
+        $nueva->refresh();
+        $soloJornada = collect($nueva->resultados[90001]['personas'])->keyBy('rut');
+        $this->assertSame('jornada_corte', $nueva->metodo);
+        $this->assertSame(5401, $soloJornada[$principal]['general']);
+        $this->assertSame(3600, $soloJornada[$ultimoDia]['general']);
     }
 
     public function test_el_modulo_requiere_acceso_a_remuneraciones_y_valida_el_mes_en_el_nombre_del_mae(): void

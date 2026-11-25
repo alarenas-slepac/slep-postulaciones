@@ -1,3 +1,11 @@
+@php
+    $pestanas = ['docentes' => 'Docentes', 'aaee' => 'Asistentes'];
+    $esDocente = $estamento === 'docentes';
+    $personas = array_filter($resultado['personas'], fn ($persona) => $persona['estamento'] === $estamento);
+    $fueraDelCorte = $resultado['fuera_del_corte'][$estamento] ?? [];
+    $fondosNomina = $esDocente ? ['docentes' => '90% docente', 'incentivo' => '10% incentivo docente'] : ['aaee' => 'Aporte de asistentes'];
+    $totalNomina = $resultado['pagos'][$estamento] + ($esDocente ? $resultado['pagos']['incentivo'] : 0);
+@endphp
 <section id="calculo-rbd" class="slep-card p-4 mb-4" aria-labelledby="detalle-sned">
     <h2 id="detalle-sned" class="h5 mb-1">{{ $resultado['establecimiento'] }}</h2>
     <p class="small text-muted mb-3">RBD {{ $resultado['rbd'] }} · {{ $metodos[$cuota->metodo] }}</p>
@@ -6,8 +14,15 @@
             <ul class="mb-0">@foreach ($resultado['errores'] as $error)<li>{{ $error }}</li>@endforeach</ul>
         </div>
     @endif
+    <nav class="nav nav-tabs mb-3" aria-label="Nómina por estamento">
+        @foreach ($pestanas as $clave => $label)
+            <a @class(['nav-link', 'active' => $estamento === $clave])
+               href="{{ route('sned.show', [$cuota, 'rbd' => $aporte->rbd, 'estamento' => $clave]) }}#calculo-rbd"
+               @if ($estamento === $clave) aria-current="page" @endif>{{ $label }}</a>
+        @endforeach
+    </nav>
     <div class="row g-3 mb-4">
-        @foreach (['docentes' => '90% docente', 'incentivo' => '10% incentivo docente', 'aaee' => 'AAEE'] as $clave => $label)
+        @foreach ($fondosNomina as $clave => $label)
             <div class="col-md-4">
                 <div class="border rounded-4 bg-light-subtle p-3">
                     <div class="text-muted small">{{ $label }}</div>
@@ -19,12 +34,20 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle">
-            <caption class="caption-top pt-0">Personas con vigencia en {{ mb_strtolower($nombresMes[max($cuota->meses())]) }}</caption>
+            <caption class="caption-top pt-0">{{ $pestanas[$estamento] }} con vigencia en {{ mb_strtolower($nombresMes[max($cuota->meses())]) }}</caption>
             <thead class="table-light">
-                <tr><th scope="col">Funcionario/a</th><th scope="col">Estamento</th><th scope="col" class="text-end">Horas de corte</th><th scope="col" class="text-end">Reparto general</th><th scope="col" class="text-end">Incentivo</th><th scope="col" class="text-end">Total</th></tr>
+                <tr>
+                    <th scope="col">Funcionario/a</th>
+                    <th scope="col" class="text-end">Horas de corte</th>
+                    @if ($esDocente)
+                        <th scope="col" class="text-end">Reparto general</th>
+                        <th scope="col" class="text-end">Incentivo</th>
+                    @endif
+                    <th scope="col" class="text-end">Total</th>
+                </tr>
             </thead>
             <tbody>
-                @forelse ($resultado['personas'] as $persona)
+                @forelse ($personas as $persona)
                     <tr>
                         <th scope="row" class="fw-normal">
                             <div class="fw-semibold">{{ $persona['nombre'] }}</div>
@@ -44,37 +67,33 @@
                                 </ul>
                             </details>
                         </th>
-                        <td>{{ $persona['estamento'] === 'aaee' ? 'AAEE' : 'Docente' }}</td>
                         <td class="text-end">{{ number_format($persona['minutos_corte'] / 60, 2, ',', '.') }}</td>
-                        <td class="text-end">{{ $pesos($persona['general']) }}</td>
-                        <td class="text-end">{{ $pesos($persona['incentivo']) }}</td>
+                        @if ($esDocente)
+                            <td class="text-end">{{ $pesos($persona['general']) }}</td>
+                            <td class="text-end">{{ $pesos($persona['incentivo']) }}</td>
+                        @endif
                         <td class="text-end fw-semibold">{{ $pesos($persona['general'] + $persona['incentivo']) }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted">Sin personas elegibles en el mes de corte.</td></tr>
+                    <tr><td colspan="{{ $esDocente ? 5 : 3 }}" class="text-center text-muted">Sin personas elegibles en el mes de corte.</td></tr>
                 @endforelse
             </tbody>
-            <tfoot class="table-light"><tr><th colspan="5" scope="row" class="text-end">Total del establecimiento</th><td class="text-end fw-bold">{{ $pesos($resultado['total']) }}</td></tr></tfoot>
+            <tfoot class="table-light"><tr><th colspan="{{ $esDocente ? 4 : 2 }}" scope="row" class="text-end">Total {{ mb_strtolower($pestanas[$estamento]) }}</th><td class="text-end fw-bold">{{ $pesos($totalNomina) }}</td></tr></tfoot>
         </table>
     </div>
-    @if ($resultado['fuera_del_corte'])
+    @if ($fueraDelCorte)
         <details class="mt-2">
             <summary class="fw-semibold">Personas con contrato solo en meses anteriores al corte</summary>
             <ul class="small pt-2 mb-0">
-                @foreach ($resultado['fuera_del_corte'] as $personas)
-                    @foreach ($personas as $persona)
-                        <li>{{ $persona['nombre'] }} · {{ $persona['rut'] }}</li>
-                    @endforeach
+                @foreach ($fueraDelCorte as $persona)
+                    <li>{{ $persona['nombre'] }} · {{ $persona['rut'] }}</li>
                 @endforeach
             </ul>
         </details>
     @endif
 </section>
 
-@php
-    $docentesElegibles = array_filter($resultado['personas'], fn ($persona) => $persona['estamento'] === 'docentes');
-@endphp
-@if ($aporte->fondoIncentivo() && $docentesElegibles)
+@if ($esDocente && $aporte->fondoIncentivo() && $personas)
     <section class="slep-card p-4 mb-4" aria-labelledby="incentivo-sned">
         <h2 id="incentivo-sned" class="h5 mb-1">Incentivo docente 10%</h2>
         <p class="text-muted mb-3">{{ $aporte->establecimiento }} · Fondo {{ $pesos($aporte->fondoIncentivo()) }}</p>
@@ -107,7 +126,7 @@
                         <table id="docentes-incentivo-sned" class="table table-hover align-middle mb-0" aria-label="Docentes elegibles para el incentivo" aria-describedby="ayuda-incentivo-sned">
                             <thead class="table-light"><tr><th scope="col">Incluir</th><th scope="col">Docente</th></tr></thead>
                             <tbody>
-                                @foreach ($docentesElegibles as $persona)
+                                @foreach ($personas as $persona)
                                     <tr>
                                         <td><input id="docente-incentivo-{{ $loop->iteration }}" type="checkbox" name="ruts[]" value="{{ $persona['rut'] }}" class="form-check-input" @checked(in_array($persona['rut'], $rutsSeleccionados, true))></td>
                                         <th scope="row"><label class="form-check-label" for="docente-incentivo-{{ $loop->iteration }}">{{ $persona['nombre'] }} <span class="small text-muted fw-normal">{{ $persona['rut'] }}</span></label></th>
