@@ -167,13 +167,11 @@ class SnedController extends Controller
     public function guardarIncentivo(Request $request, SnedCuota $cuota, SnedAporte $aporte)
     {
         $datos = $request->validate([
-            'modo' => ['required', Rule::in(['iguales', 'montos'])],
-            'alcance' => ['required', Rule::in(['seleccion', 'todos'])],
             'referencia' => ['required', 'string', 'max:2000'],
-            'ruts' => ['nullable', 'array'],
+            'ruts' => ['required', 'array', 'list'],
             'ruts.*' => ['required', 'string', 'max:12', 'distinct'],
-            'montos' => ['nullable', 'array'],
-            'montos.*' => ['nullable', 'integer', 'min:1', 'max:1000000000000'],
+        ], [
+            'ruts.required' => 'Seleccione al menos un docente para distribuir el incentivo.',
         ]);
 
         DB::transaction(function () use ($cuota, $aporte, $datos, $request) {
@@ -183,16 +181,12 @@ class SnedController extends Controller
             $this->validarCargas($cargas, $cuota);
             $resultado = $this->calculadora->calcular($cuota, $aporte, $cargas);
             $elegibles = array_column(array_filter($resultado['personas'], fn ($persona) => $persona['estamento'] === 'docentes'), 'rut');
-            $ruts = $datos['alcance'] === 'todos' ? $elegibles : ($datos['ruts'] ?? []);
-            if (! $aporte->fondoIncentivo() || ! $ruts || array_diff($ruts, $elegibles)) {
+            $ruts = $datos['ruts'];
+            if (! $aporte->fondoIncentivo() || array_diff($ruts, $elegibles)) {
                 throw ValidationException::withMessages(['ruts' => 'Seleccione docentes elegibles de este establecimiento con un fondo de incentivo positivo.']);
             }
-            $montos = $datos['modo'] === 'montos' ? array_intersect_key(array_filter($datos['montos'] ?? []), array_flip($ruts)) : [];
-            if ($datos['modo'] === 'montos' && (count($montos) !== count($ruts) || array_sum($montos) !== $aporte->fondoIncentivo())) {
-                throw ValidationException::withMessages(['montos' => 'Ingrese un monto por cada docente seleccionado. El total debe cuadrar con el 10%.']);
-            }
             $aporte->update(['incentivo' => [
-                'modo' => $datos['modo'], 'alcance' => $datos['alcance'], 'ruts' => $ruts, 'montos' => array_map('intval', $montos),
+                'alcance' => count($ruts) === count($elegibles) ? 'todos' : 'seleccion', 'ruts' => $ruts,
                 'referencia' => trim($datos['referencia']), 'usuario_id' => $request->user()->id, 'registrado_at' => now()->toDateTimeString(),
             ]]);
         });

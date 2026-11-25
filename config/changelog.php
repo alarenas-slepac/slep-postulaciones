@@ -6594,8 +6594,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.25.712',
+    'current_version' => '2026.11.25.713',
     'entries' => [
+        [
+            'version' => '2026.11.25.713',
+            'title' => 'Selección de docentes para el incentivo SNED',
+            'summary' => 'Permite seleccionar o deseleccionar a todos los docentes elegibles y reparte el incentivo del 10% en partes iguales entre las personas seleccionadas.',
+            'roles' => ['admin', 'funcionario_slep'],
+            'items' => [
+                'Si se selecciona a un solo docente, recibe el fondo completo del incentivo.',
+            ],
+            'published_at' => '2026-11-25',
+        ],
         [
             'version' => '2026.11.25.712',
             'title' => 'Nóminas de pago SNED por separado',

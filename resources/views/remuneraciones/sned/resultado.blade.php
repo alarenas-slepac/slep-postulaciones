@@ -80,46 +80,37 @@
         <p class="text-muted mb-3">{{ $aporte->establecimiento }} · Fondo {{ $pesos($aporte->fondoIncentivo()) }}</p>
         @if ($cerrada)
             <p class="mb-1">{{ $aporte->incentivo['referencia'] ?? '' }}</p>
-            <p class="small text-muted mb-0">
-                {{ ($aporte->incentivo['modo'] ?? '') === 'montos' ? 'Montos individuales' : 'Partes iguales' }}
-                @if (! empty($aporte->incentivo['registrado_at'])) · Registrado el {{ $aporte->incentivo['registrado_at'] }}@endif
-            </p>
+            @if (! empty($aporte->incentivo['registrado_at']))
+                <p class="small text-muted mb-0">Registrado el {{ $aporte->incentivo['registrado_at'] }}</p>
+            @endif
         @else
-            <form method="POST" action="{{ route('sned.incentivo', [$cuota, $aporte]) }}" class="row g-3">
+            @php
+                $rutsSeleccionados = array_key_exists('referencia', old())
+                    ? (array) old('ruts', [])
+                    : ($aporte->incentivo['ruts'] ?? []);
+            @endphp
+            <form id="form-incentivo-sned" method="POST" action="{{ route('sned.incentivo', [$cuota, $aporte]) }}" class="row g-3">
                 @csrf
-                <div class="col-md-6">
-                    <label for="alcance" class="form-label">Docentes incluidos</label>
-                    <select id="alcance" name="alcance" class="form-select" aria-describedby="ayuda-alcance">
-                        <option value="seleccion" @selected(old('alcance', $aporte->incentivo['alcance'] ?? 'seleccion') === 'seleccion')>Una o varias personas seleccionadas</option>
-                        <option value="todos" @selected(old('alcance', $aporte->incentivo['alcance'] ?? 'seleccion') === 'todos')>Todos los docentes elegibles</option>
-                    </select>
-                    <p id="ayuda-alcance" class="form-text mb-0">Para un reparto parcial, marque las personas indicadas por el establecimiento.</p>
-                </div>
-                <div class="col-md-6">
-                    <label for="modo-incentivo" class="form-label">Forma de reparto</label>
-                    <select id="modo-incentivo" name="modo" class="form-select" aria-describedby="ayuda-modo">
-                        <option value="iguales" @selected(old('modo', $aporte->incentivo['modo'] ?? '') === 'iguales')>Partes iguales</option>
-                        <option value="montos" @selected(old('modo', $aporte->incentivo['modo'] ?? '') === 'montos')>Montos individuales</option>
-                    </select>
-                    <p id="ayuda-modo" class="form-text mb-0">Complete los montos de la tabla si el establecimiento indicó montos individuales.</p>
-                </div>
                 <div class="col-12">
                     <label for="referencia" class="form-label">Referencia de la instrucción del establecimiento</label>
-                    <textarea id="referencia" name="referencia" class="form-control" rows="2" maxlength="2000" required>{{ old('referencia', $aporte->incentivo['referencia'] ?? '') }}</textarea>
+                    <textarea id="referencia" name="referencia" class="form-control @error('referencia') is-invalid @enderror" rows="2" maxlength="2000" required>{{ old('referencia', $aporte->incentivo['referencia'] ?? '') }}</textarea>
+                    @error('referencia')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-12">
+                    <p id="ayuda-incentivo-sned" class="form-text mb-2">El fondo se reparte en partes iguales entre los docentes seleccionados. Si selecciona a uno, recibe el fondo completo.</p>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <button type="button" id="alternar-incentivo-sned" class="btn btn-sm btn-outline-secondary" aria-controls="docentes-incentivo-sned" hidden>Seleccionar todos</button>
+                        <span id="conteo-incentivo-sned" class="small text-muted" role="status"></span>
+                    </div>
+                    @error('ruts')<p class="small text-danger mb-2">{{ $message }}</p>@enderror
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light"><tr><th scope="col">Incluir</th><th scope="col">Docente</th><th scope="col">Monto individual ($)</th></tr></thead>
+                        <table id="docentes-incentivo-sned" class="table table-hover align-middle mb-0" aria-label="Docentes elegibles para el incentivo" aria-describedby="ayuda-incentivo-sned">
+                            <thead class="table-light"><tr><th scope="col">Incluir</th><th scope="col">Docente</th></tr></thead>
                             <tbody>
                                 @foreach ($docentesElegibles as $persona)
-                                    @php
-                                        $rut = $persona['rut'];
-                                    @endphp
                                     <tr>
-                                        <td><input type="checkbox" name="ruts[]" value="{{ $rut }}" class="form-check-input" aria-label="Incluir a {{ $persona['nombre'] }}" @checked(in_array($rut, old('ruts', $aporte->incentivo['ruts'] ?? []), true))></td>
-                                        <th scope="row">{{ $persona['nombre'] }} <span class="small text-muted fw-normal">{{ $rut }}</span></th>
-                                        <td><input type="number" name="montos[{{ $rut }}]" min="1" step="1" class="form-control form-control-sm" aria-label="Monto individual para {{ $persona['nombre'] }}" value="{{ old('montos.'.$rut, $aporte->incentivo['montos'][$rut] ?? '') }}"></td>
+                                        <td><input id="docente-incentivo-{{ $loop->iteration }}" type="checkbox" name="ruts[]" value="{{ $persona['rut'] }}" class="form-check-input" @checked(in_array($persona['rut'], $rutsSeleccionados, true))></td>
+                                        <th scope="row"><label class="form-check-label" for="docente-incentivo-{{ $loop->iteration }}">{{ $persona['nombre'] }} <span class="small text-muted fw-normal">{{ $persona['rut'] }}</span></label></th>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -128,6 +119,31 @@
                 </div>
                 <div class="col-12"><button class="btn btn-primary">Guardar reparto del 10%</button></div>
             </form>
+            @push('scripts')
+                <script>
+                    (() => {
+                        const formulario = document.getElementById('form-incentivo-sned');
+                        const boton = document.getElementById('alternar-incentivo-sned');
+                        const conteo = document.getElementById('conteo-incentivo-sned');
+                        const casillas = Array.from(formulario.querySelectorAll('input[name="ruts[]"]'));
+
+                        const actualizarSeleccion = () => {
+                            const seleccionados = casillas.filter(casilla => casilla.checked).length;
+                            boton.textContent = seleccionados === casillas.length ? 'Deseleccionar todos' : 'Seleccionar todos';
+                            conteo.textContent = `${seleccionados} de ${casillas.length} seleccionados`;
+                        };
+
+                        boton.addEventListener('click', () => {
+                            const marcar = casillas.some(casilla => !casilla.checked);
+                            casillas.forEach(casilla => { casilla.checked = marcar; });
+                            actualizarSeleccion();
+                        });
+                        casillas.forEach(casilla => casilla.addEventListener('change', actualizarSeleccion));
+                        actualizarSeleccion();
+                        boton.hidden = false;
+                    })();
+                </script>
+            @endpush
         @endif
     </section>
 @endif

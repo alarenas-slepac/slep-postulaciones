@@ -98,22 +98,26 @@ class SnedRemuneracionesTest extends IsolatedSecurityTestCase
 
         $aporteA = $cuota->aportes()->where('rbd', 90001)->sole();
         $aporteB = $cuota->aportes()->where('rbd', 90002)->sole();
-        $incentivo = ['modo' => 'montos', 'alcance' => 'seleccion', 'referencia' => 'Acta de prueba'];
+        $incentivo = ['referencia' => 'Acta de prueba'];
         $this->post(route('sned.incentivo', [$cuota, $aporteA]), $incentivo + [
-            'ruts' => [$anterior], 'montos' => [$anterior => 1000],
+            'ruts' => [$anterior],
         ])->assertSessionHasErrors('ruts');
+        $this->post(route('sned.incentivo', [$cuota, $aporteA]), $incentivo)->assertSessionHasErrors('ruts');
         $this->post(route('sned.incentivo', [$cuota, $aporteA]), $incentivo + [
-            'ruts' => [$ultimoDia], 'montos' => [$ultimoDia => 999],
-        ])->assertSessionHasErrors('montos');
-        $this->post(route('sned.incentivo', [$cuota, $aporteA]), $incentivo + [
-            'ruts' => [$ultimoDia], 'montos' => [$ultimoDia => 1000],
+            'ruts' => [$principal, $ultimoDia],
         ])->assertSessionHasNoErrors();
+        $this->assertSame('todos', $aporteA->refresh()->incentivo['alcance']);
+        $this->assertArrayNotHasKey('montos', $aporteA->incentivo);
         $this->post(route('sned.incentivo', [$cuota, $aporteB]), [
-            'modo' => 'iguales', 'alcance' => 'todos', 'referencia' => 'Acta de prueba B',
+            'ruts' => [$principal], 'referencia' => 'Acta de prueba B',
         ])->assertSessionHasNoErrors();
 
+        $aporteA->update(['incentivo' => $aporteA->incentivo + [
+            'modo' => 'montos', 'montos' => [$principal => 200, $ultimoDia => 800],
+        ]]);
         $this->get(route('sned.show', [$cuota, 'rbd' => 90001]))->assertOk()
-            ->assertSee('Incentivo docente 10%')->assertSee('Docente de prueba de septiembre');
+            ->assertSee('Incentivo docente 10%')->assertSee('Docente de prueba de septiembre')
+            ->assertSee('Seleccionar todos')->assertSee('Deseleccionar todos')->assertDontSee('Monto individual');
         $this->post(route('sned.cerrar', $cuota))->assertSessionHasNoErrors();
         $resultado = $cuota->refresh()->resultados[90001];
         $this->assertSame(['docentes' => 9001, 'incentivo' => 1000, 'aaee' => 431], $resultado['pagos']);
@@ -122,13 +126,15 @@ class SnedRemuneracionesTest extends IsolatedSecurityTestCase
         $this->assertSame(58, $personas[$ultimoDia]['general']);
         $this->assertSame([34, 38, 30], array_map(fn ($tramo) => (int) ($tramo['minutos'] / 60), $personas[$principal]['tramos']));
         $this->assertSame(1, $personas[$ultimoDia]['tramos'][0]['dias']);
-        $this->assertSame(1000, $personas[$ultimoDia]['incentivo']);
+        $this->assertSame(500, $personas[$principal]['incentivo']);
+        $this->assertSame(500, $personas[$ultimoDia]['incentivo']);
+        $this->assertSame(1, $cuota->resultados[90002]['personas'][0]['incentivo']);
         $this->assertFalse($personas->has($anterior));
 
         $cerrada = $this->get(route('sned.show', $cuota))->assertOk()->assertSee('Nóminas para pago');
         $exportaciones = [
             ['docentes-90', 'DOCENTES_90', ['csv', 'txt'], [[$principal, '8953'], [$ultimoDia, '58']]],
-            ['docentes-10', 'DOCENTES_10', ['csv', 'txt'], [[$principal, '1'], [$ultimoDia, '1000']]],
+            ['docentes-10', 'DOCENTES_10', ['csv', 'txt'], [[$principal, '501'], [$ultimoDia, '500']]],
             ['aaee', 'AAEE', ['txt'], [[$aaee, '431']]],
         ];
         foreach ($exportaciones as [$nomina, $sufijo, $formatos, $filasEsperadas]) {
