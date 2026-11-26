@@ -8,6 +8,7 @@ class SolicitudReemplazoConfiguracion extends Model
 {
     public const CORREO_AUTORIZACIONES_DOCENTES = 'correo_autorizaciones_docentes';
     public const CORREO_REMUNERACIONES_DEUDA_PENSION = 'correo_encargada_remuneraciones_deuda_pension';
+    public const FIRMA_ORDEN_TRABAJO = 'firma_orden_trabajo';
 
     protected $table = 'solicitud_reemplazo_configuraciones';
 

@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.723',
+    'current_version' => '2026.11.26.724',
     'entries' => [
+        [
+            'version' => '2026.11.26.724',
+            'title' => 'Firma titular y subrogante en órdenes de trabajo',
+            'summary' => 'Permite configurar nombre, cargo e imagen de firma, seleccionar la autoridad vigente y revisar un PDF de ejemplo antes de guardar.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'items' => [
+                'La selección se aplica en las nuevas órdenes de Reemplazos y Prórrogas.',
+                'Al regenerar una orden se conserva la autoridad que figuraba al momento de emitirla.',
+            ],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.723',
             'title' => 'Iniciales en la orden de trabajo de prórroga',

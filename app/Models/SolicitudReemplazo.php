@@ -160,6 +160,7 @@ class SolicitudReemplazo extends Model
         'derivada_at' => 'datetime',
         'observacion_slep_at' => 'datetime',
         'orden_trabajo_creada_at' => 'datetime',
+        'orden_trabajo_firmante' => 'array',
         'contrato_trabajo_subido_at' => 'datetime',
         'contrato_trabajo_firmado_subido_at' => 'datetime',
         'contrato_trabajo_firmado_enviado_at' => 'datetime',

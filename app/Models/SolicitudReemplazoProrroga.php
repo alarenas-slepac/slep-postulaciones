@@ -29,6 +29,7 @@ class SolicitudReemplazoProrroga extends Model
             'resolucion_registrada_at' => 'datetime',
             'antecedentes' => 'array',
             'orden_trabajo_emitida_at' => 'datetime',
+            'orden_trabajo_firmante' => 'array',
         ];
     }
 
