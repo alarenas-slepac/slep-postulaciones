@@ -97,6 +97,7 @@ class SlepUiRegistry
                 self::entry('Deuda pensión de alimentos', 'gestion.deudas-pension-alimentos.index', 'bi-shield-exclamation', ['admin', 'funcionario_slep'], 'gestion.solicitudes-reemplazo'),
                 self::entry('Autorizaciones docentes', 'gestion.autorizaciones-docentes.index', 'bi-patch-check', ['admin', 'coordinador_uatp']),
                 self::entry('Finiquitos reemplazos', 'gestion.solicitudes-reemplazo.finiquitos.index', 'bi-receipt-cutoff', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'gestion.solicitudes-reemplazo'),
+                self::entry('Prórrogas Reemplazos', 'gestion.solicitudes-reemplazo.prorrogas.index', 'bi-calendar-plus', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'gestion.solicitudes-reemplazo'),
                 self::entry('Padrón reemplazos', 'reemplazos.index', 'bi-person-lines-fill', ['admin', 'coordinador_gdp', 'funcionario_slep'], 'reemplazos'),
                 self::entry('Buscador postulantes', 'reemplazos.buscador-postulantes.index', 'bi-search', ['admin', 'coordinador_gdp', 'coordinador_uatp', 'funcionario_slep', 'funcionario_estab']),
                 self::entry('Vista temporal de usuarios', 'gestion.postulante-tutorial.index', 'bi-person-video2', ['admin', 'coordinador_gdp', 'funcionario_slep']),

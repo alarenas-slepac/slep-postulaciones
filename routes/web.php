@@ -63,6 +63,7 @@ use App\Http\Controllers\Admin\AsignaturaPersonalizadaController;
 use App\Http\Controllers\FuncionarioEstab\SolicitudReemplazoController;
 use App\Http\Controllers\MessagingController;
 use App\Http\Controllers\Gestion\SolicitudReemplazoGestionController;
+use App\Http\Controllers\Gestion\SolicitudReemplazoProrrogaController;
 use App\Http\Controllers\Gestion\DeudaPensionAlimentosController as GestionDeudaPensionAlimentosController;
 use App\Http\Controllers\Gestion\AutorizacionDocenteController;
 use App\Http\Controllers\Reemplazos\BuscadorPostulantesController;
@@ -1644,6 +1645,18 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::post('/solicitudes-reemplazo/gdp/reasignar/{solicitud}', [SolicitudReemplazoGestionController::class, 'gdpReasignar'])
             ->middleware('ensure.role:admin|coordinador_gdp')
             ->name('solicitudes-reemplazo.gdp.reasignar');
+        Route::prefix('solicitudes-reemplazo/prorrogas')->name('solicitudes-reemplazo.prorrogas.')
+            ->middleware(['ensure.role:admin|coordinador_gdp|funcionario_slep', 'ensure.active-role:admin|coordinador_gdp|funcionario_slep'])
+            ->group(function () {
+                Route::get('/', [SolicitudReemplazoProrrogaController::class, 'index'])->name('index');
+                Route::get('/resoluciones/{prorroga}', [SolicitudReemplazoProrrogaController::class, 'resolucion'])
+                    ->whereNumber('prorroga')->name('resolucion');
+                Route::group(['where' => ['anio' => '(?!9999)[1-9][0-9]{3}', 'estamento' => 'docente|aaee', 'rut' => '[1-9][0-9]{0,7}[0-9K]']], function () {
+                    Route::get('/{anio}/{estamento}/{rut}', [SolicitudReemplazoProrrogaController::class, 'show'])->name('show');
+                    Route::post('/{anio}/{estamento}/{rut}', [SolicitudReemplazoProrrogaController::class, 'store'])->name('store');
+                });
+            });
+
         // Funcionario SLEP: bandeja de finiquitos de reemplazos terminados
         Route::get('/solicitudes-reemplazo/finiquitos', [SolicitudReemplazoGestionController::class, 'finiquitos'])
             ->middleware('ensure.role:admin|coordinador_gdp|funcionario_slep')
