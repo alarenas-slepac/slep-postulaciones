@@ -97,6 +97,15 @@ class CometidoInformeRendicionAccessTest extends IsolatedSecurityTestCase
                     $table->integer('size')->nullable();
                     $table->unsignedBigInteger('uploaded_by');
                     $table->timestamps();
+                } elseif ($nombre === 'cometido_funcionario_documentos_generados') {
+                    $table->string('tipo_documento');
+                    $table->string('numero_documento');
+                    $table->string('codigo_validacion');
+                    $table->string('archivo_pdf_path')->nullable();
+                    $table->string('estado')->default('vigente');
+                    $table->timestamps();
+                } elseif ($nombre === 'cometido_funcionario_firmas') {
+                    $table->unsignedBigInteger('documento_generado_id')->nullable();
                 } elseif ($nombre === 'cometido_funcionario_rendiciones') {
                     $table->string('estado');
                     $table->unsignedInteger('monto_rendido');
@@ -291,6 +300,40 @@ class CometidoInformeRendicionAccessTest extends IsolatedSecurityTestCase
             ->assertViewHas('puedeRendir', true)->assertViewHas('puedeCompletarInformeCometido', false);
         $this->post(route(self::RUTA.'rendicion.enviar', $cometido), $this->respaldoFiscal())->assertRedirect($urlPanel);
         $this->get($urlPanel)->assertOk()->assertViewHas('bloqueaDafPorInforme', true);
+    }
+
+    public function test_el_detalle_con_informe_generado_permite_regenerar_el_pdf_al_solicitante(): void
+    {
+        $solicitante = $this->testUser(1, $this->rolEstablecimiento);
+        $otroFuncionario = $this->testUser(2, $this->rolEstablecimiento);
+        $solicitante->update(['establecimiento_id' => 10]);
+        $otroFuncionario->update(['establecimiento_id' => 10]);
+        $estado = 'rendicion_enviada_pendiente_informe';
+        $cometido = $this->cometido($solicitante, $estado);
+        $cometido->informesCometido()->create(['estado_informe' => 'enviado_pendiente_jefatura']);
+        $documento = $cometido->documentosGenerados()->create([
+            'tipo_documento' => 'informe_cometido',
+            'numero_documento' => 'INF-PRUEBA',
+            'codigo_validacion' => 'PRUEBA',
+            'archivo_pdf_path' => 'cometidos/informe-prueba.pdf',
+        ]);
+        $this->mock(CometidoFuncionarioPdfService::class)->shouldReceive('generarInformeCometido')->once()
+            ->andReturn($documento);
+
+        $urlDetalle = route(self::RUTA.'show', $cometido);
+        $respuestaDetalle = $this->actingAs($solicitante)->get($urlDetalle)->assertOk()->assertSee('Regenerar PDF');
+        $urlRegenerar = route(self::RUTA.'informe.regenerar-pdf', $cometido);
+        $respuestaDetalle->assertSee('action="'.$urlRegenerar.'"', false);
+        $this->actingAs($otroFuncionario)->post($urlRegenerar)->assertForbidden();
+        $this->actingAs($solicitante)->post($urlRegenerar)->assertRedirect($urlDetalle)->assertSessionHas('success');
+
+        $this->assertDatabaseHas('cometido_funcionario_historial', [
+            'cometido_funcionario_id' => $cometido->id,
+            'user_id' => $solicitante->id,
+            'accion' => 'PDF de informe de cometido regenerado',
+            'estado_anterior' => $estado,
+            'estado_nuevo' => $estado,
+        ]);
     }
 
     public function test_solo_el_directivo_del_propio_establecimiento_puede_revisar_y_recibe_el_aviso(): void
