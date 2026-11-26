@@ -6594,8 +6594,15 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.725',
+    'current_version' => '2026.11.26.726',
     'entries' => [
+        [
+            'version' => '2026.11.26.726',
+            'title' => 'Firmas más grandes en las órdenes de trabajo',
+            'summary' => 'Amplía el espacio de la firma cargada en los PDF de Reemplazos y Prórrogas y en su vista previa.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.725',
             'title' => 'Correlativo de las órdenes de trabajo de reemplazo',
