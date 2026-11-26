@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\EnsureModuleAccess;
+use App\Models\OrdenTrabajoCorrelativo;
+use App\Models\SolicitudReemplazo;
 use App\Models\SolicitudReemplazoProrroga;
+use App\Services\OrdenTrabajoPdfService;
 use App\Services\SolicitudReemplazoProrrogaService;
 use App\Support\Rut;
 use App\Support\SlepSidebarNavigation;
@@ -14,6 +17,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Support\IsolatedSecurityTestCase;
 
 class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
@@ -21,6 +25,8 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
     private const RUTA = 'gestion.solicitudes-reemplazo.prorrogas.';
 
     private const MIGRACION = '2026_11_26_130000_create_solicitud_reemplazo_prorrogas_table.php';
+
+    private const MIGRACION_OT = '2026_11_26_140000_add_ordenes_trabajo_to_prorrogas_reemplazo.php';
 
     protected function setUp(): void
     {
@@ -35,6 +41,13 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
             $table->id();
             $table->integer('rbd');
             $table->string('nombre_establecimiento');
+            $table->boolean('sala_cuna')->default(false);
+        });
+        Schema::create('areas_desempeno', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nombre');
+            $table->string('slug');
+            $table->string('estamento');
         });
         Schema::create('reemplazos_personal', function (Blueprint $table): void {
             $table->id();
@@ -49,6 +62,10 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
             $table->string('numero_solicitud');
             $table->unsignedBigInteger('establecimiento_id');
             $table->unsignedBigInteger('reemplazo_personal_id');
+            $table->unsignedBigInteger('area_desempeno_id')->nullable();
+            $table->unsignedInteger('correlativo')->nullable();
+            $table->string('orden_trabajo_pdf_path')->nullable();
+            $table->timestamp('orden_trabajo_creada_at')->nullable();
             $table->unsignedBigInteger('postulant_profile_id')->nullable();
             $table->unsignedBigInteger('contrato_trabajo_postulant_profile_id')->nullable();
             $table->string('rut_reemplazo_normalizado')->nullable();
@@ -64,6 +81,9 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
             $table->id();
             $table->unsignedBigInteger('solicitud_reemplazo_id');
             $table->decimal('reemplazo_total', 6, 2)->nullable();
+            $table->string('financiamiento')->nullable();
+            $table->decimal('reemplazo_basica', 6, 2)->nullable();
+            $table->decimal('reemplazo_media', 6, 2)->nullable();
         });
         DB::table('establecimientos')->insert([
             ['id' => 1, 'rbd' => 101, 'nombre_establecimiento' => 'Escuela de prueba Norte'],
@@ -76,6 +96,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
             ['id' => 4, 'estatuto' => 'ASISTENTE DE LA EDUCACIÓN'],
         ]);
         (require database_path('migrations/'.self::MIGRACION))->up();
+        (require database_path('migrations/'.self::MIGRACION_OT))->up();
     }
 
     public function test_une_titulares_y_escuelas_consecutivas_pero_no_une_estamentos_ni_dias_con_brechas(): void
@@ -108,7 +129,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertSame([['desde' => '2027-02-01', 'hasta' => '2027-02-28']], $docente['cobertura']);
         $siguiente = $servicio->casos(2027)->get('docente:99000006K');
         $this->assertSame('2027-12-31', $siguiente['fecha_corte']);
-        $this->assertSame([['desde' => '2028-01-01', 'hasta' => '2028-02-28']], $siguiente['cobertura']);
+        $this->assertSame([['desde' => '2028-01-01', 'hasta' => '2028-02-29']], $siguiente['cobertura']);
     }
 
     public function test_bandejas_y_resoluciones_son_independientes_por_estamento_y_restringidas_por_rol(): void
@@ -201,6 +222,144 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $sql = [];
         $migracion->up();
         $this->assertSame([$llave], $sql);
+    }
+
+    public function test_junji_acredita_seis_meses_en_la_misma_sala_cuna_y_exporta_la_nomina_filtrada(): void
+    {
+        DB::table('establecimientos')->update(['sala_cuna' => true]);
+        DB::table('areas_desempeno')->insert([
+            ['id' => 10, 'nombre' => 'Educadora de Párvulos', 'slug' => 'educadora_de_parvulos', 'estamento' => 'docente'],
+            ['id' => 20, 'nombre' => 'Técnico de Párvulos', 'slug' => 'tecnico_parvulos', 'estamento' => 'asistente'],
+        ]);
+        $rut = '99000001K';
+        $this->periodo($rut, 1, '2027-06-12', '2027-08-31', ['area_desempeno_id' => 10]);
+        $ultimo = $this->periodo($rut, 2, '2027-09-01', '2027-12-12', ['area_desempeno_id' => 10]);
+        DB::table('solicitud_reemplazo_jornadas')->insert(['solicitud_reemplazo_id' => $ultimo, 'financiamiento' => 'JUNJI', 'reemplazo_total' => 44]);
+        $this->periodo('99000002K', 1, '2027-06-12', '2027-08-31', ['area_desempeno_id' => 10]);
+        $this->periodo('99000002K', 1, '2027-09-01', '2027-12-12', ['area_desempeno_id' => 10, 'establecimiento_id' => 2]);
+        $this->periodo('99000003K', 3, '2027-06-12', '2027-12-12', ['area_desempeno_id' => 20]);
+        $servicio = app(SolicitudReemplazoProrrogaService::class);
+        $lista = $servicio->casos(2027);
+        $this->assertSame(['junji:99000001K', 'junji:99000003K'], $lista->keys()->sort()->values()->all());
+        $this->assertSame(['desde' => '2028-02-01', 'hasta' => '2028-02-29'], $servicio->vigencia(2027, 'junji'));
+
+        $usuario = $this->testUser(1, 4);
+        $filtros = ['anio' => 2027, 'estamento' => 'junji', 'area_id' => 10];
+        $this->actingAs($usuario)->get(route(self::RUTA.'index', $filtros))->assertOk()->assertSee('44 h JUNJI');
+        $respuesta = $this->get(route(self::RUTA.'index', $filtros + ['exportar' => 1]));
+        $respuesta->assertDownload('Nomina_Prorrogas_junji_2027.xlsx');
+        $temporal = tempnam(sys_get_temp_dir(), 'prorrogas-excel-');
+        try {
+            file_put_contents($temporal, $respuesta->streamedContent());
+            $libro = IOFactory::load($temporal);
+            $hoja = $libro->getActiveSheet();
+            $this->assertSame('JUNJI', $hoja->getTitle());
+            $this->assertSame(4, $hoja->getHighestDataRow());
+            $this->assertSame('Educadora de Párvulos', $hoja->getCell('F4')->getValue());
+            $this->assertSame('44 h JUNJI', $hoja->getCell('H4')->getValue());
+            $this->assertSame('29/02/2028', $hoja->getCell('L4')->getFormattedValue());
+            $libro->disconnectWorksheets();
+        } finally {
+            unlink($temporal);
+        }
+
+        $url = route(self::RUTA.'show', ['anio' => 2027, 'estamento' => 'junji', 'rut' => $rut]);
+        $this->post($url, [
+            'numero_resolucion' => 'REX-JUNJI-PRUEBA', 'fecha_resolucion' => '2027-12-14',
+            'resolucion' => UploadedFile::fake()->create('junji.pdf', 10, 'application/pdf'),
+        ])->assertRedirect($url);
+        $registro = SolicitudReemplazoProrroga::query()->sole();
+        $this->get($url)->assertOk()->assertSee('01/02/2028')->assertSee('E-198383')->assertDontSee('41 BIS');
+        $this->post(route(self::RUTA.'orden-trabajo.generar', $registro))->assertRedirect($url);
+        Storage::disk('local')->assertExists($registro->fresh()->orden_trabajo_pdf_path);
+    }
+
+    public function test_la_orden_usa_el_ultimo_reemplazo_y_reserva_el_numero_para_ambos_modulos(): void
+    {
+        $funcionario = $this->testUser(1, 4);
+        $persona = $this->testUser(2, 1);
+        $rut = Rut::normalize($persona->rut);
+        $perfil = DB::table('postulant_profiles')->insertGetId(['user_id' => $persona->id]);
+        DB::table('areas_desempeno')->insert(['id' => 10, 'nombre' => 'Docente diferencial', 'slug' => 'docente_diferencial', 'estamento' => 'docente']);
+        $historica = $this->periodo($rut, 1, '2027-06-12', '2027-09-01', ['numero_solicitud' => '06275-2027', 'orden_trabajo_pdf_path' => 'historica.pdf']);
+        $ultimo = $this->periodo($rut, 2, '2027-09-02', '2027-12-12', [
+            'establecimiento_id' => 2, 'area_desempeno_id' => 10, 'postulant_profile_id' => $perfil,
+        ]);
+        DB::table('solicitud_reemplazo_jornadas')->insert([
+            ['solicitud_reemplazo_id' => $ultimo, 'financiamiento' => 'SUBV. GENERAL', 'reemplazo_total' => 41],
+            ['solicitud_reemplazo_id' => $ultimo, 'financiamiento' => 'PIE', 'reemplazo_total' => 3],
+        ]);
+        $migracion = require database_path('migrations/'.self::MIGRACION_OT);
+        $migracion->up();
+        $migracion->up();
+
+        $datos = ['anio' => 2027, 'estamento' => 'docente', 'rut' => $rut];
+        $url = route(self::RUTA.'show', $datos);
+        $this->actingAs($funcionario)->post($url, [
+            'numero_resolucion' => 'REX-PRUEBA', 'fecha_resolucion' => '2027-12-14',
+            'resolucion' => UploadedFile::fake()->create('prorroga.pdf', 10, 'application/pdf'),
+        ])->assertRedirect($url);
+        $registro = SolicitudReemplazoProrroga::query()->sole();
+        $this->get($url)->assertOk()->assertSee('41 h SUBV. GENERAL + 3 h PIE')->assertSee('29/02/2028');
+        $this->assertSame('Escuela de prueba Sur', $registro->antecedentes['ultimo_reemplazo']['establecimiento']);
+        $generar = route(self::RUTA.'orden-trabajo.generar', $registro);
+        $this->post($generar)->assertRedirect($url);
+        $this->post($generar)->assertRedirect($url);
+        $registro->refresh();
+        $this->assertSame(6276, $registro->correlativoOrdenTrabajo->id);
+        $this->assertSame($funcionario->id, $registro->orden_trabajo_emitida_por_id);
+        Storage::disk('local')->assertExists($registro->orden_trabajo_pdf_path);
+        $this->get(route(self::RUTA.'orden-trabajo.descargar', $registro))->assertDownload('orden-trabajo-prorroga-6276.pdf');
+
+        $nuevo = $this->periodo($rut, 1, '2028-03-01', '2028-03-31', ['estado' => 'derivada_slep', 'numero_solicitud' => '00002-2028']);
+        $solicitud = SolicitudReemplazo::findOrFail($nuevo);
+        $pdf = app(OrdenTrabajoPdfService::class);
+        $this->assertStringContainsString('06275', $pdf->generateAndStore(SolicitudReemplazo::findOrFail($historica)));
+        $rutaNueva = $pdf->generateAndStore($solicitud);
+        $this->assertStringContainsString('06277', $rutaNueva);
+        $this->assertSame($rutaNueva, $pdf->generateAndStore($solicitud));
+        $this->assertSame([6275, 6276, 6277], OrdenTrabajoCorrelativo::query()->orderBy('id')->pluck('id')->all());
+        $this->assertStringNotContainsString('41 BIS', app(SolicitudReemplazoProrrogaService::class)->motivo('aaee'));
+    }
+
+    public function test_migracion_ot_mysql_compila_y_reintenta_el_ultimo_campo_faltante(): void
+    {
+        $pdo = \Mockery::mock(\PDO::class);
+        $pdo->shouldReceive('getAttribute')->with(\PDO::ATTR_SERVER_VERSION)->andReturn('8.0.36');
+        $conexion = new MySqlConnection($pdo, 'sga_pruebas', 'sga_', ['driver' => 'mysql', 'prefix_indexes' => true]);
+        $conexion->useDefaultSchemaGrammar();
+        $sql = [];
+        $compilar = function ($nombre, $definicion, $crear = false) use ($conexion, &$sql): void {
+            $plano = new Blueprint($conexion, $nombre);
+            if ($crear) {
+                $plano->create();
+            }
+            $definicion($plano);
+            array_push($sql, ...$plano->toSql());
+        };
+        DB::table('orden_trabajo_correlativos')->insert(['origen' => 'historico', 'origen_id' => 0]);
+        Schema::shouldReceive('hasTable')->with('orden_trabajo_correlativos')->twice()->andReturn(false, true);
+        Schema::shouldReceive('hasIndex')->with('orden_trabajo_correlativos', 'otc_origen_uq')->twice()->andReturn(false, true);
+        foreach (['orden_trabajo_pdf_path', 'orden_trabajo_emitida_por_id', 'orden_trabajo_emitida_at'] as $columna) {
+            Schema::shouldReceive('hasColumn')->with('solicitud_reemplazo_prorrogas', $columna)->twice()
+                ->andReturn(false, $columna !== 'orden_trabajo_emitida_at');
+        }
+        Schema::shouldReceive('create')->once()->andReturnUsing(fn ($nombre, $definicion) => $compilar($nombre, $definicion, true));
+        Schema::shouldReceive('table')->times(5)->andReturnUsing($compilar);
+        $migracion = require database_path('migrations/'.self::MIGRACION_OT);
+        $migracion->up();
+
+        $this->assertCount(5, $sql);
+        $this->assertStringContainsString('auto_increment primary key', $sql[0]);
+        $this->assertStringContainsString('otc_origen_uq', $sql[1]);
+        preg_match_all('/\x60([^\x60]+)\x60/', implode(' ', $sql), $identificadores);
+        foreach ($identificadores[1] as $identificador) {
+            $this->assertLessThanOrEqual(64, strlen($identificador));
+        }
+        $pendiente = $sql[4];
+        $sql = [];
+        $migracion->up();
+        $this->assertSame([$pendiente], $sql);
     }
 
     private function periodo(string $rut, int $titular, string $desde, string $hasta, array $ajustes = []): int

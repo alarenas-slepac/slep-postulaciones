@@ -26,7 +26,7 @@ class SolicitudReemplazoProrrogaService
             ->lazyById(500)
             ->map(fn (SolicitudReemplazo $solicitud) => $this->periodo($solicitud))
             ->filter(fn (?array $periodo) => $periodo && ($rut === null || $rut === $periodo['rut']))
-            ->mapWithKeys(fn (array $periodo) => [$periodo['estamento'].':'.$periodo['rut'] => true])
+            ->mapWithKeys(fn (array $periodo) => [$this->claveContinuidad($periodo) => true])
             ->all();
 
         if ($candidatos === []) {
@@ -35,14 +35,14 @@ class SolicitudReemplazoProrrogaService
 
         // La cadena puede comenzar antes del semestre evaluado.
         $periodos = $base->where('fecha_inicio_trabajo', '<=', $hastaProrroga)
-            ->with('jornadas:id,solicitud_reemplazo_id,reemplazo_total')
             ->lazyById(500)
             ->map(fn (SolicitudReemplazo $solicitud) => $this->periodo($solicitud))
-            ->filter(fn (?array $periodo) => $periodo && isset($candidatos[$periodo['estamento'].':'.$periodo['rut']]))
+            ->filter(fn (?array $periodo) => $periodo && isset($candidatos[$this->claveContinuidad($periodo)]))
             ->collect()
-            ->groupBy(fn (array $periodo) => $periodo['estamento'].':'.$periodo['rut']);
+            ->groupBy(fn (array $periodo) => $this->claveContinuidad($periodo));
 
-        return $periodos->map(function (Collection $tramos) use ($inicioDiciembre, $finDiciembre, $desdeProrroga, $hastaProrroga): ?array {
+        return $periodos->map(function (Collection $tramos) use ($anio, $inicioDiciembre, $finDiciembre): ?array {
+            ['desde' => $desdeProrroga, 'hasta' => $hastaProrroga] = $this->vigencia($anio, $tramos->first()['estamento']);
             $cadenas = $this->unirPeriodos($tramos);
             $cobertura = collect($cadenas)->filter(fn (array $cadena) => $cadena['hasta'] >= $desdeProrroga && $cadena['desde'] <= $hastaProrroga)
                 ->map(fn (array $cadena) => [
@@ -59,7 +59,7 @@ class SolicitudReemplazoProrrogaService
                     continue;
                 }
                 $antecedentes = collect($cadena['periodos'])->where('desde', '<=', $corte)->values();
-                $ultimo = $antecedentes->sortBy([['hasta', 'desc'], ['desde', 'desc'], ['id', 'desc']])->first();
+                $ultimo = $this->ultimoAlCorte($antecedentes, $corte);
 
                 return [
                     'rut' => $ultimo['rut'],
@@ -68,19 +68,71 @@ class SolicitudReemplazoProrrogaService
                     'inicio_continuidad' => $cadena['desde'],
                     'fecha_corte' => $corte,
                     'periodos' => $antecedentes->all(),
+                    'ultimo_reemplazo' => $ultimo,
                     'cobertura' => $cobertura,
                 ];
             }
 
             return null;
-        })->filter();
+        })->filter()
+            ->sortBy([['fecha_corte', 'desc'], ['ultimo_reemplazo.desde', 'desc'], ['ultimo_reemplazo.id', 'desc']])
+            ->unique(fn (array $caso) => $caso['estamento'].':'.$caso['rut'])
+            ->keyBy(fn (array $caso) => $caso['estamento'].':'.$caso['rut']);
     }
 
-    public function vigencia(int $anio): array
+    public function vigencia(int $anio, string $estamento = 'docente'): array
     {
-        $siguiente = $anio + 1;
+        $febrero = CarbonImmutable::create($anio + 1, 2, 1)->startOfDay();
 
-        return ['desde' => "{$siguiente}-01-01", 'hasta' => "{$siguiente}-02-28"];
+        return [
+            'desde' => ($estamento === 'junji' ? $febrero : $febrero->startOfYear())->toDateString(),
+            'hasta' => $febrero->endOfMonth()->toDateString(),
+        ];
+    }
+
+    public function ultimoReemplazo(array $caso): array
+    {
+        if (isset($caso['ultimo_reemplazo'])) {
+            return $caso['ultimo_reemplazo'];
+        }
+        $anterior = $this->ultimoAlCorte(collect($caso['periodos']), $caso['fecha_corte']);
+        $solicitud = $anterior ? $this->solicitudes()->find($anterior['id']) : null;
+
+        return ($solicitud ? $this->periodo($solicitud) : null) ?? $anterior ?? [];
+    }
+
+    public function motivo(string $estamento): string
+    {
+        return match ($estamento) {
+            'docente' => 'BENEFICIARIO PRORROGA ENERO/FEBRERO, ART. 41 BIS, LEY N° 19.070',
+            'junji' => 'PRORROGA MES DE FEBRERO, DICTAMEN E-198383 C.G.R.',
+            default => 'PRÓRROGA ENERO/FEBRERO',
+        };
+    }
+
+    public function financiamiento(array $periodo): string
+    {
+        return collect($periodo['financiamiento'] ?? [])->map(fn (array $fila) =>
+            $this->formatearHoras($fila['horas']).' h '.$fila['fuente'])->implode(' + ');
+    }
+
+    private function formatearHoras(float $horas): string
+    {
+        return rtrim(rtrim(number_format($horas, 2, ',', ''), '0'), ',');
+    }
+
+    private function claveContinuidad(array $periodo): string
+    {
+        if ($periodo['estamento'] === 'junji') {
+            return 'junji:'.$periodo['estamento_origen'].':'.$periodo['establecimiento_id'].':'.$periodo['rut'];
+        }
+        return $periodo['estamento'].':'.$periodo['rut'];
+    }
+
+    private function ultimoAlCorte(Collection $periodos, string $corte): ?array
+    {
+        return $periodos->where('desde', '<=', $corte)->where('hasta', '>=', $corte)
+            ->sortBy([['desde', 'desc'], ['hasta', 'desc'], ['id', 'desc']])->first();
     }
 
     private function solicitudes(): Builder
@@ -88,7 +140,7 @@ class SolicitudReemplazoProrrogaService
         $columnas = [
             'id', 'numero_solicitud', 'establecimiento_id', 'reemplazo_personal_id',
             'postulant_profile_id', 'contrato_trabajo_postulant_profile_id', 'rut_reemplazo_normalizado',
-            'fecha_inicio_trabajo', 'fecha_termino', 'aaee_categoria', 'contrato_trabajo_docx_path',
+            'fecha_inicio_trabajo', 'fecha_termino', 'area_desempeno_id', 'aaee_categoria', 'contrato_trabajo_docx_path',
             'resolucion_docente_docx_path', 'resolucion_docente_firmada_pdf_path',
         ];
         if (Schema::hasColumn('solicitudes_reemplazo', 'padron_personal_snapshot')) {
@@ -100,7 +152,9 @@ class SolicitudReemplazoProrrogaService
             ->whereNotNull('fecha_inicio_trabajo')
             ->whereColumn('fecha_termino', '>=', 'fecha_inicio_trabajo')
             ->with([
-                'establecimiento:id,rbd,nombre_establecimiento',
+                'establecimiento:id,rbd,nombre_establecimiento,sala_cuna',
+                'areaDesempeno:id,nombre,slug,estamento',
+                'jornadas:id,solicitud_reemplazo_id,financiamiento,reemplazo_total,reemplazo_basica,reemplazo_media',
                 'funcionarioTitular:id,estatuto',
                 'contratoPostulante:id,user_id',
                 'postulante:id,user_id',
@@ -113,24 +167,49 @@ class SolicitudReemplazoProrrogaService
     {
         $persona = $solicitud->contratoPostulante?->user ?? $solicitud->postulante?->user;
         $rut = Rut::normalize($persona?->rut ?: $solicitud->rut_reemplazo_normalizado);
-        $estamento = $this->estamento($solicitud);
-        if (! $rut || ! preg_match('/^0*[1-9][0-9]{0,7}[0-9K]$/D', $rut) || ! $estamento) {
+        if (! $rut || ! preg_match('/^0*[1-9][0-9]{0,7}[0-9K]$/D', $rut)) {
             return null;
         }
 
-        $jornadas = $solicitud->getRelations()['jornadas'] ?? collect();
+        $area = $solicitud->areaDesempeno;
+        $jornadas = $solicitud->jornadas;
+        $esJunji = $solicitud->establecimiento?->sala_cuna
+            || preg_match('/(?:junji|sala_cuna|\bvtf\b)/i', $area?->slug ?? '')
+            || $jornadas->contains(fn ($jornada) => preg_match('/\b(?:JUNJI|VTF)\b/i', (string) $jornada->financiamiento));
+        $estamento = $this->estamento($solicitud);
+        if ($esJunji) {
+            $estamento ??= match ($area?->estamento) {
+                'docente' => 'docente',
+                'asistente', 'aaee' => 'aaee',
+                default => null,
+            };
+        }
+        if (! $estamento || ($esJunji && ! $solicitud->establecimiento_id)) {
+            return null;
+        }
+        $financiamiento = $jornadas->filter(fn ($fila) => (float) $fila->reemplazo_total > 0)->map(fn ($fila) => [
+            'fuente' => trim((string) $fila->financiamiento),
+            'horas' => (float) $fila->reemplazo_total,
+            'basica' => (float) $fila->reemplazo_basica,
+            'media' => (float) $fila->reemplazo_media,
+        ])->values()->all();
 
         return [
             'id' => $solicitud->id,
             'solicitud' => $solicitud->numero_solicitud ?: (string) $solicitud->id,
             'rut' => ltrim(substr($rut, 0, -1), '0').substr($rut, -1),
             'nombre' => $persona?->nombre_completo ?: 'Nombre no informado',
-            'estamento' => $estamento,
+            'estamento' => $esJunji ? 'junji' : $estamento,
+            'estamento_origen' => $estamento,
             'desde' => $solicitud->fecha_inicio_trabajo->toDateString(),
             'hasta' => $solicitud->fecha_termino->toDateString(),
             'establecimiento' => $solicitud->establecimiento?->nombre_establecimiento,
+            'establecimiento_id' => $solicitud->establecimiento_id,
             'rbd' => $solicitud->establecimiento?->rbd,
+            'area_id' => $area?->id,
+            'cargo' => $area?->nombre,
             'horas' => $jornadas->whereNotNull('reemplazo_total')->isNotEmpty() ? $jornadas->sum('reemplazo_total') : null,
+            'financiamiento' => $financiamiento,
         ];
     }
 
