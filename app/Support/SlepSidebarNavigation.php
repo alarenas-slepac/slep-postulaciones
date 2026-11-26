@@ -31,6 +31,7 @@ class SlepSidebarNavigation
             'gestion.deudas-pension-alimentos.index',
             'gestion.autorizaciones-docentes.index',
             'gestion.solicitudes-reemplazo.finiquitos.index',
+            'gestion.solicitudes-reemplazo.prorrogas.index',
             'reemplazos.index',
             'reemplazos.buscador-postulantes.index',
             'gestion.bolsa-trabajo.index',

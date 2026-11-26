@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.718',
+    'current_version' => '2026.11.26.719',
     'entries' => [
+        [
+            'version' => '2026.11.26.719',
+            'title' => 'Prórrogas de reemplazos docentes y AAEE',
+            'summary' => 'Consulta seis meses continuos al último día cubierto en diciembre y registra la resolución de prórroga para enero y febrero.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'items' => [
+                'Agrupa los períodos por RUT en todo el SLEP y calcula Docentes y AAEE por separado.',
+                'El expediente conserva los períodos de respaldo y el PDF de la resolución.',
+            ],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.718',
             'title' => 'Apertura del detalle con informe de cometido',
