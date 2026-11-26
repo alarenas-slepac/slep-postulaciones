@@ -81,6 +81,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
             $table->unsignedBigInteger('contrato_trabajo_postulant_profile_id')->nullable();
             $table->string('rut_reemplazo_normalizado')->nullable();
             $table->string('estado');
+            $table->date('fecha_inicio')->nullable();
             $table->date('fecha_inicio_trabajo')->nullable();
             $table->date('fecha_termino');
             $table->string('aaee_categoria')->nullable();
@@ -458,16 +459,26 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertNotSame($huella, hash('sha256', $disco->get($registro->orden_trabajo_pdf_path)));
         $this->get(route(self::RUTA.'orden-trabajo.descargar', $registro))->assertDownload('orden-trabajo-prorroga-6281.pdf');
 
-        $this->periodo('99000008K', 1, '2027-11-01', '2027-11-30', [
-            'estado' => 'rechazada_plani', 'correlativo' => 6283, 'numero_solicitud' => '06283-2027',
+        $nuevo = $this->periodo($rut, 1, '2028-03-01', '2028-03-31', [
+            'estado' => 'derivada_slep', 'correlativo' => 2, 'numero_solicitud' => '00002-2028', 'fecha_inicio' => '2028-03-01',
         ]);
-        $nuevo = $this->periodo($rut, 1, '2028-03-01', '2028-03-31', ['estado' => 'derivada_slep', 'numero_solicitud' => '00002-2028']);
         $solicitud = SolicitudReemplazo::findOrFail($nuevo);
         $pdf = app(OrdenTrabajoPdfService::class);
         $this->assertStringContainsString('06275', $pdf->generateAndStore(SolicitudReemplazo::findOrFail($historica)));
+        $numerosEnPdf = [];
+        View::composer('pdf.orden-trabajo', function ($vista) use (&$numerosEnPdf): void {
+            $numerosEnPdf[] = $vista->getData()['otNumero'];
+        });
         $rutaNueva = $pdf->generateAndStore($solicitud);
-        $this->assertStringContainsString('06284', $rutaNueva);
-        $this->assertSame($rutaNueva, $pdf->generateAndStore($solicitud));
+        $this->assertStringEndsWith('/ORDEN_TRABAJO_00002-2028.pdf', $rutaNueva);
+        $this->assertSame([6275, 6281], OrdenTrabajoCorrelativo::query()->orderBy('id')->pluck('id')->all());
+
+        DB::table('orden_trabajo_correlativos')->insert(['id' => 6284, 'origen' => 'reemplazo', 'origen_id' => $nuevo]);
+        DB::table('solicitudes_reemplazo')->where('id', $nuevo)->update([
+            'estado' => 'aceptada', 'orden_trabajo_pdf_path' => "private/solicitudes-reemplazo/{$nuevo}/ORDEN_TRABAJO_06284-2028.pdf",
+        ]);
+        $this->assertSame($rutaNueva, $pdf->generateAndStore($solicitud->fresh()));
+        $this->assertSame(['00002-2028', '00002-2028'], $numerosEnPdf);
         $this->assertSame([6275, 6281, 6284], OrdenTrabajoCorrelativo::query()->orderBy('id')->pluck('id')->all());
         $this->assertStringNotContainsString('41 BIS', app(SolicitudReemplazoProrrogaService::class)->motivo('aaee'));
     }

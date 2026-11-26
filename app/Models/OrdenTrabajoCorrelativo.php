@@ -12,14 +12,12 @@ class OrdenTrabajoCorrelativo extends Model
 
     protected $fillable = ['origen', 'origen_id'];
 
-    public const REEMPLAZO = 'reemplazo';
-
     public const PRORROGA = 'prorroga';
 
-    public static function reservar(string $origen, int $id): self
+    public static function reservarProrroga(int $id): self
     {
         // Las altas de solicitudes y las emisiones comparten la transacción coordinada del padrón.
-        $reserva = self::query()->firstOrNew(['origen' => $origen, 'origen_id' => $id]);
+        $reserva = self::query()->firstOrNew(['origen' => self::PRORROGA, 'origen_id' => $id]);
         if (! $reserva->exists) {
             $reserva->id = max(
                 (int) self::query()->max('id'),
