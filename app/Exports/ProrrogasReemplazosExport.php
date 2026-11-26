@@ -51,11 +51,12 @@ class ProrrogasReemplazosExport
         foreach ($casos as $caso) {
             $ultimo = $caso['ultimo_reemplazo'];
             $registrada = $caso['registrada'] ?? null;
+            $expediente = $caso['expediente'] ?? null;
             foreach ([
                 1 => Rut::format($caso['rut']), 2 => $caso['nombre'], 3 => $ultimo['solicitud'] ?? null, 4 => $ultimo['rbd'] ?? null,
                 5 => $ultimo['establecimiento'] ?? null, 6 => $ultimo['cargo'] ?? null,
                 8 => $this->servicio->financiamiento($ultimo), 13 => $registrada ? 'Registrada' : 'Pendiente de revisión',
-                14 => $registrada?->numero_resolucion, 15 => $registrada?->correlativoOrdenTrabajo?->id,
+                14 => $registrada?->numero_resolucion, 15 => $expediente?->correlativoOrdenTrabajo?->id,
             ] as $columna => $valor) {
                 $texto([$columna, $fila], $valor);
             }

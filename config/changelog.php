@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.720',
+    'current_version' => '2026.11.26.721',
     'entries' => [
+        [
+            'version' => '2026.11.26.721',
+            'title' => 'Órdenes de trabajo con resolución pendiente en prórrogas',
+            'summary' => 'Permite emitir la orden de trabajo y adjuntar después la resolución en el mismo expediente.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'items' => [
+                'La bandeja muestra el número de OT emitido y mantiene el estado pendiente hasta adjuntar la resolución.',
+                'La etiqueta Pendiente de revisión se muestra en una sola línea.',
+            ],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.720',
             'title' => 'Órdenes de trabajo y nóminas de prórrogas',

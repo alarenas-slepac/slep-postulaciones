@@ -79,7 +79,7 @@
                     <dl class="row mb-2">
                         <dt class="col-sm-3">Número de resolución</dt><dd class="col-sm-9 text-break">{{ $registrada->numero_resolucion }}</dd>
                         <dt class="col-sm-3">Fecha de resolución</dt><dd class="col-sm-9">{{ $registrada->fecha_resolucion->format('d/m/Y') }}</dd>
-                        <dt class="col-sm-3">Fecha de registro</dt><dd class="col-sm-9">{{ $registrada->created_at->format('d/m/Y H:i') }}</dd>
+                        <dt class="col-sm-3">Fecha de registro</dt><dd class="col-sm-9">{{ ($registrada->resolucion_registrada_at ?? $registrada->created_at)->format('d/m/Y H:i') }}</dd>
                         <dt class="col-sm-3">Registrada por</dt><dd class="col-sm-9">{{ $registrada->registradaPor?->nombre_completo ?: 'Usuario no disponible' }}</dd>
                         @if ($registrada->observacion)<dt class="col-sm-3">Observación</dt><dd class="col-sm-9 text-break">{!! nl2br(e($registrada->observacion)) !!}</dd>@endif
                     </dl>
@@ -137,16 +137,14 @@
                     <dt class="col-sm-3">Motivo</dt><dd class="col-sm-9">{{ $prorrogas->motivo($estamento) }}</dd>
                 </dl>
                 @if ($ordenDisponible)
-                    <a class="slep-listing__button slep-listing__button--secondary" href="{{ route($ruta.'orden-trabajo.descargar', $registrada) }}">
-                        <i class="bi bi-download" aria-hidden="true"></i> Descargar OT N° {{ $registrada->correlativoOrdenTrabajo?->id }}
+                    <a class="slep-listing__button slep-listing__button--secondary" href="{{ route($ruta.'orden-trabajo.descargar', $expediente) }}">
+                        <i class="bi bi-download" aria-hidden="true"></i> Descargar OT N° {{ $expediente->correlativoOrdenTrabajo?->id }}
                     </a>
-                @elseif ($registrada)
-                    <form method="POST" action="{{ route($ruta.'orden-trabajo.generar', $registrada) }}">
+                @else
+                    <form method="POST" action="{{ route($ruta.'orden-trabajo.generar-caso', compact('anio', 'estamento', 'rut')) }}">
                         @csrf
                         <button type="submit" class="slep-listing__button slep-listing__button--primary"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Generar orden de trabajo</button>
                     </form>
-                @else
-                    <p class="mb-0 slep-listing__muted">Registra la resolución para generar la orden de trabajo.</p>
                 @endif
             </div>
         </section>

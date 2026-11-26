@@ -45,6 +45,11 @@
         SUBDIRECCIÓN DE GESTIÓN Y DESARROLLO DE LAS PERSONAS<br>
         SERVICIO LOCAL DE EDUCACIÓN PÚBLICA ANDALIÉN COSTA
     </div>
-    <p class="respaldo">Resolución N° {{ $prorroga->numero_resolucion }} del {{ $fecha($prorroga->fecha_resolucion) }} · Reemplazo {{ $reemplazo['solicitud'] }}</p>
+    <p class="respaldo">
+        @if ($prorroga->tieneResolucion())
+            Resolución N° {{ $prorroga->numero_resolucion }} del {{ $fecha($prorroga->fecha_resolucion) }} ·
+        @endif
+        Reemplazo {{ $reemplazo['solicitud'] }}
+    </p>
 </body>
 </html>

@@ -28,6 +28,8 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
 
     private const MIGRACION_OT = '2026_11_26_140000_add_ordenes_trabajo_to_prorrogas_reemplazo.php';
 
+    private const MIGRACION_RESOLUCION_OPCIONAL = '2026_11_26_150000_allow_orden_trabajo_before_prorroga_resolucion.php';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -97,6 +99,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         ]);
         (require database_path('migrations/'.self::MIGRACION))->up();
         (require database_path('migrations/'.self::MIGRACION_OT))->up();
+        (require database_path('migrations/'.self::MIGRACION_RESOLUCION_OPCIONAL))->up();
     }
 
     public function test_une_titulares_y_escuelas_consecutivas_pero_no_une_estamentos_ni_dias_con_brechas(): void
@@ -295,21 +298,38 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
 
         $datos = ['anio' => 2027, 'estamento' => 'docente', 'rut' => $rut];
         $url = route(self::RUTA.'show', $datos);
-        $this->actingAs($funcionario)->post($url, [
-            'numero_resolucion' => 'REX-PRUEBA', 'fecha_resolucion' => '2027-12-14',
-            'resolucion' => UploadedFile::fake()->create('prorroga.pdf', 10, 'application/pdf'),
-        ])->assertRedirect($url);
+        $generar = route(self::RUTA.'orden-trabajo.generar-caso', $datos);
+        $this->actingAs($persona)->post($generar)->assertForbidden();
+        $this->actingAs($funcionario)->get($url)->assertOk()->assertSee($generar)->assertSee('Generar orden de trabajo')
+            ->assertSee('41 h SUBV. GENERAL + 3 h PIE')->assertSee('29/02/2028');
+        $this->post($generar)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->post($generar)->assertRedirect($url)->assertSessionHasNoErrors();
         $registro = SolicitudReemplazoProrroga::query()->sole();
-        $this->get($url)->assertOk()->assertSee('41 h SUBV. GENERAL + 3 h PIE')->assertSee('29/02/2028');
+        $this->assertFalse($registro->tieneResolucion());
+        $this->assertNull($registro->numero_resolucion);
         $this->assertSame('Escuela de prueba Sur', $registro->antecedentes['ultimo_reemplazo']['establecimiento']);
-        $generar = route(self::RUTA.'orden-trabajo.generar', $registro);
-        $this->post($generar)->assertRedirect($url);
-        $this->post($generar)->assertRedirect($url);
-        $registro->refresh();
         $this->assertSame(6276, $registro->correlativoOrdenTrabajo->id);
         $this->assertSame($funcionario->id, $registro->orden_trabajo_emitida_por_id);
-        Storage::disk('local')->assertExists($registro->orden_trabajo_pdf_path);
+        $disco = Storage::disk('local');
+        $disco->assertExists($registro->orden_trabajo_pdf_path);
+        $huella = hash('sha256', $disco->get($registro->orden_trabajo_pdf_path));
+        $this->get(route(self::RUTA.'resolucion', $registro))->assertNotFound();
         $this->get(route(self::RUTA.'orden-trabajo.descargar', $registro))->assertDownload('orden-trabajo-prorroga-6276.pdf');
+        $this->get($url)->assertOk()->assertSee('Descargar OT N° 6276')->assertSee('Registrar prórroga');
+        $bandejaPendiente = route(self::RUTA.'index', ['anio' => 2027, 'estado' => 'pendiente']);
+        $this->get($bandejaPendiente)->assertOk()->assertSee('OT N° 6276');
+
+        $this->post($url, [
+            'numero_resolucion' => 'REX-PRUEBA', 'fecha_resolucion' => '2027-12-14',
+            'resolucion' => UploadedFile::fake()->create('prorroga.pdf', 10, 'application/pdf'),
+        ])->assertRedirect($url)->assertSessionHasNoErrors();
+        $registro->refresh();
+        $this->assertDatabaseCount('solicitud_reemplazo_prorrogas', 1);
+        $this->assertSame('REX-PRUEBA', $registro->numero_resolucion);
+        $this->assertNotNull($registro->resolucion_registrada_at);
+        $this->assertSame(6276, $registro->correlativoOrdenTrabajo->id);
+        $this->assertSame($huella, hash('sha256', $disco->get($registro->orden_trabajo_pdf_path)));
+        $this->get($bandejaPendiente)->assertOk()->assertDontSee('OT N° 6276');
 
         $nuevo = $this->periodo($rut, 1, '2028-03-01', '2028-03-31', ['estado' => 'derivada_slep', 'numero_solicitud' => '00002-2028']);
         $solicitud = SolicitudReemplazo::findOrFail($nuevo);
@@ -357,6 +377,39 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
             $this->assertLessThanOrEqual(64, strlen($identificador));
         }
         $pendiente = $sql[4];
+        $sql = [];
+        $migracion->up();
+        $this->assertSame([$pendiente], $sql);
+    }
+
+    public function test_mysql_hace_opcionales_los_campos_de_resolucion_y_reanuda_el_cambio_pendiente(): void
+    {
+        $pdo = \Mockery::mock(\PDO::class);
+        $pdo->shouldReceive('getAttribute')->with(\PDO::ATTR_SERVER_VERSION)->andReturn('8.0.36');
+        $conexion = new MySqlConnection($pdo, 'sga_pruebas', 'sga_', ['driver' => 'mysql', 'prefix_indexes' => true]);
+        $conexion->useDefaultSchemaGrammar();
+        $tabla = 'solicitud_reemplazo_prorrogas';
+        $campos = ['numero_resolucion', 'fecha_resolucion', 'resolucion_path', 'resolucion_nombre'];
+        Schema::shouldReceive('getColumns')->with($tabla)->twice()->andReturn(
+            array_map(fn ($campo) => ['name' => $campo, 'nullable' => false], $campos),
+            array_map(fn ($campo) => ['name' => $campo, 'nullable' => $campo !== 'fecha_resolucion'], $campos),
+        );
+        Schema::shouldReceive('hasColumn')->with($tabla, 'resolucion_registrada_at')->twice()->andReturn(false, true);
+        $sql = [];
+        Schema::shouldReceive('table')->times(6)->andReturnUsing(function ($nombre, $definicion) use ($conexion, &$sql): void {
+            $plano = new Blueprint($conexion, $nombre);
+            $definicion($plano);
+            array_push($sql, ...$plano->toSql());
+        });
+        $migracion = require database_path('migrations/'.self::MIGRACION_RESOLUCION_OPCIONAL);
+        $migracion->up();
+        $this->assertCount(5, $sql);
+        $this->assertStringContainsString('modify `numero_resolucion` varchar(100) null', $sql[0]);
+        $this->assertStringContainsString('modify `fecha_resolucion` date null', $sql[1]);
+        $this->assertStringContainsString('modify `resolucion_path` varchar(255) null', $sql[2]);
+        $this->assertStringContainsString('modify `resolucion_nombre` varchar(255) null', $sql[3]);
+        $this->assertStringContainsString('add `resolucion_registrada_at` timestamp null', $sql[4]);
+        $pendiente = $sql[1];
         $sql = [];
         $migracion->up();
         $this->assertSame([$pendiente], $sql);
