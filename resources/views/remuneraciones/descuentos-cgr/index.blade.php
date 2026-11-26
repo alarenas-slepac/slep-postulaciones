@@ -44,10 +44,10 @@
             ];
             if ($estado === 'ingresado') {
                 $tarjetas[] = ['icono' => 'bi-file-earmark-pdf', 'etiqueta' => 'Liquidaciones cargadas', 'valor' => number_format($indicadores['documentos'], 0, ',', '.').' / '.number_format($indicadores['cuotas'], 0, ',', '.'), 'ayuda' => 'Cuotas con liquidación respecto de las cuotas programadas.'];
-                $tarjetas[] = ['icono' => 'bi-send', 'etiqueta' => 'Listos para Finanzas', 'valor' => number_format($indicadores['listos'], 0, ',', '.'), 'ayuda' => 'Registros con liquidación en todas sus cuotas.'];
+                $tarjetas[] = ['icono' => 'bi-send', 'etiqueta' => 'Listos para Finanzas', 'valor' => number_format($indicadores['listos'], 0, ',', '.'), 'ayuda' => 'Registros con liquidación en todas sus cuotas para el envío inicial.'];
             } elseif ($estado === 'descuentos_realizados') {
                 $tarjetas[] = ['icono' => 'bi-receipt', 'etiqueta' => 'Comprobantes asociados', 'valor' => number_format($indicadores['documentos'], 0, ',', '.').' / '.number_format($indicadores['cuotas'] * 2, 0, ',', '.'), 'ayuda' => 'Una asociación SIGFE y una TGR por cuota.'];
-                $tarjetas[] = ['icono' => 'bi-send', 'etiqueta' => 'Listos para Auditoría', 'valor' => number_format($indicadores['listos'], 0, ',', '.'), 'ayuda' => 'Registros con ambos comprobantes en todas sus cuotas.'];
+                $tarjetas[] = ['icono' => 'bi-send', 'etiqueta' => 'Listos para Auditoría', 'valor' => number_format($indicadores['listos'], 0, ',', '.'), 'ayuda' => 'Registros con ambos comprobantes en todas sus cuotas para el envío inicial.'];
             } elseif ($estado === 'en_auditoria') {
                 $tarjetas[] = ['icono' => 'bi-file-earmark-check', 'etiqueta' => 'Liquidaciones validadas', 'valor' => number_format($indicadores['documentos'], 0, ',', '.').' / '.number_format($indicadores['cuotas'], 0, ',', '.'), 'ayuda' => 'Cuotas con liquidación validada.'];
                 $tarjetas[] = ['icono' => 'bi-patch-check', 'etiqueta' => 'Certificados firmados', 'valor' => number_format($indicadores['firmados'], 0, ',', '.'), 'ayuda' => 'Registros con certificado PDF firmado cargado.'];
@@ -179,12 +179,19 @@
                                 <td class="text-end">{{ number_format((float) $descuento->cuota_utm, 4, ',', '.') }}<br><span class="text-muted small">{{ $descuento->numero_cuotas }} cuotas</span></td>
                                 <td>{{ $descuento->fecha_primer_descuento->translatedFormat('m-Y') }}</td>
                                 <td>{{ $descuento->fecha_primer_descuento->copy()->addMonthsNoOverflow(max(0, $descuento->numero_cuotas - 1))->format('m-Y') }}</td>
-                                <td><span class="badge {{ match($descuento->estadoActual()) { 'cerrado' => 'text-bg-success', 'en_auditoria' => 'text-bg-info', 'descuentos_realizados' => 'text-bg-warning', default => 'text-bg-primary' } }}">{{ $descuento->etiquetaEstado() }}</span></td>
+                                <td>
+                                    <span class="badge {{ match($descuento->estadoActual()) { 'cerrado' => 'text-bg-success', 'en_auditoria' => 'text-bg-info', 'descuentos_realizados' => 'text-bg-warning', default => 'text-bg-primary' } }}">{{ $descuento->etiquetaEstado() }}</span>
+                                    @if ($descuento->observacion_pendiente)
+                                        <div class="mt-1"><span class="badge text-bg-warning">Observado por Auditoría</span></div>
+                                    @endif
+                                </td>
                                 <td class="text-end">
                                     <div class="d-flex flex-wrap justify-content-end gap-2">
                                     <a href="{{ route('descuentos-cgr.show', $descuento) }}" class="btn btn-sm btn-outline-primary" aria-label="Ver cronograma de {{ $descuento->nombre }}"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Ver</a>
                                     @if ($puedeRegistrar && $descuento->estadoActual() === 'ingresado')
                                     <a href="{{ route('descuentos-cgr.edit', $descuento) }}" class="btn btn-sm btn-outline-secondary" aria-label="Editar descuento de {{ $descuento->nombre }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Editar</a>
+                                    @endif
+                                    @if ($puedeRegistrar && $descuento->estadoActual() === 'ingresado' && ! $descuento->observacion_pendiente)
                                     <form method="POST" action="{{ route('descuentos-cgr.destroy', $descuento) }}" class="d-inline" onsubmit="return confirm('Se eliminará el descuento CGR, su cronograma y la resolución PDF asociada. Esta acción no se puede deshacer. ¿Deseas continuar?');">
                                         @csrf
                                         @method('DELETE')

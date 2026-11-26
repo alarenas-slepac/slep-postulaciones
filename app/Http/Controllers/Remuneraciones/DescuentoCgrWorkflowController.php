@@ -8,12 +8,14 @@ use App\Models\DescuentoCgrArchivo;
 use App\Models\DescuentoCgrNotificacion;
 use App\Services\Remuneraciones\DescuentoCgrCertificadoService;
 use App\Services\Remuneraciones\DescuentoCgrExpedienteService;
+use App\Services\Remuneraciones\DescuentoCgrObservacionService;
 use App\Services\Remuneraciones\DescuentoCgrWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class DescuentoCgrWorkflowController extends Controller
@@ -43,14 +45,18 @@ class DescuentoCgrWorkflowController extends Controller
         $this->autorizar($request, ['admin', 'funcionario_daf']);
         abort_unless(in_array($tipo, ['sigfe', 'tgr', 'transferencia_institucion'], true), 404);
         $data = $request->validate([
-            'archivo' => ['required', 'file', 'mimes:pdf', 'max:20480'],
+            'archivo' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'cuotas' => ['required', 'array', 'min:1'],
             'cuotas.*' => ['required', 'integer', 'min:1', 'max:'.$descuentoCgr->numero_cuotas, 'distinct'],
             'folio' => ['required', 'string', 'max:100'],
             'fecha_reintegro' => ['required', 'date'],
             'monto_reintegro_pesos' => ['required', 'integer', 'min:1'],
         ]);
-        $flujo->guardarArchivos($descuentoCgr, $tipo, [['archivo' => $data['archivo'], 'cuotas' => $data['cuotas']]], $request->user()->id, $data);
+        if (isset($data['archivo'])) {
+            $flujo->guardarArchivos($descuentoCgr, $tipo, [['archivo' => $data['archivo'], 'cuotas' => $data['cuotas']]], $request->user()->id, $data);
+        } else {
+            $flujo->corregirMetadatos($descuentoCgr, $tipo, $data['cuotas'], $data, $request->user()->id);
+        }
 
         return back()->with('status', $tipo === 'transferencia_institucion'
             ? 'Comprobante de transferencia asociado a las cuotas seleccionadas.'
@@ -71,6 +77,36 @@ class DescuentoCgrWorkflowController extends Controller
         $flujo->avanzar($descuentoCgr, 'descuentos_realizados', 'en_auditoria', ['sigfe', 'tgr'], 'enviado_auditoria_en', 'auditoria_slep', 'auditoria');
 
         return back()->with('status', 'Descuento enviado a Auditoría Interna.');
+    }
+
+    public function observar(Request $request, DescuentoCgr $descuentoCgr, DescuentoCgrObservacionService $observaciones): RedirectResponse
+    {
+        abort_unless(in_array($request->user()->activeRoleName(), ['admin', 'auditoria_slep'], true), 403);
+        if ($request->filled('elementos_json') && is_string($request->input('elementos_json'))) {
+            $request->merge(['elementos' => json_decode($request->input('elementos_json'), true)]);
+        }
+        $data = $request->validate([
+            'etapa_destino' => ['required', Rule::in(array_keys(DescuentoCgrObservacionService::ETAPAS))],
+            'observacion' => ['required', 'string', 'max:5000'],
+            'elementos' => ['required', 'array', 'min:1', 'list'],
+            'elementos.*' => ['required', 'string', 'max:90', 'distinct'],
+        ], [
+            'etapa_destino.required' => 'Selecciona la etapa a la que devuelves el registro.',
+            'observacion.required' => 'Indica el motivo de la devolución.',
+            'elementos.required' => 'Selecciona al menos un campo o archivo observado.',
+        ]);
+        $observaciones->observar($descuentoCgr, $data['etapa_destino'], $data['observacion'], $data['elementos'], $request->user()->id);
+
+        return redirect()->route('descuentos-cgr.show', $descuentoCgr)->with('status', 'Observación registrada y descuento devuelto para corrección.');
+    }
+
+    public function reenviarAuditoria(Request $request, DescuentoCgr $descuentoCgr, DescuentoCgrObservacionService $observaciones): RedirectResponse
+    {
+        $destino = $observaciones->reenviar($descuentoCgr, (string) $request->user()->activeRoleName(), $request->user()->id);
+
+        return redirect()->route('descuentos-cgr.show', $descuentoCgr)->with('status', $destino === 'en_auditoria'
+            ? 'Correcciones reenviadas a Auditoría Interna.'
+            : 'Registro enviado a Finanzas para completar los comprobantes y reenviar a Auditoría.');
     }
 
     public function archivo(DescuentoCgr $descuentoCgr, DescuentoCgrArchivo $archivo): mixed

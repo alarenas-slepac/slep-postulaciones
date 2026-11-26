@@ -36,13 +36,17 @@ class DescuentoCgrIndicadoresService
 
         if ($tipos !== []) {
             $indicadores['documentos'] = DB::table('descuentos_cgr_archivos')
-                ->whereIn('descuento_cgr_id', (clone $consulta)->select('descuentos_cgr.id'))
-                ->whereIn('tipo', $tipos)
+                ->joinSub((clone $consulta)->select(['descuentos_cgr.id', 'descuentos_cgr.numero_cuotas']), 'registros_cgr',
+                    'registros_cgr.id', '=', 'descuentos_cgr_archivos.descuento_cgr_id')
+                ->whereIn('descuentos_cgr_archivos.tipo', $tipos)
+                ->where('descuentos_cgr_archivos.numero_cuota', '>=', 1)
+                ->whereColumn('descuentos_cgr_archivos.numero_cuota', '<=', 'registros_cgr.numero_cuotas')
                 ->count();
         }
 
         if (in_array($estado, ['ingresado', 'descuentos_realizados'], true)) {
-            $listos = (clone $consulta)->where('descuentos_cgr.numero_cuotas', '>', 0);
+            $listos = (clone $consulta)->where('descuentos_cgr.numero_cuotas', '>', 0)
+                ->whereDoesntHave('observacionesAuditoria', fn ($query) => $query->whereNull('reenviada_en'));
             foreach ($tipos as $tipo) {
                 $listos->whereRaw(
                     '(SELECT COUNT(*) FROM descuentos_cgr_archivos WHERE descuentos_cgr_archivos.descuento_cgr_id = descuentos_cgr.id AND descuentos_cgr_archivos.tipo = ?) = descuentos_cgr.numero_cuotas',

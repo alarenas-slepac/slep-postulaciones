@@ -8,6 +8,7 @@ use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
 use App\Services\Remuneraciones\CronogramaDescuentoCgrService;
 use App\Services\Remuneraciones\DescuentoCgrIndicadoresService;
+use App\Services\Remuneraciones\DescuentoCgrObservacionService;
 use App\Services\Remuneraciones\DescuentoCgrPdfService;
 use App\Services\Remuneraciones\ReemplazoPersonalRutService;
 use Carbon\CarbonImmutable;
@@ -21,6 +22,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class DescuentoCgrController extends Controller
 {
@@ -114,6 +116,7 @@ class DescuentoCgrController extends Controller
 
         $indicadores = app(DescuentoCgrIndicadoresService::class)->calcular($consulta, $estado);
         $descuentos = (clone $consulta)
+            ->withExists(['observacionesAuditoria as observacion_pendiente' => fn ($query) => $query->whereNull('reenviada_en')])
             ->orderByDesc('fecha_primer_descuento')
             ->latest('id')
             ->paginate(20)
@@ -157,7 +160,10 @@ class DescuentoCgrController extends Controller
 
     public function show(DescuentoCgr $descuentoCgr, CronogramaDescuentoCgrService $cronograma): View
     {
-        $descuentoCgr->load('creadoPor', 'actualizadoPor', 'archivos.cargadoPor');
+        $descuentoCgr->load([
+            'creadoPor', 'actualizadoPor', 'archivos.cargadoPor',
+            'observacionesAuditoria' => fn ($query) => $query->latest('id')->with('observadaPor', 'reenviadaPor'),
+        ]);
         $calculo = $cronograma->calcular($descuentoCgr);
 
         return view('remuneraciones.descuentos-cgr.show', compact('descuentoCgr', 'calculo'));
@@ -166,7 +172,9 @@ class DescuentoCgrController extends Controller
     public function edit(DescuentoCgr $descuentoCgr): View
     {
         $this->autorizarEdicion($descuentoCgr);
-        return view('remuneraciones.descuentos-cgr.form', compact('descuentoCgr'));
+        $observacionActiva = $descuentoCgr->observacionesAuditoria()->whereNull('reenviada_en')->first();
+
+        return view('remuneraciones.descuentos-cgr.form', compact('descuentoCgr', 'observacionActiva'));
     }
 
     public function buscarFuncionario(Request $request, ReemplazoPersonalRutService $funcionarios): JsonResponse
@@ -196,22 +204,28 @@ class DescuentoCgrController extends Controller
     ): RedirectResponse {
         $this->autorizarEdicion($descuentoCgr);
         $data = $this->datosPersistencia($request, $funcionarios, $descuentoCgr);
-        if ($descuentoCgr->archivos()->exists()) {
-            foreach (['numero_cuotas', 'fecha_primer_descuento', 'deuda_definitiva_pesos', 'deuda_equivalente_utm', 'cuota_utm', 'tasa_interes_anual', 'tasa_interes_mensual'] as $campo) {
-                $actual = $campo === 'fecha_primer_descuento' ? $descuentoCgr->fecha_primer_descuento?->toDateString() : (float) $descuentoCgr->{$campo};
-                $nuevo = $campo === 'fecha_primer_descuento' ? (string) ($data[$campo] ?? '') : (float) ($data[$campo] ?? 0);
-                if ($campo === 'fecha_primer_descuento' ? $actual !== $nuevo : abs($actual - $nuevo) > 0.00001) {
-                    throw ValidationException::withMessages([$campo => 'No se pueden cambiar los parámetros del cronograma después de cargar liquidaciones.']);
-                }
-            }
-        }
         $data['actualizado_por_id'] = $request->user()->id;
-
-        if ($request->hasFile('resolucion_pdf')) {
-            $data += $this->guardarPdf($request);
+        $nuevoPdf = null;
+        try {
+            DB::transaction(function () use ($request, $descuentoCgr, $data, &$nuevoPdf): void {
+                $registro = DescuentoCgr::query()->lockForUpdate()->findOrFail($descuentoCgr->id);
+                $this->autorizarEdicion($registro);
+                $observacion = $registro->observacionesAuditoria()->whereNull('reenviada_en')->first();
+                if ($registro->archivos()->exists()) {
+                    $this->validarCambiosCronograma($registro, $data, $observacion?->elementos ?? []);
+                }
+                if ($request->hasFile('resolucion_pdf')) {
+                    $data += $this->guardarPdf($request);
+                    $nuevoPdf = $data['resolucion_pdf_path'];
+                }
+                $registro->update($data);
+            });
+        } catch (Throwable $error) {
+            if ($nuevoPdf) {
+                Storage::disk('local')->delete($nuevoPdf);
+            }
+            throw $error;
         }
-
-        $descuentoCgr->update($data);
 
         return redirect()->route('descuentos-cgr.show', $descuentoCgr)
             ->with('status', 'Descuento CGR actualizado y cronograma recalculado.');
@@ -219,16 +233,18 @@ class DescuentoCgrController extends Controller
 
     public function destroy(DescuentoCgr $descuentoCgr): RedirectResponse
     {
-        $this->autorizarEdicion($descuentoCgr);
-        $resolucionPdfPath = $descuentoCgr->resolucion_pdf_path;
-        $archivosPaths = $descuentoCgr->archivos()->pluck('path')->unique()->all();
-
-        DB::transaction(function () use ($descuentoCgr): void {
+        [$resolucionPdfPath, $archivosPaths] = DB::transaction(function () use ($descuentoCgr): array {
+            $registro = DescuentoCgr::query()->lockForUpdate()->findOrFail($descuentoCgr->id);
+            $this->autorizarEdicion($registro);
+            abort_if($registro->observacionesAuditoria()->whereNull('reenviada_en')->exists(), 403);
+            $paths = [$registro->resolucion_pdf_path, $registro->archivos()->pluck('path')->unique()->all()];
             // La eliminación explícita conserva el comportamiento en instalaciones
             // históricas donde la llave foránea pudiera no tener ON DELETE CASCADE.
-            $descuentoCgr->documentosMensuales()->delete();
-            $descuentoCgr->archivos()->delete();
-            $descuentoCgr->delete();
+            $registro->documentosMensuales()->delete();
+            $registro->archivos()->delete();
+            $registro->delete();
+
+            return $paths;
         });
 
         if ($resolucionPdfPath) {
@@ -316,6 +332,9 @@ class DescuentoCgrController extends Controller
         $anio = substr((string) $request->validated('fecha_primer_descuento'), 0, 4);
         $nombre = Str::uuid().'.pdf';
         $path = $archivo->storeAs("descuentos-cgr/resoluciones/{$anio}", $nombre, 'local');
+        if (! $path) {
+            throw new \RuntimeException('No fue posible guardar el PDF de la resolución.');
+        }
 
         return [
             'resolucion_pdf_path' => $path,
@@ -328,5 +347,20 @@ class DescuentoCgrController extends Controller
     {
         abort_unless(request()->user()?->hasAnyRole(['admin', 'funcionario_slep']), 403);
         abort_unless($descuento->estadoActual() === 'ingresado', 403);
+    }
+
+    private function validarCambiosCronograma(DescuentoCgr $registro, array $data, array $elementosObservados): void
+    {
+        foreach (['numero_cuotas', 'fecha_primer_descuento', 'deuda_definitiva_pesos', 'deuda_equivalente_utm', 'cuota_utm', 'tasa_interes_anual', 'tasa_interes_mensual'] as $campo) {
+            if (array_key_exists($campo, $elementosObservados)) {
+                continue;
+            }
+            $cambio = $campo === 'fecha_primer_descuento'
+                ? $registro->fecha_primer_descuento?->toDateString() !== $data[$campo]
+                : abs((float) $registro->{$campo} - (float) $data[$campo]) > 0.00001;
+            if ($cambio) {
+                throw ValidationException::withMessages([$campo => 'No se pueden cambiar los parámetros del cronograma después de cargar liquidaciones.']);
+            }
+        }
     }
 }

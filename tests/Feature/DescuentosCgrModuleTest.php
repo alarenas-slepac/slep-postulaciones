@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Exports\DescuentosCgrMensualExport;
 use App\Http\Controllers\Remuneraciones\DescuentoCgrController;
+use App\Http\Middleware\CoordinarEscrituraPadron;
+use App\Http\Middleware\EnsureModuleAccess;
 use App\Mail\DescuentoCgrEtapaMail;
 use App\Http\Requests\Remuneraciones\GuardarDescuentoCgrRequest;
 use App\Models\DescuentoCgr;
@@ -23,19 +25,26 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Tests\TestCase;
+use Tests\Support\IsolatedSecurityTestCase;
 
-class DescuentosCgrModuleTest extends TestCase
+class DescuentosCgrModuleTest extends IsolatedSecurityTestCase
 {
+    private const MIGRACION_OBSERVACIONES = '2026_11_26_120000_create_descuentos_cgr_observaciones_table.php';
+
     protected function setUp(): void
     {
         parent::setUp();
-        config(['app.key' => 'base64:'.base64_encode(str_repeat('a', 32))]);
+        DB::table('roles')->insert([
+            ['id' => 4, 'name' => 'auditoria_slep', 'guard_name' => 'web'],
+            ['id' => 5, 'name' => 'funcionario_slep', 'guard_name' => 'web'],
+            ['id' => 6, 'name' => 'funcionario_daf', 'guard_name' => 'web'],
+        ]);
 
         Schema::dropIfExists('utm_valores');
         Schema::create('utm_valores', function (Blueprint $table) {
@@ -148,10 +157,12 @@ class DescuentosCgrModuleTest extends TestCase
             $table->timestamps();
             $table->unique(['descuento_cgr_id', 'numero_cuota']);
         });
+        (require database_path('migrations/'.self::MIGRACION_OBSERVACIONES))->up();
     }
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('descuentos_cgr_observaciones');
         Schema::dropIfExists('descuentos_cgr_notificaciones');
         Schema::dropIfExists('descuentos_cgr_archivos');
         Schema::dropIfExists('descuentos_cgr_documentos_mensuales');
@@ -1228,6 +1239,157 @@ class DescuentosCgrModuleTest extends TestCase
         $this->assertStringContainsString('Descuento CGR para Finanzas', $html);
         $this->assertStringContainsString('Plataforma SLEP', $html);
         $this->assertStringContainsString($descuento->numero_resolucion, $html);
+    }
+
+    public function test_auditoria_devuelve_a_finanzas_y_exige_corregir_el_archivo_y_el_folio_seleccionados(): void
+    {
+        $this->withoutMiddleware([EnsureModuleAccess::class, CoordinarEscrituraPadron::class]);
+        $this->withoutVite();
+        Mail::fake();
+        $auditor = $this->testUser(1, 4);
+        $ingreso = $this->testUser(2, 5);
+        $finanzas = $this->testUser(3, 6);
+        $descuento = $this->crearDescuento(['estado' => 'descuentos_realizados', 'numero_cuotas' => 2]);
+        $flujo = app(DescuentoCgrWorkflowService::class);
+        foreach (['sigfe', 'tgr'] as $tipo) {
+            $flujo->guardarArchivos($descuento, $tipo, [[
+                'archivo' => UploadedFile::fake()->create($tipo.'.pdf', 10, 'application/pdf'),
+                'cuotas' => [1, 2],
+            ]], $finanzas->id, ['folio' => 'F-1', 'fecha_reintegro' => '2026-06-10', 'monto_reintegro_pesos' => 142000]);
+        }
+        $descuento->update(['estado' => 'en_auditoria', 'enviado_auditoria_en' => now()->subDay()]);
+        $observar = route('descuentos-cgr.auditoria.observar', $descuento);
+        $reenviar = route('descuentos-cgr.reenviar-auditoria', $descuento);
+        $detalle = route('descuentos-cgr.show', $descuento);
+        $devolucion = [
+            'etapa_destino' => 'descuentos_realizados',
+            'observacion' => 'Corregir el folio SIGFE y reemplazar el PDF TGR de la cuota 1.',
+        ];
+
+        $this->actingAs($finanzas)->post($observar, $devolucion)->assertForbidden();
+        $this->actingAs($auditor)->get($detalle)->assertOk()
+            ->assertSee('Observar y devolver')
+            ->assertSee('Comprobante SIGFE · Cuota 1 · Folio');
+        $this->post($observar, ['etapa_destino' => 'descuentos_realizados'])->assertSessionHasErrors(['observacion', 'elementos']);
+        $this->post($observar, $devolucion + ['elementos' => ['numero_resolucion']])->assertSessionHasErrors('elementos');
+        $this->post($observar, $devolucion + ['elementos_json' => '["sigfe:1:folio","tgr:1"]'])
+            ->assertRedirect($detalle);
+
+        $this->assertSame('descuentos_realizados', $descuento->fresh()->estadoActual());
+        $this->actingAs($ingreso)->post($reenviar)->assertForbidden();
+        $this->actingAs($finanzas)->get(route('descuentos-cgr.index', ['estado' => 'descuentos_realizados']))
+            ->assertOk()->assertSee('Observado por Auditoría');
+        $this->get($detalle)->assertOk()->assertSee($devolucion['observacion'])->assertSee('Reenviar a Auditoría');
+        $this->post(route('descuentos-cgr.enviar-auditoria', $descuento))->assertSessionHasErrors('estado');
+        $this->post($reenviar)->assertSessionHasErrors('elementos');
+
+        $sigfeAntes = $descuento->archivos()->where('tipo', 'sigfe')->where('numero_cuota', 1)->sole();
+        $tgrAntes = $descuento->archivos()->where('tipo', 'tgr')->where('numero_cuota', 2)->sole();
+        $datos = ['cuotas' => [1], 'folio' => 'F-2', 'fecha_reintegro' => '2026-06-10', 'monto_reintegro_pesos' => 142000];
+        $this->post(route('descuentos-cgr.comprobantes', [$descuento, 'sigfe']), $datos)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['F-2', 'F-2'], $descuento->archivos()->where('tipo', 'sigfe')->orderBy('numero_cuota')->pluck('folio')->all());
+        $this->assertSame($sigfeAntes->path, $sigfeAntes->fresh()->path);
+        $this->post($reenviar)->assertSessionHasErrors('elementos');
+        $this->post(route('descuentos-cgr.comprobantes', [$descuento, 'tgr']), $datos + [
+            'archivo' => UploadedFile::fake()->create('tgr-corregido.pdf', 10, 'application/pdf'),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->post($reenviar)->assertRedirect($detalle)->assertSessionHasNoErrors();
+        $this->assertSame('en_auditoria', $descuento->fresh()->estadoActual());
+        $this->assertSame($tgrAntes->path, $tgrAntes->fresh()->path);
+        $historial = $descuento->observacionesAuditoria()->sole();
+        $this->assertSame($auditor->id, $historial->observada_por_id);
+        $this->assertSame($finanzas->id, $historial->reenviada_por_id);
+        $this->assertNotNull($historial->reenviada_en);
+        $this->actingAs($auditor)->get($detalle)->assertOk()->assertSee('Reenviada')->assertSee($devolucion['observacion']);
+    }
+
+    public function test_auditoria_devuelve_a_ingresados_y_retorna_directamente_tras_corregir_el_registro(): void
+    {
+        $this->withoutMiddleware([EnsureModuleAccess::class, CoordinarEscrituraPadron::class]);
+        Mail::fake();
+        $auditor = $this->testUser(1, 4);
+        $ingreso = $this->testUser(2, 5);
+        $descuento = $this->crearDescuento([
+            'estado' => 'en_auditoria', 'certificado_generado_en' => now(),
+            'certificado_firmado_path' => 'descuentos-cgr/pruebas/firmado.pdf',
+        ]);
+        Storage::disk('local')->put($descuento->certificado_firmado_path, '%PDF');
+        foreach (['liquidacion', 'sigfe', 'tgr', 'liquidacion_validada'] as $tipo) {
+            $this->registrarArchivoKpi($descuento, 1, $tipo);
+        }
+
+        $detalle = route('descuentos-cgr.show', $descuento);
+        $observar = route('descuentos-cgr.auditoria.observar', $descuento);
+        $reenviar = route('descuentos-cgr.reenviar-auditoria', $descuento);
+        $devolver = [
+            'etapa_destino' => 'ingresado', 'observacion' => 'Revisar deuda en pesos y liquidación de sueldo.',
+            'elementos' => ['deuda_definitiva_pesos', 'liquidacion:1'],
+        ];
+        $this->actingAs($auditor)->post($observar, $devolver)->assertRedirect($detalle);
+        $this->post($observar, $devolver)->assertSessionHasErrors('estado');
+        $this->assertNull($descuento->fresh()->certificado_firmado_path);
+        $this->assertFalse($descuento->archivos()->where('tipo', 'liquidacion_validada')->exists());
+        $this->assertSame($descuento->certificado_firmado_path, $descuento->observacionesAuditoria()->sole()->respaldos_previos['certificado']['certificado_firmado_path']);
+        Storage::disk('local')->assertExists($descuento->certificado_firmado_path);
+
+        $datos = $descuento->only([
+            'rut', 'numero_resolucion', 'deuda_equivalente_utm', 'cuota_utm',
+            'numero_cuotas', 'tasa_interes_anual', 'tasa_interes_mensual',
+        ]) + ['fecha_primer_descuento' => '2026-02', 'deuda_definitiva_pesos' => 150000];
+        $editar = route('descuentos-cgr.update', $descuento);
+        $this->actingAs($ingreso)->delete(route('descuentos-cgr.destroy', $descuento))->assertForbidden();
+        $this->put($editar, array_replace($datos, ['numero_cuotas' => 2]))->assertSessionHasErrors('numero_cuotas');
+        $this->put($editar, $datos)->assertRedirect($detalle)->assertSessionHasNoErrors();
+        $this->post($reenviar)->assertSessionHasErrors('elementos');
+        $this->post(route('descuentos-cgr.liquidaciones', $descuento), [
+            'liquidaciones' => [1 => UploadedFile::fake()->create('liquidacion-corregida.pdf', 10, 'application/pdf')],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post($reenviar)->assertRedirect($detalle)->assertSessionHasNoErrors();
+
+        $this->assertSame('en_auditoria', $descuento->fresh()->estadoActual());
+        $this->assertSame(150000, $descuento->fresh()->deuda_definitiva_pesos);
+        $this->assertSame($ingreso->id, $descuento->observacionesAuditoria()->sole()->reenviada_por_id);
+        $this->assertCount(3, $descuento->archivos);
+    }
+
+    public function test_ajustar_numero_de_cuotas_exige_completar_los_respaldos_nuevos_en_su_etapa(): void
+    {
+        $this->withoutMiddleware([EnsureModuleAccess::class, CoordinarEscrituraPadron::class]);
+        Mail::fake();
+        $auditor = $this->testUser(1, 4);
+        $ingreso = $this->testUser(2, 5);
+        $finanzas = $this->testUser(3, 6);
+        $descuento = $this->crearDescuento(['estado' => 'en_auditoria']);
+        foreach (['liquidacion', 'sigfe', 'tgr'] as $tipo) {
+            $this->registrarArchivoKpi($descuento, 1, $tipo);
+        }
+        $detalle = route('descuentos-cgr.show', $descuento);
+        $reenviar = route('descuentos-cgr.reenviar-auditoria', $descuento);
+        $this->actingAs($auditor)->post(route('descuentos-cgr.auditoria.observar', $descuento), [
+            'etapa_destino' => 'ingresado', 'observacion' => 'Falta una cuota en el cronograma.',
+            'elementos' => ['numero_cuotas'],
+        ])->assertRedirect($detalle);
+
+        $datos = $descuento->only([
+            'rut', 'numero_resolucion', 'deuda_definitiva_pesos', 'deuda_equivalente_utm',
+            'cuota_utm', 'tasa_interes_anual', 'tasa_interes_mensual',
+        ]) + ['fecha_primer_descuento' => '2026-02', 'numero_cuotas' => 2];
+        $this->actingAs($ingreso)->put(route('descuentos-cgr.update', $descuento), $datos)
+            ->assertRedirect($detalle)->assertSessionHasNoErrors();
+        $this->post($reenviar)->assertSessionHasErrors('documentos');
+        $this->registrarArchivoKpi($descuento, 2, 'liquidacion');
+        $this->post($reenviar)->assertRedirect($detalle)->assertSessionHasNoErrors();
+        $this->assertSame('descuentos_realizados', $descuento->fresh()->estadoActual());
+        $this->assertNull($descuento->observacionesAuditoria()->sole()->reenviada_en);
+
+        $this->actingAs($finanzas)->post($reenviar)->assertSessionHasErrors('documentos');
+        $this->registrarArchivoKpi($descuento, 2, 'sigfe');
+        $this->registrarArchivoKpi($descuento, 2, 'tgr');
+        $this->post($reenviar)->assertRedirect($detalle)->assertSessionHasNoErrors();
+        $this->assertSame('en_auditoria', $descuento->fresh()->estadoActual());
+        $this->assertSame($finanzas->id, $descuento->observacionesAuditoria()->sole()->reenviada_por_id);
     }
 
     private function crearDescuento(array $atributos = []): DescuentoCgr

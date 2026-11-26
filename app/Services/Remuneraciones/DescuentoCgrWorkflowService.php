@@ -91,7 +91,8 @@ class DescuentoCgrWorkflowService
     public function completos(DescuentoCgr $descuento, array $tipos): bool
     {
         foreach ($tipos as $tipo) {
-            $cantidad = $descuento->archivos()->where('tipo', $tipo)->distinct()->count('numero_cuota');
+            $cantidad = $descuento->archivos()->where('tipo', $tipo)
+                ->whereBetween('numero_cuota', [1, $descuento->numero_cuotas])->distinct()->count('numero_cuota');
             if ($cantidad !== (int) $descuento->numero_cuotas) {
                 return false;
             }
@@ -100,11 +101,40 @@ class DescuentoCgrWorkflowService
         return (int) $descuento->numero_cuotas > 0;
     }
 
+    public function corregirMetadatos(DescuentoCgr $descuento, string $tipo, array $cuotas, array $metadatos, int $usuarioId): void
+    {
+        DB::transaction(function () use ($descuento, $tipo, $cuotas, $metadatos, $usuarioId): void {
+            $registro = DescuentoCgr::query()->lockForUpdate()->findOrFail($descuento->id);
+            $this->exigirEstado($registro, 'descuentos_realizados');
+            if (! $registro->observacionesAuditoria()->whereNull('reenviada_en')->exists()) {
+                throw ValidationException::withMessages(['archivo' => 'Adjunta el PDF del comprobante.']);
+            }
+
+            $archivos = $registro->archivos()->where('tipo', $tipo);
+            $seleccionados = (clone $archivos)->whereIn('numero_cuota', $cuotas)->get();
+            $grupos = $seleccionados->pluck('grupo_archivo')->unique();
+            if ($seleccionados->count() !== count($cuotas) || $grupos->count() !== 1
+                || max($cuotas) > $registro->numero_cuotas) {
+                throw ValidationException::withMessages(['archivo' => 'Para corregir sólo los datos, selecciona cuotas de un mismo comprobante cargado.']);
+            }
+
+            $archivos->where('grupo_archivo', $grupos->first())->update([
+                'folio' => $metadatos['folio'],
+                'fecha_reintegro' => $metadatos['fecha_reintegro'],
+                'monto_reintegro_pesos' => $metadatos['monto_reintegro_pesos'],
+                'cargado_por_id' => $usuarioId,
+            ]);
+        });
+    }
+
     public function avanzar(DescuentoCgr $descuento, string $desde, string $hacia, array $tipos, ?string $fechaColumna, string $rolDestino, string $evento): void
     {
         DB::transaction(function () use ($descuento, $desde, $hacia, $tipos, $fechaColumna): void {
             $registro = DescuentoCgr::query()->lockForUpdate()->findOrFail($descuento->id);
             $this->exigirEstado($registro, $desde);
+            if ($registro->observacionesAuditoria()->whereNull('reenviada_en')->exists()) {
+                throw ValidationException::withMessages(['estado' => 'Usa la acción de reenvío de la observación de Auditoría.']);
+            }
             if (! $this->completos($registro, $tipos)) {
                 throw ValidationException::withMessages(['documentos' => 'Debes completar los documentos de todas las cuotas antes de avanzar.']);
             }
@@ -115,6 +145,11 @@ class DescuentoCgrWorkflowService
             $registro->save();
         });
 
+        $this->notificarEtapa($descuento, $rolDestino, $evento);
+    }
+
+    public function notificarEtapa(DescuentoCgr $descuento, string $rolDestino, string $evento): void
+    {
         foreach (DescuentoCgrNotificacion::destinatarios($evento, $rolDestino) as $email) {
             try {
                 NotificationAudit::sendMail($email, new DescuentoCgrEtapaMail($descuento->fresh(), $evento), [

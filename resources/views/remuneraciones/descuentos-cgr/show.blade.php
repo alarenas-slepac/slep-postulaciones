@@ -10,8 +10,11 @@
         $puedeRegistrar = auth()->user()?->hasAnyRole(['admin', 'funcionario_slep']) && $estado === 'ingresado';
         $puedeFinanzas = auth()->user()?->hasAnyRole(['admin', 'funcionario_daf']) && $estado === 'descuentos_realizados';
         $puedeAuditoria = auth()->user()?->hasAnyRole(['admin', 'auditoria_slep']) && $estado === 'en_auditoria';
+        $rolActivo = auth()->user()?->activeRoleName();
+        $puedeObservar = $puedeAuditoria && in_array($rolActivo, ['admin', 'auditoria_slep'], true);
+        $observacionActiva = $descuentoCgr->observacionesAuditoria->firstWhere('reenviada_en', null);
         $archivosPorCuota = $descuentoCgr->archivos->groupBy('numero_cuota')->map(fn ($archivos) => $archivos->keyBy('tipo'));
-        $completos = fn ($tipo) => $descuentoCgr->archivos->where('tipo', $tipo)->pluck('numero_cuota')->unique()->count() === (int) $descuentoCgr->numero_cuotas;
+        $completos = fn ($tipo) => $descuentoCgr->archivos->where('tipo', $tipo)->whereBetween('numero_cuota', [1, $descuentoCgr->numero_cuotas])->pluck('numero_cuota')->unique()->count() === (int) $descuentoCgr->numero_cuotas;
     @endphp
     <div class="cgr-page">
         <div class="cgr-page-header d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
@@ -25,6 +28,8 @@
                 <a href="{{ route('descuentos-cgr.pdf', $descuentoCgr) }}" target="_blank" rel="noopener" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>Ver resolución</a>
                 @if ($puedeRegistrar)
                 <a href="{{ route('descuentos-cgr.edit', $descuentoCgr) }}" class="btn btn-outline-primary"><i class="bi bi-pencil me-1"></i>Editar</a>
+                @endif
+                @if ($puedeRegistrar && ! $observacionActiva)
                 <form method="POST" action="{{ route('descuentos-cgr.destroy', $descuentoCgr) }}" onsubmit="return confirm('Se eliminará el descuento CGR, su cronograma y la resolución PDF asociada. Esta acción no se puede deshacer. ¿Deseas continuar?');">
                     @csrf
                     @method('DELETE')
@@ -48,8 +53,11 @@
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalTransferenciaInstitucion"><i class="bi bi-upload me-1" aria-hidden="true"></i>Cargar transferencia a otra institución</button>
                 @endif
                 @if ($puedeAuditoria) <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalValidadas">Cargar liquidaciones validadas</button> @endif
+                @if ($puedeObservar) <a class="btn btn-outline-warning" href="#cgr-observar"><i class="bi bi-arrow-return-left me-1" aria-hidden="true"></i>Observar y devolver</a> @endif
             </div>
         </div></div>
+
+        @include('remuneraciones.descuentos-cgr._observaciones')
 
         @if ($calculo['utm_faltantes'] !== [])
             <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i><strong>Cronograma pendiente:</strong> faltan valores UTM para {{ implode(', ', $calculo['utm_faltantes']) }}. Las columnas en pesos se completarán automáticamente al registrar esos periodos en el <a href="{{ route('descuentos-cgr.utm.index') }}" class="alert-link">mantenedor UTM</a>.</div>

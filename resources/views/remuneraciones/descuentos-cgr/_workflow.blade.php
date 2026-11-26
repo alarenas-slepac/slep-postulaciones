@@ -2,15 +2,15 @@
     <div class="card-header"><i class="bi bi-diagram-3 me-2 text-primary" aria-hidden="true"></i>Avance del cronograma</div>
     <div class="card-body">
         @if ($estado === 'ingresado')
-            @php $cargadas = $descuentoCgr->archivos->where('tipo', 'liquidacion')->pluck('numero_cuota')->unique()->count(); @endphp
+            @php $cargadas = $descuentoCgr->archivos->where('tipo', 'liquidacion')->whereBetween('numero_cuota', [1, $descuentoCgr->numero_cuotas])->pluck('numero_cuota')->unique()->count(); @endphp
             <p class="mb-3">Liquidaciones cargadas: <strong>{{ $cargadas }} de {{ $descuentoCgr->numero_cuotas }}</strong>.</p>
-            @if ($puedeRegistrar)
+            @if ($puedeRegistrar && empty($observacionActiva))
                 <form method="POST" action="{{ route('descuentos-cgr.enviar-finanzas', $descuentoCgr) }}">@csrf<button class="btn btn-primary" @disabled(! $completos('liquidacion'))><i class="bi bi-send me-1"></i>Enviar a Finanzas</button></form>
                 @unless ($completos('liquidacion')) <div class="form-text">Completa las liquidaciones de todas las cuotas para habilitar el envío.</div> @endunless
             @endif
         @elseif ($estado === 'descuentos_realizados')
             <p class="mb-3">Finanzas debe registrar un comprobante SIGFE y uno TGR para cada cuota. El comprobante de transferencia a otra institución es opcional. Un mismo comprobante puede asociarse a varias cuotas.</p>
-            @if ($puedeFinanzas)
+            @if ($puedeFinanzas && empty($observacionActiva))
                 <form method="POST" action="{{ route('descuentos-cgr.enviar-auditoria', $descuentoCgr) }}">@csrf<button class="btn btn-primary" @disabled(! ($completos('sigfe') && $completos('tgr')))><i class="bi bi-send me-1"></i>Enviar a Auditoría Interna</button></form>
                 @unless ($completos('sigfe') && $completos('tgr')) <div class="form-text">Completa los comprobantes SIGFE y TGR de todas las cuotas.</div> @endunless
             @endif
@@ -88,14 +88,40 @@
 @endforeach
 
 @if ($puedeFinanzas)
+    @php $corrigiendoComprobantes = ! empty($observacionActiva); @endphp
     @foreach (['sigfe' => ['modalSigfe', 'Comprobante de reintegro SIGFE'], 'tgr' => ['modalTgr', 'Comprobante de reintegro a TGR'], 'transferencia_institucion' => ['modalTransferenciaInstitucion', 'Comprobante de transferencia a otra institución']] as $tipo => [$modalId, $titulo])
-        <div class="modal fade cgr-document-modal" id="{{ $modalId }}" tabindex="-1" aria-labelledby="{{ $modalId }}Titulo" aria-hidden="true">
+        <div class="modal fade cgr-document-modal" id="{{ $modalId }}" tabindex="-1" aria-labelledby="{{ $modalId }}Titulo" aria-hidden="true" @if ($corrigiendoComprobantes) data-cgr-corregir-comprobante @endif>
             <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><form method="POST" action="{{ route('descuentos-cgr.comprobantes', [$descuentoCgr, $tipo]) }}" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-header"><h2 class="modal-title fs-5" id="{{ $modalId }}Titulo">{{ $titulo }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
-                <div class="modal-body"><p class="text-muted">Selecciona las cuotas cubiertas por este comprobante. Se reemplazará el documento anterior sólo para las cuotas seleccionadas.@if ($tipo === 'transferencia_institucion') Esta carga es opcional y no impide enviar el registro a Auditoría.@endif</p>
-                    <div class="row g-3 mb-3"><div class="col-md-6"><label for="{{ $modalId }}-archivo" class="form-label">Archivo PDF <span class="text-danger">*</span></label><input id="{{ $modalId }}-archivo" type="file" name="archivo" accept="application/pdf" class="form-control" required></div><div class="col-md-6"><label for="{{ $modalId }}-folio" class="form-label">{{ $tipo === 'transferencia_institucion' ? 'Número de transferencia o folio' : 'Número de reintegro o folio' }} <span class="text-danger">*</span></label><input id="{{ $modalId }}-folio" name="folio" class="form-control" maxlength="100" required></div><div class="col-md-6"><label for="{{ $modalId }}-fecha" class="form-label">{{ $tipo === 'transferencia_institucion' ? 'Fecha de transferencia' : 'Fecha de reintegro' }} <span class="text-danger">*</span></label><input id="{{ $modalId }}-fecha" type="date" name="fecha_reintegro" class="form-control" required></div><div class="col-md-6"><label for="{{ $modalId }}-monto" class="form-label">Monto total del comprobante en pesos <span class="text-danger">*</span></label><input id="{{ $modalId }}-monto" type="number" name="monto_reintegro_pesos" min="1" step="1" class="form-control" required></div></div>
-                    <fieldset><legend class="fs-6 fw-semibold">Cuotas asociadas <span class="text-danger">*</span></legend><div class="row g-2">@foreach ($calculo['filas'] as $fila)<div class="col-sm-6 col-lg-4"><label class="form-check cgr-quota-choice"><input type="checkbox" name="cuotas[]" value="{{ $fila['numero'] }}" class="form-check-input"><span class="form-check-label">Cuota {{ $fila['numero'] }} · {{ $fila['periodo']->format('m-Y') }} @if ($archivosPorCuota->get($fila['numero'], collect())->has($tipo)) <span class="text-success">Cargado</span> @endif</span></label></div>@endforeach</div></fieldset>
+                <div class="modal-body">
+                    <p class="text-muted">Selecciona las cuotas cubiertas por este comprobante. Al adjuntar un PDF, se reemplaza el archivo de las cuotas seleccionadas. @if ($tipo === 'transferencia_institucion' && ! $corrigiendoComprobantes) Esta carga es opcional y no impide enviar el registro a Auditoría.@endif</p>
+                    @if ($corrigiendoComprobantes)
+                        <p class="form-text mt-0">Si sólo corriges el folio, la fecha o el monto, deja el archivo vacío y selecciona una cuota cuyo comprobante ya esté cargado. El cambio se aplicará a todas las cuotas que comparten ese comprobante.</p>
+                    @endif
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6"><label for="{{ $modalId }}-archivo" class="form-label">Archivo PDF @unless ($corrigiendoComprobantes)<span class="text-danger">*</span>@endunless</label><input id="{{ $modalId }}-archivo" type="file" name="archivo" accept="application/pdf" class="form-control" @required(! $corrigiendoComprobantes)></div>
+                        <div class="col-md-6"><label for="{{ $modalId }}-folio" class="form-label">{{ $tipo === 'transferencia_institucion' ? 'Número de transferencia o folio' : 'Número de reintegro o folio' }} <span class="text-danger">*</span></label><input id="{{ $modalId }}-folio" name="folio" class="form-control" maxlength="100" required></div>
+                        <div class="col-md-6"><label for="{{ $modalId }}-fecha" class="form-label">{{ $tipo === 'transferencia_institucion' ? 'Fecha de transferencia' : 'Fecha de reintegro' }} <span class="text-danger">*</span></label><input id="{{ $modalId }}-fecha" type="date" name="fecha_reintegro" class="form-control" required></div>
+                        <div class="col-md-6"><label for="{{ $modalId }}-monto" class="form-label">Monto total del comprobante en pesos <span class="text-danger">*</span></label><input id="{{ $modalId }}-monto" type="number" name="monto_reintegro_pesos" min="1" step="1" class="form-control" required></div>
+                    </div>
+                    <fieldset>
+                        <legend class="fs-6 fw-semibold">Cuotas asociadas <span class="text-danger">*</span></legend>
+                        <div class="row g-2">
+                            @foreach ($calculo['filas'] as $fila)
+                                @php $comprobante = $archivosPorCuota->get($fila['numero'], collect())->get($tipo); @endphp
+                                <div class="col-sm-6 col-lg-4">
+                                    <label class="form-check cgr-quota-choice">
+                                        <input type="checkbox" name="cuotas[]" value="{{ $fila['numero'] }}" class="form-check-input"
+                                            @if ($corrigiendoComprobantes && $comprobante)
+                                                data-folio="{{ $comprobante->folio }}" data-fecha="{{ $comprobante->fecha_reintegro?->format('Y-m-d') }}" data-monto="{{ $comprobante->monto_reintegro_pesos }}"
+                                            @endif>
+                                        <span class="form-check-label">Cuota {{ $fila['numero'] }} · {{ $fila['periodo']->format('m-Y') }} @if ($comprobante) <span class="text-success">Cargado</span> @endif</span>
+                                    </label>
+                                </div>
+                            @endforeach
+                        </div>
+                    </fieldset>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary"><i class="bi bi-upload me-1"></i>Guardar comprobante</button></div>
             </form></div></div>
@@ -113,14 +139,30 @@ if (residuoCheck) {
     actualizar();
 }
 document.querySelectorAll('.cgr-document-modal').forEach((modal) => {
+    const completarDatos = (check) => {
+        const campos = modal.querySelector('form').elements;
+        campos.folio.value = check?.dataset.folio ?? '';
+        campos.fecha_reintegro.value = check?.dataset.fecha ?? '';
+        campos.monto_reintegro_pesos.value = check?.dataset.monto ?? '';
+    };
+    const corrigeComprobante = modal.hasAttribute('data-cgr-corregir-comprobante');
     modal.addEventListener('show.bs.modal', (event) => {
         const cuota = event.relatedTarget?.dataset?.cuota;
         const checks = modal.querySelectorAll('input[name="cuotas[]"]');
         if (checks.length) checks.forEach((check) => { check.checked = cuota ? check.value === cuota : false; });
+        if (corrigeComprobante) completarDatos(modal.querySelector('input[name="cuotas[]"]:checked'));
         if (!cuota) return;
         const fila = modal.querySelector('[data-cuota="' + cuota + '"]');
         if (fila) modal.addEventListener('shown.bs.modal', () => fila.scrollIntoView({block: 'center'}), {once: true});
     });
+    if (corrigeComprobante) {
+        modal.addEventListener('change', (event) => {
+            if (event.target.name === 'cuotas[]' && event.target.checked
+                && modal.querySelectorAll('input[name="cuotas[]"]:checked').length === 1) {
+                completarDatos(event.target);
+            }
+        });
+    }
 });
 </script>
 @endpush
