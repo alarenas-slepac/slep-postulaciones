@@ -1498,7 +1498,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::post('/{descuentoCgr}/comprobantes/{tipo}', [DescuentoCgrWorkflowController::class, 'comprobante'])->whereNumber('descuentoCgr')->name('comprobantes');
             Route::post('/{descuentoCgr}/enviar-auditoria', [DescuentoCgrWorkflowController::class, 'enviarAuditoria'])->whereNumber('descuentoCgr')->name('enviar-auditoria');
         });
+        Route::post('/{descuentoCgr}/reenviar-auditoria', [DescuentoCgrWorkflowController::class, 'reenviarAuditoria'])
+            ->middleware('ensure.role:admin|funcionario_slep|funcionario_daf')->whereNumber('descuentoCgr')->name('reenviar-auditoria');
         Route::middleware('ensure.role:admin|auditoria_slep')->group(function () {
+            Route::post('/{descuentoCgr}/auditoria/observar', [DescuentoCgrWorkflowController::class, 'observar'])->whereNumber('descuentoCgr')->name('auditoria.observar');
             Route::post('/{descuentoCgr}/auditoria/liquidaciones', [DescuentoCgrWorkflowController::class, 'liquidaciones'])->whereNumber('descuentoCgr')->name('auditoria.liquidaciones');
             Route::get('/{descuentoCgr}/auditoria/certificado', [DescuentoCgrWorkflowController::class, 'certificado'])->whereNumber('descuentoCgr')->name('auditoria.certificado');
             Route::post('/{descuentoCgr}/auditoria/certificado/residuo', [DescuentoCgrWorkflowController::class, 'certificado'])->whereNumber('descuentoCgr')->name('auditoria.certificado-residuo');

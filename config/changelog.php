@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.25.716',
+    'current_version' => '2026.11.26.717',
     'entries' => [
+        [
+            'version' => '2026.11.26.717',
+            'title' => 'Observaciones y devolución de registros CGR',
+            'summary' => 'Auditoría puede indicar el motivo, marcar campos o respaldos por cuota y devolver un registro a Ingresados o a Finanzas.',
+            'roles' => ['admin', 'auditoria_slep', 'funcionario_slep', 'funcionario_daf'],
+            'items' => [
+                'El detalle muestra las correcciones pendientes y el historial de cada devolución y reenvío.',
+                'El registro regresa a Auditoría tras completar las correcciones y los respaldos requeridos.',
+            ],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.25.716',
             'title' => 'Antecedentes de sobredotación en Excluidos PAL 2027',

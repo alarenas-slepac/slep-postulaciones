@@ -108,6 +108,11 @@ class DescuentoCgr extends Model
         return $this->hasMany(DescuentoCgrArchivo::class, 'descuento_cgr_id');
     }
 
+    public function observacionesAuditoria(): HasMany
+    {
+        return $this->hasMany(DescuentoCgrObservacion::class, 'descuento_cgr_id');
+    }
+
     public function estadoActual(): string
     {
         return $this->estado ?: 'ingresado';

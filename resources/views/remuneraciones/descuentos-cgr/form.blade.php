@@ -22,6 +22,20 @@
             <div class="alert alert-danger"><strong><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Revisa los datos ingresados.</strong><ul class="mb-0 mt-2">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
         @endif
 
+        @if (! empty($observacionActiva))
+            @inject('observacionesCgr', 'App\Services\Remuneraciones\DescuentoCgrObservacionService')
+            <div class="alert alert-warning">
+                <p class="fw-semibold mb-1">Devuelto por Auditoría</p>
+                <p class="mb-2 text-break">{!! nl2br(e($observacionActiva->observacion)) !!}</p>
+                <ul class="mb-2">
+                    @foreach (array_keys($observacionActiva->elementos) as $clave)
+                        <li>{{ $observacionesCgr->etiqueta($clave) }}</li>
+                    @endforeach
+                </ul>
+                Guarda los cambios y usa el detalle del registro para completar los respaldos y reenviarlo.
+            </div>
+        @endif
+
         <form method="POST" action="{{ $editando ? route('descuentos-cgr.update', $descuentoCgr) : route('descuentos-cgr.store') }}" enctype="multipart/form-data">
             @csrf
             @if ($editando) @method('PUT') @endif
