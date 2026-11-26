@@ -11,7 +11,7 @@ use App\Services\RestrictedRutService;
 use App\Services\SolicitudReemplazoProrrogaService;
 use App\Support\Rut;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\UniqueConstraintViolationException;
+use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -43,10 +43,7 @@ class SolicitudReemplazoProrrogaController extends Controller
         $estamento = $filtros['estamento'] ?? 'docente';
         $vigencia = $this->servicio->vigencia($anio, $estamento);
         $casos = $this->servicio->casos($anio);
-        $registradas = $this->registradas($anio);
-        foreach ($registradas as $registrada) {
-            $casos->put($registrada['estamento'].':'.$registrada['rut'], $registrada);
-        }
+        $casos = $casos->replace($this->expedientes($anio));
         $areasJunji = $casos->where('estamento', 'junji')->pluck('ultimo_reemplazo.cargo', 'ultimo_reemplazo.area_id')
             ->filter()->sort(SORT_NATURAL | SORT_FLAG_CASE);
 
@@ -86,14 +83,15 @@ class SolicitudReemplazoProrrogaController extends Controller
 
     public function show(int $anio, string $estamento, string $rut): View
     {
-        $caso = $this->registradas($anio, $rut)->firstWhere('estamento', $estamento) ?? $this->caso($anio, $estamento, $rut);
+        $caso = $this->expedientes($anio, $rut)->get($estamento.':'.$rut) ?? $this->caso($anio, $estamento, $rut);
+        $expediente = $caso['expediente'] ?? null;
         $registrada = $caso['registrada'] ?? null;
-        $ordenDisponible = $registrada?->orden_trabajo_pdf_path && Storage::disk('local')->exists($registrada->orden_trabajo_pdf_path);
+        $ordenDisponible = $expediente?->orden_trabajo_pdf_path && Storage::disk('local')->exists($expediente->orden_trabajo_pdf_path);
         $vigencia = $this->servicio->vigencia($anio, $estamento);
         $estamentos = SolicitudReemplazoProrroga::ESTAMENTOS;
 
         return view('gestion.solicitudes-reemplazo.prorrogas.show', compact(
-            'anio', 'estamento', 'rut', 'estamentos', 'caso', 'registrada', 'vigencia', 'ordenDisponible',
+            'anio', 'estamento', 'rut', 'estamentos', 'caso', 'expediente', 'registrada', 'vigencia', 'ordenDisponible',
         ));
     }
 
@@ -105,12 +103,6 @@ class SolicitudReemplazoProrrogaController extends Controller
             'resolucion' => ['required', 'file', 'mimes:pdf', 'max:20480'],
             'observacion' => ['nullable', 'string', 'max:5000'],
         ]);
-        if ($this->registradas($anio, $rut)->contains('estamento', $estamento)) {
-            throw ValidationException::withMessages(['resolucion' => 'La prórroga de este estamento y año ya está registrada.']);
-        }
-
-        $caso = $this->caso($anio, $estamento, $rut);
-        $vigencia = $this->servicio->vigencia($anio, $estamento);
         $archivo = $datos['resolucion'];
         $ruta = $archivo->storeAs("reemplazos/prorrogas/{$anio}", Str::uuid().'.pdf', 'local');
         if (! $ruta) {
@@ -118,23 +110,21 @@ class SolicitudReemplazoProrrogaController extends Controller
         }
 
         try {
-            SolicitudReemplazoProrroga::create([
-                'anio_diciembre' => $anio,
-                'estamento' => $estamento,
-                'rut' => $rut,
-                'vigencia_desde' => $vigencia['desde'],
-                'vigencia_hasta' => $vigencia['hasta'],
-                'antecedentes' => $caso,
-                'numero_resolucion' => $datos['numero_resolucion'],
-                'fecha_resolucion' => $datos['fecha_resolucion'],
-                'observacion' => $datos['observacion'] ?? null,
-                'resolucion_path' => $ruta,
-                'resolucion_nombre' => Str::limit($archivo->getClientOriginalName(), 255, ''),
-                'registrada_por_id' => $request->user()->id,
-            ]);
-        } catch (UniqueConstraintViolationException) {
-            Storage::disk('local')->delete($ruta);
-            throw ValidationException::withMessages(['resolucion' => 'La prórroga de este estamento y año ya está registrada.']);
+            DB::transaction(function () use ($anio, $estamento, $rut, $datos, $ruta, $archivo, $request): void {
+                $expediente = $this->bloquearOCrearExpediente($anio, $estamento, $rut);
+                if ($expediente->tieneResolucion()) {
+                    throw ValidationException::withMessages(['resolucion' => 'La prórroga de este estamento y año ya está registrada.']);
+                }
+                $expediente->update([
+                    'numero_resolucion' => $datos['numero_resolucion'],
+                    'fecha_resolucion' => $datos['fecha_resolucion'],
+                    'observacion' => $datos['observacion'] ?? null,
+                    'resolucion_path' => $ruta,
+                    'resolucion_nombre' => Str::limit($archivo->getClientOriginalName(), 255, ''),
+                    'registrada_por_id' => $request->user()->id,
+                    'resolucion_registrada_at' => now(),
+                ]);
+            });
         } catch (Throwable $error) {
             Storage::disk('local')->delete($ruta);
             throw $error;
@@ -147,7 +137,7 @@ class SolicitudReemplazoProrrogaController extends Controller
     public function resolucion(SolicitudReemplazoProrroga $prorroga): StreamedResponse
     {
         $disco = Storage::disk('local');
-        abort_unless($disco->exists($prorroga->resolucion_path), 404);
+        abort_unless($prorroga->tieneResolucion() && $disco->exists($prorroga->resolucion_path), 404);
 
         return $disco->download($prorroga->resolucion_path, "resolucion-prorroga-{$prorroga->id}.pdf", [
             'Content-Type' => 'application/pdf',
@@ -156,11 +146,22 @@ class SolicitudReemplazoProrrogaController extends Controller
 
     public function generarOrden(Request $request, SolicitudReemplazoProrroga $prorroga, OrdenTrabajoPdfService $pdf): RedirectResponse
     {
+        return $this->emitirOrden($request, $pdf, fn () =>
+            SolicitudReemplazoProrroga::query()->lockForUpdate()->findOrFail($prorroga->id));
+    }
+
+    public function generarOrdenCaso(Request $request, int $anio, string $estamento, string $rut, OrdenTrabajoPdfService $pdf): RedirectResponse
+    {
+        return $this->emitirOrden($request, $pdf, fn () => $this->bloquearOCrearExpediente($anio, $estamento, $rut));
+    }
+
+    private function emitirOrden(Request $request, OrdenTrabajoPdfService $pdf, Closure $expedienteBloqueado): RedirectResponse
+    {
         $archivoGenerado = null;
         try {
-            $parametros = DB::transaction(function () use ($request, $prorroga, $pdf, &$archivoGenerado): array {
-                $registro = SolicitudReemplazoProrroga::query()->lockForUpdate()->findOrFail($prorroga->id);
-                $caso = $this->datosRegistrados($registro);
+            $parametros = DB::transaction(function () use ($request, $expedienteBloqueado, $pdf, &$archivoGenerado): array {
+                $registro = $expedienteBloqueado();
+                $caso = $this->datosExpediente($registro);
                 $estamento = $caso['estamento'];
                 $parametros = ['anio' => $registro->anio_diciembre, 'estamento' => $estamento, 'rut' => $registro->rut];
                 if ($registro->orden_trabajo_pdf_path && Storage::disk('local')->exists($registro->orden_trabajo_pdf_path)) {
@@ -188,7 +189,7 @@ class SolicitudReemplazoProrrogaController extends Controller
                 $numero = OrdenTrabajoCorrelativo::reservar(OrdenTrabajoCorrelativo::PRORROGA, $registro->id)->id;
                 $ultimo['desglose'] = $this->servicio->financiamiento($ultimo);
                 $archivoGenerado = $pdf->generarProrroga($registro, $numero, $ultimo, $vigencia, $this->servicio->motivo($estamento));
-                unset($caso['registrada']);
+                unset($caso['expediente'], $caso['registrada']);
                 $registro->update([
                     'antecedentes' => $caso,
                     'orden_trabajo_pdf_path' => $archivoGenerado,
@@ -220,22 +221,42 @@ class SolicitudReemplazoProrrogaController extends Controller
         ]);
     }
 
-    private function registradas(int $anio, ?string $rut = null): Collection
+    private function bloquearOCrearExpediente(int $anio, string $estamento, string $rut): SolicitudReemplazoProrroga
+    {
+        $existente = $this->expedientes($anio, $rut)->get($estamento.':'.$rut)['expediente'] ?? null;
+        $consulta = SolicitudReemplazoProrroga::query()->lockForUpdate();
+        if ($existente) {
+            return $consulta->findOrFail($existente->id);
+        }
+
+        $caso = $this->caso($anio, $estamento, $rut);
+        $vigencia = $this->servicio->vigencia($anio, $estamento);
+
+        return $consulta->createOrFirst(
+            ['anio_diciembre' => $anio, 'estamento' => $estamento, 'rut' => $rut],
+            ['vigencia_desde' => $vigencia['desde'], 'vigencia_hasta' => $vigencia['hasta'], 'antecedentes' => $caso],
+        );
+    }
+
+    private function expedientes(int $anio, ?string $rut = null): Collection
     {
         return SolicitudReemplazoProrroga::query()->where('anio_diciembre', $anio)
             ->when($rut !== null, fn ($query) => $query->where('rut', $rut))
             ->with('registradaPor', 'correlativoOrdenTrabajo')->orderBy('id')->get()
-            ->map(fn (SolicitudReemplazoProrroga $registro) => $this->datosRegistrados($registro))
+            ->map(fn (SolicitudReemplazoProrroga $registro) => $this->datosExpediente($registro))
             ->keyBy(fn (array $caso) => $caso['estamento'].':'.$caso['rut']);
     }
 
-    private function datosRegistrados(SolicitudReemplazoProrroga $registro): array
+    private function datosExpediente(SolicitudReemplazoProrroga $registro): array
     {
         $caso = $registro->antecedentes;
         $ultimo = $this->servicio->ultimoReemplazo($caso);
         $caso['ultimo_reemplazo'] = $ultimo;
         $caso['estamento'] = ($ultimo['estamento'] ?? null) === 'junji' ? 'junji' : $registro->estamento;
-        $caso['registrada'] = $registro;
+        $caso['expediente'] = $registro;
+        if ($registro->tieneResolucion()) {
+            $caso['registrada'] = $registro;
+        }
 
         return $caso;
     }

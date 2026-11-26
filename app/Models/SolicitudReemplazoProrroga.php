@@ -15,7 +15,7 @@ class SolicitudReemplazoProrroga extends Model
     protected $fillable = [
         'anio_diciembre', 'estamento', 'rut', 'vigencia_desde', 'vigencia_hasta', 'antecedentes',
         'numero_resolucion', 'fecha_resolucion', 'resolucion_path', 'resolucion_nombre',
-        'observacion', 'registrada_por_id',
+        'observacion', 'registrada_por_id', 'resolucion_registrada_at',
         'orden_trabajo_pdf_path', 'orden_trabajo_emitida_por_id', 'orden_trabajo_emitida_at',
     ];
 
@@ -26,6 +26,7 @@ class SolicitudReemplazoProrroga extends Model
             'vigencia_desde' => 'date',
             'vigencia_hasta' => 'date',
             'fecha_resolucion' => 'date',
+            'resolucion_registrada_at' => 'datetime',
             'antecedentes' => 'array',
             'orden_trabajo_emitida_at' => 'datetime',
         ];
@@ -34,6 +35,11 @@ class SolicitudReemplazoProrroga extends Model
     public function registradaPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'registrada_por_id');
+    }
+
+    public function tieneResolucion(): bool
+    {
+        return filled($this->resolucion_path);
     }
 
     public function correlativoOrdenTrabajo(): HasOne

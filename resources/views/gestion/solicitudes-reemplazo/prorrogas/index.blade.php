@@ -94,12 +94,22 @@
             <div class="slep-listing__panel-header"><h2 id="prorroga-resultados">{{ $estamentos[$estamento] }}</h2></div>
             <div class="slep-listing__table-wrap">
                 <table class="slep-listing__table" role="table">
-                    <thead><tr><th scope="col">Reemplazante</th><th scope="col">Último establecimiento</th><th scope="col">Continuidad en diciembre</th><th scope="col">Jornada y financiamiento</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th scope="col">Reemplazante</th>
+                            <th scope="col">Último establecimiento</th>
+                            <th scope="col">Continuidad en diciembre</th>
+                            <th scope="col" style="width: 20%">Jornada y financiamiento</th>
+                            <th scope="col" style="min-width: 11rem">Estado</th>
+                            <th scope="col">Acción</th>
+                        </tr>
+                    </thead>
                     <tbody>
                     @forelse ($paginador as $caso)
                         @php
                             $establecimientos = collect($caso['periodos'])->pluck('establecimiento')->filter()->unique();
                             $registrada = isset($caso['registrada']);
+                            $expediente = $caso['expediente'] ?? null;
                             $ultimo = $caso['ultimo_reemplazo'];
                         @endphp
                         <tr role="row">
@@ -118,10 +128,10 @@
                                 <div class="small slep-listing__muted">{{ $prorrogas->financiamiento($ultimo) ?: 'Financiamiento sin informar' }}</div>
                             </td>
                             <td data-label="Estado">
-                                <span class="slep-status-pill slep-status-pill--{{ $registrada ? 'success' : 'warning' }}">{{ $registrada ? 'Registrada' : 'Pendiente de revisión' }}</span>
+                                <span class="slep-status-pill slep-status-pill--{{ $registrada ? 'success' : 'warning' }} text-nowrap">{{ $registrada ? 'Registrada' : 'Pendiente de revisión' }}</span>
                                 @if ($caso['cobertura'])<div class="small slep-listing__muted mt-1">Tiene cobertura registrada en enero o febrero</div>@endif
-                                @if ($registrada && $caso['registrada']->orden_trabajo_pdf_path)
-                                    <div class="small mt-1">OT N° {{ $caso['registrada']->correlativoOrdenTrabajo?->id }}</div>
+                                @if ($expediente?->orden_trabajo_pdf_path)
+                                    <div class="small mt-1">OT N° {{ $expediente->correlativoOrdenTrabajo?->id }}</div>
                                 @endif
                             </td>
                             <td data-label="Acción">

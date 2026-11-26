@@ -1658,6 +1658,8 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
                 Route::group(['where' => ['anio' => '(?!9999)[1-9][0-9]{3}', 'estamento' => 'docente|aaee|junji', 'rut' => '[1-9][0-9]{0,7}[0-9K]']], function () {
                     Route::get('/{anio}/{estamento}/{rut}', [SolicitudReemplazoProrrogaController::class, 'show'])->name('show');
                     Route::post('/{anio}/{estamento}/{rut}', [SolicitudReemplazoProrrogaController::class, 'store'])->name('store');
+                    Route::post('/{anio}/{estamento}/{rut}/orden-trabajo', [SolicitudReemplazoProrrogaController::class, 'generarOrdenCaso'])
+                        ->name('orden-trabajo.generar-caso');
                 });
             });
 
