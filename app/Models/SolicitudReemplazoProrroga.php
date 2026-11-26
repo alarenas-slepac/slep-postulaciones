@@ -42,6 +42,11 @@ class SolicitudReemplazoProrroga extends Model
         return filled($this->resolucion_path);
     }
 
+    public function ordenTrabajoEmitidaPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'orden_trabajo_emitida_por_id')->withTrashed();
+    }
+
     public function correlativoOrdenTrabajo(): HasOne
     {
         return $this->hasOne(OrdenTrabajoCorrelativo::class, 'origen_id')

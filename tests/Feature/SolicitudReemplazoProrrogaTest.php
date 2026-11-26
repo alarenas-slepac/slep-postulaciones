@@ -17,6 +17,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\View;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Support\IsolatedSecurityTestCase;
 
@@ -284,6 +285,11 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
     public function test_la_orden_usa_el_ultimo_reemplazo_y_reserva_el_numero_para_ambos_modulos(): void
     {
         $funcionario = $this->testUser(1, 4);
+        $funcionario->update(['nombres' => 'Ágata Ejemplo', 'apellido_paterno' => 'Prueba', 'apellido_materno' => 'Simulada']);
+        $inicialesEnPdf = [];
+        View::composer('pdf.orden-trabajo-prorroga', function ($vista) use (&$inicialesEnPdf): void {
+            $inicialesEnPdf[] = $vista->getData()['inicialesEmisor'];
+        });
         $persona = $this->testUser(2, 1);
         $rut = Rut::normalize($persona->rut);
         $perfil = DB::table('postulant_profiles')->insertGetId(['user_id' => $persona->id]);
@@ -317,6 +323,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertSame('Escuela de prueba Sur', $registro->antecedentes['ultimo_reemplazo']['establecimiento']);
         $this->assertSame(6281, $registro->correlativoOrdenTrabajo->id);
         $this->assertSame($funcionario->id, $registro->orden_trabajo_emitida_por_id);
+        $this->assertSame(['áps'], $inicialesEnPdf);
         $disco = Storage::disk('local');
         $disco->assertExists($registro->orden_trabajo_pdf_path);
         $huella = hash('sha256', $disco->get($registro->orden_trabajo_pdf_path));
@@ -350,6 +357,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertSame(6281, $registro->correlativoOrdenTrabajo->id);
         $this->assertSame($funcionario->id, $registro->orden_trabajo_emitida_por_id);
         $this->assertTrue($emitidaAt->equalTo($registro->orden_trabajo_emitida_at));
+        $this->assertSame(['áps', 'áps'], $inicialesEnPdf);
         $this->assertSame('REX-PRUEBA', $registro->numero_resolucion);
         $disco->assertExists($registro->resolucion_path);
         $disco->assertMissing($rutaAnterior);

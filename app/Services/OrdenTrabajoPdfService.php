@@ -94,7 +94,12 @@ class OrdenTrabajoPdfService
         string $motivo,
         bool $regenerar = false,
     ): string {
-        $contenido = Pdf::loadView('pdf.orden-trabajo-prorroga', compact('prorroga', 'numero', 'reemplazo', 'vigencia', 'motivo'))
+        $emisor = $prorroga->ordenTrabajoEmitidaPor;
+        $inicialesEmisor = mb_strtolower(implode('', array_map(
+            fn ($parte) => mb_substr(trim((string) $parte), 0, 1, 'UTF-8'),
+            [$emisor?->nombres, $emisor?->apellido_paterno, $emisor?->apellido_materno],
+        )), 'UTF-8');
+        $contenido = Pdf::loadView('pdf.orden-trabajo-prorroga', compact('prorroga', 'numero', 'reemplazo', 'vigencia', 'motivo', 'inicialesEmisor'))
             ->setPaper('letter', 'portrait')->output();
         // Mantiene disponible el PDF anterior hasta que se confirme el reemplazo.
         $version = $regenerar ? '_'.Str::uuid() : '';
