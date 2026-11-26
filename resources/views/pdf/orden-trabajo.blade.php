@@ -17,63 +17,7 @@
         .spacer { height: 10px; }
         .footer { margin-top: 26px; }
 
-        /* bloque firma/timbre/pie */
-        .firma-section {
-            position: relative;
-            width: 100%;
-            margin-top: 34px;
-            text-align: center;
-        }
-
-        /* área donde se montan timbre y firma */
-        .firma-layer {
-            position: relative;
-            width: 320px;
-            height: 120px;
-            margin: 0 auto -28px auto; /* hace que baje sobre el pie de firma */
-        }
-
-        /* timbre atrás */
-        .firma-layer .timbre-img {
-            position: absolute;
-            left: 50%;
-            margin-left: -85px;
-            top: 18px;
-            width: 170px;
-            height: auto;
-            z-index: 1;
-            opacity: 0.95;
-        }
-
-        /* firma encima del timbre */
-        .firma-layer .firma-img {
-            position: absolute;
-            left: 50%;
-            margin-left: -140px;
-            top: 0;
-            width: 280px;
-            height: auto;
-            z-index: 2;
-        }
-
-        /* fallback cuando solo existe una imagen combinada */
-        .firma-combo {
-            text-align: center;
-            margin: 0 auto -18px auto;
-        }
-        .firma-combo .firma-img {
-            width: 280px;
-            height: auto;
-        }
-
-        .firma-text {
-            position: relative;
-            z-index: 0;
-            text-align: center;
-            font-size: 12px;
-            line-height: 1.3;
-            padding-top: 34px; /* espacio para que el montaje entre parcialmente sobre el pie */
-        }
+        @include('pdf.partials.orden-trabajo-firma-estilos')
 
         .elaborado-por {
             margin-top: 18px;
@@ -100,17 +44,6 @@
     // Logo antiguo usado específicamente para la Orden de Trabajo.
     $logoFile = public_path('branding/logo-andalien-costa.svg');
     $logoData = is_file($logoFile) ? 'data:image/svg+xml;base64,' . base64_encode(file_get_contents($logoFile)) : null;
-
-    // Firma y timbre (preferimos archivos separados). Mantengo fallback al archivo único antiguo.
-    $firmaSoloFile  = public_path('branding/firma.png');
-    $timbreFile     = public_path('branding/timbre.png');
-    $firmaComboFile = public_path('branding/firma-makarena.png');
-
-    $firmaSoloData = is_file($firmaSoloFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($firmaSoloFile)) : null;
-    $timbreData    = is_file($timbreFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($timbreFile)) : null;
-    $firmaComboData = (!$firmaSoloData && is_file($firmaComboFile))
-        ? 'data:image/png;base64,' . base64_encode(file_get_contents($firmaComboFile))
-        : null;
 
     // Postulante
     $postUser = $s->postulante?->user;
@@ -242,31 +175,7 @@
 @endif
 
 <div class="footer">
-    <div class="firma-section">
-
-        @if($firmaSoloData || $timbreData)
-            <div class="firma-layer">
-                @if($timbreData)
-                    <img class="timbre-img" src="{{ $timbreData }}" alt="Timbre">
-                @endif
-
-                @if($firmaSoloData)
-                    <img class="firma-img" src="{{ $firmaSoloData }}" alt="Firma">
-                @endif
-            </div>
-        @elseif($firmaComboData)
-            <div class="firma-combo">
-                <img class="firma-img" src="{{ $firmaComboData }}" alt="Firma y timbre">
-            </div>
-        @endif
-
-        <div class="firma-text">
-            <strong>MAKARENA PAREDES AGUILERA</strong><br>
-            <strong>SUBDIRECTORA DE GESTION Y DESARROLLO DE LAS PERSONAS</strong><br>
-            “POR ORDEN DEL DIRECTOR EJECUTIVO”<br>
-            SERVICIO LOCAL DE EDUCACIÓN PUBLICA ANDALIEN COSTA
-        </div>
-    </div>
+    @include('pdf.partials.orden-trabajo-firma')
 
     @if($elaboradoPor !== '')
         <div class="elaborado-por">

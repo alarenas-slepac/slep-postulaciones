@@ -35,6 +35,8 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         parent::setUp();
         $this->withoutMiddleware(EnsureModuleAccess::class);
         $this->withoutVite();
+        Schema::create('padron_aplicacion_control', fn (Blueprint $table) => $table->id());
+        DB::table('padron_aplicacion_control')->insert(['id' => 1]);
         DB::table('roles')->insert([
             ['id' => 4, 'name' => 'funcionario_slep', 'guard_name' => 'web'],
             ['id' => 5, 'name' => 'coordinador_gdp', 'guard_name' => 'web'],
@@ -273,6 +275,8 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         ])->assertRedirect($url);
         $registro = SolicitudReemplazoProrroga::query()->sole();
         $this->get($url)->assertOk()->assertSee('01/02/2028')->assertSee('E-198383')->assertDontSee('41 BIS');
+        $this->post(route(self::RUTA.'orden-trabajo.generar', $registro), ['regenerar' => 1])->assertSessionHasErrors('orden_trabajo');
+        $this->assertNull($registro->fresh()->correlativoOrdenTrabajo);
         $this->post(route(self::RUTA.'orden-trabajo.generar', $registro))->assertRedirect($url);
         Storage::disk('local')->assertExists($registro->fresh()->orden_trabajo_pdf_path);
     }
@@ -292,6 +296,9 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
             ['solicitud_reemplazo_id' => $ultimo, 'financiamiento' => 'SUBV. GENERAL', 'reemplazo_total' => 41],
             ['solicitud_reemplazo_id' => $ultimo, 'financiamiento' => 'PIE', 'reemplazo_total' => 3],
         ]);
+        $this->periodo('99000009K', 1, '2027-10-01', '2027-10-31', [
+            'estado' => 'rechazada_uatp', 'correlativo' => 6280, 'numero_solicitud' => '06280-2027',
+        ]);
         $migracion = require database_path('migrations/'.self::MIGRACION_OT);
         $migracion->up();
         $migracion->up();
@@ -308,16 +315,16 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertFalse($registro->tieneResolucion());
         $this->assertNull($registro->numero_resolucion);
         $this->assertSame('Escuela de prueba Sur', $registro->antecedentes['ultimo_reemplazo']['establecimiento']);
-        $this->assertSame(6276, $registro->correlativoOrdenTrabajo->id);
+        $this->assertSame(6281, $registro->correlativoOrdenTrabajo->id);
         $this->assertSame($funcionario->id, $registro->orden_trabajo_emitida_por_id);
         $disco = Storage::disk('local');
         $disco->assertExists($registro->orden_trabajo_pdf_path);
         $huella = hash('sha256', $disco->get($registro->orden_trabajo_pdf_path));
         $this->get(route(self::RUTA.'resolucion', $registro))->assertNotFound();
-        $this->get(route(self::RUTA.'orden-trabajo.descargar', $registro))->assertDownload('orden-trabajo-prorroga-6276.pdf');
-        $this->get($url)->assertOk()->assertSee('Descargar OT N° 6276')->assertSee('Registrar prórroga');
+        $this->get(route(self::RUTA.'orden-trabajo.descargar', $registro))->assertDownload('orden-trabajo-prorroga-6281.pdf');
+        $this->get($url)->assertOk()->assertSee('Descargar OT N° 6281')->assertSee('Registrar prórroga');
         $bandejaPendiente = route(self::RUTA.'index', ['anio' => 2027, 'estado' => 'pendiente']);
-        $this->get($bandejaPendiente)->assertOk()->assertSee('OT N° 6276');
+        $this->get($bandejaPendiente)->assertOk()->assertSee('OT N° 6281');
 
         $this->post($url, [
             'numero_resolucion' => 'REX-PRUEBA', 'fecha_resolucion' => '2027-12-14',
@@ -327,18 +334,39 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertDatabaseCount('solicitud_reemplazo_prorrogas', 1);
         $this->assertSame('REX-PRUEBA', $registro->numero_resolucion);
         $this->assertNotNull($registro->resolucion_registrada_at);
-        $this->assertSame(6276, $registro->correlativoOrdenTrabajo->id);
+        $this->assertSame(6281, $registro->correlativoOrdenTrabajo->id);
         $this->assertSame($huella, hash('sha256', $disco->get($registro->orden_trabajo_pdf_path)));
-        $this->get($bandejaPendiente)->assertOk()->assertDontSee('OT N° 6276');
+        $this->get($bandejaPendiente)->assertOk()->assertDontSee('OT N° 6281');
 
+        $rutaAnterior = $registro->orden_trabajo_pdf_path;
+        $emitidaAt = $registro->orden_trabajo_emitida_at;
+        $regenerar = route(self::RUTA.'orden-trabajo.generar', $registro);
+        $this->actingAs($persona)->post($regenerar, ['regenerar' => 1])->assertForbidden();
+        $gdp = $this->testUser(3, 5);
+        $this->actingAs($gdp)->get($url)->assertOk()->assertSee('Regenerar orden de trabajo')->assertSee('Descargar OT N° 6281');
+        $this->post($regenerar, ['regenerar' => 1])->assertRedirect($url)
+            ->assertSessionHas('status', 'Orden de trabajo regenerada con el mismo número.');
+        $registro->refresh();
+        $this->assertSame(6281, $registro->correlativoOrdenTrabajo->id);
+        $this->assertSame($funcionario->id, $registro->orden_trabajo_emitida_por_id);
+        $this->assertTrue($emitidaAt->equalTo($registro->orden_trabajo_emitida_at));
+        $this->assertSame('REX-PRUEBA', $registro->numero_resolucion);
+        $disco->assertExists($registro->resolucion_path);
+        $disco->assertMissing($rutaAnterior);
+        $this->assertNotSame($huella, hash('sha256', $disco->get($registro->orden_trabajo_pdf_path)));
+        $this->get(route(self::RUTA.'orden-trabajo.descargar', $registro))->assertDownload('orden-trabajo-prorroga-6281.pdf');
+
+        $this->periodo('99000008K', 1, '2027-11-01', '2027-11-30', [
+            'estado' => 'rechazada_plani', 'correlativo' => 6283, 'numero_solicitud' => '06283-2027',
+        ]);
         $nuevo = $this->periodo($rut, 1, '2028-03-01', '2028-03-31', ['estado' => 'derivada_slep', 'numero_solicitud' => '00002-2028']);
         $solicitud = SolicitudReemplazo::findOrFail($nuevo);
         $pdf = app(OrdenTrabajoPdfService::class);
         $this->assertStringContainsString('06275', $pdf->generateAndStore(SolicitudReemplazo::findOrFail($historica)));
         $rutaNueva = $pdf->generateAndStore($solicitud);
-        $this->assertStringContainsString('06277', $rutaNueva);
+        $this->assertStringContainsString('06284', $rutaNueva);
         $this->assertSame($rutaNueva, $pdf->generateAndStore($solicitud));
-        $this->assertSame([6275, 6276, 6277], OrdenTrabajoCorrelativo::query()->orderBy('id')->pluck('id')->all());
+        $this->assertSame([6275, 6281, 6284], OrdenTrabajoCorrelativo::query()->orderBy('id')->pluck('id')->all());
         $this->assertStringNotContainsString('41 BIS', app(SolicitudReemplazoProrrogaService::class)->motivo('aaee'));
     }
 

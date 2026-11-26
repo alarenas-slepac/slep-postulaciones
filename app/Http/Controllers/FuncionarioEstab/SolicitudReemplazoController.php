@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Support\PdfBranding;
 use App\Mail\SolicitudReemplazoCreada;
 use App\Models\Establecimiento;
+use App\Models\OrdenTrabajoCorrelativo;
 use App\Models\PostulantProfile;
 use App\Models\ReemplazoPersonal;
 use App\Services\Padron\PadronBloqueoService;
@@ -366,9 +367,7 @@ class SolicitudReemplazoController extends Controller
         ) {
             $anio = now()->year;
 
-            // correlativo por año (con lock)
-            $max = SolicitudReemplazo::where('anio', $anio)->lockForUpdate()->max('correlativo');
-            $next = (int)$max + 1;
+            $next = OrdenTrabajoCorrelativo::siguienteSolicitud($anio);
 
             if ($next > 99999) {
                 throw new \RuntimeException('Se alcanzó el máximo de solicitudes para el año.');

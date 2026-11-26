@@ -18,6 +18,29 @@ class OrdenTrabajoCorrelativo extends Model
 
     public static function reservar(string $origen, int $id): self
     {
-        return self::query()->firstOrCreate(['origen' => $origen, 'origen_id' => $id]);
+        // Las altas de solicitudes y las emisiones comparten la transacción coordinada del padrón.
+        $reserva = self::query()->firstOrNew(['origen' => $origen, 'origen_id' => $id]);
+        if (! $reserva->exists) {
+            $reserva->id = max(
+                (int) self::query()->max('id'),
+                (int) SolicitudReemplazo::query()->max('correlativo'),
+            ) + 1;
+            $reserva->save();
+        }
+
+        return $reserva;
+    }
+
+    public static function siguienteSolicitud(int $anio): int
+    {
+        $siguiente = (int) SolicitudReemplazo::query()->where('anio', $anio)->lockForUpdate()->max('correlativo') + 1;
+        foreach (self::query()->select('id')->where('id', '>=', $siguiente)->lazyById() as $reserva) {
+            if ($reserva->id > $siguiente) {
+                break;
+            }
+            $siguiente++;
+        }
+
+        return $siguiente;
     }
 }
