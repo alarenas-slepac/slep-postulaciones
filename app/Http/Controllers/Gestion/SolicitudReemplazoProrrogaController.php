@@ -196,14 +196,16 @@ class SolicitudReemplazoProrrogaController extends Controller
                 }
 
                 $numero = ($correlativo ?? OrdenTrabajoCorrelativo::reservar(OrdenTrabajoCorrelativo::PRORROGA, $registro->id))->id;
+                if (! $correlativo) {
+                    $registro->ordenTrabajoEmitidaPor()->associate($request->user());
+                    $registro->orden_trabajo_emitida_at = now();
+                }
                 $ultimo['desglose'] = $this->servicio->financiamiento($ultimo);
                 $archivoGenerado = $pdf->generarProrroga($registro, $numero, $ultimo, $vigencia, $this->servicio->motivo($estamento), $regenerar);
                 unset($caso['expediente'], $caso['registrada']);
                 $registro->update([
                     'antecedentes' => $caso,
                     'orden_trabajo_pdf_path' => $archivoGenerado,
-                    'orden_trabajo_emitida_por_id' => $correlativo ? $registro->orden_trabajo_emitida_por_id : $request->user()->id,
-                    'orden_trabajo_emitida_at' => $correlativo ? $registro->orden_trabajo_emitida_at : now(),
                 ]);
                 if ($archivoAnterior && $archivoAnterior !== $archivoGenerado) {
                     DB::afterCommit(fn () => Storage::disk('local')->delete($archivoAnterior));

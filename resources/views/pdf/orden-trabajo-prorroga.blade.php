@@ -49,6 +49,9 @@
     </table>
     @include('pdf.partials.orden-trabajo-firma')
     <p class="respaldo">
+        @if ($inicialesEmisor !== '')
+            /{{ $inicialesEmisor }}<br>
+        @endif
         @if ($prorroga->tieneResolucion())
             Resolución N° {{ $prorroga->numero_resolucion }} del {{ $fecha($prorroga->fecha_resolucion) }} ·
         @endif

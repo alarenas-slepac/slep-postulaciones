@@ -6594,8 +6594,15 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.722',
+    'current_version' => '2026.11.26.723',
     'entries' => [
+        [
+            'version' => '2026.11.26.723',
+            'title' => 'Iniciales en la orden de trabajo de prórroga',
+            'summary' => 'Muestra bajo la firma de Subdirección las iniciales de quien emitió la orden, también al regenerar el PDF.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.722',
             'title' => 'Regeneración de órdenes de trabajo de prórroga',
