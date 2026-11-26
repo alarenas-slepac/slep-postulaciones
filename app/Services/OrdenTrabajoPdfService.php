@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\OrdenTrabajoCorrelativo;
 use App\Models\SolicitudReemplazo;
 use App\Models\SolicitudReemplazoProrroga;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -42,12 +41,7 @@ class OrdenTrabajoPdfService
         ]);
 
         $yaEmitida = $s->orden_trabajo_pdf_path || in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true);
-        $numeroAsignado = OrdenTrabajoCorrelativo::query()
-            ->where('origen', OrdenTrabajoCorrelativo::REEMPLAZO)->where('origen_id', $s->id)->value('id');
-        if ($numeroAsignado === null && ! $yaEmitida) {
-            $numeroAsignado = OrdenTrabajoCorrelativo::reservar(OrdenTrabajoCorrelativo::REEMPLAZO, $s->id)->id;
-        }
-        $otNumero = $this->makeOtNumber($s, $numeroAsignado);
+        $otNumero = $this->makeOtNumber($s);
         $safeNumero = preg_replace('/[^0-9A-Za-z\- ]/', '', $otNumero);
         $safeNumero = Str::of($safeNumero)->replace(' ', '_')->__toString();
 
@@ -77,9 +71,9 @@ class OrdenTrabajoPdfService
      * - Si fecha_inicio y fecha_termino son el mismo año: {XXXXX}-{AAAA}
      * - Si abarcan años distintos: {XXXXX}-{AAAA} a {AAAA}-{XXXXX}
      */
-    public function makeOtNumber(SolicitudReemplazo $s, ?int $numeroAsignado = null): string
+    public function makeOtNumber(SolicitudReemplazo $s): string
     {
-        $num = $numeroAsignado ?? $s->numero_solicitud ?? $s->correlativo ?? $s->id;
+        $num = $s->correlativo ?? $s->numero_solicitud ?? $s->id;
         $correl = str_pad((string) (int) $num, 5, '0', STR_PAD_LEFT);
 
         $yIni = $s->fecha_inicio?->format('Y') ?? (string) ($s->anio ?? now()->year);

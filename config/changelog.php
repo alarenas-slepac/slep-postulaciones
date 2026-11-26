@@ -6594,8 +6594,15 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.724',
+    'current_version' => '2026.11.26.725',
     'entries' => [
+        [
+            'version' => '2026.11.26.725',
+            'title' => 'Correlativo de las órdenes de trabajo de reemplazo',
+            'summary' => 'Emite y regenera las órdenes de reemplazo con el correlativo de su solicitud. La reserva de números libres se aplica solamente a las prórrogas.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.724',
             'title' => 'Firma titular y subrogante en órdenes de trabajo',

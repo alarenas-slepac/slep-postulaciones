@@ -195,7 +195,7 @@ class SolicitudReemplazoProrrogaController extends Controller
                     throw ValidationException::withMessages(['orden_trabajo' => 'El reemplazante tiene una restricción judicial registrada.']);
                 }
 
-                $numero = ($correlativo ?? OrdenTrabajoCorrelativo::reservar(OrdenTrabajoCorrelativo::PRORROGA, $registro->id))->id;
+                $numero = ($correlativo ?? OrdenTrabajoCorrelativo::reservarProrroga($registro->id))->id;
                 if (! $correlativo) {
                     $registro->ordenTrabajoEmitidaPor()->associate($request->user());
                     $registro->orden_trabajo_emitida_at = now();
