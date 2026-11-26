@@ -77,7 +77,7 @@
                                         value="{{ old($clave.'.cargo', $perfil['cargo']) }}" maxlength="160" @required($clave === 'titular')>
                                     @error($clave.'.cargo')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
-                                <div>
+                                <div class="mb-3">
                                     <label for="{{ $clave }}-firma" class="form-label">Imagen de firma</label>
                                     <input type="file" id="{{ $clave }}-firma" name="{{ $clave }}[firma]"
                                         class="form-control @error($clave.'.firma') is-invalid @enderror" accept="image/png,image/jpeg"
@@ -89,6 +89,21 @@
                                             Firma guardada. Selecciona otra imagen para reemplazarla.
                                         @elseif ($clave === 'titular')
                                             Firma institucional registrada. Carga una nueva imagen si cambia la persona titular.
+                                        @endif
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="{{ $clave }}-timbre" class="form-label">Imagen de timbre</label>
+                                    <input type="file" id="{{ $clave }}-timbre" name="{{ $clave }}[timbre]"
+                                        class="form-control @error($clave.'.timbre') is-invalid @enderror" accept="image/png,image/jpeg"
+                                        aria-describedby="{{ $clave }}-timbre-ayuda">
+                                    @error($clave.'.timbre')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    <div id="{{ $clave }}-timbre-ayuda" class="form-text">
+                                        PNG o JPG, hasta 2 MB y 1600 × 1200 píxeles.
+                                        @if ($perfil['archivo_timbre'] ?? null)
+                                            Timbre guardado. Selecciona otra imagen para reemplazarlo.
+                                        @else
+                                            Este perfil usa el timbre institucional. Carga una imagen para cambiarlo.
                                         @endif
                                     </div>
                                 </div>

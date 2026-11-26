@@ -17,6 +17,7 @@ class OrdenTrabajoFirmaService
             'nombre' => 'MAKARENA PAREDES AGUILERA',
             'cargo' => 'SUBDIRECTORA DE GESTION Y DESARROLLO DE LAS PERSONAS',
             'archivo' => null,
+            'archivo_timbre' => null,
         ];
     }
 
@@ -29,7 +30,7 @@ class OrdenTrabajoFirmaService
         return $guardada ?? [
             'vigente' => 'titular',
             'titular' => $this->titularInstitucional(),
-            'subrogante' => ['nombre' => '', 'cargo' => '', 'archivo' => null],
+            'subrogante' => ['nombre' => '', 'cargo' => '', 'archivo' => null, 'archivo_timbre' => null],
         ];
     }
 
@@ -40,32 +41,36 @@ class OrdenTrabajoFirmaService
         return $configuracion[$configuracion['vigente']];
     }
 
-    public function paraPdf(array $firmante, ?UploadedFile $nuevaFirma = null): array
+    public function paraPdf(array $firmante, ?UploadedFile $nuevaFirma = null, ?UploadedFile $nuevoTimbre = null): array
     {
-        $timbre = $this->imagenInstitucional('timbre.png');
-        if ($nuevaFirma || $firmante['archivo']) {
-            $contenido = $nuevaFirma ? $nuevaFirma->get() : Storage::disk('local')->get($firmante['archivo']);
-            $imagen = is_string($contenido) ? @getimagesizefromstring($contenido) : false;
-            if (! $imagen || ! in_array($imagen['mime'], ['image/png', 'image/jpeg'], true)) {
-                throw new RuntimeException('La imagen de firma de la orden de trabajo no está disponible.');
-            }
-
-            return $firmante + [
-                'firma' => 'data:'.$imagen['mime'].';base64,'.base64_encode($contenido),
-                'timbre' => $timbre,
-                'combinada' => null,
-                'personalizada' => true,
-            ];
-        }
-
-        $firma = $this->imagenInstitucional('firma.png');
+        $firmaPersonalizada = $nuevaFirma || $firmante['archivo'];
+        $archivoTimbre = $firmante['archivo_timbre'] ?? null;
+        $timbrePersonalizado = $nuevoTimbre || $archivoTimbre;
+        $firma = $firmaPersonalizada
+            ? $this->imagenCargada($firmante['archivo'], $nuevaFirma, 'firma')
+            : $this->imagenInstitucional('firma.png');
+        $timbre = $timbrePersonalizado
+            ? $this->imagenCargada($archivoTimbre, $nuevoTimbre, 'timbre')
+            : $this->imagenInstitucional('timbre.png');
 
         return $firmante + [
             'firma' => $firma,
             'timbre' => $timbre,
-            'combinada' => $firma ? null : $this->imagenInstitucional('firma-makarena.png'),
-            'personalizada' => false,
+            'combinada' => $firma || $timbrePersonalizado ? null : $this->imagenInstitucional('firma-makarena.png'),
+            'personalizada' => $firmaPersonalizada,
+            'timbrePersonalizado' => $timbrePersonalizado,
         ];
+    }
+
+    private function imagenCargada(?string $ruta, ?UploadedFile $nuevaImagen, string $tipo): string
+    {
+        $contenido = $nuevaImagen ? $nuevaImagen->get() : Storage::disk('local')->get($ruta);
+        $imagen = is_string($contenido) ? @getimagesizefromstring($contenido) : false;
+        if (! $imagen || ! in_array($imagen['mime'], ['image/png', 'image/jpeg'], true)) {
+            throw new RuntimeException("La imagen de {$tipo} de la orden de trabajo no está disponible.");
+        }
+
+        return 'data:'.$imagen['mime'].';base64,'.base64_encode($contenido);
     }
 
     private function imagenInstitucional(string $nombre): ?string
