@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Models\OrdenTrabajoCorrelativo;
 use App\Models\SolicitudReemplazo;
+use App\Models\SolicitudReemplazoConfiguracion;
 use App\Models\SolicitudReemplazoProrroga;
+use App\Services\OrdenTrabajoFirmaService;
 use App\Services\OrdenTrabajoPdfService;
 use App\Services\SolicitudReemplazoProrrogaService;
 use App\Support\Rut;
@@ -30,6 +32,10 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
     private const MIGRACION_OT = '2026_11_26_140000_add_ordenes_trabajo_to_prorrogas_reemplazo.php';
 
     private const MIGRACION_RESOLUCION_OPCIONAL = '2026_11_26_150000_allow_orden_trabajo_before_prorroga_resolucion.php';
+
+    private const MIGRACION_FIRMANTE = '2026_11_26_160000_add_firmante_to_ordenes_trabajo_reemplazo.php';
+
+    private const RUTA_FIRMA = 'gestion.solicitudes-reemplazo.firma-ot.';
 
     protected function setUp(): void
     {
@@ -103,6 +109,85 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         (require database_path('migrations/'.self::MIGRACION))->up();
         (require database_path('migrations/'.self::MIGRACION_OT))->up();
         (require database_path('migrations/'.self::MIGRACION_RESOLUCION_OPCIONAL))->up();
+        (require database_path('migrations/2026_08_11_090000_create_solicitud_reemplazo_autorizaciones_docentes_tables.php'))->up();
+        (require database_path('migrations/'.self::MIGRACION_FIRMANTE))->up();
+    }
+
+    public function test_configuracion_permite_previsualizar_una_firma_sin_publicarla_y_admite_volver_a_la_titular(): void
+    {
+        $gdp = $this->testUser(1, 5);
+        $funcionario = $this->testUser(2, 4);
+        $edit = route(self::RUTA_FIRMA.'edit');
+        $update = route(self::RUTA_FIRMA.'update');
+        $preview = route(self::RUTA_FIRMA.'preview');
+        $datos = $this->datosFirmaSubrogante();
+        $firmas = app(OrdenTrabajoFirmaService::class);
+        $this->actingAs($funcionario)->get($edit)->assertForbidden();
+        $this->post($update, $datos)->assertForbidden();
+        $this->post($preview, $datos)->assertForbidden();
+
+        $this->actingAs($gdp)->get($edit)->assertOk()->assertSee('Firma de órdenes de trabajo')->assertSee('Previsualizar PDF');
+        $menu = SlepUiRegistry::menuGroups($gdp, 'coordinador_gdp');
+        $seccion = collect(SlepSidebarNavigation::forRole($menu, 'coordinador_gdp', self::RUTA_FIRMA.'edit')['sections'])->firstWhere('key', 'seleccion');
+        $this->assertContains(self::RUTA_FIRMA.'edit', array_column($seccion['links'], 'route'));
+        $this->from($edit)->post($update, $datos)->assertSessionHasErrors('subrogante.firma');
+        $datos['subrogante']['firma'] = UploadedFile::fake()->image('firma-de-prueba.png', 240, 110);
+        $vistas = [];
+        View::composer('pdf.orden-trabajo-prorroga', function ($vista) use (&$vistas): void {
+            $vistas[] = $vista->getData()['firmaOt'];
+        });
+        $respuesta = $this->post($preview, $datos)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $respuesta->getContent());
+        $this->assertSame('Persona subrogante de prueba', $vistas[0]['nombre']);
+        $this->assertStringStartsWith('data:image/png;base64,', $vistas[0]['firma']);
+        $this->assertDatabaseMissing('solicitud_reemplazo_configuraciones', ['clave' => SolicitudReemplazoConfiguracion::FIRMA_ORDEN_TRABAJO]);
+        $this->assertSame([], Storage::disk('local')->allFiles('reemplazos/firmas-ot'));
+
+        $this->post($update, $datos)->assertRedirect($edit)->assertSessionHasNoErrors();
+        $subrogante = $firmas->vigente();
+        $this->assertSame('Persona subrogante de prueba', $subrogante['nombre']);
+        Storage::disk('local')->assertExists($subrogante['archivo']);
+        unset($datos['subrogante']['firma']);
+        $datos['vigente'] = 'titular';
+        $this->post($update, $datos)->assertRedirect($edit)->assertSessionHasNoErrors();
+        $this->assertSame($firmas->titularInstitucional(), $firmas->vigente());
+        $this->assertSame($subrogante, $firmas->configuracion()['subrogante']);
+    }
+
+    public function test_una_ot_de_reemplazo_conserva_el_firmante_y_el_archivo_aunque_se_cambie_la_configuracion(): void
+    {
+        $gdp = $this->testUser(1, 5);
+        $firmas = app(OrdenTrabajoFirmaService::class);
+        $datos = $this->datosFirmaSubrogante();
+        $datos['subrogante']['firma'] = UploadedFile::fake()->image('firma-de-prueba.jpg', 300, 80);
+        $update = route(self::RUTA_FIRMA.'update');
+        $this->actingAs($gdp)->post($update, $datos)->assertSessionHasNoErrors();
+        $firmante = $firmas->vigente();
+
+        $id = $this->periodo('99000009K', 1, '2027-01-01', '2027-01-31', ['estado' => 'derivada_slep']);
+        $orden = SolicitudReemplazo::findOrFail($id);
+        $pdf = app(OrdenTrabajoPdfService::class);
+        $ruta = $pdf->generateAndStore($orden);
+        DB::table('solicitudes_reemplazo')->where('id', $id)
+            ->update(['orden_trabajo_pdf_path' => $ruta, 'orden_trabajo_firmante' => json_encode($orden->orden_trabajo_firmante), 'estado' => 'aceptada']);
+        $this->assertSame($firmante, $orden->orden_trabajo_firmante);
+
+        $datos['subrogante']['firma'] = UploadedFile::fake()->image('nueva-firma-de-prueba.png', 400, 120);
+        $datos['vigente'] = 'titular';
+        $this->post($update, $datos)->assertSessionHasNoErrors();
+        $this->assertNotSame($firmante['archivo'], $firmas->configuracion()['subrogante']['archivo']);
+        Storage::disk('local')->assertExists($firmante['archivo']);
+        $this->assertSame($ruta, $pdf->generateAndStore($orden->fresh()));
+        $this->assertSame($firmante, $orden->fresh()->orden_trabajo_firmante);
+    }
+
+    private function datosFirmaSubrogante(): array
+    {
+        return [
+            'vigente' => 'subrogante',
+            'titular' => app(OrdenTrabajoFirmaService::class)->titularInstitucional(),
+            'subrogante' => ['nombre' => 'Persona subrogante de prueba', 'cargo' => 'Subdirección subrogante de prueba'],
+        ];
     }
 
     public function test_une_titulares_y_escuelas_consecutivas_pero_no_une_estamentos_ni_dias_con_brechas(): void
@@ -284,6 +369,11 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
 
     public function test_la_orden_usa_el_ultimo_reemplazo_y_reserva_el_numero_para_ambos_modulos(): void
     {
+        $gdp = $this->testUser(3, 5);
+        $datosFirma = $this->datosFirmaSubrogante();
+        $datosFirma['subrogante']['firma'] = UploadedFile::fake()->image('firma-de-prueba.png', 240, 90);
+        $this->actingAs($gdp)->post(route(self::RUTA_FIRMA.'update'), $datosFirma)->assertSessionHasNoErrors();
+        $firmante = app(OrdenTrabajoFirmaService::class)->vigente();
         $funcionario = $this->testUser(1, 4);
         $funcionario->update(['nombres' => 'Ágata Ejemplo', 'apellido_paterno' => 'Prueba', 'apellido_materno' => 'Simulada']);
         $inicialesEnPdf = [];
@@ -324,6 +414,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertSame(6281, $registro->correlativoOrdenTrabajo->id);
         $this->assertSame($funcionario->id, $registro->orden_trabajo_emitida_por_id);
         $this->assertSame(['áps'], $inicialesEnPdf);
+        $this->assertSame($firmante, $registro->orden_trabajo_firmante);
         $disco = Storage::disk('local');
         $disco->assertExists($registro->orden_trabajo_pdf_path);
         $huella = hash('sha256', $disco->get($registro->orden_trabajo_pdf_path));
@@ -349,7 +440,9 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $emitidaAt = $registro->orden_trabajo_emitida_at;
         $regenerar = route(self::RUTA.'orden-trabajo.generar', $registro);
         $this->actingAs($persona)->post($regenerar, ['regenerar' => 1])->assertForbidden();
-        $gdp = $this->testUser(3, 5);
+        $datosFirma['vigente'] = 'titular';
+        unset($datosFirma['subrogante']['firma']);
+        $this->actingAs($gdp)->post(route(self::RUTA_FIRMA.'update'), $datosFirma)->assertSessionHasNoErrors();
         $this->actingAs($gdp)->get($url)->assertOk()->assertSee('Regenerar orden de trabajo')->assertSee('Descargar OT N° 6281');
         $this->post($regenerar, ['regenerar' => 1])->assertRedirect($url)
             ->assertSessionHas('status', 'Orden de trabajo regenerada con el mismo número.');
@@ -358,6 +451,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertSame($funcionario->id, $registro->orden_trabajo_emitida_por_id);
         $this->assertTrue($emitidaAt->equalTo($registro->orden_trabajo_emitida_at));
         $this->assertSame(['áps', 'áps'], $inicialesEnPdf);
+        $this->assertSame($firmante, $registro->orden_trabajo_firmante);
         $this->assertSame('REX-PRUEBA', $registro->numero_resolucion);
         $disco->assertExists($registro->resolucion_path);
         $disco->assertMissing($rutaAnterior);
@@ -413,6 +507,32 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
             $this->assertLessThanOrEqual(64, strlen($identificador));
         }
         $pendiente = $sql[4];
+        $sql = [];
+        $migracion->up();
+        $this->assertSame([$pendiente], $sql);
+    }
+
+    public function test_migracion_firmante_mysql_reintenta_el_cambio_faltante(): void
+    {
+        $pdo = \Mockery::mock(\PDO::class);
+        $pdo->shouldReceive('getAttribute')->with(\PDO::ATTR_SERVER_VERSION)->andReturn('8.0.36');
+        $conexion = new MySqlConnection($pdo, 'sga_pruebas', 'sga_', ['driver' => 'mysql', 'prefix_indexes' => true]);
+        $conexion->useDefaultSchemaGrammar();
+        Schema::shouldReceive('hasColumn')->with('solicitudes_reemplazo', 'orden_trabajo_firmante')->twice()->andReturn(false, true);
+        Schema::shouldReceive('hasColumn')->with('solicitud_reemplazo_prorrogas', 'orden_trabajo_firmante')->twice()->andReturn(false, false);
+        $sql = [];
+        Schema::shouldReceive('table')->times(3)->andReturnUsing(function ($tabla, $definicion) use ($conexion, &$sql): void {
+            $plano = new Blueprint($conexion, $tabla);
+            $definicion($plano);
+            array_push($sql, ...$plano->toSql());
+        });
+        $migracion = require database_path('migrations/'.self::MIGRACION_FIRMANTE);
+        $migracion->up();
+        $this->assertSame([
+            'alter table `sga_solicitudes_reemplazo` add `orden_trabajo_firmante` json null',
+            'alter table `sga_solicitud_reemplazo_prorrogas` add `orden_trabajo_firmante` json null',
+        ], $sql);
+        $pendiente = $sql[1];
         $sql = [];
         $migracion->up();
         $this->assertSame([$pendiente], $sql);

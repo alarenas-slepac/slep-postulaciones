@@ -55,3 +55,17 @@
     line-height: 1.3;
     padding-top: 34px; /* espacio para que el montaje entre parcialmente sobre el pie */
 }
+
+.firma-section--personalizada { page-break-inside: avoid; }
+.firma-section--personalizada .firma-layer { height: 160px; margin-bottom: 0; }
+.firma-section--personalizada .firma-layer .timbre-img { width: 132px; margin-left: -66px; }
+.firma-section--personalizada .firma-layer .firma-img {
+    position: relative;
+    left: auto;
+    display: block;
+    width: auto;
+    max-width: 220px;
+    max-height: 124px;
+    margin: 0 auto;
+}
+.firma-section--personalizada .firma-text { padding-top: 6px; }

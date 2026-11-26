@@ -1,8 +1,11 @@
+@php
+    $tituloOrden = $numero === null ? 'Orden de Trabajo · Vista previa' : 'Orden de Trabajo N° '.$numero;
+@endphp
 <!doctype html>
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Orden de Trabajo N° {{ $numero }}</title>
+    <title>{{ $tituloOrden }}</title>
     <style>
         @page { margin: 42pt 64pt; }
         body { font: 10pt DejaVu Sans, sans-serif; color: #171717; }
@@ -30,7 +33,7 @@
         $capital = fn ($valor) => mb_strtoupper((string) $valor, 'UTF-8');
         $filas = [
             'NOMBRE' => $capital($reemplazo['nombre']),
-            'RUT' => \App\Support\Rut::format($prorroga->rut),
+            'RUT' => \App\Support\Rut::format($prorroga->rut) ?: '—',
             'ESTABLECIMIENTO' => $capital($reemplazo['establecimiento']),
             'CARGO' => $capital($reemplazo['cargo']),
             'JORNADA' => $horas.' HRS',
@@ -41,7 +44,7 @@
         ];
     @endphp
     <img class="logo" src="{{ $logo }}" alt="SLEP Andalién Costa">
-    <h1>ORDEN DE TRABAJO N° {{ $numero }}</h1>
+    <h1>{{ mb_strtoupper($tituloOrden) }}</h1>
     <table>
         @foreach ($filas as $etiqueta => $valor)
             <tr><th scope="row">{{ $etiqueta }}</th><td class="separador">:</td><td>{{ $valor }}</td></tr>

@@ -32,6 +32,7 @@ class SlepSidebarNavigation
             'gestion.autorizaciones-docentes.index',
             'gestion.solicitudes-reemplazo.finiquitos.index',
             'gestion.solicitudes-reemplazo.prorrogas.index',
+            'gestion.solicitudes-reemplazo.firma-ot.edit',
             'reemplazos.index',
             'reemplazos.buscador-postulantes.index',
             'gestion.bolsa-trabajo.index',

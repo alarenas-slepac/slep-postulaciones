@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 
 class OrdenTrabajoPdfService
 {
+    public function __construct(private readonly OrdenTrabajoFirmaService $firmas) {}
+
     /**
      * Genera el PDF de Orden de Trabajo y lo guarda en storage/app (disco local).
      * Retorna el path guardado (ej: private/solicitudes-reemplazo/{id}/ORDEN_TRABAJO_XXXXX-AAAA.pdf).
@@ -39,19 +41,23 @@ class OrdenTrabajoPdfService
             'ordenTrabajoCreadaPor',
         ]);
 
+        $yaEmitida = $s->orden_trabajo_pdf_path || in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true);
         $numeroAsignado = OrdenTrabajoCorrelativo::query()
             ->where('origen', OrdenTrabajoCorrelativo::REEMPLAZO)->where('origen_id', $s->id)->value('id');
-        if ($numeroAsignado === null && ! $s->orden_trabajo_pdf_path
-            && ! in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true)) {
+        if ($numeroAsignado === null && ! $yaEmitida) {
             $numeroAsignado = OrdenTrabajoCorrelativo::reservar(OrdenTrabajoCorrelativo::REEMPLAZO, $s->id)->id;
         }
         $otNumero = $this->makeOtNumber($s, $numeroAsignado);
         $safeNumero = preg_replace('/[^0-9A-Za-z\- ]/', '', $otNumero);
         $safeNumero = Str::of($safeNumero)->replace(' ', '_')->__toString();
 
+        $s->orden_trabajo_firmante = $yaEmitida
+            ? ($s->orden_trabajo_firmante ?? $this->firmas->titularInstitucional())
+            : $this->firmas->vigente();
         $pdf = Pdf::loadView('pdf.orden-trabajo', [
             's' => $s,
             'otNumero' => $otNumero,
+            'firmaOt' => $this->firmas->paraPdf($s->orden_trabajo_firmante),
         ])->setPaper('letter', 'portrait');
 
         $dir = "private/solicitudes-reemplazo/{$s->id}";
@@ -99,7 +105,10 @@ class OrdenTrabajoPdfService
             fn ($parte) => mb_substr(trim((string) $parte), 0, 1, 'UTF-8'),
             [$emisor?->nombres, $emisor?->apellido_paterno, $emisor?->apellido_materno],
         )), 'UTF-8');
-        $contenido = Pdf::loadView('pdf.orden-trabajo-prorroga', compact('prorroga', 'numero', 'reemplazo', 'vigencia', 'motivo', 'inicialesEmisor'))
+        $yaEmitida = $regenerar || $prorroga->orden_trabajo_pdf_path || $prorroga->getRawOriginal('orden_trabajo_emitida_at');
+        $prorroga->orden_trabajo_firmante ??= $yaEmitida ? $this->firmas->titularInstitucional() : $this->firmas->vigente();
+        $firmaOt = $this->firmas->paraPdf($prorroga->orden_trabajo_firmante);
+        $contenido = Pdf::loadView('pdf.orden-trabajo-prorroga', compact('prorroga', 'numero', 'reemplazo', 'vigencia', 'motivo', 'inicialesEmisor', 'firmaOt'))
             ->setPaper('letter', 'portrait')->output();
         // Mantiene disponible el PDF anterior hasta que se confirme el reemplazo.
         $version = $regenerar ? '_'.Str::uuid() : '';

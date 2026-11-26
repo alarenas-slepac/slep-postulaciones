@@ -68,6 +68,7 @@ use App\Http\Controllers\Gestion\DeudaPensionAlimentosController as GestionDeuda
 use App\Http\Controllers\Gestion\AutorizacionDocenteController;
 use App\Http\Controllers\Reemplazos\BuscadorPostulantesController;
 use App\Http\Controllers\Gestion\OrdenTrabajoPdfController;
+use App\Http\Controllers\Gestion\OrdenTrabajoFirmaController;
 use App\Http\Controllers\Gestion\EstadisticasController;
 use App\Http\Controllers\Gestion\InformesController;
 use App\Http\Controllers\Gestion\PostulanteTutorialController;
@@ -1558,6 +1559,14 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
         Route::get('/solicitudes-reemplazo', [SolicitudReemplazoGestionController::class, 'index'])
             ->middleware('ensure.role:admin|coordinador_uatp|coordinador_gdp|funcionario_slep|supervisor_plani')
             ->name('solicitudes-reemplazo.index');
+
+        Route::prefix('solicitudes-reemplazo/firma-ot')->name('solicitudes-reemplazo.firma-ot.')
+            ->middleware(['ensure.role:admin|coordinador_gdp', 'ensure.active-role:admin|coordinador_gdp'])
+            ->group(function () {
+                Route::get('/', [OrdenTrabajoFirmaController::class, 'edit'])->name('edit');
+                Route::post('/', [OrdenTrabajoFirmaController::class, 'update'])->name('update');
+                Route::post('/vista-previa', [OrdenTrabajoFirmaController::class, 'preview'])->name('preview');
+            });
 
         Route::get('/solicitudes-reemplazo/exportar', [SolicitudReemplazoGestionController::class, 'exportar'])
             ->middleware('ensure.role:admin|coordinador_gdp')
