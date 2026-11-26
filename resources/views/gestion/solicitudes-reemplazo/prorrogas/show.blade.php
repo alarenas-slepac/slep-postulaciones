@@ -126,7 +126,10 @@
         <section class="slep-listing__panel" aria-labelledby="prorroga-orden">
             <div class="slep-listing__panel-header"><h2 id="prorroga-orden">Orden de trabajo</h2></div>
             <div class="slep-listing__filters">
-                @php($ultimo = $caso['ultimo_reemplazo'])
+                @php
+                    $ultimo = $caso['ultimo_reemplazo'];
+                    $numeroOrden = $expediente?->correlativoOrdenTrabajo?->id;
+                @endphp
                 <dl class="row mb-3">
                     <dt class="col-sm-3">Reemplazo de origen</dt><dd class="col-sm-9">{{ $ultimo['solicitud'] ?? 'Sin información' }}</dd>
                     <dt class="col-sm-3">Establecimiento</dt><dd class="col-sm-9">{{ $ultimo['establecimiento'] ?? 'Sin información' }}</dd>
@@ -136,10 +139,20 @@
                     <dt class="col-sm-3">Vigencia de la orden</dt><dd class="col-sm-9">{{ $fecha($vigencia['desde']) }} al {{ $fecha($vigencia['hasta']) }}</dd>
                     <dt class="col-sm-3">Motivo</dt><dd class="col-sm-9">{{ $prorrogas->motivo($estamento) }}</dd>
                 </dl>
-                @if ($ordenDisponible)
-                    <a class="slep-listing__button slep-listing__button--secondary" href="{{ route($ruta.'orden-trabajo.descargar', $expediente) }}">
-                        <i class="bi bi-download" aria-hidden="true"></i> Descargar OT N° {{ $expediente->correlativoOrdenTrabajo?->id }}
-                    </a>
+                @if ($numeroOrden)
+                    <div class="slep-listing__actions">
+                        @if ($ordenDisponible)
+                            <a class="slep-listing__button slep-listing__button--secondary" href="{{ route($ruta.'orden-trabajo.descargar', $expediente) }}">
+                                <i class="bi bi-download" aria-hidden="true"></i> Descargar OT N° {{ $numeroOrden }}
+                            </a>
+                        @endif
+                        <form method="POST" action="{{ route($ruta.'orden-trabajo.generar', $expediente) }}" onsubmit="return confirm('¿Regenerar el PDF de esta orden de trabajo con el mismo número?');">
+                            @csrf
+                            <button type="submit" name="regenerar" value="1" class="slep-listing__button slep-listing__button--secondary">
+                                <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Regenerar orden de trabajo
+                            </button>
+                        </form>
+                    </div>
                 @else
                     <form method="POST" action="{{ route($ruta.'orden-trabajo.generar-caso', compact('anio', 'estamento', 'rut')) }}">
                         @csrf

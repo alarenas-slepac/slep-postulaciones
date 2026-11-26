@@ -12,7 +12,13 @@
         th, td { padding: 5pt 0; vertical-align: top; text-align: left; }
         th { width: 135pt; font-size: 9pt; }
         .separador { width: 9pt; }
-        .firma { margin: 74pt 0 0; text-align: center; font-weight: bold; line-height: 1.5; }
+        @include('pdf.partials.orden-trabajo-firma-estilos')
+        .firma-section { page-break-inside: avoid; }
+        .firma-layer { height: 176px; margin-bottom: 0; }
+        .firma-layer .firma-img { width: 220px; margin-left: -110px; }
+        .firma-layer .timbre-img { width: 132px; margin-left: -66px; }
+        .firma-text { padding-top: 6px; }
+        .firma-combo { margin-bottom: 0; }
         .respaldo { margin-top: 28pt; font-size: 8pt; }
     </style>
 </head>
@@ -41,10 +47,7 @@
             <tr><th scope="row">{{ $etiqueta }}</th><td class="separador">:</td><td>{{ $valor }}</td></tr>
         @endforeach
     </table>
-    <div class="firma">
-        SUBDIRECCIÓN DE GESTIÓN Y DESARROLLO DE LAS PERSONAS<br>
-        SERVICIO LOCAL DE EDUCACIÓN PÚBLICA ANDALIÉN COSTA
-    </div>
+    @include('pdf.partials.orden-trabajo-firma')
     <p class="respaldo">
         @if ($prorroga->tieneResolucion())
             Resolución N° {{ $prorroga->numero_resolucion }} del {{ $fecha($prorroga->fecha_resolucion) }} ·

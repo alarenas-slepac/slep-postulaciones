@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.721',
+    'current_version' => '2026.11.26.722',
     'entries' => [
+        [
+            'version' => '2026.11.26.722',
+            'title' => 'Regeneración de órdenes de trabajo de prórroga',
+            'summary' => 'Permite regenerar el PDF con el mismo correlativo e incorpora la firma y el timbre de Subdirección usados en Reemplazos.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'items' => [
+                'Las OT nuevas continúan después de los correlativos asignados a solicitudes de reemplazo, incluidas las rechazadas.',
+                'Las solicitudes nuevas mantienen su serie anual y saltan los números reservados para órdenes de trabajo.',
+            ],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.721',
             'title' => 'Órdenes de trabajo con resolución pendiente en prórrogas',

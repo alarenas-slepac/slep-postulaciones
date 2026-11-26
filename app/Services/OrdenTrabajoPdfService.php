@@ -86,11 +86,19 @@ class OrdenTrabajoPdfService
         return "{$correl}-{$yIni} a {$yFin}-{$correl}";
     }
 
-    public function generarProrroga(SolicitudReemplazoProrroga $prorroga, int $numero, array $reemplazo, array $vigencia, string $motivo): string
-    {
+    public function generarProrroga(
+        SolicitudReemplazoProrroga $prorroga,
+        int $numero,
+        array $reemplazo,
+        array $vigencia,
+        string $motivo,
+        bool $regenerar = false,
+    ): string {
         $contenido = Pdf::loadView('pdf.orden-trabajo-prorroga', compact('prorroga', 'numero', 'reemplazo', 'vigencia', 'motivo'))
             ->setPaper('letter', 'portrait')->output();
-        $ruta = "reemplazos/prorrogas/{$prorroga->anio_diciembre}/orden_trabajo_{$numero}.pdf";
+        // Mantiene disponible el PDF anterior hasta que se confirme el reemplazo.
+        $version = $regenerar ? '_'.Str::uuid() : '';
+        $ruta = "reemplazos/prorrogas/{$prorroga->anio_diciembre}/orden_trabajo_{$numero}{$version}.pdf";
         if (! Storage::disk('local')->put($ruta, $contenido)) {
             throw new \RuntimeException('No se pudo guardar la Orden de Trabajo de prórroga.');
         }

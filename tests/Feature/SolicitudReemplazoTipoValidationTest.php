@@ -49,6 +49,11 @@ class SolicitudReemplazoTipoValidationTest extends IsolatedSecurityTestCase
             $table->timestamps();
         });
         Schema::create('postulant_profiles', fn (Blueprint $table) => $table->id());
+        Schema::create('orden_trabajo_correlativos', function (Blueprint $table): void {
+            $table->id();
+            $table->string('origen', 16);
+            $table->unsignedBigInteger('origen_id');
+        });
         foreach ([
             '2026_01_29_000001_create_reemplazos_personal_table.php',
             '2026_01_29_192443_create_solicitudes_reemplazo_tables.php',
@@ -102,6 +107,22 @@ class SolicitudReemplazoTipoValidationTest extends IsolatedSecurityTestCase
         $this->assertSame('44.00', $solicitud->jornadas->sole()->reemplazo_total);
         Storage::disk('local')->assertExists([$solicitud->oficio_pdf_path, $solicitud->respaldo_pdf_path]);
         Mail::assertSent(SolicitudReemplazoCreada::class);
+    }
+
+    public function test_omite_reservas_de_ot_al_numerar_solicitudes_sin_perder_la_serie_anual(): void
+    {
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-10-06'));
+        $this->existingRequest(TipoReemplazo::REPOSO_MUTUALIDAD, 18)->update(['estado' => 'rechazada_uatp']);
+        DB::table('orden_trabajo_correlativos')->insert([
+            ['id' => 19, 'origen' => 'prorroga', 'origen_id' => 1],
+            ['id' => 20, 'origen' => 'reemplazo', 'origen_id' => 2],
+            ['id' => 22, 'origen' => 'prorroga', 'origen_id' => 3],
+        ]);
+        $this->post(route('funcionario.solicitudes-reemplazo.store'), $this->payload(TipoReemplazo::REPOSO_MUTUALIDAD))
+            ->assertRedirect(route('funcionario.solicitudes-reemplazo.index'))->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('solicitudes_reemplazo', [
+            'anio' => 2026, 'correlativo' => 21, 'numero_solicitud' => '00021-2026', 'estado' => 'pendiente_uatp',
+        ]);
     }
 
     public function test_creation_prepares_whatsapp_after_request_and_hours_inside_transaction(): void

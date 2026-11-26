@@ -32,7 +32,10 @@ class CoordinarEscrituraPadron
         // Excepción heredada: este GET regenera el archivo y actualiza la solicitud.
         $regeneratesOrder = $controller === 'App\\Http\\Controllers\\Gestion\\OrdenTrabajoPdfController'
             && in_array($action, ['show', 'download'], true) && $request->boolean('regenerar');
-        if (($request->isMethodSafe() && ! $regeneratesOrder) || ! in_array($controller, $controllers, true)) {
+        $emiteOrdenProrroga = $controller === 'App\\Http\\Controllers\\Gestion\\SolicitudReemplazoProrrogaController'
+            && in_array($action, ['generarOrden', 'generarOrdenCaso'], true);
+        if (($request->isMethodSafe() && ! $regeneratesOrder)
+            || (! $emiteOrdenProrroga && ! in_array($controller, $controllers, true))) {
             return $next($request);
         }
         try {

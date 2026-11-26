@@ -146,8 +146,12 @@ class SolicitudReemplazoProrrogaController extends Controller
 
     public function generarOrden(Request $request, SolicitudReemplazoProrroga $prorroga, OrdenTrabajoPdfService $pdf): RedirectResponse
     {
-        return $this->emitirOrden($request, $pdf, fn () =>
-            SolicitudReemplazoProrroga::query()->lockForUpdate()->findOrFail($prorroga->id));
+        return $this->emitirOrden(
+            $request,
+            $pdf,
+            fn () => SolicitudReemplazoProrroga::query()->lockForUpdate()->findOrFail($prorroga->id),
+            $request->boolean('regenerar'),
+        );
     }
 
     public function generarOrdenCaso(Request $request, int $anio, string $estamento, string $rut, OrdenTrabajoPdfService $pdf): RedirectResponse
@@ -155,17 +159,22 @@ class SolicitudReemplazoProrrogaController extends Controller
         return $this->emitirOrden($request, $pdf, fn () => $this->bloquearOCrearExpediente($anio, $estamento, $rut));
     }
 
-    private function emitirOrden(Request $request, OrdenTrabajoPdfService $pdf, Closure $expedienteBloqueado): RedirectResponse
+    private function emitirOrden(Request $request, OrdenTrabajoPdfService $pdf, Closure $expedienteBloqueado, bool $regenerar = false): RedirectResponse
     {
         $archivoGenerado = null;
         try {
-            $parametros = DB::transaction(function () use ($request, $expedienteBloqueado, $pdf, &$archivoGenerado): array {
+            $parametros = DB::transaction(function () use ($request, $expedienteBloqueado, $pdf, $regenerar, &$archivoGenerado): array {
                 $registro = $expedienteBloqueado();
                 $caso = $this->datosExpediente($registro);
                 $estamento = $caso['estamento'];
                 $parametros = ['anio' => $registro->anio_diciembre, 'estamento' => $estamento, 'rut' => $registro->rut];
-                if ($registro->orden_trabajo_pdf_path && Storage::disk('local')->exists($registro->orden_trabajo_pdf_path)) {
+                $archivoAnterior = $registro->orden_trabajo_pdf_path;
+                if (! $regenerar && $archivoAnterior && Storage::disk('local')->exists($archivoAnterior)) {
                     return $parametros;
+                }
+                $correlativo = $registro->correlativoOrdenTrabajo;
+                if ($regenerar && ! $correlativo) {
+                    throw ValidationException::withMessages(['orden_trabajo' => 'Primero debes emitir la orden de trabajo.']);
                 }
                 $ultimo = $caso['ultimo_reemplazo'];
                 if ($estamento === 'junji' && ! isset($registro->antecedentes['ultimo_reemplazo'])) {
@@ -186,16 +195,19 @@ class SolicitudReemplazoProrrogaController extends Controller
                     throw ValidationException::withMessages(['orden_trabajo' => 'El reemplazante tiene una restricción judicial registrada.']);
                 }
 
-                $numero = OrdenTrabajoCorrelativo::reservar(OrdenTrabajoCorrelativo::PRORROGA, $registro->id)->id;
+                $numero = ($correlativo ?? OrdenTrabajoCorrelativo::reservar(OrdenTrabajoCorrelativo::PRORROGA, $registro->id))->id;
                 $ultimo['desglose'] = $this->servicio->financiamiento($ultimo);
-                $archivoGenerado = $pdf->generarProrroga($registro, $numero, $ultimo, $vigencia, $this->servicio->motivo($estamento));
+                $archivoGenerado = $pdf->generarProrroga($registro, $numero, $ultimo, $vigencia, $this->servicio->motivo($estamento), $regenerar);
                 unset($caso['expediente'], $caso['registrada']);
                 $registro->update([
                     'antecedentes' => $caso,
                     'orden_trabajo_pdf_path' => $archivoGenerado,
-                    'orden_trabajo_emitida_por_id' => $request->user()->id,
-                    'orden_trabajo_emitida_at' => now(),
+                    'orden_trabajo_emitida_por_id' => $correlativo ? $registro->orden_trabajo_emitida_por_id : $request->user()->id,
+                    'orden_trabajo_emitida_at' => $correlativo ? $registro->orden_trabajo_emitida_at : now(),
                 ]);
+                if ($archivoAnterior && $archivoAnterior !== $archivoGenerado) {
+                    DB::afterCommit(fn () => Storage::disk('local')->delete($archivoAnterior));
+                }
 
                 return $parametros;
             });
@@ -207,7 +219,7 @@ class SolicitudReemplazoProrrogaController extends Controller
         }
 
         return redirect()->route('gestion.solicitudes-reemplazo.prorrogas.show', $parametros)
-            ->with('status', 'Orden de trabajo disponible para descargar.');
+            ->with('status', $regenerar ? 'Orden de trabajo regenerada con el mismo número.' : 'Orden de trabajo disponible para descargar.');
     }
 
     public function descargarOrden(SolicitudReemplazoProrroga $prorroga): StreamedResponse
