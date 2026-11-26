@@ -6594,8 +6594,18 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.717',
+    'current_version' => '2026.11.26.718',
     'entries' => [
+        [
+            'version' => '2026.11.26.718',
+            'title' => 'Apertura del detalle con informe de cometido',
+            'summary' => 'Registra la ruta del botón Regenerar PDF para que el detalle de un cometido con informe emitido vuelva a abrir correctamente.',
+            'roles' => ['admin', 'funcionario_ac', 'funcionario_estab'],
+            'items' => [
+                'La regeneración conserva los permisos del trámite y se registra en su historial.',
+            ],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.717',
             'title' => 'Observaciones y devolución de registros CGR',

@@ -1163,6 +1163,10 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
             Route::patch('/{cometido}/gdp/resolucion', [CometidoFuncionarioController::class, 'emitirResolucionGdp'])->middleware('ensure.role:coordinador_gdp|funcionario_slep|admin')->name('gdp.resolucion');
             Route::get('/{cometido}/informe-cometido', [CometidoFuncionarioInformeController::class, 'create'])->middleware('ensure.role:funcionario_estab|funcionario_ac|admin')->name('informe.create');
             Route::post('/{cometido}/informe-cometido', [CometidoFuncionarioInformeController::class, 'store'])->middleware('ensure.role:funcionario_estab|funcionario_ac|admin')->name('informe.store');
+            Route::post('/{cometido}/informe-cometido/regenerar-pdf', [CometidoFuncionarioInformeController::class, 'regenerarPdf'])
+                ->middleware('ensure.role:funcionario_estab|funcionario_ac|admin')
+                ->whereNumber('cometido')
+                ->name('informe.regenerar-pdf');
             Route::patch('/{cometido}/daf/contabilidad-viatico', [CometidoFuncionarioController::class, 'registrarContabilidadViatico'])->middleware('ensure.role:funcionario_daf|admin')->name('daf.contabilidad-viatico');
             Route::patch('/{cometido}/daf/pago-viatico', [CometidoFuncionarioController::class, 'registrarPagoViatico'])->middleware('ensure.role:funcionario_daf|admin')->name('daf.pago-viatico');
             Route::patch('/{cometido}/cerrar', [CometidoFuncionarioController::class, 'cerrar'])->middleware('ensure.role:coordinador_gdp|funcionario_slep|funcionario_daf|admin')->name('cerrar');
