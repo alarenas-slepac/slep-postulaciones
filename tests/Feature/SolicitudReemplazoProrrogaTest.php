@@ -127,12 +127,16 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->post($update, $datos)->assertForbidden();
         $this->post($preview, $datos)->assertForbidden();
 
-        $this->actingAs($gdp)->get($edit)->assertOk()->assertSee('Firma de órdenes de trabajo')->assertSee('Previsualizar PDF');
+        $this->actingAs($gdp)->get($edit)->assertOk()->assertSee('Firma de órdenes de trabajo')
+            ->assertSee('Previsualizar PDF')->assertSee('Imagen de timbre');
         $menu = SlepUiRegistry::menuGroups($gdp, 'coordinador_gdp');
         $seccion = collect(SlepSidebarNavigation::forRole($menu, 'coordinador_gdp', self::RUTA_FIRMA.'edit')['sections'])->firstWhere('key', 'seleccion');
         $this->assertContains(self::RUTA_FIRMA.'edit', array_column($seccion['links'], 'route'));
         $this->from($edit)->post($update, $datos)->assertSessionHasErrors('subrogante.firma');
         $datos['subrogante']['firma'] = UploadedFile::fake()->image('firma-de-prueba.png', 240, 110);
+        $datos['subrogante']['timbre'] = UploadedFile::fake()->create('timbre.pdf', 2, 'application/pdf');
+        $this->post($update, $datos)->assertSessionHasErrors('subrogante.timbre');
+        $datos['subrogante']['timbre'] = UploadedFile::fake()->image('timbre-de-prueba.jpg', 160, 160);
         $vistas = [];
         View::composer('pdf.orden-trabajo-prorroga', function ($vista) use (&$vistas): void {
             $vistas[] = $vista->getData()['firmaOt'];
@@ -141,17 +145,24 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $this->assertStringStartsWith('%PDF', $respuesta->getContent());
         $this->assertSame('Persona subrogante de prueba', $vistas[0]['nombre']);
         $this->assertStringStartsWith('data:image/png;base64,', $vistas[0]['firma']);
+        $this->assertSame('data:image/jpeg;base64,'.base64_encode($datos['subrogante']['timbre']->get()), $vistas[0]['timbre']);
         $this->assertDatabaseMissing('solicitud_reemplazo_configuraciones', ['clave' => SolicitudReemplazoConfiguracion::FIRMA_ORDEN_TRABAJO]);
         $this->assertSame([], Storage::disk('local')->allFiles('reemplazos/firmas-ot'));
 
         $this->post($update, $datos)->assertRedirect($edit)->assertSessionHasNoErrors();
         $subrogante = $firmas->vigente();
         $this->assertSame('Persona subrogante de prueba', $subrogante['nombre']);
-        Storage::disk('local')->assertExists($subrogante['archivo']);
-        unset($datos['subrogante']['firma']);
+        Storage::disk('local')->assertExists([$subrogante['archivo'], $subrogante['archivo_timbre']]);
+        unset($datos['subrogante']['firma'], $datos['subrogante']['timbre']);
         $datos['vigente'] = 'titular';
         $this->post($update, $datos)->assertRedirect($edit)->assertSessionHasNoErrors();
         $this->assertSame($firmas->titularInstitucional(), $firmas->vigente());
+        $this->assertSame($subrogante, $firmas->configuracion()['subrogante']);
+
+        $datos['titular']['timbre'] = UploadedFile::fake()->image('timbre-titular-de-prueba.png', 140, 140);
+        $this->post($update, $datos)->assertRedirect($edit)->assertSessionHasNoErrors();
+        $this->assertNull($firmas->vigente()['archivo']);
+        Storage::disk('local')->assertExists($firmas->vigente()['archivo_timbre']);
         $this->assertSame($subrogante, $firmas->configuracion()['subrogante']);
     }
 
@@ -161,6 +172,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $firmas = app(OrdenTrabajoFirmaService::class);
         $datos = $this->datosFirmaSubrogante();
         $datos['subrogante']['firma'] = UploadedFile::fake()->image('firma-de-prueba.jpg', 300, 80);
+        $datos['subrogante']['timbre'] = UploadedFile::fake()->image('timbre-de-prueba.png', 130, 100);
         $update = route(self::RUTA_FIRMA.'update');
         $this->actingAs($gdp)->post($update, $datos)->assertSessionHasNoErrors();
         $firmante = $firmas->vigente();
@@ -168,18 +180,26 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $id = $this->periodo('99000009K', 1, '2027-01-01', '2027-01-31', ['estado' => 'derivada_slep']);
         $orden = SolicitudReemplazo::findOrFail($id);
         $pdf = app(OrdenTrabajoPdfService::class);
+        $timbres = [];
+        View::composer('pdf.orden-trabajo', function ($vista) use (&$timbres): void {
+            $timbres[] = $vista->getData()['firmaOt']['timbre'];
+        });
+        $timbreOriginal = 'data:image/png;base64,'.base64_encode($datos['subrogante']['timbre']->get());
         $ruta = $pdf->generateAndStore($orden);
         DB::table('solicitudes_reemplazo')->where('id', $id)
             ->update(['orden_trabajo_pdf_path' => $ruta, 'orden_trabajo_firmante' => json_encode($orden->orden_trabajo_firmante), 'estado' => 'aceptada']);
         $this->assertSame($firmante, $orden->orden_trabajo_firmante);
 
         $datos['subrogante']['firma'] = UploadedFile::fake()->image('nueva-firma-de-prueba.png', 400, 120);
+        $datos['subrogante']['timbre'] = UploadedFile::fake()->image('nuevo-timbre-de-prueba.jpg', 135, 90);
         $datos['vigente'] = 'titular';
         $this->post($update, $datos)->assertSessionHasNoErrors();
         $this->assertNotSame($firmante['archivo'], $firmas->configuracion()['subrogante']['archivo']);
-        Storage::disk('local')->assertExists($firmante['archivo']);
+        $this->assertNotSame($firmante['archivo_timbre'], $firmas->configuracion()['subrogante']['archivo_timbre']);
+        Storage::disk('local')->assertExists([$firmante['archivo'], $firmante['archivo_timbre']]);
         $this->assertSame($ruta, $pdf->generateAndStore($orden->fresh()));
         $this->assertSame($firmante, $orden->fresh()->orden_trabajo_firmante);
+        $this->assertSame([$timbreOriginal, $timbreOriginal], $timbres);
     }
 
     private function datosFirmaSubrogante(): array
@@ -373,6 +393,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $gdp = $this->testUser(3, 5);
         $datosFirma = $this->datosFirmaSubrogante();
         $datosFirma['subrogante']['firma'] = UploadedFile::fake()->image('firma-de-prueba.png', 240, 90);
+        $datosFirma['subrogante']['timbre'] = UploadedFile::fake()->image('timbre-de-prueba.png', 150, 180);
         $this->actingAs($gdp)->post(route(self::RUTA_FIRMA.'update'), $datosFirma)->assertSessionHasNoErrors();
         $firmante = app(OrdenTrabajoFirmaService::class)->vigente();
         $funcionario = $this->testUser(1, 4);
@@ -442,7 +463,7 @@ class SolicitudReemplazoProrrogaTest extends IsolatedSecurityTestCase
         $regenerar = route(self::RUTA.'orden-trabajo.generar', $registro);
         $this->actingAs($persona)->post($regenerar, ['regenerar' => 1])->assertForbidden();
         $datosFirma['vigente'] = 'titular';
-        unset($datosFirma['subrogante']['firma']);
+        unset($datosFirma['subrogante']['firma'], $datosFirma['subrogante']['timbre']);
         $this->actingAs($gdp)->post(route(self::RUTA_FIRMA.'update'), $datosFirma)->assertSessionHasNoErrors();
         $this->actingAs($gdp)->get($url)->assertOk()->assertSee('Regenerar orden de trabajo')->assertSee('Descargar OT N° 6281');
         $this->post($regenerar, ['regenerar' => 1])->assertRedirect($url)

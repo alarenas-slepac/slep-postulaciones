@@ -19,6 +19,8 @@ use Throwable;
 
 class OrdenTrabajoFirmaController extends Controller
 {
+    private const IMAGENES = ['firma' => 'archivo', 'timbre' => 'archivo_timbre'];
+
     public function __construct(private readonly OrdenTrabajoFirmaService $firmas) {}
 
     public function edit(): View
@@ -40,13 +42,18 @@ class OrdenTrabajoFirmaController extends Controller
                 );
                 $datos = $this->validar($request, $this->firmas->configuracion($registro));
                 foreach (array_keys(OrdenTrabajoFirmaService::PERFILES) as $perfil) {
-                    if ($imagen = $request->file($perfil.'.firma')) {
+                    foreach (self::IMAGENES as $tipo => $columna) {
+                        $campo = $perfil.'.'.$tipo;
+                        $imagen = $request->file($campo);
+                        if (! $imagen) {
+                            continue;
+                        }
                         $ruta = $imagen->store('reemplazos/firmas-ot', 'local');
                         if (! $ruta) {
-                            throw ValidationException::withMessages([$perfil.'.firma' => 'No se pudo guardar la imagen de firma.']);
+                            throw ValidationException::withMessages([$campo => "No se pudo guardar la imagen de {$tipo}."]);
                         }
                         $archivosNuevos[] = $ruta;
-                        $datos[$perfil]['archivo'] = $ruta;
+                        $datos[$perfil][$columna] = $ruta;
                     }
                 }
                 // Los PDF históricos conservan la referencia al archivo original.
@@ -75,7 +82,7 @@ class OrdenTrabajoFirmaController extends Controller
             'vigencia' => ['desde' => '2027-01-01', 'hasta' => '2027-02-28'],
             'motivo' => 'Vista previa de la firma',
             'inicialesEmisor' => '',
-            'firmaOt' => $this->firmas->paraPdf($datos[$vigente], $request->file($vigente.'.firma')),
+            'firmaOt' => $this->firmas->paraPdf($datos[$vigente], $request->file($vigente.'.firma'), $request->file($vigente.'.timbre')),
         ])->setPaper('letter', 'portrait')->stream('vista-previa-firma-ot.pdf');
         $pdf->headers->set('Cache-Control', 'private, no-store');
 
@@ -89,10 +96,12 @@ class OrdenTrabajoFirmaController extends Controller
         foreach (OrdenTrabajoFirmaService::PERFILES as $perfil => $etiqueta) {
             $reglas[$perfil.'.nombre'] = ['nullable', 'string', 'max:140'];
             $reglas[$perfil.'.cargo'] = ['nullable', 'string', 'max:160'];
-            $reglas[$perfil.'.firma'] = ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048', 'dimensions:max_width=1600,max_height=1200'];
             $atributos[$perfil.'.nombre'] = 'nombre del perfil '.$etiqueta;
             $atributos[$perfil.'.cargo'] = 'cargo del perfil '.$etiqueta;
-            $atributos[$perfil.'.firma'] = 'imagen de firma del perfil '.$etiqueta;
+            foreach (array_keys(self::IMAGENES) as $tipo) {
+                $reglas[$perfil.'.'.$tipo] = ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048', 'dimensions:max_width=1600,max_height=1200'];
+                $atributos[$perfil.'.'.$tipo] = "imagen de {$tipo} del perfil {$etiqueta}";
+            }
         }
         $solicitado = $request->validate($reglas, [], $atributos);
         $vigente = $solicitado['vigente'];
@@ -105,9 +114,11 @@ class OrdenTrabajoFirmaController extends Controller
             $nombre = trim($solicitado[$perfil]['nombre'] ?? '');
             $cargo = trim($solicitado[$perfil]['cargo'] ?? '');
             $nuevaFirma = $request->hasFile($perfil.'.firma');
+            $nuevoTimbre = $request->hasFile($perfil.'.timbre');
             $archivo = mb_strtolower($nombre) === mb_strtolower($actual[$perfil]['nombre']) ? $actual[$perfil]['archivo'] : null;
+            $archivoTimbre = $actual[$perfil]['archivo_timbre'] ?? null;
             $institucional = $perfil === 'titular' && mb_strtolower($nombre) === mb_strtolower($this->firmas->titularInstitucional()['nombre']);
-            if ($perfil === 'titular' || $perfil === $vigente || $nombre !== '' || $cargo !== '' || $nuevaFirma) {
+            if ($perfil === 'titular' || $perfil === $vigente || $nombre !== '' || $cargo !== '' || $nuevaFirma || $nuevoTimbre) {
                 if ($nombre === '') {
                     $errores[$perfil.'.nombre'] = 'Indica el nombre para el perfil '.$etiqueta.'.';
                 }
@@ -117,8 +128,13 @@ class OrdenTrabajoFirmaController extends Controller
                 if (! $nuevaFirma && ($archivo ? ! Storage::disk('local')->exists($archivo) : ! $institucional)) {
                     $errores[$perfil.'.firma'] = 'Carga la firma de esta persona.';
                 }
+                if (! $nuevoTimbre && $archivoTimbre && ! Storage::disk('local')->exists($archivoTimbre)) {
+                    $errores[$perfil.'.timbre'] = 'Vuelve a cargar el timbre de este perfil.';
+                }
+            } else {
+                $archivoTimbre = null;
             }
-            $datos[$perfil] = compact('nombre', 'cargo', 'archivo');
+            $datos[$perfil] = ['nombre' => $nombre, 'cargo' => $cargo, 'archivo' => $archivo, 'archivo_timbre' => $archivoTimbre];
         }
         if ($errores) {
             throw ValidationException::withMessages($errores);

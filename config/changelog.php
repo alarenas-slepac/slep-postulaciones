@@ -6594,8 +6594,15 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.726',
+    'current_version' => '2026.11.26.727',
     'entries' => [
+        [
+            'version' => '2026.11.26.727',
+            'title' => 'Timbre configurable en las órdenes de trabajo',
+            'summary' => 'Permite cargar y previsualizar un timbre para cada perfil de firma. Las órdenes de Reemplazos y Prórrogas usan el timbre del perfil seleccionado al emitirse.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.726',
             'title' => 'Firmas más grandes en las órdenes de trabajo',

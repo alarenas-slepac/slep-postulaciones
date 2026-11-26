@@ -26,6 +26,24 @@
     opacity: 0.95;
 }
 
+.firma-layer .timbre-cargado {
+    position: absolute;
+    top: 18px;
+    left: 0;
+    width: 100%;
+    z-index: 1;
+    opacity: 0.95;
+}
+
+.firma-layer .timbre-cargado img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 132px;
+    max-height: 106px;
+    margin: 0 auto;
+}
+
 /* firma encima del timbre */
 .firma-layer .firma-img {
     position: absolute;

@@ -5,7 +5,11 @@
         </div>
     @elseif ($firmaOt['firma'] || $firmaOt['timbre'])
         <div class="firma-layer">
-            @if ($firmaOt['timbre'])
+            @if ($firmaOt['timbrePersonalizado'])
+                <div class="timbre-cargado">
+                    <img src="{{ $firmaOt['timbre'] }}" alt="Timbre">
+                </div>
+            @elseif ($firmaOt['timbre'])
                 <img class="timbre-img" src="{{ $firmaOt['timbre'] }}" alt="Timbre">
             @endif
 
