@@ -5,6 +5,7 @@
 @endpush
 
 @section('content')
+    @inject('prorrogas', 'App\Services\SolicitudReemplazoProrrogaService')
     @php
         $ruta = 'gestion.solicitudes-reemplazo.prorrogas.';
         $fecha = fn ($valor) => \Carbon\CarbonImmutable::parse($valor)->format('d/m/Y');
@@ -18,6 +19,10 @@
                     <p class="mb-0 slep-listing__muted">Revisa los reemplazos con seis meses de continuidad al último día cubierto en diciembre de {{ $anio }}.</p>
                 </div>
             </div>
+            <a class="slep-listing__button slep-listing__button--secondary"
+                href="{{ route($ruta.'index', array_replace($filtros, ['anio' => $anio, 'estamento' => $estamento, 'exportar' => 1])) }}">
+                <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Descargar nómina Excel
+            </a>
         </header>
 
         @if ($errors->any())
@@ -52,6 +57,17 @@
                             <option value="registrada" @selected(($filtros['estado'] ?? null) === 'registrada')>Registrada</option>
                         </select>
                     </div>
+                    @if ($estamento === 'junji')
+                        <div class="col-md-6">
+                            <label for="prorroga-area" class="form-label">Área de desempeño</label>
+                            <select id="prorroga-area" name="area_id" class="form-select">
+                                <option value="">Todas las áreas</option>
+                                @foreach ($areasJunji as $areaId => $cargo)
+                                    <option value="{{ $areaId }}" @selected((int) ($filtros['area_id'] ?? 0) === (int) $areaId)>{{ $cargo }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                 </div>
                 <div class="slep-listing__filter-actions justify-content-end">
                     <div class="slep-listing__actions">
@@ -67,7 +83,7 @@
         <nav class="slep-listing__actions mb-4" aria-label="Estamentos de reemplazo">
             @foreach ($estamentos as $clave => $etiqueta)
                 <a class="slep-listing__button slep-listing__button--{{ $estamento === $clave ? 'primary' : 'secondary' }}"
-                    href="{{ route($ruta.'index', array_replace($filtros, ['anio' => $anio, 'estamento' => $clave])) }}"
+                    href="{{ route($ruta.'index', array_replace($filtros, ['anio' => $anio, 'estamento' => $clave, 'area_id' => $clave === 'junji' ? ($filtros['area_id'] ?? null) : null])) }}"
                     @if ($estamento === $clave) aria-current="page" @endif>
                     {{ $etiqueta }} · {{ $conteos->get($clave, 0) }}
                 </a>
@@ -78,26 +94,35 @@
             <div class="slep-listing__panel-header"><h2 id="prorroga-resultados">{{ $estamentos[$estamento] }}</h2></div>
             <div class="slep-listing__table-wrap">
                 <table class="slep-listing__table" role="table">
-                    <thead><tr><th scope="col">Reemplazante</th><th scope="col">Establecimientos</th><th scope="col">Continuidad en diciembre</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
+                    <thead><tr><th scope="col">Reemplazante</th><th scope="col">Último establecimiento</th><th scope="col">Continuidad en diciembre</th><th scope="col">Jornada y financiamiento</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
                     <tbody>
                     @forelse ($paginador as $caso)
                         @php
                             $establecimientos = collect($caso['periodos'])->pluck('establecimiento')->filter()->unique();
                             $registrada = isset($caso['registrada']);
+                            $ultimo = $caso['ultimo_reemplazo'];
                         @endphp
                         <tr role="row">
                             <td data-label="Reemplazante"><strong class="slep-listing__person">{{ $caso['nombre'] }}</strong><div>{{ \App\Support\Rut::format($caso['rut']) }}</div></td>
-                            <td data-label="Establecimientos" class="text-break">
-                                {{ $establecimientos->first() ?? 'Sin establecimiento informado' }}
+                            <td data-label="Último establecimiento" class="text-break">
+                                {{ $ultimo['establecimiento'] ?? 'Sin establecimiento informado' }}
+                                @if (! empty($ultimo['cargo']))<div class="small slep-listing__muted">{{ $ultimo['cargo'] }}</div>@endif
                                 @if ($establecimientos->count() > 1)<div class="small slep-listing__muted">{{ $establecimientos->count() }} establecimientos en total</div>@endif
                             </td>
                             <td data-label="Continuidad en diciembre">
                                 {{ $fecha($caso['inicio_continuidad']) }} al {{ $fecha($caso['fecha_corte']) }}
                                 <div class="small slep-listing__muted">{{ count($caso['periodos']) }} períodos de reemplazo</div>
                             </td>
+                            <td data-label="Jornada y financiamiento">
+                                <div>{{ isset($ultimo['horas']) ? number_format($ultimo['horas'], 2, ',', '.').' h' : 'Jornada sin informar' }}</div>
+                                <div class="small slep-listing__muted">{{ $prorrogas->financiamiento($ultimo) ?: 'Financiamiento sin informar' }}</div>
+                            </td>
                             <td data-label="Estado">
                                 <span class="slep-status-pill slep-status-pill--{{ $registrada ? 'success' : 'warning' }}">{{ $registrada ? 'Registrada' : 'Pendiente de revisión' }}</span>
                                 @if ($caso['cobertura'])<div class="small slep-listing__muted mt-1">Tiene cobertura registrada en enero o febrero</div>@endif
+                                @if ($registrada && $caso['registrada']->orden_trabajo_pdf_path)
+                                    <div class="small mt-1">OT N° {{ $caso['registrada']->correlativoOrdenTrabajo?->id }}</div>
+                                @endif
                             </td>
                             <td data-label="Acción">
                                 <a class="slep-listing__button slep-listing__button--secondary" href="{{ route($ruta.'show', ['anio' => $anio, 'estamento' => $estamento, 'rut' => $caso['rut']]) }}"
@@ -105,7 +130,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-center p-4">No hay reemplazos para el estamento, el año y los filtros seleccionados.</td></tr>
+                        <tr><td colspan="6" class="text-center p-4">No hay reemplazos para el estamento, el año y los filtros seleccionados.</td></tr>
                     @endforelse
                     </tbody>
                 </table>

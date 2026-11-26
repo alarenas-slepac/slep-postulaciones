@@ -5,6 +5,7 @@
 @endpush
 
 @section('content')
+    @inject('prorrogas', 'App\Services\SolicitudReemplazoProrrogaService')
     @php
         $ruta = 'gestion.solicitudes-reemplazo.prorrogas.';
         $fecha = fn ($valor) => \Carbon\CarbonImmutable::parse($valor)->format('d/m/Y');
@@ -39,7 +40,7 @@
             </div>
             <div class="slep-listing__table-wrap">
                 <table class="slep-listing__table" role="table">
-                    <thead><tr><th scope="col">Solicitud</th><th scope="col">Establecimiento</th><th scope="col">Inicio efectivo</th><th scope="col">Término vigente</th><th scope="col">Jornada</th></tr></thead>
+                    <thead><tr><th scope="col">Solicitud</th><th scope="col">Establecimiento</th><th scope="col">Inicio efectivo</th><th scope="col">Término vigente</th><th scope="col">Jornada y financiamiento</th></tr></thead>
                     <tbody>
                     @foreach ($caso['periodos'] as $periodo)
                         <tr role="row">
@@ -47,7 +48,10 @@
                             <td data-label="Establecimiento">{{ $periodo['establecimiento'] ?? 'Sin establecimiento informado' }}@if ($periodo['rbd'])<div class="small slep-listing__muted">RBD {{ $periodo['rbd'] }}</div>@endif</td>
                             <td data-label="Inicio efectivo">{{ $fecha($periodo['desde']) }}</td>
                             <td data-label="Término vigente">{{ $fecha($periodo['hasta']) }}</td>
-                            <td data-label="Jornada">{{ $periodo['horas'] === null ? 'Sin información' : number_format($periodo['horas'], 2, ',', '.').' h' }}</td>
+                            <td data-label="Jornada y financiamiento">
+                                {{ isset($periodo['horas']) ? number_format($periodo['horas'], 2, ',', '.').' h' : 'Jornada sin informar' }}
+                                <div class="small slep-listing__muted">{{ $prorrogas->financiamiento($periodo) ?: 'Financiamiento sin informar' }}</div>
+                            </td>
                         </tr>
                     @endforeach
                     </tbody>
@@ -115,6 +119,34 @@
                             </button>
                         </div>
                     </form>
+                @endif
+            </div>
+        </section>
+
+        <section class="slep-listing__panel" aria-labelledby="prorroga-orden">
+            <div class="slep-listing__panel-header"><h2 id="prorroga-orden">Orden de trabajo</h2></div>
+            <div class="slep-listing__filters">
+                @php($ultimo = $caso['ultimo_reemplazo'])
+                <dl class="row mb-3">
+                    <dt class="col-sm-3">Reemplazo de origen</dt><dd class="col-sm-9">{{ $ultimo['solicitud'] ?? 'Sin información' }}</dd>
+                    <dt class="col-sm-3">Establecimiento</dt><dd class="col-sm-9">{{ $ultimo['establecimiento'] ?? 'Sin información' }}</dd>
+                    <dt class="col-sm-3">Área de desempeño</dt><dd class="col-sm-9">{{ $ultimo['cargo'] ?? 'Sin información' }}</dd>
+                    <dt class="col-sm-3">Jornada</dt><dd class="col-sm-9">{{ isset($ultimo['horas']) ? number_format($ultimo['horas'], 2, ',', '.').' h' : 'Sin información' }}</dd>
+                    <dt class="col-sm-3">Financiamiento</dt><dd class="col-sm-9">{{ $prorrogas->financiamiento($ultimo) ?: 'Sin información' }}</dd>
+                    <dt class="col-sm-3">Vigencia de la orden</dt><dd class="col-sm-9">{{ $fecha($vigencia['desde']) }} al {{ $fecha($vigencia['hasta']) }}</dd>
+                    <dt class="col-sm-3">Motivo</dt><dd class="col-sm-9">{{ $prorrogas->motivo($estamento) }}</dd>
+                </dl>
+                @if ($ordenDisponible)
+                    <a class="slep-listing__button slep-listing__button--secondary" href="{{ route($ruta.'orden-trabajo.descargar', $registrada) }}">
+                        <i class="bi bi-download" aria-hidden="true"></i> Descargar OT N° {{ $registrada->correlativoOrdenTrabajo?->id }}
+                    </a>
+                @elseif ($registrada)
+                    <form method="POST" action="{{ route($ruta.'orden-trabajo.generar', $registrada) }}">
+                        @csrf
+                        <button type="submit" class="slep-listing__button slep-listing__button--primary"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Generar orden de trabajo</button>
+                    </form>
+                @else
+                    <p class="mb-0 slep-listing__muted">Registra la resolución para generar la orden de trabajo.</p>
                 @endif
             </div>
         </section>

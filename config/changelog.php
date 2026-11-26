@@ -6594,8 +6594,19 @@ return [
         'impact' => 'Permite corregir rechazos UATP sin crear una solicitud duplicada, manteniendo trazabilidad administrativa y restringiendo la reapertura a roles autorizados.',
     ],
 
-    'current_version' => '2026.11.26.719',
+    'current_version' => '2026.11.26.720',
     'entries' => [
+        [
+            'version' => '2026.11.26.720',
+            'title' => 'Órdenes de trabajo y nóminas de prórrogas',
+            'summary' => 'Genera órdenes desde el último reemplazo, muestra su financiamiento, comparte el correlativo con Reemplazos y exporta una nómina Excel por pestaña.',
+            'roles' => ['admin', 'coordinador_gdp', 'funcionario_slep'],
+            'items' => [
+                'JUNJI acredita continuidad en el mismo establecimiento y genera órdenes sólo para febrero.',
+                'Las órdenes usan la fecha de término real de febrero, incluido el día 29 en años bisiestos.',
+            ],
+            'published_at' => '2026-11-26',
+        ],
         [
             'version' => '2026.11.26.719',
             'title' => 'Prórrogas de reemplazos docentes y AAEE',

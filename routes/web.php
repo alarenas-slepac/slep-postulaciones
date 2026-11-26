@@ -1651,7 +1651,11 @@ Route::middleware(['auth', 'verified', 'ensure.module'])->group(function () {
                 Route::get('/', [SolicitudReemplazoProrrogaController::class, 'index'])->name('index');
                 Route::get('/resoluciones/{prorroga}', [SolicitudReemplazoProrrogaController::class, 'resolucion'])
                     ->whereNumber('prorroga')->name('resolucion');
-                Route::group(['where' => ['anio' => '(?!9999)[1-9][0-9]{3}', 'estamento' => 'docente|aaee', 'rut' => '[1-9][0-9]{0,7}[0-9K]']], function () {
+                Route::post('/ordenes-trabajo/{prorroga}', [SolicitudReemplazoProrrogaController::class, 'generarOrden'])
+                    ->whereNumber('prorroga')->name('orden-trabajo.generar');
+                Route::get('/ordenes-trabajo/{prorroga}', [SolicitudReemplazoProrrogaController::class, 'descargarOrden'])
+                    ->whereNumber('prorroga')->name('orden-trabajo.descargar');
+                Route::group(['where' => ['anio' => '(?!9999)[1-9][0-9]{3}', 'estamento' => 'docente|aaee|junji', 'rut' => '[1-9][0-9]{0,7}[0-9K]']], function () {
                     Route::get('/{anio}/{estamento}/{rut}', [SolicitudReemplazoProrrogaController::class, 'show'])->name('show');
                     Route::post('/{anio}/{estamento}/{rut}', [SolicitudReemplazoProrrogaController::class, 'store'])->name('store');
                 });

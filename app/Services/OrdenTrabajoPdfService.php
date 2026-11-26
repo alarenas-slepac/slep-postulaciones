@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\OrdenTrabajoCorrelativo;
 use App\Models\SolicitudReemplazo;
+use App\Models\SolicitudReemplazoProrroga;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -37,7 +39,13 @@ class OrdenTrabajoPdfService
             'ordenTrabajoCreadaPor',
         ]);
 
-        $otNumero = $this->makeOtNumber($s);
+        $numeroAsignado = OrdenTrabajoCorrelativo::query()
+            ->where('origen', OrdenTrabajoCorrelativo::REEMPLAZO)->where('origen_id', $s->id)->value('id');
+        if ($numeroAsignado === null && ! $s->orden_trabajo_pdf_path
+            && ! in_array($s->estado, ['aceptada', 'cerrado', 'cerrada'], true)) {
+            $numeroAsignado = OrdenTrabajoCorrelativo::reservar(OrdenTrabajoCorrelativo::REEMPLAZO, $s->id)->id;
+        }
+        $otNumero = $this->makeOtNumber($s, $numeroAsignado);
         $safeNumero = preg_replace('/[^0-9A-Za-z\- ]/', '', $otNumero);
         $safeNumero = Str::of($safeNumero)->replace(' ', '_')->__toString();
 
@@ -51,7 +59,9 @@ class OrdenTrabajoPdfService
         $filename = "ORDEN_TRABAJO_{$safeNumero}{$suffix}.pdf";
         $path = "{$dir}/{$filename}";
 
-        Storage::disk('local')->put($path, $pdf->output());
+        if (! Storage::disk('local')->put($path, $pdf->output())) {
+            throw new \RuntimeException('No se pudo guardar la Orden de Trabajo.');
+        }
 
         return $path;
     }
@@ -61,9 +71,9 @@ class OrdenTrabajoPdfService
      * - Si fecha_inicio y fecha_termino son el mismo año: {XXXXX}-{AAAA}
      * - Si abarcan años distintos: {XXXXX}-{AAAA} a {AAAA}-{XXXXX}
      */
-    public function makeOtNumber(SolicitudReemplazo $s): string
+    public function makeOtNumber(SolicitudReemplazo $s, ?int $numeroAsignado = null): string
     {
-        $num = $s->numero_solicitud ?? $s->correlativo ?? $s->id;
+        $num = $numeroAsignado ?? $s->numero_solicitud ?? $s->correlativo ?? $s->id;
         $correl = str_pad((string) (int) $num, 5, '0', STR_PAD_LEFT);
 
         $yIni = $s->fecha_inicio?->format('Y') ?? (string) ($s->anio ?? now()->year);
@@ -74,5 +84,17 @@ class OrdenTrabajoPdfService
         }
 
         return "{$correl}-{$yIni} a {$yFin}-{$correl}";
+    }
+
+    public function generarProrroga(SolicitudReemplazoProrroga $prorroga, int $numero, array $reemplazo, array $vigencia, string $motivo): string
+    {
+        $contenido = Pdf::loadView('pdf.orden-trabajo-prorroga', compact('prorroga', 'numero', 'reemplazo', 'vigencia', 'motivo'))
+            ->setPaper('letter', 'portrait')->output();
+        $ruta = "reemplazos/prorrogas/{$prorroga->anio_diciembre}/orden_trabajo_{$numero}.pdf";
+        if (! Storage::disk('local')->put($ruta, $contenido)) {
+            throw new \RuntimeException('No se pudo guardar la Orden de Trabajo de prórroga.');
+        }
+
+        return $ruta;
     }
 }
